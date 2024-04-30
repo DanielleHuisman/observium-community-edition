@@ -69,6 +69,9 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
   public function testGetDeviceIcon($device, $base_icon, $result)
   {
     $GLOBALS['config']['base_url'] = 'http://localhost';
+    // for device_permitted
+    $device['device_id'] = 98217;
+    $_SESSION['userlevel'] = 7;
     $this->assertSame($result, get_device_icon($device, $base_icon));
   }
 
@@ -80,7 +83,7 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       // by $device['os'] and icon definition
       array(array('os' => 'ios', 'icon' => '', 'sysObjectID' => ''), TRUE, 'cisco'),
       // by $device['os'] and vendor definition
-      array(array('os' => 'cyclades', 'icon' => '', 'sysObjectID' => ''), TRUE, 'emerson'),
+      array(array('os' => 'liebert', 'icon' => '', 'sysObjectID' => ''), TRUE, 'emerson'),
       // by $device['os'] and vendor defined icon
       array(array('os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => ''), TRUE, 'summitd'),
       // by $device['os'] and vendor defined icon
@@ -92,14 +95,15 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       // by $device['os'] and icon in array
       array(array('os' => 'ios', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
       // by all, who win?
-      array(array('os' => 'cyclades', 'distro' => 'RedHat', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
+      array(array('os' => 'liebert', 'distro' => 'RedHat', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
       // unknown
       array(array('os' => 'yohoho', 'icon' => '', 'sysObjectID' => ''), TRUE, 'generic'),
       // empty
       array(array(), TRUE, 'generic'),
       
       // Last, check with img tag
-      array(array('os' => 'ios'), FALSE, '<img src="http://localhost/images/os/cisco.png" srcset="http://localhost/images/os/cisco_2x.png 2x" alt="" />'),
+      array(array('os' => 'ios'),   FALSE, '<img src="http://localhost/images/os/cisco.svg" style="max-height: 32px;" alt="" />'),
+      array(array('os' => 'screenos'), FALSE, '<img src="http://localhost/images/os/juniper-old.png" srcset="http://localhost/images/os/juniper-old_2x.png 2x" alt="" />'),
     );
   }
 

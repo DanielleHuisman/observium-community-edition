@@ -1,0 +1,960 @@
+DC-L2VPN-MIB DEFINITIONS ::= BEGIN
+
+  -- PRODUCT-SHORT-NAME L2VM
+
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Unsigned32,
+    Integer32,
+    TimeTicks
+      FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION,
+    TruthValue,
+    RowStatus
+      FROM SNMPv2-TC
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP
+      FROM SNMPv2-CONF
+
+    MjStatus,
+    SjStatus,
+    AdminStatus,
+    OperStatus,
+    NpgOperStatus,
+    NumericIndex
+      FROM DC-MASTER-TC;
+
+  l2vpnMib MODULE-IDENTITY
+    LAST-UPDATED "201309200000Z" -- Fri Sep 20 00:00:00 GMT 2013
+    ORGANIZATION "Data Connection Ltd."
+    CONTACT-INFO
+                 "Postal: Data Connection Ltd.
+                          100 Church Street
+                          Enfield
+                          EN2 6BQ
+                          United Kingdom
+                  Tel:    +44 20 8366 1177
+                  E-mail: l2vpn@dataconnection.com"
+    DESCRIPTION  "DC-L2VPN Manager MIB."
+    ::= { iso
+          member-body (2)
+          gb (826)
+          national (0)
+          eng-ltd(1)
+          dataConnectionLtd (1578918)
+          adg (5)
+          l2(94)
+          l2vpn(2)
+          1 }
+
+  l2vpnObjects     OBJECT IDENTIFIER ::= { l2vpnMib 1 } -- L2VPN tables
+  l2vpnConformance OBJECT IDENTIFIER ::= { l2vpnMib 2 } -- Module conformance
+
+-------------------------------------------------------------------------------
+--
+-- Textual conventions
+--
+
+  L2vmMjIfId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The type of interface to which a master join applies."
+    SYNTAX      INTEGER {
+                  ifAtgI3(696844288),    -- Interface IF_ATG_I3
+                  ifAtgBdpi(697761792),  -- Interface IF_ATG_BDPI
+                  ifAtgPvpi(1921384448)  -- Interface IF_ATG_PVPI
+                }
+
+  L2vmSjIfId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The type of interface to which a slave join applies."
+    SYNTAX      INTEGER {
+                  ifAtgRpi(1031864320)   -- Interface IF_ATG_QCRP
+                }
+
+  L2vpnADType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Types of auto-discovery protocol that can be used for L2VPNs."
+    SYNTAX      INTEGER {
+                    none (1),       -- All PWs provisioned statically
+                    bgp (2)         -- BGP used to discover L2VPN sites.
+                }
+
+  L2vpnSigType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Types of signaling protocol that can be used for L2VPNs."
+    SYNTAX      INTEGER {
+                    none (1),       -- All PWs provisioned statically
+                    ldp (2),        -- LDP used to signal pseudowires
+                    bgp (3)         -- BGP used to signal pseudowires
+                }
+
+  L2vpnPwBindType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This type represents the different ways to identify a PW that is
+         bound to a VPN."
+    SYNTAX      INTEGER {
+                    pwMibIndex (1), -- The PW(s) are identified by a PW set
+                                    -- index, which corresponds to a set of
+                                    -- PWs explicitly provisioned in the
+                                    -- pwTable with pwRedundancySetId set to
+                                    -- that index.
+                    lclRmtVeId (2)  -- The PW is identified by a local and
+                                    -- remote VE ID
+                }
+
+  L2vpnType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Types of L2VPN."
+    SYNTAX      INTEGER {
+                    none (0),       -- No L2VPN
+                    vpls (1),       -- Virtual Private LAN Service
+                    vpws (2)        -- Virtual Private Wire Service
+                }
+
+  L2vpnSiteId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "An L2VPN site ID."
+    SYNTAX      Unsigned32 (1..4294967295)
+
+  L2vpnVeIdOrZero ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "An L2VPN VE ID."
+    SYNTAX      Unsigned32 (0..4294967295)
+
+  BgpRouteDistinguisher ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Syntax for a route distinguisher. For a complete
+         definition of a route distinguisher, see [RFC4364]."
+    REFERENCE
+        "[RFC4364]"
+    SYNTAX      OCTET STRING(SIZE (8))
+
+  BgpExtendedCommunity ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Syntax for a BGP extended community."
+    REFERENCE
+        "[RFC4364]"
+    SYNTAX      OCTET STRING(SIZE (8))
+
+  BgpRouteTargetType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Used to define the type of a route target usage.
+         Route targets can be specified to be imported,
+         exported, or both.  For a complete definition of a
+         route target, see [RFC4364]."
+    REFERENCE
+      "[RFC4364]"
+    SYNTAX      INTEGER { import(1), export(2), both(3) }
+
+-------------------------------------------------------------------------------
+--
+-- DC-L2VPN Manager Entity Table.
+--
+
+  l2vmEntityTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME L2VM_ENT
+    SYNTAX      SEQUENCE OF L2vmEntityEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "DC-L2VPN Manager Entity Table.
+
+                 This is the top-level MIB for DC-L2VPN Manager.  Each entry
+                 in this table represents a DC-L2VPN Manager entity."
+    ::= { l2vpnObjects 1 }
+
+  l2vmEntityEntry OBJECT-TYPE
+    SYNTAX      L2vmEntityEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry represents a DC-L2VPN Manager entity."
+    INDEX { l2vmEntityIndex }
+    ::= { l2vmEntityTable 1 }
+
+  L2vmEntityEntry ::= SEQUENCE {
+      l2vmEntityIndex                   NumericIndex,
+      l2vmEntityRowStatus               RowStatus,
+      l2vmEntityAdminStatus             AdminStatus,
+      l2vmEntityOperStatus              NpgOperStatus,
+      l2vmEntityVplsIndexNext           NumericIndex,
+      l2vmEntityVpwsIndexNext           NumericIndex,
+      l2vmEntityNbasePriority           Integer32,
+      l2vmEntityTimerGranularity        Integer32,
+      l2vmEntityRestartDuration         TimeTicks,
+      l2vmEntityRescheduleLimit         Integer32,
+      l2vmEntityPvpiBufferPoolSize      Integer32,
+      l2vmEntityRpiBufferPoolSize       Integer32,
+      l2vmEntityRpiFailTimeout          TimeTicks,
+      l2vmEntityRetryInterval           TimeTicks,
+      l2vmEntityVpnNotifEnable          TruthValue,
+      l2vmEntityVpnNotifBufferPoolSize  Integer32,
+      l2vmEntitySupportVpls             TruthValue,
+      l2vmEntityBdpiBufferPoolSize      Integer32
+    }
+
+  l2vmEntityIndex OBJECT-TYPE
+    SYNTAX      NumericIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies a DC-L2VPN Manager entity."
+    ::= { l2vmEntityEntry 1 }
+
+  l2vmEntityRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this DC-L2VPN Manager entity, used to
+                 create and destroy table entries."
+    ::= { l2vmEntityEntry 2 }
+
+  l2vmEntityAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this DC-L2VPN Manager entity,
+                 used to activate and deactivate DC-L2VPN Manager."
+    DEFVAL      { adminStatusUp }
+    ::= { l2vmEntityEntry 3 }
+
+  l2vmEntityOperStatus OBJECT-TYPE
+    SYNTAX      NpgOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this DC-L2VPN Manager
+                 entity."
+    ::= { l2vmEntityEntry 4 }
+
+-- This following object is equivalent to the vplsConfigIndexNext object in
+-- draft-ietf-l2vpn-vpls-mib.
+  l2vmEntityVplsIndexNext OBJECT-TYPE
+    SYNTAX                NumericIndex
+    MAX-ACCESS            read-only
+    STATUS                current
+    DESCRIPTION "This field indicates an appropriate value to be used for
+                 vplsIndex when creating entries in the vplsConfigTable
+                 MIB.  The value 0 indicates that no value can be provided.
+
+                 The Metaswitch implementation returns a value that is
+                 currently available.  The value returned is always one
+                 greater than the highest vplsIndex a vplsConfigTable entry
+                 exists for, or zero if this would not be within the valid
+                 range.  Note however that the next attempt to create a new
+                 entry in the vplsConfigTable with this vplsIndex cannot be
+                 guaranteed to succeed; for example, it may fail because of
+                 memory constraints."
+    ::= { l2vmEntityEntry 5 }
+
+  l2vmEntityVpwsIndexNext OBJECT-TYPE
+    SYNTAX                NumericIndex
+    MAX-ACCESS            read-only
+    STATUS                current
+    DESCRIPTION "This field indicates an appropriate value to be used for
+                 vpwsIndex when creating entries in the vpwsConfigTable
+                 MIB.  The value 0 indicates that no value can be provided.
+
+                 The Metaswitch implementation returns a value that is
+                 currently available.  The value returned is always one
+                 greater than the highest vpwsIndex a vpwsConfigTable entry
+                 exists for, or zero if this would not be within the valid
+                 range.  Note however that the next attempt to create a new
+                 entry in the vpwsConfigTable with this vpwsIndex cannot be
+                 guaranteed to succeed; for example, it may fail because of
+                 memory constraints."
+    ::= { l2vmEntityEntry 6 }
+
+  l2vmEntityNbasePriority OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "N-BASE priority for this DC-L2VPN Manager entity.
+
+                 When multiple N-BASE processes have IPSs queued, then the
+                 supplied N-BASE scheduler prioritizes them according to
+                 the N-BASE priority of the processes involved.  Processes
+                 with higher priority values will be scheduled earlier.
+
+                 This field is not suitable for network administrators."
+    DEFVAL      { 64 }
+    ::= { l2vmEntityEntry 7 }
+
+  l2vmEntityTimerGranularity OBJECT-TYPE
+    SYNTAX      Integer32 (1..1000)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Clustered timer granularity for this DC-L2VPN Manager
+                 entity.
+
+                 Increasing this value reduces the accuracy of clustered
+                 timers, but might reduce the number of OS timer calls,
+                 improving performance.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL { 10 }
+    ::= { l2vmEntityEntry 8 }
+
+  l2vmEntityRestartDuration OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The length of the audit period for the BDPI join after the
+                 entity activates.
+
+                 After a restart, bridge domain information is kept
+                 programmed until the end of the audit period.  Increasing
+                 this value may improve the chance of not deprogramming and
+                 later reprogramming bridge domain state, at the cost of
+                 increasing the amount of time bridge domains and
+                 interfaces that are no longer needed after the restart
+                 remain programmed.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 18000 }
+    ::= { l2vmEntityEntry 9 }
+
+  l2vmEntityRescheduleLimit OBJECT-TYPE
+    SYNTAX      Integer32 (1..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The maximum number of different objects that can be
+                 processed in a single schedule.
+
+                 When subcomponents are scheduled by receipt of an IPS or a
+                 timer pop, that IPS can cause more work than can be
+                 performed in a reasonable time without blocking the
+                 N-BASE.  Subcomponents handle this by breaking off
+                 processing when they hit a processing limit.
+
+                 Higher values increase the processing efficiency of
+                 DC-L2VPN Manager instances, but can cause the scheduler to
+                 be blocked for excessive periods, causing timers to pop
+                 late.  Lower values have the reverse effects.
+
+                 This field is not suitable for network administrators."
+    DEFVAL      { 1000 }
+    ::= { l2vmEntityEntry 10 }
+
+  l2vmEntityPvpiBufferPoolSize OBJECT-TYPE
+    SYNTAX      Integer32 (1..200)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of the PVPI buffer pool.
+
+                 This determines the maximum number of buffers that can
+                 exist at once for the PVPI pool.  DC-L2VPN Manager does
+                 not use pre-allocated pools, so the maximum number of
+                 buffers is also limited by memory availability, and so
+                 this number does not relate directly to memory usage.
+
+                 Buffer pools provide flow control, which is useful in
+                 ensuring efficient operation of the overall system.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 10 }
+    ::= { l2vmEntityEntry 11 }
+
+  l2vmEntityRpiBufferPoolSize OBJECT-TYPE
+    SYNTAX      Integer32 (1..200)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of the RPI buffer pool.  In systems which are not
+                 using BGP auto-discovery there will be no RPI join and
+                 this field has no effect.
+
+                 This determines the maximum number of buffers that can
+                 exist at once for the RPI pool.  DC-L2VPN Manager does not
+                 use pre-allocated pools, so the maximum number of buffers
+                 is also limited by memory availability, and so this number
+                 does not relate directly to memory usage.
+
+                 Buffer pools provide flow control, which is useful in
+                 ensuring efficient operation of the overall system.
+
+                 Setting any of the values to 0 gives infinite capacity
+                 buffer pools.  This allows these pools to take up
+                 arbitrarily large amounts of memory, so is strongly
+                 discouraged.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 10 }
+    ::= { l2vmEntityEntry 12 }
+
+  l2vmEntityRpiFailTimeout OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The length of time route information learned over the RPI
+                 join is retained for after the failure of the join.
+
+                 Increasing this value allows the RPI join more time to
+                 recover before treating the routes learned over the join
+                 as gone, but causes outdated state to remain programmed
+                 for longer.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 3000 }
+    ::= { l2vmEntityEntry 13 }
+
+  l2vmEntityRetryInterval OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The retry interval for resource failures that are retried
+                 on a timer.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 1000 }
+    ::= { l2vmEntityEntry 14 }
+
+  l2vmEntityVpnNotifEnable  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "If this object is set to true(1), then DC-L2VM will emit
+                 VPN-scoped notifications, otherwise DC-L2VM will not emit
+                 VPN-scoped notifications."
+    DEFVAL      { false }
+    ::= { l2vmEntityEntry 15 }
+
+  l2vmEntityVpnNotifBufferPoolSize OBJECT-TYPE
+    SYNTAX      Integer32 (1..200)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of the buffer pool that DC-L2VM uses for VPN-scoped
+                 notifcations.  If this buffer pool is exhausted then DC-L2VM
+                 queues the notifications until more buffers are available.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 10 }
+    ::= { l2vmEntityEntry 16 }
+
+  l2vmEntitySupportVpls OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Whether this DC-L2VPN Manager entity supports VPLSs (in
+                 addition to VPWSs) and VPWSs, or just VPWSs.
+
+                 If this field is set to true, this entity will not go oper
+                 up until a BDPI join is established.  If this field is set
+                 to false, attempts to configure VPLSs and BDPI joins will
+                 be rejected.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { false }
+    ::= { l2vmEntityEntry 17 }
+
+  l2vmEntityBdpiBufferPoolSize OBJECT-TYPE
+    SYNTAX      Integer32 (1..200)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of the BDPI buffer pool.
+
+                 This determines the maximum number of buffers that can
+                 exist at once for the BDPI pool.  DC-L2VPN Manager does
+                 not use pre-allocated pools, so the maximum number of
+                 buffers is also limited by memory availability, and so
+                 this number does not relate directly to memory usage.
+
+                 Buffer pools provide flow control, which is useful in
+                 ensuring efficient operation of the overall system.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-L2VPN Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 10 }
+    ::= { l2vmEntityEntry 18 }
+
+-- End of DC-L2VPN Manager Entity Table.
+
+-------------------------------------------------------------------------------
+--
+-- DC-L2VPN Manager Master Join Table.
+--
+
+  l2vmMjTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME L2VM_MJ
+    SYNTAX      SEQUENCE OF L2vmMjEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "DC-L2VPN Manager Master Join Table.
+
+                 This table controls the master joins that DC-L2VPN Manager
+                 creates with other FTEs.  Each join is represented by a row
+                 in this table.
+
+                 Note: All fields in this MIB must map directly to equivalent
+                 fields in the AMB_AHSL_MJ MIB."
+    ::= { l2vpnObjects 2 }
+
+  l2vmMjEntry OBJECT-TYPE
+    SYNTAX      L2vmMjEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a join for which DC-L2VPN Manager is master."
+    INDEX { l2vmEntityIndex,
+            l2vmMjInterfaceId,
+            l2vmMjPartnerType,
+            l2vmMjPartnerIndex,
+            l2vmMjSubIndex }
+    ::= { l2vmMjTable 1 }
+
+  L2vmMjEntry ::= SEQUENCE {
+      l2vmMjInterfaceId                 L2vmMjIfId,
+      l2vmMjPartnerType                 Unsigned32,
+      l2vmMjPartnerIndex                Unsigned32,
+      l2vmMjSubIndex                    Unsigned32,
+      l2vmMjRowStatus                   RowStatus,
+      l2vmMjAdminStatus                 AdminStatus,
+      l2vmMjOperStatus                  OperStatus,
+      l2vmMjJoinStatus                  MjStatus
+    }
+
+  l2vmMjInterfaceId OBJECT-TYPE
+    SYNTAX      L2vmMjIfId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The interface type of the master join."
+    ::= { l2vmMjEntry 2 }
+
+  l2vmMjPartnerType OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies the type of slave entity to join to.  This can
+                 be used to distinguish between different entity types,
+                 both of whom provide the same interace.  This index is
+                 used in the join user data, to enable FTI-specific code
+                 within System Manager to select a suitable slave entity.
+                 The numeric values for this index are defined by the
+                 particular interface that this join is for - see the
+                 relevant interface header file."
+    ::= { l2vmMjEntry 3 }
+
+  l2vmMjPartnerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies the specific slave entity to join with.  This
+                 index is used in the join user data, to enable
+                 FTI-specific code within System Manager to select a
+                 suitable slave entity."
+    ::= { l2vmMjEntry 4 }
+
+  l2vmMjSubIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Permits multiple joins between the same pair of entities."
+    ::= { l2vmMjEntry 5 }
+
+  l2vmMjRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this master join, used to create and
+                 destroy table entries."
+    ::= { l2vmMjEntry 6 }
+
+  l2vmMjAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this master join, used to
+                 activate and deactivate the join."
+    DEFVAL      { adminStatusUp }
+    ::= { l2vmMjEntry 7 }
+
+  l2vmMjOperStatus OBJECT-TYPE
+    SYNTAX      OperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational state of this master join."
+    ::= { l2vmMjEntry 8 }
+
+  l2vmMjJoinStatus OBJECT-TYPE
+    SYNTAX      MjStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The detailed HAF status of the master join."
+    ::= { l2vmMjEntry 9 }
+
+-- End of DC-L2VPN Manager Master Join Table.
+
+-------------------------------------------------------------------------------
+--
+-- DC-L2VPN Manager Slave Join Table (READ-ONLY).
+--
+
+  l2vmSjTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME L2VM_SJ
+    SYNTAX      SEQUENCE OF L2vmSjEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "DC-L2VPN Manager Slave Join Table (read-only).
+
+                 This table reports the status of DC-L2VPN Manager's slave
+                 joins.  Each join is represented by a row in this table.
+
+                 Note: All fields in this MIB must map directly to equivalent
+                 fields in the AMB_AHSL_SJ MIB."
+    ::= { l2vpnObjects 3 }
+
+  l2vmSjEntry OBJECT-TYPE
+    SYNTAX      L2vmSjEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a join for which DC-L2VPN Manager is slave."
+    INDEX { l2vmEntityIndex,
+            l2vmSjInterfaceId,
+            l2vmSjPartnerType,
+            l2vmSjPartnerIndex,
+            l2vmSjSubIndex }
+    ::= { l2vmSjTable 1 }
+
+  L2vmSjEntry ::= SEQUENCE {
+      l2vmSjInterfaceId                 L2vmSjIfId,
+      l2vmSjPartnerType                 Unsigned32,
+      l2vmSjPartnerIndex                Unsigned32,
+      l2vmSjSubIndex                    Unsigned32,
+      l2vmSjJoinStatus                  SjStatus
+    }
+
+  l2vmSjInterfaceId OBJECT-TYPE
+    SYNTAX      L2vmSjIfId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The interface type of the slave join."
+    ::= { l2vmSjEntry 2 }
+
+  l2vmSjPartnerType OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The join master's entity type.  The numeric values for
+                 this index are defined by the particular interface that
+                 this join is for - see the relevant interface header file."
+    ::= { l2vmSjEntry 3 }
+
+  l2vmSjPartnerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The join master's entity index."
+    ::= { l2vmSjEntry 4 }
+
+  l2vmSjSubIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Permits multiple joins between the same pair of entities."
+    ::= { l2vmSjEntry 5 }
+
+  l2vmSjJoinStatus OBJECT-TYPE
+    SYNTAX      SjStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The detailed HAF status of the slave join."
+    ::= { l2vmSjEntry 6 }
+
+-- End of DC-L2VPN Manager Slave Join Table.
+
+-------------------------------------------------------------------------------
+--
+-- L2VPN BGP Route Target Config Table.
+--
+
+  l2vmBgpRTCfgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L2vmBgpRTCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "L2VPN BGP Route Target Config Table.
+
+                This table specifies the Route Targets that are imported and
+                exported during BGP auto-discovery.
+
+                In BGP auto-discovery each L2VPN instance advertises itself
+                by originating a BGP L2VPN route and discovers other L2VPN
+                instances by importing their BGP L2VPN routes.
+
+                The Route Target configuration controls which L2VPN
+                instances import which BGP L2VPN routes, and so determines
+                which L2VPN instances discover each other and establish
+                pseudowires.
+
+                -  When an L2VPN instance originates a BGP L2VPN route it
+                   includes its export Route Targets as extended community
+                   attributes in the BGP L2VPN route.
+
+                -  When an L2VPN instance receives a BGP L2VPN route it only
+                   imports the route if one of its import Route Targets
+                   matches the received route.
+
+                -  The result is that two L2VPN instances only discover each
+                   other if each exports a Route Target that the other
+                   imports.
+
+                Each L2VPN instance that uses BGP auto-discovery must be
+                configured with at least one Route Target, otherwise it
+                will never discover other L2VPN instances (no import Route
+                Target) and never be discovered by other L2VPN instances
+                (no export Route Target).
+
+                The simplest configuration is for each L2VPN instance to
+                import and export a single Route Target that is unique to
+                the L2VPN that it belongs to.
+
+                This MIB table corresponds to vplsBgpRteTargetTable in
+                draft-ietf-l2vpn-vpls-mib-10, and is also used for
+                configuration of  BGP Route Targets for VPWS instances that
+                are provisioned using the colored-pools method."
+    ::= { l2vpnObjects 4 }
+
+  l2vmBgpRTCfgEntry OBJECT-TYPE
+    SYNTAX      L2vmBgpRTCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a configured Route Target."
+    INDEX { l2vmEntityIndex,
+            l2vmBgpRTCfgVpnType,
+            l2vmBgpRTCfgVpnIndex,
+            l2vmBgpRTCfgIndex }
+    ::= { l2vmBgpRTCfgTable 1 }
+
+  L2vmBgpRTCfgEntry ::= SEQUENCE {
+      l2vmBgpRTCfgVpnType               L2vpnType,
+      l2vmBgpRTCfgVpnIndex              NumericIndex,
+      l2vmBgpRTCfgIndex                 NumericIndex,
+      l2vmBgpRTCfgRowStatus             RowStatus,
+      l2vmBgpRTCfgAdminStatus           AdminStatus,
+      l2vmBgpRTCfgOperStatus            NpgOperStatus,
+      l2vmBgpRTCfgType                  BgpRouteTargetType,
+      l2vmBgpRTCfgRT                    BgpExtendedCommunity
+    }
+
+  l2vmBgpRTCfgVpnType OBJECT-TYPE
+    SYNTAX      L2vpnType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The route target configured in this MIB row applies to the
+                 L2VPN instance whose type is given by this field and whose
+                 instance index is given by l2vmBgpRTCfgVpnIndex."
+    ::= { l2vmBgpRTCfgEntry 2 }
+
+  l2vmBgpRTCfgVpnIndex OBJECT-TYPE
+    SYNTAX      NumericIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The route target configured in this MIB row applies to the
+                 L2VPN instance whose type is given by l2vmBgpRTCfgVpnType
+                 and whose instance index is given by this field.
+
+                 If l2vmBgpRTCfgVpnType is vpls then this field corresponds
+                 to vplsIndex.
+
+                 If l2vmBgpRTCfgVpnType is vpws then this field corresponds
+                 to vpwsIndex."
+    ::= { l2vmBgpRTCfgEntry 3 }
+
+  l2vmBgpRTCfgIndex OBJECT-TYPE
+    SYNTAX      NumericIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "This index identifies a particular route target that is
+                 configured for the L2VPN instance that is identified by
+                 l2vmBgpRTCfgVpnType and l2vmBgpRTCfgVpnIndex.  It allows
+                 multiple route targets to be configured for a single L2VPN
+                 instance."
+    ::= { l2vmBgpRTCfgEntry 4 }
+
+  l2vmBgpRTCfgRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this Route Target Configuration Table
+                 entry, used to create and destroy table entries."
+    ::= { l2vmBgpRTCfgEntry 5 }
+
+  l2vmBgpRTCfgAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this Route Target
+                 Configuration Table entry, used to activate and deactivate
+                 the entry."
+    DEFVAL      { adminStatusUp }
+    ::= { l2vmBgpRTCfgEntry 6 }
+
+  l2vmBgpRTCfgOperStatus OBJECT-TYPE
+    SYNTAX      NpgOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational state of this Route Target
+                 Configuration Table entry."
+    ::= { l2vmBgpRTCfgEntry 7 }
+
+  l2vmBgpRTCfgType OBJECT-TYPE
+    SYNTAX      BgpRouteTargetType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Used to define the type of a route target usage.  Route
+                 targets can be specified to be imported, exported, or
+                 both.  For a complete definition of a route target, see
+                 [RFC4364]."
+    DEFVAL       { both }
+    ::= { l2vmBgpRTCfgEntry 8 }
+
+  l2vmBgpRTCfgRT OBJECT-TYPE
+    SYNTAX      BgpExtendedCommunity
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The route target associated with the L2VPN service.
+
+                 This field must be set to a valid route target value
+                 to activate the Route Target Configuration table entry.
+                 (The default value of zero is not valid).
+
+                 In order to be a valid route target, the first two bytes
+                 of the field must indicate the type of the extended
+                 community.  This should be one of the following.
+                 -  0x0002 to indicate a 2-byte AS-specific route target
+                    extended community.
+                 -  0x0102 to indicate an IPv4-address-specific route
+                    target extended community.
+                 -  0x0202 to indicate a 4-byte AS-specific route target
+                    extended community."
+    DEFVAL      { '0000000000000000'H }
+    ::= { l2vmBgpRTCfgEntry 9 }
+
+-- End of BGP Auto-Discovery Route Target Config Table.
+
+-------------------------------------------------------------------------------
+--
+-- DC-L2VPN Manager module conformance statement
+--
+
+  l2vpnCompliances
+     OBJECT IDENTIFIER ::= { l2vpnConformance 1 }
+
+  l2vpnGroups
+     OBJECT IDENTIFIER ::= { l2vpnConformance 2 }
+
+--
+-- Module compliance is divided into three categories.
+--   -  Support for those objects that configure a DC-L2VPN Manager entity
+--      (framework compliance).
+--   -  Support for those objects that configure BGP auto-discovery parameters
+--      (BGP auto-discovery compliance).
+
+  l2vpnFrameworkCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for configuration
+                 of the DC-L2VPN manager entity only."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         l2vpnFrameworkGroup
+                       }
+    ::= { l2vpnCompliances 1 }
+
+  l2vmBgpADCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for configuration
+                 of the DC-L2VPN manager entity and BGP auto-discovery
+                 parameters."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         l2vpnFrameworkGroup,
+                         l2vmBgpADGroup
+                       }
+    ::= { l2vpnCompliances 2 }
+
+  l2vpnFrameworkGroup OBJECT-GROUP
+    OBJECTS {
+              l2vmEntityRowStatus,
+              l2vmEntityAdminStatus,
+              l2vmEntityOperStatus,
+              l2vmEntityVplsIndexNext,
+              l2vmEntityVpwsIndexNext,
+              l2vmEntityNbasePriority,
+              l2vmEntityTimerGranularity,
+              l2vmEntityRestartDuration,
+              l2vmEntityRescheduleLimit,
+              l2vmEntityPvpiBufferPoolSize,
+              l2vmEntityRpiBufferPoolSize,
+              l2vmEntityRpiFailTimeout,
+              l2vmEntityRetryInterval,
+              l2vmEntityVpnNotifEnable,
+              l2vmEntityVpnNotifBufferPoolSize,
+              l2vmEntitySupportVpls,
+              l2vmEntityBdpiBufferPoolSize,
+              l2vmMjRowStatus,
+              l2vmMjAdminStatus,
+              l2vmMjOperStatus,
+              l2vmMjJoinStatus,
+              l2vmSjJoinStatus
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects relating to configuration of the DC-L2VPN Manager entity."
+    ::= { l2vpnGroups 1 }
+
+  l2vmBgpADGroup OBJECT-GROUP
+    OBJECTS {
+              l2vmBgpRTCfgRowStatus,
+              l2vmBgpRTCfgAdminStatus,
+              l2vmBgpRTCfgOperStatus,
+              l2vmBgpRTCfgType,
+              l2vmBgpRTCfgRT
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects relating to configuration of BGP auto-discovery."
+    ::= { l2vpnGroups 2 }
+
+-------------------------------------------------------------------------------
+
+END

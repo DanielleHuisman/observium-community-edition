@@ -44,6 +44,11 @@ if (!isset($multiplier)) {
     $multiplier = "8";
 }
 
+// Override graphtype colours
+// FIXME - dumb hack, if it's useful extend it and do it properly later
+if(isset($vars['colours_in']) && is_array($config['graph_colours'][$vars['colours_in']])) { $colours_in = $vars['colours_in']; }
+if(isset($vars['colours_out']) && is_array($config['graph_colours'][$vars['colours_out']])) { $colours_out = $vars['colours_out']; }
+
 $rrd_multi = [];
 $stack     = '';
 foreach ($rrd_list as $rrd) {

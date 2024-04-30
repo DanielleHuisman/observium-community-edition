@@ -15,20 +15,30 @@
 chdir(dirname($argv[0]));
 
 // Get options before definitions!
-$options = getopt("o:d");
+$options = getopt("o:dt");
+$cload_time = microtime(TRUE);
 
+if (isset($options['o'])) {
+    // Skip load full definitions, while not required on initial config
+    define('OBS_DEFINITIONS_SKIP', TRUE);
+}
 require_once("includes/observium.inc.php");
 
-if (is_cli()) {
-    if (isset($options['o'])) {
-        // get filtered options
-        get_config_json($options['o']);
-        //print_vars($options);
-    } else {
-        // All config options
-        get_config_json();
-        //print(safe_json_encode($config));
-    }
+if (!is_cli()) {
+    return;
+}
+
+if (isset($options['t'])) {
+    print_cli(OBS_PROCESS_NAME . ' Load time: ' . elapsed_time($cload_time, 4) . PHP_EOL);
+    exit;
+}
+
+if (isset($options['o'])) {
+    // get filtered options
+    get_config_json($options['o']);
+} else {
+    // All config options
+    get_config_json();
 }
 
 // EOF

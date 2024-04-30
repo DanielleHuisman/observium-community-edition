@@ -129,8 +129,7 @@ function discover_ip_address_definition($device, $mib, $entry)
 
 }
 
-function discover_add_ip_address($device, $mib, $entry)
-{
+function discover_add_ip_address($device, $mib, $entry) {
     global $ip_data;
 
     $ip = $entry['ip'];
@@ -232,8 +231,7 @@ function discover_add_ip_address($device, $mib, $entry)
  *
  * @return string|null
  */
-function netmask2cidr($netmask)
-{
+function netmask2cidr($netmask) {
     $addr = Net_IPv4::parseAddress("1.2.3.4/$netmask");
     return is_intnum($addr->bitmask) ? $addr->bitmask : NULL;
 }
@@ -245,8 +243,7 @@ function netmask2cidr($netmask)
  *
  * @return string|null
  */
-function cidr2netmask($cidr)
-{
+function cidr2netmask($cidr) {
     if (!is_intnum($cidr) || $cidr < 0 || $cidr > 32) {
         return NULL;
     }
@@ -295,13 +292,12 @@ function gateway2prefix($ip, $gateway) {
     return 32;
 }
 
-function get_ip_prefix($entry)
-{
+function get_ip_prefix($entry) {
     if (!is_array($entry)) {
-        // Convert ip/prefix string to common array
+        // Convert ip/prefix string to a common array
         $address = $entry;
         $entry   = [];
-        [$entry['ip'], $prefix] = explode('/', $address);
+        [ $entry['ip'], $prefix ] = explode('/', $address);
         if (!safe_empty($prefix)) {
             if (is_numeric($prefix)) {
                 $entry['prefix'] = $prefix;
@@ -348,7 +344,7 @@ function get_ip_prefix($entry)
  *
  * @param string $address IP address string
  *
- * @return mixed IP version or FALSE if passed incorrect address
+ * @return integer|false IP version or FALSE if passed incorrect address
  */
 function get_ip_version($address)
 {
@@ -359,14 +355,14 @@ function get_ip_version($address)
         return FALSE;
     }
 
-    $address_version = FALSE;
     if (preg_match('%^' . OBS_PATTERN_IPV4 . '$%', $address)) {
-        $address_version = 4;
-    } elseif (preg_match('%^' . OBS_PATTERN_IPV6 . '$%i', $address)) {
-        $address_version = 6;
+        return 4;
+    }
+    if (preg_match('%^' . OBS_PATTERN_IPV6 . '$%i', $address)) {
+        return 6;
     }
 
-    return $address_version;
+    return FALSE;
 }
 
 /**
@@ -377,8 +373,7 @@ function get_ip_version($address)
  *
  * @return string|array Compressed address string
  */
-function ip_compress($address, $force = TRUE)
-{
+function ip_compress($address, $force = TRUE) {
 
     // Recursive compress for arrays
     if (is_array($address)) {
@@ -389,9 +384,9 @@ function ip_compress($address, $force = TRUE)
         return $array;
     }
 
-    [$ip, $net] = explode('/', $address);
+    [ $ip, $net ] = explode('/', $address);
     if (get_ip_version($ip) === 6) {
-        $address = Net_IPv6 ::compress($ip, $force);
+        $address = Net_IPv6::compress($ip, $force);
         if (is_numeric($net) && ($net >= 0) && ($net <= 128)) {
             $address .= '/' . $net;
         }
@@ -408,8 +403,7 @@ function ip_compress($address, $force = TRUE)
  *
  * @return string|array Uncompressed address string
  */
-function ip_uncompress($address, $leading_zeros = TRUE)
-{
+function ip_uncompress($address, $leading_zeros = TRUE) {
 
     // Recursive uncompress for arrays
     if (is_array($address)) {
@@ -420,9 +414,9 @@ function ip_uncompress($address, $leading_zeros = TRUE)
         return $array;
     }
 
-    [$ip, $net] = explode('/', $address);
+    [ $ip, $net ] = explode('/', $address);
     if (get_ip_version($ip) === 6) {
-        $address = Net_IPv6 ::uncompress($ip, $leading_zeros);
+        $address = Net_IPv6::uncompress($ip, $leading_zeros);
         if (is_numeric($net) && ($net >= 0) && ($net <= 128)) {
             $address .= '/' . $net;
         }
@@ -440,8 +434,7 @@ function ip_uncompress($address, $leading_zeros = TRUE)
  *
  * @return string Return compressed IP address or __ if IP is empty
  */
-function safe_ip_hostname_key(&$hostname, &$ip = NULL)
-{
+function safe_ip_hostname_key(&$hostname, &$ip = NULL) {
     $hostname = strtolower($hostname);
 
     // Hostname is IP address
@@ -473,8 +466,7 @@ function safe_ip_hostname_key(&$hostname, &$ip = NULL)
  * @return bool Returns TRUE if address is valid, FALSE if not valid.
  */
 // TESTME needs unit testing
-function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
-{
+function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL) {
 
     if (str_contains($ipv4_address, '/')) {
         [$ipv4_address, $ipv4_prefixlen] = explode('/', $ipv4_address);
@@ -482,7 +474,7 @@ function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
     $ip_full = $ipv4_address . '/' . $ipv4_prefixlen;
 
     // False if invalid IPv4 syntax
-    if (strlen((string)$ipv4_prefixlen) &&
+    if (!safe_empty((string)$ipv4_prefixlen) &&
         !preg_match('%^' . OBS_PATTERN_IPV4_NET . '$%', $ip_full)) {
         // Address with prefix
         return FALSE;
@@ -526,12 +518,12 @@ function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
 function is_ipv6_valid($ipv6_address, $ipv6_prefixlen = NULL)
 {
     if (str_contains($ipv6_address, '/')) {
-        [$ipv6_address, $ipv6_prefixlen] = explode('/', $ipv6_address);
+        [ $ipv6_address, $ipv6_prefixlen ] = explode('/', $ipv6_address);
     }
     $ip_full = $ipv6_address . '/' . $ipv6_prefixlen;
 
     // False if invalid IPv6 syntax
-    if (strlen((string)$ipv6_prefixlen) &&
+    if (!safe_empty((string)$ipv6_prefixlen) &&
         !preg_match('%^' . OBS_PATTERN_IPV6_NET . '$%i', $ip_full)) {
         // Address with prefix
         return FALSE;
@@ -588,20 +580,19 @@ function is_ipv6_valid($ipv6_address, $ipv6_prefixlen = NULL)
  *
  * @return string IP type
  */
-function get_ip_type($address)
-{
+function get_ip_type($address) {
     global $config;
 
-    [$ip, $bits] = explode('/', trim($address)); // Remove subnet/mask if exist
+    [ $ip, $bits ] = explode('/', trim($address)); // Remove subnet/mask if exist
 
     $ip_version = get_ip_version($ip);
     switch ($ip_version) {
         case 4:
 
             // Detect IPv4 broadcast
-            if (strlen($bits)) {
-                $ip_parse = Net_IPv4 ::parseAddress($address);
-                if ($ip == $ip_parse -> broadcast && $ip_parse -> bitmask < 31) { // Do not set /31 and /32 as broadcast!
+            if (!safe_empty($bits)) {
+                $ip_parse = Net_IPv4::parseAddress($address);
+                if ($ip == $ip_parse->broadcast && $ip_parse->bitmask < 31) { // Do not set /31 and /32 as broadcast!
                     $ip_type = 'broadcast';
                     break;
                 }
@@ -612,7 +603,7 @@ function get_ip_type($address)
 
             $ip_type = ($ip_version == 4) ? 'unicast' : 'reserved'; // Default for any valid address
             foreach ($config['ip_types'] as $type => $entry) {
-                if (isset($entry['networks']) && match_network($ip, $entry['networks'], TRUE)) {
+                if (isset($entry['networks']) && match_network_first($ip, $entry['networks'])) {
                     // Stop loop if IP founded in networks
                     $ip_type = $type;
                     break;
@@ -661,10 +652,9 @@ function get_ip_type($address)
  *
  * @param string $network Network/IP query string
  *
- * @return array Array with parsed network params
+ * @return array|false Array with parsed network params
  */
-function parse_network($network)
-{
+function parse_network($network) {
     $network = trim($network);
 
     $array = [
@@ -692,7 +682,7 @@ function parse_network($network)
             $array['network']       = $matches['ipv4_network']; // Network with prefix
             $array['query_type']    = 'single';                 // Single IP query
         } else {
-            $address = Net_IPv4 ::parseAddress($matches['ipv4_network']);
+            $address = Net_IPv4::parseAddress($matches['ipv4_network']);
             //print_vars($address);
             $array['prefix']        = $address -> bitmask . '';
             $array['network_start'] = $address -> network;
@@ -711,7 +701,7 @@ function parse_network($network)
             $array['network']       = $matches['ipv6_network']; // Network with prefix
             $array['query_type']    = 'single';                 // Single IP query
         } else {
-            $address = Net_IPv6 ::parseAddress($array['address'], $array['prefix']);
+            $address = Net_IPv6::parseAddress($array['address'], $array['prefix']);
             //print_vars($address);
             $array['network_start'] = $address['start'];
             $array['network_end']   = $address['end'];
@@ -897,8 +887,7 @@ function match_network_first($ip, $nets) {
  *
  * @return string Hex humber
  */
-function binary_to_hex($str)
-{
+function binary_to_hex($str) {
     $hex = '';
     foreach (str_split($str) as $char) {
         $hex .= str_pad(dechex(ord($char)), 2, '0', STR_PAD_LEFT);
@@ -922,8 +911,7 @@ function binary_to_hex($str)
  *
  * @return string IP address or original input string if not contains IP address
  */
-function hex2ip($ip_hex)
-{
+function hex2ip($ip_hex) {
     //$ip = trim($ip_hex, "\"\t\n\r\0\x0B"); // Strange case, cleaned incorrectly
     $ip = trim($ip_hex, "\"\t\n\r\0");
 
@@ -1015,8 +1003,7 @@ function hex2ip($ip_hex)
  *
  * @return string HEX encoded address
  */
-function ip2hex($ip, $separator = ' ')
-{
+function ip2hex($ip, $separator = ' ') {
     $ip_hex = trim($ip, " \"\t\n\r\0\x0B");
 
     switch (get_ip_version($ip_hex)) {
@@ -1028,7 +1015,7 @@ function ip2hex($ip, $separator = ' ')
             break;
 
         case 6: // IPv6
-            $ip_hex   = str_replace(':', '', Net_IPv6 ::uncompress($ip_hex, TRUE));
+            $ip_hex   = str_replace(':', '', ip_uncompress($ip_hex));
             $ip_array = str_split($ip_hex, 2);
             break;
 
@@ -1039,19 +1026,110 @@ function ip2hex($ip, $separator = ' ')
     return implode($separator, $ip_array);
 }
 
+function ip_whois($ip) {
+    global $config;
+
+    // Here common WHOIS info
+    $response = '';
+    if (safe_empty($config['http_proxy']) && is_executable($config['whois'])) {
+        // Use direct whois cmd query (preferred)
+        // NOTE, for now not tested and not supported for KRNIC, ie: 202.30.50.0, 2001:02B8:00A2::
+        $cmd   = $config['whois'] . ' ' . escapeshellarg($ip);
+        $whois = external_exec($cmd);
+
+        if (str_contains($whois, '# start')) {
+            // Some time whois return multiple (ie: whois 8.8.8.8), then use last
+            $multi_whois = explode('# start', $whois);
+            $whois = array_pop($multi_whois);
+        }
+
+        //$response .= "API: WHOIS CMD\n";
+        $org = 0;
+        foreach (explode("\n", $whois) as $line) {
+            if (str_starts_with($line, '# end')) {
+                break;
+            }
+            if (preg_match('/^(\w[\w\s\-\/]+):.*$/', $line, $matches)) {
+                if (in_array($matches[1], [ 'Ref', 'source', 'nic-hdl-br' ])) {
+                    if ($org === 1) {
+                        $response .= PHP_EOL;
+                        $org++;
+                        continue;
+                    }
+                    break;
+                }
+                if (in_array($matches[1], [ 'Organization', 'org', 'mnt-irt' ])) {
+                    $org++; // has org info
+                } elseif (in_array($matches[1], [ 'Comment', 'ResourceLink' ])) {
+                    continue; // skip comments
+                }
+                $response .= $line . PHP_EOL;
+            }
+        }
+
+        return $response;
+    }
+
+    // Use RIPE whois API query
+    $tags = [ 'app' => OBSERVIUM_PRODUCT . '-' . get_unique_id(), 'ip' => $ip ];
+    if (($request = get_http_def('ripe_whois', $tags)) && safe_count($request['data']['records'])) {
+        $whois_parts = [];
+        foreach ($request['data']['records'] as $parts) {
+            $key = $parts[0]['key'];
+
+            if (in_array($key, [ 'NetRange', 'inetnum', 'inet6num' ])) {
+                $org = 0;
+
+                $whois_parts[0] = '';
+                foreach ($parts as $part) {
+                    if (in_array($part['key'], [ 'Ref', 'source', 'nic-hdl-br' ])) {
+                        break;
+                    }
+                    if (in_array($part['key'], [ 'Organization', 'org', 'mnt-irt' ])) {
+                        $org      = 1; // has org info
+                        $org_name = $part['value'];
+                    } elseif ($part['key'] === 'Comment') {
+                        continue; // skip comments
+                    }
+                    $whois_parts[0] .= sprintf('%-16s %s' . PHP_EOL, $part['key'] . ':', $part['value']);
+                }
+
+            } elseif ($org === 1 && $key === 'OrgName' && strpos($org_name, $parts[0]['value']) === 0) {
+
+                $whois_parts[1] = '';
+                foreach ($parts as $part) {
+                    if (in_array($part['key'], [ 'Ref', 'source', 'nic-hdl-br' ])) {
+                        break;
+                    }
+                    if ($part['key'] === 'Comment') {
+                        continue; // skip comments
+                    }
+                    $whois_parts[1] .= sprintf('%-16s %s' . PHP_EOL, $part['key'] . ':', $part['value']);
+                }
+
+                break;
+            }
+        }
+        //array_unshift($whois_parts, "API: HTTP RIPE\n");
+        $response .= implode(PHP_EOL, $whois_parts);
+
+        //print_vars($request['data']['records']);
+    }
+
+    return $response;
+}
+
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function snmp2ipv6($ipv6_snmp)
-{
+function snmp2ipv6($ipv6_snmp) {
     $ipv6 = explode('.', $ipv6_snmp);
 
     // Workaround stupid Microsoft bug in Windows 2008 -- this is fixed length!
     // < fenestro> "because whoever implemented this mib for Microsoft was ignorant of RFC 2578 section 7.7 (2)"
-    if (count($ipv6) == 17 && $ipv6[0] == 16) {
+    if (count($ipv6) === 17 && $ipv6[0] == 16) {
         array_shift($ipv6);
     }
 
-    //for ($i = 0; $i <= 15; $i++) { $ipv6[$i] = zeropad(dechex($ipv6[$i])); }
     $ipv6_2 = [];
     for ($i = 0; $i <= 15; $i += 2) {
         $ipv6_2[] = zeropad(dechex($ipv6[$i])) . zeropad(dechex($ipv6[$i + 1]));
@@ -1062,9 +1140,8 @@ function snmp2ipv6($ipv6_snmp)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function ipv62snmp($ipv6)
-{
-    $ipv6_ex = explode(':', Net_IPv6 ::uncompress($ipv6));
+function ipv62snmp($ipv6) {
+    $ipv6_ex = explode(':', ip_uncompress($ipv6));
     for ($i = 0; $i < 8; $i++) {
         $ipv6_ex[$i] = zeropad($ipv6_ex[$i], 4);
     }

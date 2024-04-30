@@ -13,7 +13,7 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
   */
   public function testProcessSyslogLine($line, $result) {
     // Create fake device array from syslog line
-    list($os) = explode('||', $line, 2);
+    $os = explode('||', $line, 2)[0];
     $device = array('hostname' => $os, 'device_id' => crc32($os), 'os' => $os);
     if (isset($GLOBALS['config']['os'][$os]['os_group'])) {
       $device['os_group'] = $GLOBALS['config']['os'][$os]['os_group'];
@@ -22,7 +22,7 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
 
     // Override device cache for syslog processing:
     $host = $device['hostname'];
-    $dev_cache = array();
+    $dev_cache = [];
     $dev_cache[$host]['lastchecked'] = time();
     $dev_cache[$host]['device_id']  = $device['device_id'];
     $dev_cache[$host]['os']         = $device['os'];
@@ -32,15 +32,13 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
     $GLOBALS['dev_cache'] = $dev_cache;
 
     // Override config syslog filter
-    $GLOBALS['config']['syslog']['filter'] = array('TEST', 'derp');
+    $GLOBALS['config']['syslog']['filter'] = [ 'TEST', 'derp' ];
 
-    if ($tmp = process_syslog_line($line))
-    {
+    if ($tmp = process_syslog_line($line)) {
       // Just custom resort array
-      $entry = array();
-      foreach (array('facility', 'priority', 'level', 'tag', // array('host', 'facility', 'priority', 'level', 'tag',
-                     'program', 'msg', 'msg_orig') as $key)
-      {
+      $entry = [];
+      foreach ([ 'facility', 'priority', 'level', 'tag', // [ 'host', 'facility', 'priority', 'level', 'tag',
+                 'program', 'msg', 'msg_orig' ] as $key) {
         $entry[$key] = $tmp[$key];
       }
     } else {
@@ -53,7 +51,7 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
 
   public function providerProcessSyslogLine()
   {
-    $result = array();
+    $result = [];
     // Linux/Unix
     $result[] = array('linux||9||6||6||CRON[3196]:||2018-03-13 06:25:01|| (root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))||CRON',
                                      array('facility'  => 'cron', 'priority' => '6', 'level' => '6',
@@ -498,6 +496,40 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
                                            'msg'       => 'Member port XGE1/0/33 of aggregation group BAGG33 changed to the inactive state, because the physical state of the port is down.',
                                            'msg_orig'  => 'Member port XGE1/0/33 of aggregation group BAGG33 changed to the inactive state, because the physical state of the port is down.',
                                            ));
+
+        // ArubaOS
+        $result[] = [ 'arubaos||1||6||6||00413||2023-10-11 17:37:28|| SNTP:  Updated time by 4 seconds from server at 192.129.28.2. Previous time was Wed Oct 11 17:37:24 2023. Current time is Wed Oct 11 17:37:28 2023.||00413',
+                      [ 'facility'  => 'user', 'priority' => '6', 'level' => '6',
+                        'tag'       => '00413', 'program' => 'SNTP',
+                        'msg'       => 'Updated time by 4 seconds from server at 192.129.28.2. Previous time was Wed Oct 11 17:37:24 2023. Current time is Wed Oct 11 17:37:28 2023.',
+                        'msg_orig'  => 'SNTP:  Updated time by 4 seconds from server at 192.129.28.2. Previous time was Wed Oct 11 17:37:24 2023. Current time is Wed Oct 11 17:37:28 2023.', ]
+        ];
+        $result[] = [ 'arubaos||1||6||6||00076||2023-10-11 16:13:18|| ports:  port 38 is now on-line||00076',
+                      [ 'facility'  => 'user', 'priority' => '6', 'level' => '6',
+                        'tag'       => '00076', 'program' => 'PORTS',
+                        'msg'       => 'port 38 is now on-line',
+                        'msg_orig'  => 'ports:  port 38 is now on-line', ]
+        ];
+
+        // ArubaOS-CX
+        $result[] = [ 'arubaos-cx||23||6||6||log-proxyd[2872]||2023-10-06 13:50:24||Event|5209|LOG_INFO|AMM|1/5|User !raabc logged in from 10.30.2.245 through SSH session.||log-proxyd',
+                        [ 'facility'  => 'local7', 'priority' => '6', 'level' => '6',
+                          'tag'       => '5209,AMM,1/5', 'program' => 'LOG-PROXYD',
+                          'msg'       => 'User !raabc logged in from 10.30.2.245 through SSH session.',
+                          'msg_orig'  => 'Event|5209|LOG_INFO|AMM|1/5|User !raabc logged in from 10.30.2.245 through SSH session.', ]
+        ];
+        $result[] = [ 'arubaos-cx||23||6||6||lacpd[3920]||2023-02-23 12:26:49||Event|1307|LOG_INFO|UMM|-|LACP system ID set to 08:f1:ea:61:2a:00||lacpd',
+                      [ 'facility'  => 'local7', 'priority' => '6', 'level' => '6',
+                        'tag'       => '1307,UMM', 'program' => 'LACPD',
+                        'msg'       => 'LACP system ID set to 08:f1:ea:61:2a:00',
+                        'msg_orig'  => 'Event|1307|LOG_INFO|UMM|-|LACP system ID set to 08:f1:ea:61:2a:00', ]
+        ];
+        $result[] = [ 'arubaos-cx||23||2||2||crash-tools[3920]||2023-02-23 12:26:49||Event|1206|LOG_CRIT|||Module rebooted. Reason : Reboot requested by user, Version: XL.10.10.1020#012, Boot-ID : fed7f6e9e75f4d95a4fb3b4643f024d5||crash-tools',
+                      [ 'facility'  => 'local7', 'priority' => '2', 'level' => '2',
+                        'tag'       => '1206', 'program' => 'CRASH-TOOLS',
+                        'msg'       => 'Module rebooted. Reason : Reboot requested by user, Version: XL.10.10.1020#012, Boot-ID : fed7f6e9e75f4d95a4fb3b4643f024d5',
+                        'msg_orig'  => 'Event|1206|LOG_CRIT|||Module rebooted. Reason : Reboot requested by user, Version: XL.10.10.1020#012, Boot-ID : fed7f6e9e75f4d95a4fb3b4643f024d5', ]
+        ];
 
     // NS-BSD
     $result[] = array('ns-bsd||user||5||notice||0d||2018-10-16 18:13:05||2018-10-16T18:13:03+02:00 fw.hostname.net tproxyd - - - ﻿id=firewall time=\"2018-10-16 18:13:03\" fw=\"fw.hostname.net\" tz=+0200 startime=\"2018-10-16 18:13:02\" pri=5 proto=http confid=1 slotlevel=2 ruleid=9 rulename=\"16663e6700f_5\" op=GET result=416 user=\"\" domain=\"\" src=192.168.0.148 srcport=59365 srcportname=ephemeral_fw_tcp dst=88.221.145.155 dstport=80 dstportname=http srcmac=54:27:1e:5c:22:bb dstname=2.tlu.dl.delivery.mp.microsoft.com modsrc=192.168.1.2 modsrcport=9619 origdst=88.221.145.155 origdstport=80 ipv=4 sent=484 rcvd=0 duration=0.00 dstcontinent=\"eu\" dstcountry=\"it\" action=block contentpolicy=1 urlruleid=2 cat_site=\"vpnssl_owa\" arg=\"/filestreamingservice/files/5fa99684-8931-4eff-bc5d-27ff2a406a31%3FP1%3D1539706618%26P2%3D402%26P3%3D2%26P4%3DHCvXZchoZYgzbdK0XkO2CelafFHcA%252bUrQcgT5u%252b6WDwtpi5jZJu%252fUjCHpbffRGU5iG8kuHW1C5uQ68drtUWh%252fA%253d%253d\" msg=\"Requested range not satisfiable\" logtype=\"web\"||1',

@@ -13,7 +13,7 @@
 $i = 0;
 
 foreach ($procs as $proc) {
-    $rrd_filename = get_rrd_path($device, "processor-" . $proc['processor_type'] . "-" . $proc['processor_index'] . ".rrd");
+    $rrd_filename = get_rrd_path($device, get_processor_rrd($device, $proc));
 
     if (rrd_is_file($rrd_filename)) {
         $descr = rewrite_entity_name($proc['processor_descr'], 'processor');

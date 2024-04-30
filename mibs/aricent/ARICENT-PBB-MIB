@@ -1,0 +1,776 @@
+-- Copyright (C) 2008-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsdot1ah.mib,v 1.4 2012/09/07 09:52:05 siva Exp $
+
+ARICENT-PBB-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32,Integer32,enterprises
+        FROM SNMPv2-SMI
+    RowStatus, StorageType, MacAddress, TruthValue
+        FROM SNMPv2-TC
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB
+    IEEE8021PbbComponentIdentifier, IEEE8021PbbServiceIdentifier,
+    IEEE8021PbbServiceIdentifierOrUnassigned, IEEE8021PbbIngressEgress
+        FROM IEEE8021-TC-MIB
+    VlanId
+        FROM Q-BRIDGE-MIB
+    InterfaceIndex, InterfaceIndexOrZero, ifIndex
+        FROM IF-MIB
+    MODULE-COMPLIANCE, OBJECT-GROUP
+        FROM SNMPv2-CONF;
+
+fsPbbMib MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com"
+    DESCRIPTION
+        "Initial version published in 802.1ap."
+    REVISION "201209050000Z"
+    DESCRIPTION
+        "Initial version published in 802.1ap."
+    ::= { enterprises  aricent-communication-holding-ltd(29601) iss(2) 14 }
+
+    
+fsPbbNotifications  OBJECT IDENTIFIER ::= { fsPbbMib 0 }
+fsPbbObjects        OBJECT IDENTIFIER ::= { fsPbbMib 1 }
+fsPbbConformance    OBJECT IDENTIFIER ::= { fsPbbMib 2 }
+
+--
+-- 802.1ah MIB Objects
+--
+
+fsPbbProviderBackboneBridge
+    OBJECT IDENTIFIER ::= { fsPbbObjects 1 }
+
+-- ===========================================================
+-- 12.16.1.1/2 Backbone Edge Bridge (BEB) configuration
+-- ===========================================================
+--    items a), b), c), e), and g), see below
+--    d) arBridgeBaseBridgeAddress from IEEE8021-BRIDGE-MIB
+--    f) arBridgeBaseBridgeAddress from IEEE8021-BRIDGE-MIB
+--    i) and j)  ifPhysAddress from the IF-MIB, the correct instance
+--        can be found using arBridgeBasePortIfIndex
+--        from the IEEE8021-BRIDGE-MIB
+-- ===========================================================
+
+fsPbbBackboneEdgeBridgeObjects
+    OBJECT IDENTIFIER ::= { fsPbbProviderBackboneBridge 1 }
+
+fsPbbBackboneEdgeBridgeAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The MAC Address used by the BEB when it must be refered
+         to in a unique fashion."
+    REFERENCE   "IEEE 802.1ah Section 12.16.1.1.3 a)"
+    ::= { fsPbbBackboneEdgeBridgeObjects 1 }
+
+fsPbbBackboneEdgeBridgeName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A text string of locally determined significance.  This value
+         must be persistent over power up restart/reboot."
+    REFERENCE   "IEEE 802.1ah Section 12.16.1.1.3 b), 12.16.1.2.2"
+    ::= { fsPbbBackboneEdgeBridgeObjects 2 }
+
+fsPbbNumberOfIComponents OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of I-components in this BEB."
+    REFERENCE   "IEEE 802.1ah Section 12.16.1.1.3 c)"
+    ::= { fsPbbBackboneEdgeBridgeObjects 3 }
+
+fsPbbNumberOfBComponents OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of B-components in this BEB."
+    REFERENCE   "IEEE 802.1ah Section 12.16.1.1.3 e)"
+    ::= { fsPbbBackboneEdgeBridgeObjects 4 }
+
+fsPbbNumberOfBebPorts OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of CNPs, PIPs, CBPs, and PNPs in this BEB."
+    REFERENCE   "IEEE 802.1ah Section 12.16.1.1.3 g)"
+    ::= { fsPbbBackboneEdgeBridgeObjects 5 }
+
+fsPbbNextAvailablePipIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object provides an available ifIndex value that can
+        be used for creation of a PIP."
+    REFERENCE   "IEEE 802.1ah Section 12.16.4.1/2"
+    ::= { fsPbbBackboneEdgeBridgeObjects 6 }
+
+-- ===========================================================
+-- 12.16.3.1/2 Virtual Instance Port (VIP) configuration table
+-- ===========================================================
+
+fsPbbVipTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbVipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the additional PBB parameters for each
+         VIP.  Entries in this table must be persistent over power
+         up restart/reboot."
+    REFERENCE   "IEEE 802.1ah Section 12.16.3.1/2"
+    ::= { fsPbbProviderBackboneBridge 2 }
+
+fsPbbVipEntry OBJECT-TYPE
+    SYNTAX      FsPbbVipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry consists of the name string, I-SID, Default
+         Destination MAC, Service Type, and possible B-MAC."
+    INDEX       { fsdot1ahContextId,
+                  ifIndex }
+    ::= { fsPbbVipTable 1 }
+
+FsPbbVipEntry ::=
+    SEQUENCE {
+        fsdot1ahContextId          
+            Integer32,
+        fsPbbVipPipIfIndex
+            InterfaceIndexOrZero,
+        fsPbbVipISid
+            IEEE8021PbbServiceIdentifierOrUnassigned,
+        fsPbbVipDefaultDstBMAC
+            MacAddress,
+        fsPbbVipType
+            IEEE8021PbbIngressEgress,
+        fsPbbVipRowStatus
+            RowStatus
+    }
+
+fsdot1ahContextId OBJECT-TYPE
+   SYNTAX       Integer32 (0..65535)
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "Identifies a virtual context."
+   ::= { fsPbbVipEntry 1 }
+
+fsPbbVipPipIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Identifies the PIP associated with this VIP within the BEB.
+         A value of zero indicates the VIP is not currently associated
+         with any PIP.
+
+        The value of this object must be persistent across
+        reinitializations of the management system."
+    DEFVAL      { 0 }
+    ::= { fsPbbVipEntry 2 }
+
+fsPbbVipISid OBJECT-TYPE
+    SYNTAX      IEEE8021PbbServiceIdentifierOrUnassigned
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The I-SID for this VIP.
+
+         Within an I-Component, an VIP can only be serviced
+         by one I-SID. And the ISID is a configurable parameter
+         of the VIP.
+
+        The value of this object must be persistent across
+        reinitializations of the management system."
+    DEFVAL { 1 }
+    ::= { fsPbbVipEntry 3 }
+
+fsPbbVipDefaultDstBMAC OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Default Destination B-MAC for this VIP."
+    DEFVAL { '001e83000001'h }
+    ::= { fsPbbVipEntry 4 }
+
+fsPbbVipType OBJECT-TYPE
+    SYNTAX      IEEE8021PbbIngressEgress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This feature is used to support asymmetic VLANs.
+
+        The value of this object must be persistent across
+        reinitializations of the management system."
+    DEFVAL { 3 }
+    ::= { fsPbbVipEntry 5 }
+
+fsPbbVipRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This indicates the status of an entry in this table, and is
+        used to create/delete entries.
+
+        It is an implementation specific decision as to whether any
+        column in this table may be set while the corresponding
+        instance of this object is valid(1).
+
+        The value of this object must be persistent across
+        reinitializations of the management system."
+    ::= { fsPbbVipEntry 6 }
+
+-- ===========================================================
+-- 12.16.3.1/2 I-SID to VIP cross-reference table
+-- ===========================================================
+
+fsPbbISidToVipTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbISidToVipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains a cross-reference of I-SID values
+         to the VIPs with which they are associated.  This allows
+         VIPs to be located easily by their associated I-SID."
+    REFERENCE   "IEEE 802.1ah Section 12.16.3.1/2"
+    ::= { fsPbbProviderBackboneBridge 3 }
+
+fsPbbISidToVipEntry OBJECT-TYPE
+    SYNTAX      FsPbbISidToVipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A mapping from an I-SID to the VIP whith which it is
+         associated.  An entry will exist for each entry in
+         the fsPbbVipTable."
+    INDEX       { fsPbbISidToVipISid }
+    ::= { fsPbbISidToVipTable 1 }
+
+FsPbbISidToVipEntry ::=
+    SEQUENCE {
+        fsPbbISidToVipISid
+            IEEE8021PbbServiceIdentifier,
+        fsPbbISidToVipComponentId
+            IEEE8021PbbComponentIdentifier,
+        fsPbbISidToVipPort
+            InterfaceIndex
+    }
+
+fsPbbISidToVipISid OBJECT-TYPE
+    SYNTAX      IEEE8021PbbServiceIdentifier
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The I-SID of a VIP."
+    ::= { fsPbbISidToVipEntry 1 }
+
+fsPbbISidToVipComponentId OBJECT-TYPE
+    SYNTAX      IEEE8021PbbComponentIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The component identifier of the VIP to which this I-SID
+        is associated."
+    ::= { fsPbbISidToVipEntry 2 }
+
+fsPbbISidToVipPort OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The port number of the VIP to which this I-SID is associated."
+    ::= { fsPbbISidToVipEntry 3 }
+
+-- ===========================================================
+-- 12.16.4.1/2 Provider Instance Port (PIP) configuration
+--             table
+-- ===========================================================
+
+fsPbbPipTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbPipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains the parameters for each PIP, and
+         can be used to configure the PIP port names. An entry 
+         in this table is internally created and made active 
+         once a PIP is created from if mib itself Entries
+         in this table must be persistent over power up
+         restart/reboot."
+    REFERENCE   "IEEE 802.1ah Section 12.16.4.1/2"
+    ::= { fsPbbProviderBackboneBridge 4 }
+
+fsPbbPipEntry OBJECT-TYPE
+    SYNTAX      FsPbbPipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The parameters for a PIP.   "
+    INDEX       { fsPbbPipIfIndex }
+    ::= { fsPbbPipTable 1 }
+
+FsPbbPipEntry ::=
+    SEQUENCE {
+        fsPbbPipIfIndex
+            InterfaceIndex,
+        fsPbbPipBMACAddress
+            MacAddress,
+        fsPbbPipName
+            SnmpAdminString,
+        fsPbbPipIComponentId
+            IEEE8021PbbComponentIdentifier,
+        fsPbbPipRowStatus
+            RowStatus
+    }
+
+fsPbbPipIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The number identifying the PIP."
+    ::= { fsPbbPipEntry 1 }
+
+fsPbbPipBMACAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The B-MAC used by this PIP for the B-SA."
+    ::= { fsPbbPipEntry 2 }
+
+fsPbbPipName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE(0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A text string of local significance which identifies the
+         PIP within a BEB."
+    DEFVAL { ''H }
+    ::= { fsPbbPipEntry 3 }
+
+fsPbbPipIComponentId OBJECT-TYPE
+    SYNTAX      IEEE8021PbbComponentIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Identifies the I-component associated with this PIP."
+    ::= { fsPbbPipEntry 4 }
+
+fsPbbPipRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the status of an entry in this table, and is used
+        to fetch the status of PIP entries.
+
+        An entry in this table is internally created and made active o
+        nce a PIP is created from if mib itself"
+    ::= { fsPbbPipEntry 5 }
+
+-- ===========================================================
+-- 12.16.4.3/4 Virtual Instance Port (VIP) to Provider
+--             Instance Port (PIP) mapping table
+-- ===========================================================
+
+fsPbbVipToPipMappingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbVipToPipMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists VIPs and the PIP to which each is
+         associated, and allows the PIP associated with each
+         VIP to be configured.  Entries in this table must be
+         persistent over power up restart/reboot."
+    REFERENCE   "IEEE 802.1ah Section 12.16.4.3/4"
+    ::= { fsPbbProviderBackboneBridge 5 }
+
+fsPbbVipToPipMappingEntry OBJECT-TYPE
+    SYNTAX      FsPbbVipToPipMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "The index ifindex in the table is specifed as VIP's
+          interface index."
+    INDEX       { fsdot1ahContextId,
+                  ifIndex }
+    ::= { fsPbbVipToPipMappingTable 1 }
+
+FsPbbVipToPipMappingEntry ::=
+    SEQUENCE {
+        fsPbbVipToPipMappingPipIfIndex
+            InterfaceIndex,
+        fsPbbVipToPipMappingStorageType
+            StorageType,
+        fsPbbVipToPipMappingRowStatus
+            RowStatus
+    }
+
+fsPbbVipToPipMappingPipIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The PIP's interface number."
+    ::= { fsPbbVipToPipMappingEntry 1 }
+
+fsPbbVipToPipMappingStorageType OBJECT-TYPE
+    SYNTAX      StorageType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the storage type of this entry.  An entry whose
+        storage type is permanent(4) need not allow write access to
+        other columns in that entry."
+    ::= { fsPbbVipToPipMappingEntry 2 }
+
+fsPbbVipToPipMappingRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the status of an entry in this table, and is used
+        to create/delete entries.
+
+        The corresponding instance of fsPbbVipToPipMappingPipIfIndex
+        must be set before this object can be made active(1).
+
+        The corresponding instance of fsPbbVipToPipMappingPipIfIndex
+        may not be changed while this object is active(1)."
+    ::= { fsPbbVipToPipMappingEntry 3 }
+
+-- ===========================================================
+-- 12.16.5.1/2 Service Mapping configuration table
+-- ===========================================================
+
+fsPbbCBPServiceMappingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbCBPServiceMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The CBP table of I-SID values (6.11).  The contents of this
+         table are not persistent over power up restart/reboot."
+    REFERENCE   "IEEE 802.1ah Section 12.16.5.1/2"
+    ::= { fsPbbProviderBackboneBridge 6 }
+
+fsPbbCBPServiceMappingEntry OBJECT-TYPE
+    SYNTAX      FsPbbCBPServiceMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry includes the B-VID to carry and optionally an
+         I-SID for mapping I-SIDs normally used at a Peer E-NNI
+         (6.11, 26.6.2).  The table is indexed by the component ID 
+         of the relevant B-Component of the PBB, the Bridge port
+         number of the CBP on that Bcomponent, and the I-SID for 
+         the service. "
+    INDEX       { fsdot1ahContextId,
+                  ifIndex,
+                  fsPbbCBPServiceMappingBackboneSid }
+    ::= { fsPbbCBPServiceMappingTable 1 }
+
+FsPbbCBPServiceMappingEntry ::=
+    SEQUENCE {
+        fsPbbCBPServiceMappingBackboneSid
+            IEEE8021PbbServiceIdentifier,
+        fsPbbCBPServiceMappingBVid
+            VlanId,
+        fsPbbCBPServiceMappingDefaultBackboneDest
+            MacAddress,
+        fsPbbCBPServiceMappingType
+            IEEE8021PbbIngressEgress,
+        fsPbbCBPServiceMappingLocalSid
+            IEEE8021PbbServiceIdentifierOrUnassigned,
+        fsPbbCBPServiceMappingRowStatus
+            RowStatus
+    }
+
+fsPbbCBPServiceMappingBackboneSid OBJECT-TYPE
+    SYNTAX      IEEE8021PbbServiceIdentifier
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The I-SID value used between the PIP and CBP."
+    ::= { fsPbbCBPServiceMappingEntry 1 }
+
+fsPbbCBPServiceMappingBVid OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The B-VID which will carry this service instance."
+    ::= { fsPbbCBPServiceMappingEntry 2 }
+
+fsPbbCBPServiceMappingDefaultBackboneDest OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A default destination B-MAC for the CBP to use."
+    ::= { fsPbbCBPServiceMappingEntry 3 }
+
+fsPbbCBPServiceMappingType OBJECT-TYPE
+    SYNTAX      IEEE8021PbbIngressEgress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Used for Pt-MPt service where ingress or egress limiting
+         is desired."
+    ::= { fsPbbCBPServiceMappingEntry 4 }
+
+fsPbbCBPServiceMappingLocalSid OBJECT-TYPE
+    SYNTAX      IEEE8021PbbServiceIdentifierOrUnassigned
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The I-SID which will be transmitted over the PBBN."
+    DEFVAL { 1 }
+    ::= { fsPbbCBPServiceMappingEntry 5 }
+
+fsPbbCBPServiceMappingRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the status of an entry in this table, and is used
+        to create/delete entries."
+    ::= { fsPbbCBPServiceMappingEntry 6 }
+
+-- ===========================================================
+-- CBP port creation/deletion table
+-- ===========================================================
+
+fsPbbCbpTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbCbpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table is used to fetch the status of Customer
+        Backbone Ports in a PBB.
+
+        Entries in this table must be persistent across reinitializations
+        of the management system."
+    ::= { fsPbbProviderBackboneBridge 7 }
+
+fsPbbCbpEntry OBJECT-TYPE
+    SYNTAX      FsPbbCbpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry representing a dynamically created CBP in a PBB."
+    INDEX       { fsdot1ahContextId,
+                  ifIndex }
+    ::= { fsPbbCbpTable 1 }
+
+FsPbbCbpEntry ::=
+    SEQUENCE {
+        fsPbbCbpRowStatus
+            RowStatus
+    }
+
+fsPbbCbpRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object is used for fetching the status of  entries in
+        this table. It will be internally set to active once a CBP
+        is created using the if mib."
+    ::= { fsPbbCbpEntry 1 }
+
+
+-- ===========================================================
+-- PIP to VIP Mapping table 
+-- ===========================================================
+
+fsPbbPipToVipMappingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbPipToVipMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table provides list of VIPs for a given PIP"
+    ::= { fsPbbProviderBackboneBridge 8 }
+
+
+fsPbbPipToVipMappingEntry OBJECT-TYPE
+    SYNTAX      FsPbbPipToVipMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "Gives PIP to VIP mapping where both are index to the table
+            and mapping status is stored to specify if a VIP maps to a PIP or not"
+    INDEX       { fsdot1ahContextId,
+                  fsPbbPipIfIndex,ifIndex}
+    ::= { fsPbbPipToVipMappingTable 1 }
+
+FsPbbPipToVipMappingEntry ::=
+    SEQUENCE {
+        fsPbbPipToVipMappingStatus
+            TruthValue
+    }
+
+fsPbbPipToVipMappingStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "PIP to VIP mapping status. True specifies that the given VIP maps to a PIP.
+        This mib object always returns True."
+    ::= { fsPbbPipToVipMappingEntry 1 }
+
+
+
+-- =============================================================
+-- Conformance Information
+-- =============================================================
+
+fsPbbGroups
+    OBJECT IDENTIFIER ::= { fsPbbConformance 1 }
+fsPbbCompliances
+    OBJECT IDENTIFIER ::= { fsPbbConformance 2 }
+
+-- =============================================================
+-- Units of conformance
+-- =============================================================
+
+fsPbbBackboneEdgeBridgeGroup OBJECT-GROUP
+    OBJECTS {
+        fsPbbBackboneEdgeBridgeAddress,
+        fsPbbBackboneEdgeBridgeName,
+        fsPbbNumberOfIComponents,
+        fsPbbNumberOfBComponents,
+        fsPbbNumberOfBebPorts
+    }
+    STATUS      current
+    DESCRIPTION
+        "The collection of objects used to represent a Backbone
+         Edge Bridge."
+    ::= { fsPbbGroups 1 }
+
+fsPbbVipGroup OBJECT-GROUP
+    OBJECTS {
+        fsPbbVipPipIfIndex,
+        fsPbbVipISid,
+        fsPbbVipDefaultDstBMAC,
+        fsPbbVipType,
+        fsPbbVipRowStatus,
+        fsPbbISidToVipComponentId,
+        fsPbbISidToVipPort
+    }
+    STATUS      current
+    DESCRIPTION
+        "The collection of objects used to represent a Virtual
+         Instance Port (VIP)."
+    ::= { fsPbbGroups 2 }
+
+fsPbbPipGroup OBJECT-GROUP
+    OBJECTS {
+        fsPbbNextAvailablePipIfIndex,
+        fsPbbPipBMACAddress,
+        fsPbbPipName,
+        fsPbbPipIComponentId,
+        fsPbbPipRowStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "The collection of objects used to represent a Provider
+         Instance Port (PIP)."
+    ::= { fsPbbGroups 3 }
+
+fsPbbVipToPipMappingGroup OBJECT-GROUP
+    OBJECTS {
+        fsPbbVipToPipMappingPipIfIndex,
+        fsPbbVipToPipMappingStorageType,
+        fsPbbVipToPipMappingRowStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "The collection of objects used to represent the mapping
+         of a VIP to a PIP."
+    ::= { fsPbbGroups 4 }
+
+fsPbbCBPServiceMappingGroup OBJECT-GROUP
+    OBJECTS {
+        fsPbbCBPServiceMappingBVid,
+        fsPbbCBPServiceMappingDefaultBackboneDest,
+        fsPbbCBPServiceMappingType,
+        fsPbbCBPServiceMappingLocalSid,
+        fsPbbCBPServiceMappingRowStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "The collection of objects used to represent a service instance."
+    ::= { fsPbbGroups 5 }
+
+fsPbbDynamicCbpGroup OBJECT-GROUP
+    OBJECTS {
+        fsPbbCbpRowStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "The collection of objects used to dynamically create/delete
+        CBPs in a PBB."
+    ::= { fsPbbGroups 6 }
+
+-- =============================================================
+-- Compliance statements
+-- =============================================================
+
+fsPbbCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for devices supporting Provider
+         Backbone Bridging as defined in IEEE 802.1ah."
+    MODULE
+        MANDATORY-GROUPS {
+            fsPbbBackboneEdgeBridgeGroup,
+            fsPbbVipGroup,
+            fsPbbPipGroup,
+            fsPbbVipToPipMappingGroup,
+            fsPbbCBPServiceMappingGroup,
+            fsPbbDynamicCbpGroup
+        }
+
+    OBJECT fsPbbPipName
+    MIN-ACCESS read-only
+    DESCRIPTION
+        "Read-write access for this object is not required."
+
+    OBJECT fsPbbVipToPipMappingPipIfIndex
+    MIN-ACCESS read-only
+    DESCRIPTION
+        "Read-write access for this object is not required."
+
+    OBJECT fsPbbCBPServiceMappingBVid
+    MIN-ACCESS not-accessible
+    DESCRIPTION
+        "Read-only and read-write access for this object are optional."
+
+    OBJECT fsPbbCBPServiceMappingDefaultBackboneDest
+    MIN-ACCESS not-accessible
+    DESCRIPTION
+        "Read-only and read-write access for this object are optional."
+
+    OBJECT fsPbbCBPServiceMappingLocalSid
+    MIN-ACCESS not-accessible
+    DESCRIPTION
+        "Read-only and read-write access for this object are optional."
+
+    ::= { fsPbbCompliances 1 }
+
+END
+
+

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -613,7 +613,7 @@ function check_autodiscovery($hostname, $ip = NULL)
             //  break;
             default:
                 // All other reasons check last_checked_unixtime not more than 24 hours
-                $interval = $config['time']['now'] - $db_entry['last_checked_unixtime'];
+                $interval = get_time() - $db_entry['last_checked_unixtime'];
                 if ($interval <= $config['autodiscovery']['recheck_interval']) {
                     $interval         = format_uptime($interval);
                     $recheck_interval = format_uptime($config['autodiscovery']['recheck_interval']);
@@ -675,8 +675,7 @@ function get_autodiscovery_entry($hostname, $ip = NULL, $exclude_device_id = NUL
 }
 
 // Note return numeric device_id if already found, if not found: FALSE (for cached results) or NULL for not cached
-function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL)
-{
+function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL) {
     global $cache;
 
     $ip_type = get_ip_type($ip);
@@ -869,8 +868,7 @@ function discover_device($device, $options = NULL)
 
         include("includes/discovery/$module.inc.php");
 
-        $m_end                                    = utime();
-        $GLOBALS['module_stats'][$module]['time'] = round($m_end - $m_start, 4);
+        $GLOBALS['module_stats'][$module]['time'] = elapsed_time($m_start, 4);
         print_module_stats($device, $module);
         echo(PHP_EOL);
         //print_cli_heading("Module End: %R".$module."");
@@ -1146,9 +1144,44 @@ function discover_app($device, $type, $instance = NULL)
  *
  * @return array
  */
-function discover_fetch_oids($device, $mib, $def, $table_oids)
-{
-    $array = [];
+function discover_fetch_oids($device, $mib, $def, $table_oids) {
+
+    // Individual indexes (not sure how unify for all entities)
+    $entity_get  = isset($GLOBALS['config']['mibs'][$mib]['sensors_walk']) && !$GLOBALS['config']['mibs'][$mib]['sensors_walk'];
+    $indexes_get = isset($def['indexes']) && ($entity_get || $def['type'] === 'static' || $def['type'] === 'indexes'); // type static for processors
+    $oids_walk   = (isset($def['table_walk']) && !$def['table_walk']) || !isset($def['table']);
+
+    if ($indexes_get) {
+        // Get separate Oids by snmpget for cases, when device have troubles with walking (ie FIREBRICK-MIB)
+
+        $array = fetch_def_oids_indexes($device, $mib, $def, $table_oids);
+
+    } elseif ($oids_walk) {
+        // Walk individual OIDs separately
+
+        $array = fetch_def_oids_walks($device, $mib, $def, $table_oids);
+
+    } else {
+        // Walk the whole table
+        $flags = get_def_snmp_flags($def);
+        $array = snmp_cache_table($device, $def['table'], [], $mib, NULL, $flags);
+        // Append oid_extra
+        if (isset($def['oid_extra']) && in_array('oid_extra', $table_oids, TRUE)) {
+            foreach ((array)$def['oid_extra'] as $get_oid) {
+                $array = snmp_cache_table($device, $get_oid, $array, $mib, NULL, $flags);
+            }
+        }
+    }
+
+    // Populate entPhysical using the value of supplied oid_entPhysicalIndex.
+    // Will populate with values from entPhysicalContainedIn if entPhysical_parent set.
+    fetch_def_oids_entphysical($device, $def, $array);
+
+    print_debug_vars($array);
+    return $array;
+}
+
+function get_def_snmp_flags($def) {
     // SNMP flags
     $flags = OBS_SNMP_ALL_NUMERIC_INDEX | OBS_SNMP_DISPLAY_HINT | OBS_SNMP_CONCAT;
     // Allow custom definition flags
@@ -1157,139 +1190,269 @@ function discover_fetch_oids($device, $mib, $def, $table_oids)
             // If table output is used, exclude numeric index
             $flags ^= OBS_SNMP_NUMERIC_INDEX;
         }
-        $flags |= $def['snmp_flags'];
-    } else {
-        // Force UTF decode?
-        //$flags = $flags | OBS_SNMP_HEX | OBS_DECODE_UTF8;
+        return $flags | $def['snmp_flags'];
+    }
+    // Force UTF decode?
+    //$flags = $flags | OBS_SNMP_HEX | OBS_DECODE_UTF8;
+
+    return $flags;
+}
+
+function fetch_def_oids_indexes($device, $mib, $def, $table_oids) {
+    // Get separate Oids by snmpget for cases, when device have troubles with walking (ie FIREBRICK-MIB)
+
+    // Create a list of required Oids
+    $get_oids = [];
+    foreach ($table_oids as $table_oid) {
+        if (isset($def[$table_oid])) {
+            // See WIPIPE-MIB
+            $oids_tmp = ($table_oid === 'oids') ? array_keys($def[$table_oid]) : (array)$def[$table_oid];
+            //$get_oids = array_merge($get_oids, $oids_tmp);
+            $get_oids[] = $oids_tmp;
+        }
+    }
+    $get_oids = array_merge([], ...$get_oids);
+    unset($oids_tmp);
+
+    // Get individual Oids
+    $i = 0;
+    $array = [];
+    foreach (array_keys($def['indexes']) as $index) {
+        $get_oid = implode(".$index ", $get_oids) . ".$index"; // Generate multi get list of indexed oids
+        $array   = snmp_get_multi_oid($device, $get_oid, $array, $mib, NULL, get_def_snmp_flags($def));
+
+        if ($i === 0 && !snmp_status()) {
+            break;
+        } // break on first index loop of incorrect answer
+        $i++;
     }
 
-    $indexes_get = isset($def['indexes']) &&
-                   isset($GLOBALS['config']['mibs'][$mib]['sensors_walk']) &&
-                   !$GLOBALS['config']['mibs'][$mib]['sensors_walk'];
-    $oids_walk   = (isset($def['table_walk']) && !$def['table_walk']) || !isset($def['table']);
-    if ($indexes_get) {
-        // Get separate Oids by snmpget for cases, when device have troubles with walking (ie FIREBRICK-MIB)
+    return $array;
+}
 
-        // Create list of required Oids
-        $get_oids = [];
-        foreach ($table_oids as $table_oid) {
-            if (isset($def[$table_oid])) {
-                // See WIPIPE-MIB
-                $oids_tmp = ($table_oid === 'oids') ? array_keys($def[$table_oid]) : (array)$def[$table_oid];
-                //$get_oids = array_merge($get_oids, $oids_tmp);
-                $get_oids[] = $oids_tmp;
-            }
-        }
-        $get_oids = array_merge([], ...$get_oids);
-        unset($oids_tmp);
+function fetch_def_oids_walks($device, $mib, $def, $table_oids) {
+    // Walk individual OIDs separately
 
-        // Get individual Oids
-        $i = 0;
-        foreach (array_keys($def['indexes']) as $index) {
-            $get_oid = implode(".$index ", $get_oids) . ".$index"; // Generate multi get list of indexed oids
-            $array   = snmp_get_multi_oid($device, $get_oid, $array, $mib, NULL, $flags);
-
-            if ($i === 0 && !snmp_status()) {
-                break;
-            } // break on first index loop if incorrect answer
-            $i++;
-        }
-    } elseif ($oids_walk) {
-        // Walk individual OIDs separately
-
-        foreach ($table_oids as $table_oid) {
-            if (isset($def[$table_oid])) {
-                $oids_tmp = ($table_oid === 'oids') ? array_keys($def[$table_oid]) : (array)$def[$table_oid];
-                foreach ($oids_tmp as $get_oid) {
-                    // Do not walk limit/unit/scale oids with passed indexes (they should be fetched by get)
-                    if (str_contains_array($table_oid, ['limit', 'unit', 'scale', 'total', 'count']) && str_contains($get_oid, '.')) {
-                        continue;
-                    }
-
-                    $array = snmp_cache_table($device, $get_oid, $array, $mib, NULL, $flags);
-                    //print_vars($array);
+    $flags = get_def_snmp_flags($def);
+    $array = [];
+    foreach ($table_oids as $table_oid) {
+        if (isset($def[$table_oid])) {
+            $oids_tmp = ($table_oid === 'oids') ? array_keys($def[$table_oid]) : (array)$def[$table_oid];
+            foreach ($oids_tmp as $get_oid) {
+                // Do not walk limit/unit/scale oids with passed indexes (they should be fetched by get)
+                if (str_contains_array($table_oid, [ 'limit', 'unit', 'scale', 'total', 'count' ]) && str_contains($get_oid, '.')) {
+                    continue;
                 }
-            }
-        }
-        unset($oids_tmp);
-    } else {
-        // Walk whole table
-        $array = snmp_cache_table($device, $def['table'], $array, $mib, NULL, $flags);
-        // Append oid_extra
-        if (isset($def['oid_extra']) && in_array('oid_extra', $table_oids)) {
-            foreach ((array)$def['oid_extra'] as $get_oid) {
+
                 $array = snmp_cache_table($device, $get_oid, $array, $mib, NULL, $flags);
+                //print_vars($array);
             }
         }
     }
 
-    // Populate entPhysical using value of supplied oid_entPhysicalIndex.
-    // Will populate with values from entPhysicalContainedIn if entPhysical_parent set.
-    if (isset($def['oid_entPhysicalIndex']) || isset($def['entPhysicalIndex'])) {
+    return $array;
+}
+
+function fetch_def_oids_entphysical($device, $def, &$array) {
+
+    if (!isset($def['oid_entPhysicalIndex']) && !isset($def['entPhysicalIndex'])) {
+        return;
+    }
+
+    $oids_tmp = [];
+
+    // Fetch entPhysicalIndex by defined oid or just use tag, mostly common is %index%
+    $use_oid = isset($def['oid_entPhysicalIndex']);
+
+    foreach ($array as $index => $array_tmp) {
+        // Get entPhysicalIndex
+        if ($use_oid) {
+            $entPhysicalIndex = $array_tmp[$def['oid_entPhysicalIndex']] ?? NULL;
+        } else {
+            $array_tmp['index'] = $index;
+            $entPhysicalIndex   = array_tag_replace($array_tmp, $def['entPhysicalIndex']);
+        }
+
+        if (is_numeric($entPhysicalIndex)) {
+            if (isset($def['entPhysical_parent']) && $def['entPhysical_parent']) {
+                $oidlist = [ 'entPhysicalContainedIn' ];
+            } else {
+                $oidlist = [ 'entPhysicalContainedIn', 'entPhysicalDescr', 'entPhysicalAlias', 'entPhysicalName' ];
+            }
+
+            foreach ($oidlist as $oid_tmp) {
+                $oids_tmp[] = $oid_tmp . '.' . $entPhysicalIndex;
+            }
+        }
+    }
+
+    $entPhysicalTable = snmp_get_multi_oid($device, $oids_tmp, [], 'ENTITY-MIB');
+
+    foreach ($array as $index => $array_tmp) {
+        // Get entPhysicalIndex
+        if ($use_oid) {
+            $entPhysicalIndex = $array_tmp[$def['oid_entPhysicalIndex']] ?? NULL;
+        } else {
+            $array_tmp['index'] = $index;
+            $entPhysicalIndex   = array_tag_replace($array_tmp, $def['entPhysicalIndex']);
+        }
+
+        if (is_array($entPhysicalTable[$entPhysicalIndex])) {
+            $array[$index] = array_merge($array_tmp, $entPhysicalTable[$entPhysicalIndex]);
+        }
+    }
+
+    if (isset($def['entPhysical_parent']) && $def['entPhysical_parent']) {
         $oids_tmp = [];
 
-        // Fetch entPhysicalIndex by defined oid or just use tag, mostly common is %index%
-        $use_oid = isset($def['oid_entPhysicalIndex']);
-
-        foreach ($array as $index => $array_tmp) {
-            // Get entPhysicalIndex
-            if ($use_oid) {
-                $entPhysicalIndex = isset($array_tmp[$def['oid_entPhysicalIndex']]) ? $array_tmp[$def['oid_entPhysicalIndex']] : NULL;
-            } else {
-                $array_tmp['index'] = $index;
-                $entPhysicalIndex   = array_tag_replace($array_tmp, $def['entPhysicalIndex']);
-            }
-
-            if (is_numeric($entPhysicalIndex)) {
-                if (isset($def['entPhysical_parent']) && $def['entPhysical_parent']) {
-                    $oidlist = ['entPhysicalContainedIn'];
-                } else {
-                    $oidlist = ['entPhysicalContainedIn', 'entPhysicalDescr', 'entPhysicalAlias', 'entPhysicalName'];
-                }
-
-                foreach ($oidlist as $oid_tmp) {
-                    $oids_tmp[] = $oid_tmp . '.' . $entPhysicalIndex;
-                }
+        foreach ($entPhysicalTable as $entPhysicalIndex => $entPhysicalEntry) {
+            foreach (['entPhysicalDescr', 'entPhysicalAlias', 'entPhysicalName'] as $oid_tmp) {
+                $oids_tmp[] = $oid_tmp . '.' . $entPhysicalEntry['entPhysicalContainedIn'];
             }
         }
-
-        $entPhysicalTable = snmp_get_multi_oid($device, $oids_tmp, [], 'ENTITY-MIB');
+        $entPhysicalTable = snmp_get_multi_oid($device, $oids_tmp, $entPhysicalTable, 'ENTITY-MIB');
 
         foreach ($array as $index => $array_tmp) {
-            // Get entPhysicalIndex
-            if ($use_oid) {
-                $entPhysicalIndex = isset($array_tmp[$def['oid_entPhysicalIndex']]) ? $array_tmp[$def['oid_entPhysicalIndex']] : NULL;
-            } else {
-                $array_tmp['index'] = $index;
-                $entPhysicalIndex   = array_tag_replace($array_tmp, $def['entPhysicalIndex']);
-            }
-
-            if (is_array($entPhysicalTable[$entPhysicalIndex])) {
-                $array[$index] = array_merge($array[$index], $entPhysicalTable[$entPhysicalIndex]);
-            }
-        }
-
-        if (isset($def['entPhysical_parent']) && $def['entPhysical_parent']) {
-            $oids_tmp = [];
-
-            foreach ($entPhysicalTable as $entPhysicalIndex => $entPhysicalEntry) {
-                foreach (['entPhysicalDescr', 'entPhysicalAlias', 'entPhysicalName'] as $oid_tmp) {
-                    $oids_tmp[] = $oid_tmp . '.' . $entPhysicalEntry['entPhysicalContainedIn'];
-                }
-            }
-            $entPhysicalTable = snmp_get_multi_oid($device, $oids_tmp, $entPhysicalTable, 'ENTITY-MIB');
-
-            foreach ($array as $index => $array_tmp) {
-                if (is_array($entPhysicalTable[$array_tmp['entPhysicalContainedIn']])) {
-                    $array[$index] = array_merge($array[$index], $entPhysicalTable[$array_tmp['entPhysicalContainedIn']]);
-                }
+            if (is_array($entPhysicalTable[$array_tmp['entPhysicalContainedIn']])) {
+                $array[$index] = array_merge($array_tmp, $entPhysicalTable[$array_tmp['entPhysicalContainedIn']]);
             }
         }
     }
-    // End entPhysical
+}
 
-    print_debug_vars($array);
-    return $array;
+function fetch_oids_lldp_addr($device, &$lldp_array) {
+    if (empty($lldp_array)) {
+        return;
+    }
+
+    // lldpRemManAddrTable
+    // Case 1:
+    // LLDP-MIB::lldpRemManAddrSubtype.120.30001.1582.1.4.10.133.3.10 = INTEGER: ipV4(1)
+    // LLDP-MIB::lldpRemManAddr.120.30001.1582.1.4.10.133.3.10 = Hex-STRING: 0A 85 03 0A
+    // LLDP-MIB::lldpRemManAddrIfSubtype.120.30001.1582.1.4.10.133.3.10 = INTEGER: ifIndex(2)
+    // LLDP-MIB::lldpRemManAddrIfId.120.30001.1582.1.4.10.133.3.10 = INTEGER: 2009
+    // LLDP-MIB::lldpRemManAddrOID.120.30001.1582.1.4.10.133.3.10 = OID: SNMPv2-SMI::zeroDotZero.0
+    // Case 2:
+    // LLDP-MIB::lldpRemManAddrIfSubtype.1173570000.129.2.1.4.10.0.10.5 = INTEGER: unknown(1)
+    // LLDP-MIB::lldpRemManAddrIfSubtype.1173834000.4.6.0.6.132.181.156.89.235.128 = INTEGER: unknown(1)
+    // LLDP-MIB::lldpRemManAddrIfId.1173570000.129.2.1.4.10.0.10.5 = INTEGER: 0
+    // LLDP-MIB::lldpRemManAddrIfId.1173834000.4.6.0.6.132.181.156.89.235.128 = INTEGER: 0
+    // LLDP-MIB::lldpRemManAddrOID.1173570000.129.2.1.4.10.0.10.5 = OID: SNMPv2-SMI::enterprises.14823.2.2.1.2.1.1
+    // LLDP-MIB::lldpRemManAddrOID.1173834000.4.6.0.6.132.181.156.89.235.128 = OID: SNMPv2-SMI::enterprises.14823.2.2.1.2.1.7
+    // Case 3:
+    // LLDP-MIB::lldpRemManAddrIfId.0.2.1.1.4.10.137.41.4 = INTEGER: 0
+    // LLDP-MIB::lldpRemManAddrIfId.0.3.1.1.4.10.137.41.57 = INTEGER: 2009
+    // LLDP-MIB::lldpRemManAddrIfId.0.47.1.1.4.10.137.41.19 = INTEGER: 2009
+    // LLDP-MIB::lldpRemManAddrIfId.0.49.3.1.4.10.129.2.171 = INTEGER: 34
+    // LLDP-MIB::lldpRemManAddrIfId.0.49.3.2.16.42.2.32.40.255.0.0.0.0.0.0.1.0.0.1.113 = INTEGER: 34
+    // LLDP-MIB::lldpRemManAddrIfId.0.49.4.1.4.10.129.2.171 = INTEGER: 19
+    // LLDP-MIB::lldpRemManAddrIfId.0.49.4.2.16.42.2.32.40.255.0.0.0.0.0.0.1.0.0.1.113 = INTEGER: 19
+    // LLDP-MIB::lldpRemManAddrIfId.0.53.2.1.4.10.129.2.171 = INTEGER: 23
+    // LLDP-MIB::lldpRemManAddrIfId.0.53.2.2.16.42.2.32.40.255.0.0.0.0.0.0.1.0.0.1.113 = INTEGER: 23
+    // Case 4:
+    // LLDP-MIB::lldpRemManAddrSubtype.22 = INTEGER: ipV4(1)
+    // LLDP-MIB::lldpRemManAddrSubtype.86 = INTEGER: ipV6(2)
+    // LLDP-MIB::lldpRemManAddr.22 = STRING: "10.31.0.2"
+    // LLDP-MIB::lldpRemManAddr.86 = STRING: "fe80::d6ca:6dff:fe8e:8b3f"
+    // Case 5 (multiple IP addresses):
+    // lldpRemManAddrIfId.31300.2.2.1.4.192.168.13.1 = 5
+    // lldpRemManAddrIfId.31300.2.2.2.16.32.1.4.112.0.40.11.253.0.0.0.0.0.0.0.0 = 5
+    // lldpRemManAddrIfId.31300.2.2.2.16.254.128.0.0.0.0.0.0.198.173.52.255.254.216.108.126 = 5
+    $lldp_addr = snmpwalk_cache_oid($device, 'lldpRemManAddrIfId', [], "LLDP-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+    $lldp_addr = snmpwalk_cache_oid($device, 'lldpRemManAddr', $lldp_addr, "LLDP-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+
+    foreach ($lldp_addr as $index => $entry) {
+        if (isset($lldp_array[$index])) {
+            $lldp_array[$index] = array_merge($lldp_array[$index], $entry);
+            if (isset($entry['lldpRemManAddr'])) {
+                $addr = hex2ip($entry['lldpRemManAddr']);
+                $lldp_array[$index]['lldpRemMan'][$addr] = $entry; // For multiple entries
+            }
+            continue;
+        }
+        $index_array = explode('.', $index);
+        // LLDP index
+        $lldpRemTimeMark     = array_shift($index_array);
+        $lldpRemLocalPortNum = array_shift($index_array);
+        $lldpRemIndex        = array_shift($index_array);
+        $lldp_index          = "$lldpRemTimeMark.$lldpRemLocalPortNum.$lldpRemIndex";
+        if (!isset($lldp_array[$lldp_index])) {
+            continue;
+        }
+        $lldp_array[$lldp_index] = array_merge($lldp_array[$lldp_index], $entry);
+
+        // Already exist Oid, just merge
+        // if (isset($entry['lldpRemManAddr'])) {
+        //   continue;
+        // }
+
+        // Convert from index part
+        $lldpAddressFamily = array_shift($index_array);
+        if ($lldpAddressFamily == 1 && safe_count($index_array) === 4) {
+            // Incorrect indexes
+            // lldpRemManAddrIfId.7800.28.1.1.10.99.0.10 = 2
+            // lldpRemManAddrIfId.32900.4.1.2.42.14.17.6 = 2
+            $len = 4;
+        } else {
+            $len = array_shift($index_array);
+        }
+        $addr = implode('.', $index_array);
+        if (isset($entry['lldpRemManAddr'])) {
+            // Already exist Oid, just merge
+            $addr = hex2ip($entry['lldpRemManAddr']);
+            //continue;
+        } elseif ($lldpAddressFamily == 1 || $len == 4) {
+            // IPv4, ie: 4.10.129.2.171
+            $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
+        } elseif ($lldpAddressFamily == 2 || $len == 16) {
+            // IPv6, ie: 16.42.2.32.40.255.0.0.0.0.0.0.1.0.0.1.113
+            $addr = snmp2ipv6($addr);
+            $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
+        } elseif ($lldpAddressFamily == 0 && $len == 6) {
+            // Hrm, I really not know what is this, ie, seems as MAC address:
+            // 6 132.181.156.89.235.128 84:B5:9C:59:EB:80
+            continue;
+        }
+        $lldp_array[$lldp_index]['lldpRemMan'][$addr] = $entry; // For multiple entries
+    }
+
+    // Clean IP, select best
+    foreach ($lldp_array as $lldp_index => $lldp) {
+        if (!isset($lldp['lldpRemMan'])) {
+            continue;
+        }
+        $lldp['lldpRemMan'] = array_keys($lldp['lldpRemMan']);
+        if (safe_count($lldp['lldpRemMan']) > 1) {
+            // Multiple IP addresses.. detect best?
+            foreach ($lldp['lldpRemMan'] as $addr) {
+                $addr_version = get_ip_version($addr);
+                $addr_type = get_ip_type($addr);
+                if (in_array($addr_type, [ 'unspecified', 'loopback', 'reserved', 'multicast' ])) {
+                    continue;
+                }
+                if ($addr_version == 6 && $addr_type === 'link-local') {
+                    continue;
+                }
+                if ($addr_type === 'unicast') {
+                    // Prefer IPv4/IPv6 unicast
+                    $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
+                    break;
+                }
+                if ($addr_version == 4) {
+                    // Than prefer IPv4
+                    $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
+                    break;
+                }
+                $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
+            }
+            print_debug("Multiple remote IP addresses detect, selected: $addr");
+            print_debug_vars($lldp);
+        }
+        $lldp_array[$lldp_index]['lldpRemMan'] = $lldp['lldpRemMan'];
+        if (isset($lldp_array[$lldp_index]['lldpRemManAddr'])) {
+            $lldp_array[$lldp_index]['lldpRemManAddr'] = hex2ip($lldp_array[$lldp_index]['lldpRemManAddr']);
+        }
+    }
 }
 
 // DOCME needs phpdoc block
@@ -1342,7 +1505,7 @@ function discover_neighbour($port, $protocol, $neighbour)
         print_debug("Local port unknown, skip neighbour.");
         return NULL;
     } //elseif (is_bad_xdp($neighbour['remote_hostname'], $neighbour['remote_platform']) || empty($neighbour['remote_hostname']))
-    elseif (!strlen($neighbour['remote_hostname']) || is_bad_xdp($neighbour['remote_hostname'])) {
+    if (safe_empty($neighbour['remote_hostname']) || is_bad_xdp($neighbour['remote_hostname'])) {
         // Note in neighbour discovery, ignore only hostname!
         print_debug("Hostname ignored, skip neighbour.");
         return NULL;
@@ -1358,7 +1521,7 @@ function discover_neighbour($port, $protocol, $neighbour)
     $neighbour['active']   = '1';
 
     // Get the remote device id if we've not been told it
-    if (isset($neighbour['remote_port_id']) && !isset($neighbour['remote_device_id'])) {
+    if (isset($neighbour['remote_port_id']) && safe_empty($neighbour['remote_device_id'])) {
         $neighbour['remote_device_id'] = get_device_id_by_port_id($neighbour['remote_port_id']);
     }
 
@@ -1498,84 +1661,6 @@ function discover_storage(&$valid, $device, $storage_index, $storage_type, $stor
         $GLOBALS['module_stats']['storage']['ignored']++;
     }
     $valid[$storage_mib][$storage_index] = $storage_descr;
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// FIXME don't pass valid, use this as a global variable
-function discover_processor(&$valid, $device, $processor_oid, $processor_index, $processor_type, $processor_descr, $processor_precision = 1, $value = NULL, $entPhysicalIndex = NULL, $hrDeviceIndex = NULL, $processor_returns_idle = 0)
-{
-
-    print_debug($device['device_id'] . " -> $processor_oid, $processor_index, $processor_type, $processor_descr, $processor_precision, $value, $entPhysicalIndex, $hrDeviceIndex");
-
-    // Check processor ignore filters
-    if (entity_descr_check($processor_descr, 'processor')) {
-        return FALSE;
-    }
-    //foreach ($config['ignore_processor'] as $bi)        { if (strcasecmp($bi, $processor_descr) == 0)   { print_debug("Skipped by equals: $bi, $processor_descr "); return FALSE; } }
-    //foreach ($config['ignore_processor_string'] as $bi) { if (stripos($processor_descr, $bi) !== FALSE) { print_debug("Skipped by strpos: $bi, $processor_descr "); return FALSE; } }
-    //foreach ($config['ignore_processor_regexp'] as $bi) { if (preg_match($bi, $processor_descr) > 0)    { print_debug("Skipped by regexp: $bi, $processor_descr "); return FALSE; } }
-
-    // Skip discovery processor if value not numeric or null(default)
-    if ($value !== NULL) {
-        $value = snmp_fix_numeric($value);
-    } // Remove unnecessary spaces
-    if (!(is_numeric($value) || $value === NULL)) {
-        print_debug("Skipped by not numeric value: $value, $processor_descr ");
-        return FALSE;
-    }
-
-    $params = ['processor_index', 'entPhysicalIndex', 'hrDeviceIndex', 'processor_oid', 'processor_type', 'processor_descr', 'processor_precision', 'processor_returns_idle'];
-    //$params_state = array('processor_usage');
-
-    $processor_db = dbFetchRow("SELECT * FROM `processors` WHERE `device_id` = ? AND `processor_index` = ? AND `processor_type` = ?", [$device['device_id'], $processor_index, $processor_type]);
-    if (!isset($processor_db['processor_id'])) {
-        $update = ['device_id' => $device['device_id']];
-        if (!$processor_precision) {
-            $processor_precision = 1;
-        }
-        foreach ($params as $param) {
-            $update[$param] = ($$param === NULL ? ['NULL'] : $$param);
-        }
-
-        if ($processor_precision != 1) {
-            $value = round(float_div($value, $processor_precision), 2);
-        }
-        // The OID returns idle value, so we subtract it from 100.
-        if ($processor_returns_idle) {
-            $value = 100 - $value;
-        }
-
-        $update['processor_usage'] = $value;
-        $id                        = dbInsert($update, 'processors');
-
-        $GLOBALS['module_stats']['processors']['added']++; //echo('+');
-        log_event("Processor added: index $processor_index, type $processor_type, descr $processor_descr", $device, 'processor', $id);
-    } else {
-        $update = [];
-        foreach ($params as $param) {
-            if ($$param != $processor_db[$param]) {
-                $update[$param] = ($$param === NULL ? ['NULL'] : $$param);
-            }
-        }
-
-        // Skip WMI processor description update, this is done in poller
-        if (isset($update['processor_descr']) && $processor_type === 'hr' &&
-            ($update['processor_descr'] === 'Unknown Processor Type' || $update['processor_descr'] === 'Intel') &&
-            is_module_enabled($device, 'wmi', 'poller')) {
-            unset($update['processor_descr']);
-        }
-
-        if (count($update)) {
-            dbUpdate($update, 'processors', '`processor_id` = ?', [$processor_db['processor_id']]);
-            $GLOBALS['module_stats']['processors']['updated']++; //echo('U');
-            log_event("Processor updated: index $processor_index, mib $processor_type, descr $processor_descr", $device, 'processor', $processor_db['processor_id']);
-        } else {
-            $GLOBALS['module_stats']['processors']['unchanged']++; //echo('.');
-        }
-    }
-
-    $valid[$processor_type][$processor_index] = 1;
 }
 
 // DOCME needs phpdoc block
@@ -1748,22 +1833,21 @@ function check_valid_printer_supplies($device)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function discover_inventory($device, $index, $inventory_tmp, $mib)
-{
+function discover_inventory($device, $index, $inventory_tmp, $mib) {
     $entPhysical_oids = [
-      'entPhysicalDescr', 'entPhysicalClass', 'entPhysicalName', 'entPhysicalHardwareRev',
-      'entPhysicalFirmwareRev', 'entPhysicalSoftwareRev', 'entPhysicalAlias', 'entPhysicalAssetID',
-      'entPhysicalIsFRU', 'entPhysicalModelName', 'entPhysicalVendorType', 'entPhysicalSerialNum',
-      'entPhysicalContainedIn', 'entPhysicalParentRelPos', 'entPhysicalMfgName', 'ifIndex', 'inventory_mib'
+        'entPhysicalDescr', 'entPhysicalClass', 'entPhysicalName', 'entPhysicalHardwareRev',
+        'entPhysicalFirmwareRev', 'entPhysicalSoftwareRev', 'entPhysicalAlias', 'entPhysicalAssetID',
+        'entPhysicalIsFRU', 'entPhysicalModelName', 'entPhysicalVendorType', 'entPhysicalSerialNum',
+        'entPhysicalContainedIn', 'entPhysicalParentRelPos', 'entPhysicalMfgName', 'ifIndex', 'inventory_mib'
     ];
 
-    $numeric_oids = ['entPhysicalContainedIn', 'entPhysicalParentRelPos', 'ifIndex']; // DB type 'int'
+    $numeric_oids = [ 'entPhysicalContainedIn', 'entPhysicalParentRelPos', 'ifIndex' ]; // DB type 'int'
 
     if (!is_array($inventory_tmp) || !is_numeric($index)) {
         return FALSE;
     }
 
-    $inventory                      = ['entPhysicalIndex' => $index];
+    $inventory                      = [ 'entPhysicalIndex' => $index ];
     $inventory_tmp['inventory_mib'] = $mib;
 
     // Rewrites
@@ -1780,12 +1864,16 @@ function discover_inventory($device, $index, $inventory_tmp, $mib)
     } elseif (!isset($inventory['entPhysicalModelName'])) {
         $inventory['entPhysicalModelName'] = $inventory['entPhysicalName'];
     }
+    if (safe_empty($inventory['entPhysicalName']) && $inventory['entPhysicalDescr']) {
+        // JunOS EVO return empty entPhysicalName
+        $inventory['entPhysicalName'] = $inventory['entPhysicalDescr'];
+    }
 
     $query        = 'SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalIndex` = ? AND `inventory_mib` = ?';
-    $inventory_db = dbFetchRow($query, [$device['device_id'], $index, $mib]);
+    $inventory_db = dbFetchRow($query, [ $device['device_id'], $index, $mib ]);
     if (!is_array($inventory_db)) {
         // Compatibility, try with empty mib name
-        $inventory_db = dbFetchRow($query, [$device['device_id'], $index, '']);
+        $inventory_db = dbFetchRow($query, [ $device['device_id'], $index, '' ]);
     }
 
     if (!is_array($inventory_db)) {
@@ -1825,8 +1913,7 @@ function discover_inventory($device, $index, $inventory_tmp, $mib)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function check_valid_inventory($device)
-{
+function check_valid_inventory($device) {
 
     $query   = 'SELECT * FROM `entPhysical` WHERE `device_id` = ?';
     $entries = dbFetchRows($query, [$device['device_id']]);

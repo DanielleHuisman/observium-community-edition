@@ -6,6 +6,31 @@
 
 require_once "HTML_ImageMap.class.php";
 
+
+function extract_port_id($str) {
+    $port_id = null;
+
+    // Check if the string matches the first format: obs_port:<device_id>:<ifIndex>
+    if (preg_match('/^obs_port:(\d+):(\d+)$/', $str, $matches)) {
+        $device_id = $matches[1];
+        $ifIndex = $matches[2];
+        $port_id = get_port_by_ifIndex($device_id, $ifIndex);
+    }
+    // Check if the string matches the second format: obs_port:<port_id>
+    elseif (preg_match('/^obs_port:(\d+)$/', $str, $matches)) {
+        $port_id = $matches[1];
+    }
+    // If the string does not match any format, return null or handle as appropriate
+    else {
+        return null;
+    }
+
+    return $port_id;
+}
+
+
+
+
 class WeatherMapLink extends WeatherMapItem
 {
 	var $owner,                $name;

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -126,18 +126,18 @@ function humanize_maintenance(&$maint)
 
     $maint['row_class'] = '';
 
-    if ($maint['maint_start'] > $GLOBALS['config']['time']['now']) {
-        $maint['start_text'] = "+" . format_uptime($maint['maint_start'] - $GLOBALS['config']['time']['now']);
+    if ($maint['maint_start'] > get_time()) {
+        $maint['start_text'] = "+" . format_uptime($maint['maint_start'] - get_time());
     } else {
-        $maint['start_text']  = "-" . format_uptime($GLOBALS['config']['time']['now'] - $maint['maint_start']);
+        $maint['start_text']  = "-" . format_uptime(get_time() - $maint['maint_start']);
         $maint['row_class']   = "warning";
         $maint['active_text'] = '<span class="label label-warning pull-right">active</span>';
     }
 
-    if ($maint['maint_end'] > $GLOBALS['config']['time']['now']) {
-        $maint['end_text'] = "+" . format_uptime($maint['maint_end'] - $GLOBALS['config']['time']['now']);
+    if ($maint['maint_end'] > get_time()) {
+        $maint['end_text'] = "+" . format_uptime($maint['maint_end'] - get_time());
     } else {
-        $maint['end_text']    = "-" . format_uptime($GLOBALS['config']['time']['now'] - $maint['maint_end']);
+        $maint['end_text']    = "-" . format_uptime(get_time() - $maint['maint_end']);
         $maint['row_class']   = "disabled";
         $maint['active_text'] = '<span class="label label-disabled pull-right">ended</span>';
     }
@@ -416,6 +416,7 @@ function humanize_bgp(&$peer)
         $peer['peer_type_class'] = "warning";
         $peer['peer_type']       = "Priv " . $peer['peer_type'];
     }
+
     if (is_bgp_as_private($peer['local_as'])) {
         $peer['peer_local_class'] = "warning";
         $peer['peer_local_type']  = "private";
@@ -451,8 +452,7 @@ function humanize_bgp(&$peer)
  *
  */
 // TESTME needs unit testing
-function humanize_port(&$port)
-{
+function humanize_port(&$port) {
     global $config, $cache;
 
     // Exit if already humanized
@@ -476,11 +476,12 @@ function humanize_port(&$port)
     }
 
     // If we can get the device data from the global cache, do it, else pull it from the db (mostly for external scripts)
-    $device = device_by_id_cache($port['device_id']);
+    //$device = device_by_id_cache($port['device_id']);
 
     // Workaround for devices/ports who long time not updated and have empty port_label
-    if (safe_empty($port['port_label']) || safe_empty($port['port_label_base'] . $port['port_label_num'])) {
-        process_port_label($port, $device);
+    if (safe_empty($port['port_label']) || safe_empty($port['port_label_short']) || safe_empty($port['port_label_base'] . $port['port_label_num'])) {
+        unset($port['port_label'], $port['port_label_short'], $port['port_label_base'], $port['port_label_num']);
+        process_port_label($port, device_by_id_cache($port['device_id']));
     }
 
     // Set humanised values for use in UI
@@ -544,12 +545,12 @@ function humanize_port(&$port)
         }
     }
 
-    // If the device is down, colour the row/tab as 'warning' meaning that the entity is down because of something below it.
+    /* If the device is down, colour the row/tab as 'warning' meaning that the entity is down because of something below it.
     if ($device['status'] == '0') {
         $port['table_tab_colour'] = "#ff6600";
-        $port['row_class']        = "warning";
+        //$port['row_class']        = "warning";
         $port['icon']             = 'port-ignored';
-    }
+    } */
     if ($port['ignore'] == '1' && $port['row_class'] !== 'ok') {
         $port['row_class'] = "suppressed";
     }
@@ -560,14 +561,9 @@ function humanize_port(&$port)
     $port['out_rate'] = $port['ifOutOctets_rate'] * 8;
 
     // Colour in bps based on speed if > 50, else by UI convention.
-    if ($port['ifSpeed'] > 0) {
-        $in_perc  = round($port['in_rate'] / $port['ifSpeed'] * 100);
-        $out_perc = round($port['out_rate'] / $port['ifSpeed'] * 100);
-    } else {
-        // exclude division by zero error
-        $in_perc  = 0;
-        $out_perc = 0;
-    }
+    $in_perc  = float_div($port['in_rate'], $port['ifSpeed']) * 100;
+    $out_perc = float_div($port['out_rate'], $port['ifSpeed']) * 100;
+
     if ($port['in_rate'] == 0) {
         $port['bps_in_style'] = '';
     } elseif ($in_perc < '50') {
@@ -586,8 +582,8 @@ function humanize_port(&$port)
     }
 
     // Colour in and out pps based on UI convention
-    $port['pps_in_style']  = ($port['ifInUcastPkts_rate'] == 0) ? '' : 'color: #740074;';
-    $port['pps_out_style'] = ($port['ifOutUcastPkts_rate'] == 0) ? '' : 'color: #FF7400;';
+    $port['pps_in_style']  = $port['ifInUcastPkts_rate'] == 0 ? '' : 'color: #740074;';
+    $port['pps_out_style'] = $port['ifOutUcastPkts_rate'] == 0 ? '' : 'color: #FF7400;';
 
     $port['humanized'] = TRUE; /// Set this so we can check it later.
 
@@ -793,15 +789,16 @@ function rewrite_unix_hardware($descr, $hw = NULL)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_ftos_vlanid($device, $ifindex)
-{
+function rewrite_ftos_vlanid($device, $ifindex) {
     // damn DELL use them one known indexes
     //dot1qVlanStaticName.1107787777 = Vlan 1
     //dot1qVlanStaticName.1107787998 = mgmt
-    $ftos_vlan = dbFetchCell('SELECT `ifName` FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?', [$device['device_id'], $ifindex]);
-    [, $vlanid] = explode(' ', $ftos_vlan);
+    if ($ifindex > 4096 &&
+        $ftos_vlan = dbFetchCell('SELECT `ifName` FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?', [ $device['device_id'], $ifindex ])) {
+        return explode(' ', $ftos_vlan)[1];
+    }
 
-    return $vlanid;
+    return $ifindex;
 }
 
 // DOCME needs phpdoc block

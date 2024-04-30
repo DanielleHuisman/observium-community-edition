@@ -1,0 +1,1503 @@
+--  =======================================================================
+--  File        : osProvY1564.mib
+--  Description : Private MIB support the functionality of Y1564 in the 
+--                framework of Service Provision.
+--  By          : Matan
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-PROV-Y1564-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE,
+                Unsigned32, Counter64                         FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION, TruthValue, DateAndTime,
+                MacAddress, DisplayString                     FROM SNMPv2-TC
+                oaOptiSwitch,
+                EntityName, EntityNameOrNone, EntryValidator,
+                PortList,
+                PortIndexOrNone, ServFlowId, ProfileStatus           FROM OS-COMMON-TC-MIB
+                InetAddressType, InetAddress                  FROM INET-ADDRESS-MIB           -- RFC2851
+                osEthServId                                   FROM OS-ETH-SERV-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP,
+                NOTIFICATION-GROUP                            FROM SNMPv2-CONF;
+
+osProvY1564   MODULE-IDENTITY
+                LAST-UPDATED "202003030000Z" -- 03 March 2020
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Matan Unger;
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  munger@mrv.com"
+                DESCRIPTION
+                    "Y1564 for EServices."
+                    
+                REVISION     "202003030000Z" -- 03 March 2020
+                DESCRIPTION
+                    "Destination-to-source jitters:
+                        osProvY1564RsltDsJittMin, osProvY1564RsltDsJittMax,
+                        osProvY1564RsltDsJittAverage, osProvY1564RsltDsJittSum2,
+                        osProvY1564HistDsJittMin, osProvY1564HistDsJittMax,
+                        osProvY1564HistDsJittAverage, osProvY1564HistDsJittSum2."
+
+                REVISION     "201905230000Z" -- 23 May 2019
+                DESCRIPTION
+                    "Added support to multi source-mac address, object osProvY1564FlowSrcMacRange."
+
+                REVISION     "201708060000Z" -- 06 Aug. 2017
+                DESCRIPTION
+                    "1. Added the TestProtocol TEXTUAL-CONVENTION.
+                     2. The names of bits and description of osProvY1564ProtocolSupported have been changed.
+                     3. The gbjects osProvY1564PrflProtocol, osProvY1564RsltProtocol and
+                        osProvY1564HistProtocol have now syntax of TestProtocol."
+
+                REVISION     "201610200000Z" -- 20 Oct. 2016
+                DESCRIPTION
+                    "New 'High Capacity' tables osProvY1564HcHistTable and osProvY1564HcRsltTable."
+
+                REVISION     "201505070000Z" -- 7 May 2015
+                DESCRIPTION
+                    "New value  absent(6) in TEXTUAL-CONVENTION for TestRunState."
+
+                REVISION     "201405110000Z" -- 11 May 2014
+                DESCRIPTION
+                    "Initial edition."
+
+                ::= { oaOptiSwitch 4 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osProvY1564Notifications  OBJECT IDENTIFIER ::= { osProvY1564 0 }
+osProvY1564Gen            OBJECT IDENTIFIER ::= { osProvY1564 1 }
+osProvY1564Capabilities   OBJECT IDENTIFIER ::= { osProvY1564Gen 1 }
+osProvY1564Conformance    OBJECT IDENTIFIER ::= { osProvY1564 100 }
+osProvY1564MIBCompliances OBJECT IDENTIFIER ::= { osProvY1564Conformance 1 }
+osProvY1564MIBGroups      OBJECT IDENTIFIER ::= { osProvY1564Conformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+TestRunState        ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates the running state of the Test and state of the its results:
+        notRunning  (1) - Test is not active,
+        running     (2) - Test is running,
+        waitInQueue (3) - Test is waiting for hardware resources,
+        readyForRun (4) - Test have received hardware resource and ready to run,
+        idle        (5) - Test is waiting for the next burst.
+        absent      (6) - Test doesn't have results."
+    REFERENCE
+       "."
+    SYNTAX      INTEGER {
+                  notRunning  (1),
+                  running     (2),
+                  waitInQueue (3),
+                  readyForRun (4),
+                  idle        (5),
+                  absent      (6)
+                }
+
+TestProtocol        ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Protocol of a test.
+         In Legacy OS these values mean:
+           l2Protocol - dmmITUtY1731 (2), -- ITU-T Y.1721
+           l3Protocol - icmpEcho     (5)  -- RFC792
+         In OSA-V* these values mean:
+           l2Protocol - LBM and selectively DMM
+           l3Protocol - icmpEcho
+       "
+    REFERENCE
+       "."
+    SYNTAX      INTEGER {
+                  unknown      (1),
+                  l2Protocol   (2), -- ITU-T Y.1721
+                  l3Protocol   (5)  -- RFC792
+                }
+
+-- *******************************************************************
+--  osProvY1564Capabilities global configuration, status & capatibilities
+-- ******************************************************************* 
+ 
+osProvY1564ProtocolSupported OBJECT-TYPE
+    SYNTAX       BITS
+                   {
+                     l2Supported (0),
+                     l3Supported (1)
+                   }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates protocols supported by this agent:
+         l2Supported(0) means that l2Protocol of ITU-T Y.1721 is supported;
+         l3Supported(1) means that l2Protocol of RFC792 is supported
+       Additionally this object serves as a SupportValue."
+    ::= { osProvY1564Capabilities 1 }
+
+osY1564IpAddrTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  ipv4     (0),
+                  ipv6     (1),
+                  ipv4z    (2),
+                  ipv6z    (3)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of supported Internet address In terms of RFC 3291 (INET-ADDRESS-MIB)."
+    ::= { osProvY1564Capabilities 3 }
+
+osProvY1564MinRate OBJECT-TYPE
+      SYNTAX     Unsigned32
+      UNITS      "Kbits/sec"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+        "Minimum positive value for osProvY1564Rate, supported by the aggent."
+    ::= { osProvY1564Capabilities 4 }
+
+osProvY1564MaxRate OBJECT-TYPE
+      SYNTAX     Unsigned32
+      UNITS      "Kbits/sec"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+        "Minimum value for osProvY1564Rate, supported by the aggent."
+    ::= { osProvY1564Capabilities 5 }
+
+-- ************************************************************
+-- The osProvY1564PrflTable Table - profiles of configurations
+-- ************************************************************
+osProvY1564PrflTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvY1564PrflEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains Y1564 Profiles."
+    ::= { osProvY1564 4 }
+
+osProvY1564PrflEntry    OBJECT-TYPE
+    SYNTAX      OsProvY1564PrflEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osProvY1564PrflId }
+    ::= { osProvY1564PrflTable 1 }
+
+OsProvY1564PrflEntry ::= SEQUENCE {
+      osProvY1564PrflId                     EntityName,
+      osProvY1564PrflProtocol               TestProtocol,
+      osProvY1564PrflDuration               Unsigned32,
+      osProvY1564PrflRateCIR                Unsigned32,
+      osProvY1564PrflRateEIR                Unsigned32,
+
+      osProvY1564PrflPerformanceMember      Unsigned32,
+      osProvY1564PrflTimeout                Unsigned32,
+      osProvY1564PrflAllwdPcktLoss          Unsigned32,
+
+      osProvY1564PrflPacketLength           Unsigned32,
+      osProvY1564PrflDataFill               OCTET STRING,
+      osProvY1564PrflTtl                    Unsigned32,
+
+      osProvY1564PrflMaxRows                Unsigned32,
+
+      osProvY1564PrflTrapsGeneration        BITS,
+
+      osProvY1564PrflLastError              DisplayString,
+      osProvY1564PrflAdminStatus            EntryValidator,
+      osProvY1564PrflOperStatus             ProfileStatus
+}
+
+osProvY1564PrflId OBJECT-TYPE
+    SYNTAX          EntityName
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "."
+    ::= { osProvY1564PrflEntry 2 }
+
+osProvY1564PrflProtocol    OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    DEFVAL { unknown }
+    ::= { osProvY1564PrflEntry 5 }
+
+osProvY1564PrflDuration OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..3600)
+    UNITS            "seconds"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Duration of one test."
+    DEFVAL { 60 }
+    ::= { osProvY1564PrflEntry 6 }
+
+osProvY1564PrflRateCIR     OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "Kbits/sec"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The rate CIR."
+    DEFVAL { 0 } 
+    ::= { osProvY1564PrflEntry 18 }
+
+osProvY1564PrflRateEIR     OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "Kbits/sec"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The rate EIR."
+    DEFVAL { 0 } 
+    ::= { osProvY1564PrflEntry 19 }
+    
+    
+osProvY1564PrflPerformanceMember OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION      
+           "Is the profile test is a member at the performance test"
+    DEFVAL { 1 }
+    ::= { osProvY1564PrflEntry 20 }
+    
+    
+osProvY1564PrflTimeout  OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..60000)
+    UNITS            "milliseconds"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Specifies the duration to wait for a responce (milliseconds)."
+    DEFVAL { 200 }
+    ::= { osProvY1564PrflEntry 26 }
+
+osProvY1564PrflAllwdPcktLoss OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..10000)
+    UNITS            "0.01%"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Maximum loss ratio allowed in the throughput test."
+    DEFVAL { 0 }
+    ::= { osProvY1564PrflEntry 28 }
+
+osProvY1564PrflPacketLength OBJECT-TYPE
+    SYNTAX           Unsigned32 (64..9216)
+    UNITS            "octets"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Packet length, including VLAN ID and CRC."
+    DEFVAL { 68 }
+    ::= { osProvY1564PrflEntry 32 }
+
+osProvY1564PrflDataFill    OBJECT-TYPE
+    SYNTAX           OCTET STRING (SIZE(0..32))
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Determine how to fill the data portion of a probe
+       packet, while number of characters is a multiple of 8."
+    DEFVAL { ''H }
+    ::= { osProvY1564PrflEntry 35 }
+
+osProvY1564PrflTtl OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..255)
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Time To Live."
+    DEFVAL { 128 }
+    ::= { osProvY1564PrflEntry 37 }
+
+osProvY1564PrflMaxRows     OBJECT-TYPE
+    SYNTAX           Unsigned32 (2..65535)
+    UNITS            "rows"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The maximum number of entries allowed in the
+        osProvY1564HistTable.  An implementation of this
+        MIB will remove the oldest entry in the
+        osProvY1564HistTable to allow the addition of an
+        new entry once the number of rows in the
+        osProvY1564HistTable reaches this value.
+
+        Old entries are not removed when a new test is
+        started.  Entries are added to the osProvY1564HistTable
+        until pingFlowMaxRows is reached before entries begin to
+        be removed.
+
+        A value of 0 for this object disables creation of
+        osProvY1564HistTable entries."
+    DEFVAL { 10 }
+    ::= { osProvY1564PrflEntry 50 }
+    
+osProvY1564PrflTrapsGeneration OBJECT-TYPE
+    SYNTAX           BITS  {
+                       testComplete(0)
+                     }
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The value of this object determines when and if to generate a notification for this entry."
+    DEFVAL { {} }
+    ::= { osProvY1564PrflEntry 55 }
+
+osProvY1564PrflLastError  OBJECT-TYPE
+    SYNTAX          DisplayString (SIZE (0..160))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "."
+    ::= { osProvY1564PrflEntry 97 }
+
+osProvY1564PrflAdminStatus OBJECT-TYPE
+    SYNTAX          EntryValidator
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Allows to create new rows or delete old rows."
+    ::= { osProvY1564PrflEntry 98 }
+
+osProvY1564PrflOperStatus OBJECT-TYPE
+    SYNTAX          ProfileStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "."
+    ::= { osProvY1564PrflEntry 99 }
+
+-- ************************************************************
+-- The osProvY1564ServTable Table - configuration
+-- ************************************************************
+osProvY1564ServTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsProvY1564ServEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Y1564 service configuration table."
+    ::= { osProvY1564 6 }
+
+osProvY1564ServEntry OBJECT-TYPE
+    SYNTAX       OsProvY1564ServEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId }
+    ::= { osProvY1564ServTable 1 }
+
+OsProvY1564ServEntry ::= SEQUENCE {
+      osProvY1564ServPerfEnabled           TruthValue,
+      osProvY1564ServPerfDuration          Unsigned32
+      }
+
+osProvY1564ServPerfEnabled OBJECT-TYPE
+    SYNTAX           TruthValue
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "To start/stop Performance test."
+    DEFVAL { false }
+    ::= { osProvY1564ServEntry 20 }
+
+osProvY1564ServPerfDuration  OBJECT-TYPE
+    SYNTAX           Unsigned32  (1..900)
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Configure the performance test duration (1 - 900 seconds)."
+    DEFVAL { 900 }
+    ::= { osProvY1564ServEntry 25 }
+
+
+-- ************************************************************
+-- The osProvY1564FlowTable Table - configuration
+-- ************************************************************
+osProvY1564FlowTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsProvY1564FlowEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Y1564 flow configuration table."
+    ::= { osProvY1564 7 }
+
+osProvY1564FlowEntry OBJECT-TYPE
+    SYNTAX       OsProvY1564FlowEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEthServY1564FlowId }
+    ::= { osProvY1564FlowTable 1 }
+
+OsProvY1564FlowEntry ::= SEQUENCE {
+      osEthServY1564FlowId             ServFlowId, 
+      osProvY1564FlowPrfl              EntityNameOrNone,
+
+      osProvY1564FlowDstMac            MacAddress,
+      osProvY1564FlowSrcMac            MacAddress,
+
+      osProvY1564FlowSrcMacRange        PortList,
+
+      osProvY1564FlowDstIpType         InetAddressType,
+      osProvY1564FlowDstIpAddr         InetAddress,
+
+      osProvY1564FlowTxPort            PortIndexOrNone,
+      osProvY1564FlowTos               Unsigned32,
+      osProvY1564FlowConfEnabled       TruthValue,
+      osProvY1564FlowClear             TruthValue
+      }
+
+osEthServY1564FlowId     OBJECT-TYPE
+    SYNTAX          ServFlowId
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "The ServFlowId (ID) of the flow."
+    ::= { osProvY1564FlowEntry 2 }
+
+
+osProvY1564FlowPrfl OBJECT-TYPE
+    SYNTAX           EntityNameOrNone
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Refers to an entry in osProvY1564PrflTable. If osProvY1564FlowPrfl
+       is empty, then default values are used."
+--  DEFVAL { }
+    ::= { osProvY1564FlowEntry 4 }
+
+osProvY1564FlowDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osProvY1564PrflProtocol is equal to l2Protocol(2) or to lbmITUtY1731(3), then osProvY1564DstMac must be defined
+       with a host physical address to be used as a remote host for performing an operation.
+
+       If osProvY1564PrflProtocol is equal to l3Protocol(5), then the test cannot be enabled if osProvY1564FlowDstMac
+       is not equal to 00:00:00:00:00:00."
+    DEFVAL { '000000000000'H }
+    ::= { osProvY1564FlowEntry 6 }
+
+osProvY1564FlowSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osProvY1564PrflProtocol is equal to l2Protocol(2) or to lbmITUtY1731(3), then osProvY1564FlowSrcMac must be defined.
+        If configured, override osProvY1564FlowSrcMacRange value.
+       If osProvY1564PrflProtocol is equal to l3Protocol(5), then the test cannot be enabled if osProvY1564FlowSrcMac
+       is not equal to 00:00:00:00:00:00."
+    DEFVAL { '000000000000'H }
+    ::= { osProvY1564FlowEntry 7 }
+    
+osProvY1564FlowSrcMacRange OBJECT-TYPE
+    SYNTAX       PortList
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "Defines customer source-mac range, i.e. multi source-mac addresses based on machine source-mac 
+        changing the thrid byte corresponding to the configured range.
+        This parameter overwrite osProvY1564FlowSrcMac parameter. If source-mac was configured before setting this value, 
+        then after deleting this value the previous source-mac value will set instead.  
+        Corresponds to cli command 'source-mac range'."
+
+    DEFVAL { "" }
+    ::= { osProvY1564FlowEntry 8 }
+
+
+osProvY1564FlowDstIpType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Specifies the type of host address to be used at a remote
+        host for performing an operation."
+    DEFVAL { ipv4 }
+    ::= { osProvY1564FlowEntry 10 }
+
+osProvY1564FlowDstIpAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osProvY1564PrflProtocol is equal to l2Protocol(2) or to lbmITUtY1731(3), then he test cannot be enabled if osProvY1564DstIpAddr
+       is not equal to 0.0.0.0.
+
+       If osProvY1564PrflProtocol is equal to l3Protocol(5), then osProvY1564DstIpAddr must be defined
+       with a host Layer 3 address to be used as a remote host for performing an operation."
+    DEFVAL { '00000000'H }
+    ::= { osProvY1564FlowEntry 11 }
+
+osProvY1564FlowTxPort OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "If osProvY1564PrflProtocol is equal to l2Protocol(2) or to lbmITUtY1731(3), then osProvY1564TxPort may be defined
+      and used when osProvY1564FlowDstMac is absent in learning table (FDB) to determine the port,
+      from wich the requests are to be transmitted.
+
+      If osProvY1564PrflProtocol is equal to l3Protocol(5), then the test cannot be enabled if osProvY1564TxPort
+      is not equal to 0."
+    DEFVAL { 0 }
+    ::= { osProvY1564FlowEntry 14 }
+
+osProvY1564FlowTos  OBJECT-TYPE
+    SYNTAX           Unsigned32  (0..255)
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Specifies the value to store in the Differentiated
+       Services (DS) Field in the IP packet used to
+       encapsulate the ping probe.  The DS Field is defined
+       as the Type of Service (TOS) octet in a IPv4 header
+       or as the Traffic Class octet in a IPv6 header.
+
+       The value of this object must be a decimal integer
+       in the range from 0 to 255.  This option can be used
+       to determine what effect an explicit DS Field setting
+       has on a ping response.  Not all values are legal or
+       meaningful.  A value of 0 means that the function
+       represented by this option is not supported.  DS Field
+       usage is often not supported by IP implementations and
+       not all values are supported.  Refer to RFC 2474 for
+       guidance on usage of this field."
+    REFERENCE
+        "Refer to RFC 2474 for the definition of the
+        Differentiated Services Field and to RFC 1812
+        Section 5.3.2 for Type of Service (TOS).
+        The desription has been copied form DISMAN-PING-MIB, "
+    DEFVAL { 0 }
+    ::= { osProvY1564FlowEntry 15 }
+
+
+osProvY1564FlowConfEnabled OBJECT-TYPE
+    SYNTAX           TruthValue
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "To start/stop configuration test."
+    DEFVAL { false }
+    ::= { osProvY1564FlowEntry 20 }
+
+osProvY1564FlowClear OBJECT-TYPE
+    SYNTAX           TruthValue
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "This object when written clears the osProvY1564HistTable history tables 
+        - all rows are deleted.  When read the value always returns 'false'. 
+        Writing this object at row creation is irrelevant and should not
+        be done.  "
+    DEFVAL { false }
+    ::= { osProvY1564FlowEntry 21 }
+
+
+-- ************************************************************
+-- The osProvY1564RsltTable - last complete result
+-- ************************************************************
+osProvY1564RsltTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvY1564RsltEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contain the last completed burst results. Exception is the object osProvY1564RsltTestRunState - it
+       indicates a current state of the test."
+    ::= { osProvY1564 10 }
+
+osProvY1564RsltEntry OBJECT-TYPE
+    SYNTAX      OsProvY1564RsltEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osProvY1564RsltTable table."
+    INDEX { osEthServId, osEthServY1564FlowId } -- AUGMENTS { osProvY1564FlowEntry }
+    ::= { osProvY1564RsltTable 1 }
+
+OsProvY1564RsltEntry ::= SEQUENCE {
+      osProvY1564RsltStarted               DateAndTime,
+      osProvY1564RsltTestRunState          TestRunState,
+      osProvY1564RsltProtocol              TestProtocol,
+      osProvY1564RsltTestStep              INTEGER,
+      osProvY1564RsltLastTestType          INTEGER,
+      osProvY1564RsltTestStatus            INTEGER,
+      osProvY1564RsltRate                  Unsigned32,
+      osProvY1564RsltPacketLength          Unsigned32,
+      osProvY1564RsltDstMac                MacAddress,
+      osProvY1564RsltSrcMac                MacAddress,
+      osProvY1564RsltIpDstType             InetAddressType,
+      osProvY1564RsltIpDstAddr             InetAddress,
+      osProvY1564RsltTxPort                PortIndexOrNone,
+      osProvY1564RsltTransmitted           Unsigned32,
+      osProvY1564RsltReceived              Unsigned32,
+      osProvY1564RsltRttMin                Unsigned32,
+      osProvY1564RsltRttMax                Unsigned32,
+      osProvY1564RsltRttAverage            Unsigned32,
+      osProvY1564RsltRttSum2               Unsigned32,
+
+      osProvY1564RsltJittMin               Unsigned32,
+      osProvY1564RsltJittMax               Unsigned32,
+      osProvY1564RsltJittAverage           Unsigned32,
+      osProvY1564RsltJittSum2              Unsigned32,
+
+      osProvY1564RsltDsJittMin             Unsigned32,
+      osProvY1564RsltDsJittMax             Unsigned32,
+      osProvY1564RsltDsJittAverage         Unsigned32,
+      osProvY1564RsltDsJittSum2            Unsigned32,
+
+      osProvY1564RsltPcktLoss              Unsigned32,
+
+      osProvY1564RsltLastTestFailed        TruthValue
+}
+
+osProvY1564RsltStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osProvY1564RsltEntry 2 }
+
+osProvY1564RsltTestRunState OBJECT-TYPE
+    SYNTAX           TestRunState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osProvY1564RsltEntry 3 }
+
+osProvY1564RsltProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osProvY1564RsltEntry 4 }
+
+osProvY1564RsltTestStep OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  unknown      (0),
+                  a1           (1),
+                  a2           (2),
+                  b1           (3),
+                  b2           (4),
+                  c1           (5),
+                  c2           (6)
+                }
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The step of the test that the results relate to."
+    ::= { osProvY1564RsltEntry 5 }
+    
+osProvY1564RsltLastTestType   OBJECT-TYPE 
+    SYNTAX      INTEGER {
+                  unknown       (1),
+                  configuration (2),
+                  performance   (3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The type of last executed test."
+    ::= { osProvY1564RsltEntry 6 }
+
+osProvY1564RsltTestStatus   OBJECT-TYPE 
+    SYNTAX      INTEGER {
+                  unknown       (1),
+                  pass          (2),
+                  fail          (3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Did the test passed or failed"
+    ::= { osProvY1564RsltEntry 7 }
+
+
+osProvY1564RsltRate        OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "Kbits/sec"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "The rate of transmition frames 
+       GET operation always returns the last configured or default value."
+    DEFVAL { 0 } 
+    ::= { osProvY1564RsltEntry 8 }
+
+osProvY1564RsltPacketLength OBJECT-TYPE
+    SYNTAX           Unsigned32 (64..9216)
+    UNITS            "octets"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Packet length, including VLAN ID and CRC."
+    DEFVAL { 512 }
+    ::= { osProvY1564RsltEntry 9 }
+
+
+osProvY1564RsltDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osProvY1564FlowDstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osProvY1564RsltEntry 10 }
+
+osProvY1564RsltSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osProvY1564FlowSrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osProvY1564RsltEntry 11 }
+
+
+
+osProvY1564RsltIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osProvY1564FlowDstIpType."
+    ::= { osProvY1564RsltEntry 12 }
+
+osProvY1564RsltIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osProvY1564FlowDstIpAddr."
+    ::= { osProvY1564RsltEntry 13 }
+
+osProvY1564RsltTxPort OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osProvY1564RsltEntry 16 }
+
+osProvY1564RsltTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osProvY1564RsltEntry 21 }
+
+osProvY1564RsltReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osProvY1564RsltEntry 22 }
+
+osProvY1564RsltRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osProvY1564RsltEntry 23 }
+
+osProvY1564RsltRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osProvY1564RsltEntry 24 }
+
+osProvY1564RsltRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osProvY1564RsltEntry 25 }
+
+osProvY1564RsltRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osProvY1564RsltEntry 26 }
+
+osProvY1564RsltJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destination jitter values."
+    ::= { osProvY1564RsltEntry 30 }
+
+osProvY1564RsltJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destination jitter values."
+    ::= { osProvY1564RsltEntry 32 }
+
+osProvY1564RsltJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destination jitter values."
+    ::= { osProvY1564RsltEntry 33 }
+
+osProvY1564RsltJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osProvY1564RsltEntry 34 }
+
+osProvY1564RsltDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destination-to-source jitter values."
+    ::= { osProvY1564RsltEntry 35 }
+
+osProvY1564RsltDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destination-to-source jitter values."
+    ::= { osProvY1564RsltEntry 36 }
+
+osProvY1564RsltDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destination-to-source jitter values."
+    ::= { osProvY1564RsltEntry 37 }
+
+osProvY1564RsltDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all destination-to-source
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osProvY1564RsltEntry 38 }
+
+osProvY1564RsltPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osProvY1564RsltEntry 40 }
+
+osProvY1564RsltLastTestFailed OBJECT-TYPE 
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "."
+    ::= { osProvY1564RsltEntry 42 }
+
+-- ************************************************************
+-- The osProvY1564HistTable - history table
+-- ************************************************************
+osProvY1564HistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvY1564HistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contain at most last osProvY1564MaxRows samples, each of them reflects results of 
+       comleted burst."
+    ::= { osProvY1564 11 }
+
+osProvY1564HistEntry OBJECT-TYPE
+    SYNTAX      OsProvY1564HistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osProvY1564HistTable table."
+    INDEX { osEthServId, osEthServY1564FlowId, osProvY1564HistIndex }
+    ::= { osProvY1564HistTable 1 }
+
+OsProvY1564HistEntry ::= SEQUENCE {
+      osProvY1564HistIndex                 Unsigned32,
+      osProvY1564HistStarted               DateAndTime,
+      osProvY1564HistProtocol              TestProtocol,
+      osProvY1564HistTestStep              INTEGER,
+      osProvY1564HistTestType              INTEGER,
+      osProvY1564HistTestStatus            INTEGER,
+      osProvY1564HistRate                  Unsigned32,
+      osProvY1564HisPacketLength           Unsigned32,
+      osProvY1564HistDstMac                MacAddress,
+      osProvY1564HistSrcMac                MacAddress,
+      osProvY1564HistIpDstType             InetAddressType,
+      osProvY1564HistIpDstAddr             InetAddress,
+      osProvY1564HistTxPort                PortIndexOrNone,
+      osProvY1564HistTransmitted           Unsigned32,
+      osProvY1564HistReceived              Unsigned32,
+      osProvY1564HistRttMin                Unsigned32,
+      osProvY1564HistRttMax                Unsigned32,
+      osProvY1564HistRttAverage            Unsigned32,
+      osProvY1564HistRttSum2               Unsigned32,
+
+      osProvY1564HistJittMin               Unsigned32,
+      osProvY1564HistJittMax               Unsigned32,
+      osProvY1564HistJittAverage           Unsigned32,
+      osProvY1564HistJittSum2              Unsigned32,
+
+      osProvY1564HistDsJittMin             Unsigned32,
+      osProvY1564HistDsJittMax             Unsigned32,
+      osProvY1564HistDsJittAverage         Unsigned32,
+      osProvY1564HistDsJittSum2            Unsigned32,
+
+      osProvY1564HistPcktLoss              Unsigned32
+}
+
+osProvY1564HistIndex OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An index that uniquely identifies the particular
+        sample this entry represents among all samples
+        associated with the same osProvY1564FlowEntry.
+        This index starts at 1 and increases by one
+        as each new sample is taken."
+    REFERENCE
+       "."
+    ::= { osProvY1564HistEntry 2 }
+
+osProvY1564HistStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osProvY1564HistEntry 3 }
+
+osProvY1564HistProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osProvY1564HistEntry 4 }
+
+
+osProvY1564HistTestStep OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  unknown      (0),
+                  a1           (1),
+                  a2           (2),
+                  b1           (3),
+                  b2           (4),
+                  c1           (5),
+                  c2           (6)
+                }
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The step of the test that the results relate to."
+    ::= { osProvY1564HistEntry 5 }
+    
+osProvY1564HistTestType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  unknown             (1),
+                  configuration       (2),
+                  performance         (3)
+                }
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The phase of the y1564 test (configuration or performance)."
+    ::= { osProvY1564HistEntry 6 }
+    
+    
+osProvY1564HistTestStatus   OBJECT-TYPE 
+    SYNTAX      INTEGER {
+                  unknown       (1),
+                  pass          (2),
+                  fail          (3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Did the test passed or failed"
+    ::= { osProvY1564HistEntry 7 }
+
+osProvY1564HistRate        OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "Kbits/sec"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "The rate of transmition frames 
+       GET operation always returns the last configured or default value."
+    DEFVAL { 0 } 
+    ::= { osProvY1564HistEntry 8 }
+    
+osProvY1564HisPacketLength OBJECT-TYPE
+    SYNTAX           Unsigned32 (64..9216)
+    UNITS            "octets"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Packet length, including VLAN ID and CRC."
+    DEFVAL { 512 }
+    ::= { osProvY1564HistEntry 9 }
+    
+osProvY1564HistDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osProvY1564FlowDstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osProvY1564HistEntry 10 }
+
+osProvY1564HistSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osProvY1564FlowSrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osProvY1564HistEntry 11 }
+
+
+
+osProvY1564HistIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osProvY1564FlowDstIpType."
+    ::= { osProvY1564HistEntry 12 }
+
+osProvY1564HistIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osProvY1564FlowDstIpAddr."
+    ::= { osProvY1564HistEntry 13 }
+
+osProvY1564HistTxPort  OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osProvY1564HistEntry 16 }
+
+osProvY1564HistTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osProvY1564HistEntry 21 }
+
+osProvY1564HistReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osProvY1564HistEntry 22 }
+
+osProvY1564HistRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osProvY1564HistEntry 23 }
+
+osProvY1564HistRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osProvY1564HistEntry 24 }
+
+osProvY1564HistRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osProvY1564HistEntry 25 }
+
+osProvY1564HistRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osProvY1564HistEntry 26 }
+
+osProvY1564HistJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destination jitter values."
+    ::= { osProvY1564HistEntry 30 }
+
+osProvY1564HistJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destination jitter values."
+    ::= { osProvY1564HistEntry 32 }
+
+osProvY1564HistJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destination jitter values."
+    ::= { osProvY1564HistEntry 33 }
+
+osProvY1564HistJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osProvY1564HistEntry 34 }
+
+osProvY1564HistDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destination-to-source jitter values."
+    ::= { osProvY1564HistEntry 35 }
+
+osProvY1564HistDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destination-to-source jitter values."
+    ::= { osProvY1564HistEntry 36 }
+
+osProvY1564HistDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destination-to-source jitter values."
+    ::= { osProvY1564HistEntry 37 }
+
+osProvY1564HistDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all destination-to-source
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osProvY1564HistEntry 38 }
+
+osProvY1564HistPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osProvY1564HistEntry 40 }
+
+-- ************************************************************
+-- The osProvY1564HcRsltTable - last complete result
+-- ************************************************************
+osProvY1564HcRsltTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvY1564HcRsltEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This 'High Capacity' table is an extension of osProvY1564RsltTable."
+    ::= { osProvY1564 12 }
+
+osProvY1564HcRsltEntry OBJECT-TYPE
+    SYNTAX      OsProvY1564HcRsltEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osProvY1564HcRsltTable table."
+    -- AUGMENTS { osProvY1564RsltEntry }
+    INDEX { osEthServId, osEthServY1564FlowId }
+    ::= { osProvY1564HcRsltTable 1 }
+
+OsProvY1564HcRsltEntry ::= SEQUENCE {
+      osProvY1564HcRsltTransmitted           Counter64,
+      osProvY1564HcRsltReceived              Counter64
+}
+
+
+osProvY1564HcRsltTransmitted OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osProvY1564HcRsltEntry 21 }
+
+osProvY1564HcRsltReceived OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osProvY1564HcRsltEntry 22 }
+
+
+-- ************************************************************
+-- The osProvY1564HcHistTable - history table
+-- ************************************************************
+osProvY1564HcHistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvY1564HcHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This 'High Capacity' table is an extension of osProvY1564HistTable."
+    ::= { osProvY1564 13 }
+
+osProvY1564HcHistEntry OBJECT-TYPE
+    SYNTAX      OsProvY1564HcHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osProvY1564HcHistTable table."
+    -- AUGMENTS { osProvY1564HistEntry }
+    INDEX { osEthServId, osEthServY1564FlowId, osProvY1564HistIndex }
+    ::= { osProvY1564HcHistTable 1 }
+
+OsProvY1564HcHistEntry ::= SEQUENCE {
+      osProvY1564HcHistTransmitted           Counter64,
+      osProvY1564HcHistReceived              Counter64
+}
+
+
+osProvY1564HcHistTransmitted OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osProvY1564HcHistEntry 21 }
+
+osProvY1564HcHistReceived OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osProvY1564HcHistEntry 22 }
+
+
+-- ************************************************************
+ -- Notification Definition section
+-- ************************************************************
+
+osProvY1564TestCompleteAlarm NOTIFICATION-TYPE
+    OBJECTS     { osProvY1564RsltLastTestFailed }
+    STATUS      current
+    DESCRIPTION
+       "Generated when a test completes and bit burstComplete is set in osY1564TrapsGeneration."
+    ::= { osProvY1564Notifications 1 }
+
+
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osProvY1564MIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { osProvY1564MandatoryGroup,
+                           osY1564NotificationsGroup
+                         }
+
+    ::= { osProvY1564MIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osProvY1564MandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+      osProvY1564ProtocolSupported, osY1564IpAddrTypesSupported,
+      osProvY1564MinRate, osProvY1564MaxRate, 
+
+      osProvY1564PrflProtocol,
+      osProvY1564PrflDuration, 
+      osProvY1564PrflRateCIR, osProvY1564PrflRateEIR,
+      osProvY1564PrflTimeout,
+      osProvY1564PrflAllwdPcktLoss,
+      osProvY1564PrflPacketLength, osProvY1564PrflDataFill,
+      osProvY1564PrflTtl, 
+      osProvY1564PrflPerformanceMember,
+      osProvY1564PrflMaxRows, osProvY1564PrflTrapsGeneration,
+      osProvY1564PrflLastError,
+      osProvY1564PrflAdminStatus, osProvY1564PrflOperStatus,
+
+      osProvY1564ServPerfEnabled,osProvY1564ServPerfDuration,
+
+      osProvY1564FlowPrfl,
+      osProvY1564FlowDstMac, osProvY1564FlowSrcMac, osProvY1564FlowSrcMacRange,
+      osProvY1564FlowDstIpType, osProvY1564FlowDstIpAddr,
+      osProvY1564FlowTxPort, osProvY1564FlowTos,
+      osProvY1564FlowConfEnabled, osProvY1564FlowClear,
+
+      osProvY1564RsltStarted,
+      osProvY1564RsltTestRunState, osProvY1564RsltProtocol,
+      osProvY1564RsltTestStep,osProvY1564RsltLastTestType,osProvY1564RsltTestStatus,osProvY1564RsltRate,osProvY1564RsltPacketLength,
+      osProvY1564RsltDstMac, osProvY1564RsltSrcMac,
+      osProvY1564RsltIpDstType, osProvY1564RsltIpDstAddr,
+      osProvY1564RsltTxPort,
+      osProvY1564RsltTransmitted, osProvY1564RsltReceived,
+      osProvY1564RsltRttMin, osProvY1564RsltRttMax, osProvY1564RsltRttAverage, osProvY1564RsltRttSum2,
+      osProvY1564RsltJittMin, osProvY1564RsltJittMax, osProvY1564RsltJittAverage, osProvY1564RsltJittSum2,
+      osProvY1564RsltDsJittMin, osProvY1564RsltDsJittMax, osProvY1564RsltDsJittAverage, osProvY1564RsltDsJittSum2,
+      osProvY1564RsltPcktLoss,
+      osProvY1564RsltLastTestFailed,
+
+      osProvY1564HistStarted, osProvY1564HistProtocol,
+      osProvY1564HistTestStep,osProvY1564HistTestType,osProvY1564HistTestStatus,osProvY1564HistRate,osProvY1564HisPacketLength,
+      osProvY1564HistDstMac, osProvY1564HistSrcMac,
+      osProvY1564HistIpDstType, osProvY1564HistIpDstAddr,
+      osProvY1564HistTxPort, osProvY1564HistTransmitted,
+      osProvY1564HistReceived, osProvY1564HistRttMin,
+      osProvY1564HistRttMax, osProvY1564HistRttAverage, osProvY1564HistRttSum2,
+      osProvY1564HistJittMin, osProvY1564HistJittMax, osProvY1564HistJittAverage, osProvY1564HistJittSum2,
+      osProvY1564HistDsJittMin, osProvY1564HistDsJittMax, osProvY1564HistDsJittAverage, osProvY1564HistDsJittSum2,
+      osProvY1564HistPcktLoss,
+      osProvY1564HcRsltTransmitted, osProvY1564HcRsltReceived,
+      osProvY1564HcHistTransmitted, osProvY1564HcHistReceived
+    }
+    STATUS current 
+    DESCRIPTION 
+        "."
+    ::= { osProvY1564MIBGroups 1 }
+
+osY1564NotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+                  osProvY1564TestCompleteAlarm
+                 }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osProvY1564MIBGroups 2 }
+
+
+END
+

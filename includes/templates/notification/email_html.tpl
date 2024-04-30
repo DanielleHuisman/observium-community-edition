@@ -5,7 +5,7 @@
  *
  * @package    observium
  * @subpackage templates
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 /**
@@ -118,5 +118,8 @@
     {{/ENTITY_GRAPHS}}
   </tbody>
 </table>
+
+{{{FOOTER}}}
+
 </body>
 </html>

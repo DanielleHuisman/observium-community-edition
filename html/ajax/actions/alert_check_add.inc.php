@@ -5,8 +5,8 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage ajax
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -17,15 +17,15 @@ if (!$limitwrite) {
 }
 
 $ok = TRUE;
-foreach (['entity_type', 'alert_name', 'alert_severity', 'alert_conditions'] as $var) {
-    if (!isset($vars[$var]) || strlen($vars[$var]) == '0') {
+foreach ([ 'entity_type', 'alert_name', 'alert_severity', 'alert_conditions' ] as $var) {
+    if (safe_empty($vars[$var])) {
         $ok       = FALSE;
         $failed[] = $var;
     }
 }
 
 if ($ok) {
-    if (dbExist('alert_tests', '`entity_type` = ? AND `alert_name` = ?', [$vars['entity_type'], $vars['alert_name']])) {
+    if (dbExist('alert_tests', '`entity_type` = ? AND `alert_name` = ?', [ $vars['entity_type'], $vars['alert_name'] ])) {
         print_json_status('failed', "Alert Checker '{$vars['alert_name']}' already exist.");
         return;
     }
@@ -34,8 +34,16 @@ if ($ok) {
 
     $conditions = [];
     foreach (explode("\n", trim($vars['alert_conditions'])) as $cond) {
+        if (preg_match(OBS_PATTERN_XSS, $cond)) {
+            print_json_status('failed', "Prevent XSS payload.");
+            return;
+        }
         $condition = [];
-        [$condition['metric'], $condition['condition'], $condition['value']] = explode(" ", trim($cond), 3);
+        [ $condition['metric'], $condition['condition'], $condition['value'] ] = explode(" ", trim($cond), 3);
+        if (!is_alpha($condition['metric'])) {
+            print_json_status('failed', "Incorrect condition metric '" . escape_html($condition['metric']) . "'");
+            return;
+        }
         $conditions[] = $condition;
     }
     $check_array['conditions']        = safe_json_encode($conditions);

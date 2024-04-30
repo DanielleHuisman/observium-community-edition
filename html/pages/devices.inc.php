@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -28,13 +28,16 @@ $query_permitted = generate_query_permitted_ng(['device'], ['device_table' => 'd
 $where_array = build_devices_where_array($vars);
 
 // Fixme. Unused?
-if (safe_count($where_array)) {
-    $where = ' WHERE ' . implode(' AND ', $where_array);
-} else {
-    $where = '';
-}
+$where = generate_where_clause($where_array);
 
 register_html_title("Devices");
+if (is_string($vars['type']) && isset($config['devicetypes'][$vars['type']]['text'])) {
+    register_html_title($config['devicetypes'][$vars['type']]['text']);
+} elseif (isset($vars['status']) && !$vars['status'] && safe_count($vars) === 3) {
+    register_html_title("Down");
+} elseif (isset($vars['disabled']) && $vars['disabled'] && safe_count($vars) === 3) {
+    register_html_title("Disabled");
+}
 
 foreach ($config['device_types'] as $entry) {
     $types[$entry['type']] = $entry;
@@ -367,10 +370,10 @@ if ($vars['format'] === 'graphs') {
     }
 
     if (!is_numeric($vars['from'])) {
-        $vars['from'] = $config['time']['day'];
+        $vars['from'] = get_time('day');
     }
     if (!is_numeric($vars['to'])) {
-        $vars['to'] = $config['time']['now'];
+        $vars['to'] = get_time();
     }
 }
 

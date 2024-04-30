@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -42,7 +42,7 @@ foreach (get_device_mibs_permitted($device) as $mib) {
 
             // Convert strings '3.40 TB' to value
             // See QNAP NAS-MIB or HIK-DEVICE-MIB
-            $unit = isset($entry['unit']) ? $entry['unit'] : NULL;
+            $unit = $entry['unit'] ?? NULL;
 
             if ($entry['type'] === 'table' || !isset($entry['type'])) {
 
@@ -68,11 +68,7 @@ foreach (get_device_mibs_permitted($device) as $mib) {
                     $oid_num = $entry['oid_num'] . '.' . $index;
 
                     // Generate mempool description
-                    $mempool_entry['i']     = $i;
-                    $mempool_entry['index'] = $index;
-                    foreach (explode('.', $index) as $k => $i) {
-                        $mempool_entry['index' . $k] = $i;          // Index parts
-                    }
+                    $mempool_entry = array_merge($mempool_entry, entity_index_tags($index, $i));
                     $descr = entity_descr_definition('mempool', $entry, $mempool_entry, $mempools_count);
 
                     // Check array requirements list

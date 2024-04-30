@@ -31,7 +31,7 @@ OSPF-MIB::ospfDemandExtensions.0 = INTEGER: false(2)
 
 // Pull data from device
 if ($ospf_instance_poll = snmpwalk_cache_oid($device, 'ospfGeneralGroup', [], 'OSPF-MIB')) {
-    $ospf_instance_poll = $ospf_instance_poll[0];
+    $ospf_instance_poll = array_shift($ospf_instance_poll);
 
     // Don't bother polling everything if we have no enabled or non-defaulted router ids.
     if ($ospf_instance_poll['ospfRouterId'] !== '0.0.0.0' ||
@@ -159,6 +159,14 @@ if (OBS_DEBUG) {
 }
 
 foreach ($ospf_areas_poll as $ospf_area_index => $ospf_area_poll) {
+    // Fortigate have Extra index part!
+    $index_parts = explode('.', $ospf_area_index);
+    if (count($index_parts) > 4) {
+        // OSPF-MIB::ospfAreaId.0.0.0.0.1 = IpAddress: 0.0.0.0
+        array_pop($index_parts);
+        $ospf_area_index = implode('.', $index_parts);
+    }
+
     // If the entry doesn't already exist in the prebuilt array, insert into the database and put into the array
     $insert = [];
     if (!isset($ospf_areas_db[$ospf_area_index])) {
@@ -211,7 +219,7 @@ foreach ($ospf_areas_db as $ospf_area_db) {
 }
 // Multi Delete
 if (!safe_empty($db_delete)) {
-    dbDelete('ospf_areas', generate_query_values_ng($db_delete, 'ospf_area_id'));
+    dbDelete('ospf_areas', generate_query_values($db_delete, 'ospf_area_id'));
 }
 
 unset($ospf_areas_db, $ospf_areas_poll, $db_delete);
@@ -251,9 +259,17 @@ $ospf_port_oids = ['ospfIfIpAddress', 'ospfAddressLessIf', 'ospfIfAreaId', 'ospf
                    'ospfIfStatus', 'ospfIfMulticastForwarding', 'ospfIfDemand', 'ospfIfAuthType'];
 
 // Build array of existing entries
-// V2 always have 5 part index, ie: 95.130.232.140.0
-foreach (dbFetchRows('SELECT * FROM `ospf_ports` WHERE `device_id` = ? AND `ospf_port_id` REGEXP ?',
-                     [$device['device_id'], '^[[:digit:]]+(\.[[:digit:]]+){4}$']) as $entry) {
+if (get_db_version() < 493) {
+    // CLEANME. Remove after CE 24.xx
+    // V2 always have 5 part index, ie: 95.130.232.140.0
+    $sql    = 'SELECT * FROM `ospf_ports` WHERE `device_id` = ? AND `ospf_port_id` REGEXP ?';
+    $params = [ $device['device_id'], '^[[:digit:]]+(\.[[:digit:]]+){4}$' ];
+} else {
+    $sql    = 'SELECT * FROM `ospf_ports` WHERE `device_id` = ? AND `ospfVersionNumber` = ?';
+    $params = [ $device['device_id'], 'version2' ];
+}
+$ospf_ports_db = [];
+foreach (dbFetchRows($sql, $params) as $entry) {
     $ospf_ports_db[$entry['ospf_port_id']] = $entry;
 }
 
@@ -266,6 +282,14 @@ if (OBS_DEBUG) {
 }
 
 foreach ($ospf_ports_poll as $ospf_port_index => $ospf_port_poll) {
+    // Fortigate have Extra index part!
+    $index_parts = explode('.', $ospf_port_index);
+    if (count($index_parts) > 5) {
+        // OSPF-MIB::ospfIfIpAddress.10.255.14.1.0.1 = IpAddress: 10.255.14.1
+        array_pop($index_parts);
+        $ospf_port_index = implode('.', $index_parts);
+    }
+
     $insert = [];
 
     // Get associated port
@@ -286,6 +310,7 @@ foreach ($ospf_ports_poll as $ospf_port_index => $ospf_port_poll) {
     if (!isset($ospf_ports_db[$ospf_port_index])) {
         $insert['device_id']    = $device['device_id'];
         $insert['ospf_port_id'] = $ospf_port_index;
+        $insert['ospfVersionNumber'] = 'version2';
 
         foreach ($ospf_port_oids as $oid) {
             // Loop the OIDs
@@ -307,6 +332,7 @@ foreach ($ospf_ports_poll as $ospf_port_index => $ospf_port_poll) {
             }
         }
         if ($db_update) {
+            $insert['ospfVersionNumber'] = 'version2';
             dbUpdateRowMulti($insert, 'ospf_ports', 'ospf_ports_id');
             echo('U');
         } else {
@@ -329,7 +355,7 @@ foreach ($ospf_ports_db as $ospf_port_db) {
 }
 // Multi Delete
 if (!safe_empty($db_delete)) {
-    dbDelete('ospf_ports', generate_query_values_ng($db_delete, 'ospf_ports_id'));
+    dbDelete('ospf_ports', generate_query_values($db_delete, 'ospf_ports_id'));
 }
 
 unset($ospf_ports_db, $ospf_ports_poll, $db_delete);
@@ -358,9 +384,17 @@ $ospf_nbr_oids = ['ospfNbrIpAddr', 'ospfNbrAddressLessIndex', 'ospfNbrRtrId', 'o
                   'ospfNbmaNbrPermanence', 'ospfNbrHelloSuppressed'];
 
 // Build array of existing entries
-// V2 always have 5 part index, ie: .95.130.232.130.0
-foreach (dbFetchRows('SELECT * FROM `ospf_nbrs` WHERE `device_id` = ? AND `ospf_nbr_id` REGEXP ?',
-                     [$device['device_id'], '^[[:digit:]]+(\.[[:digit:]]+){4}$']) as $entry) {
+if (get_db_version() < 493) {
+    // CLEANME. Remove after CE 24.xx
+    // V2 always have 5 part index, ie: 95.130.232.140.0
+    $sql    = 'SELECT * FROM `ospf_nbrs` WHERE `device_id` = ? AND `ospf_nbr_id` REGEXP ?';
+    $params = [ $device['device_id'], '^[[:digit:]]+(\.[[:digit:]]+){4}$' ];
+} else {
+    $sql    = 'SELECT * FROM `ospf_nbrs` WHERE `device_id` = ? AND `ospfVersionNumber` = ?';
+    $params = [ $device['device_id'], 'version2' ];
+}
+$ospf_nbrs_db = [];
+foreach (dbFetchRows($sql, $params) as $entry) {
     $ospf_nbrs_db[$entry['ospf_nbr_id']] = $entry;
 }
 
@@ -373,6 +407,14 @@ if (OBS_DEBUG) {
 }
 
 foreach ($ospf_nbrs_poll as $ospf_nbr_index => $ospf_nbr_poll) {
+    // Fortigate have Extra index part!
+    $index_parts = explode('.', $ospf_nbr_index);
+    if (count($index_parts) > 5) {
+        // OSPF-MIB::ospfNbrIpAddr.10.255.14.2.0.1 = IpAddress: 10.255.14.2
+        array_pop($index_parts);
+        $ospf_nbr_index = implode('.', $index_parts);
+    }
+
     // If the entry doesn't already exist in the prebuilt array, insert into the database and put into the array
     $insert = [];
 
@@ -399,6 +441,7 @@ foreach ($ospf_nbrs_poll as $ospf_nbr_index => $ospf_nbr_poll) {
     if (!isset($ospf_nbrs_db[$ospf_nbr_index])) {
         $insert['device_id']   = $device['device_id'];
         $insert['ospf_nbr_id'] = $ospf_nbr_index;
+        $insert['ospfVersionNumber'] = 'version2';
 
         if (is_null($insert['port_id'])) {
             $insert['port_id'] = 0; // keep compat with old db
@@ -426,6 +469,7 @@ foreach ($ospf_nbrs_poll as $ospf_nbr_index => $ospf_nbr_poll) {
             $db_update = TRUE;
         }
         if ($db_update) {
+            $insert['ospfVersionNumber'] = 'version2';
             if (is_null($insert['port_id'])) {
                 $insert['port_id'] = ['NULL'];
             }
@@ -451,7 +495,7 @@ foreach ($ospf_nbrs_db as $ospf_nbr_db) {
 }
 // Multi Delete
 if (!safe_empty($db_delete)) {
-    dbDelete('ospf_nbrs', generate_query_values_ng($db_delete, 'ospf_nbrs_id'));
+    dbDelete('ospf_nbrs', generate_query_values($db_delete, 'ospf_nbrs_id'));
 }
 
 unset($ospf_nbrs_db, $ospf_nbrs_poll, $db_delete);

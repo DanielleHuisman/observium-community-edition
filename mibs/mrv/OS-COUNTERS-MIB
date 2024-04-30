@@ -1,0 +1,1256 @@
+--  =======================================================================
+--  File        : osCounters.mib
+--  Description : Private MIB supports MRV counters
+--  By          : Inna
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-COUNTERS-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE, enterprises,
+                Counter64, Unsigned32                         FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION,
+                DisplayString, TruthValue                     FROM SNMPv2-TC
+                oaOptiSwitch                                  FROM OS-COMMON-TC-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osCounters       MODULE-IDENTITY
+                LAST-UPDATED "201612270000Z"  -- 27 Dec. 2016
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Inna Levin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ilevin@mrv.com"
+                DESCRIPTION
+                    "Ingress/Egress Counters for Network Interconnect Devices."
+
+                REVISION     "201612270000Z"  -- 27 Dec. 2016
+                DESCRIPTION
+                  "Changes for OS-V* famoly:
+                  a) osCountersVFeaturesSupport BITs and;
+                  b) new onjects osCntVifDropOcts and osCntVifDropPkts;
+                  b) the new table osCntVBindTable is an alternative of osCntBindTable."
+
+
+                REVISION     "201104050000Z"
+                DESCRIPTION
+                   "1. Adding new enumerations: ingressMatchingCounters (6), egressMatchingCounters (7), tunnelCounters (8)
+                        for the object osCountersFeaturesSupport
+                    2. Adding new TEXTUAL-CONVENTIONs CntDirection, CntMatchingId    
+                    3. Adding new table osCntBindTable
+                    4. Adding new table osCntAclTable of the ACL counters "
+
+                REVISION     "201007170000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 8 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osCountersCapabilities   OBJECT IDENTIFIER ::= { osCounters 1 }
+osCountersConformance    OBJECT IDENTIFIER ::= { osCounters 100 }
+osCountersMIBCompliances OBJECT IDENTIFIER ::= { osCountersConformance 1 }
+osCountersMIBGroups      OBJECT IDENTIFIER ::= { osCountersConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+CntBooleanFlag ::=               TEXTUAL-CONVENTION
+                                 STATUS       current
+                                 DESCRIPTION
+                                 "Boolean type value."
+                                 SYNTAX       INTEGER {
+                                    other     (-1),
+                                    no        (0),
+                                    yes       (1)
+                                 }
+
+CntEntryStatusVal ::=            TEXTUAL-CONVENTION
+                                 STATUS       current
+                                 DESCRIPTION
+                                 "Status for controlling of the entry."
+                                 SYNTAX       INTEGER {
+                                    none       (1),
+                                    invalid    (2),
+                                    valid      (3),
+                                    clear      (4)
+                                 }
+
+CntEntryStatusExtVal ::=         TEXTUAL-CONVENTION
+                                 STATUS       current
+                                 DESCRIPTION
+                                 "Status for controlling of the entry with extentions (create/delete)."
+                                 SYNTAX       INTEGER { 
+                                    none       (1),
+                                    invalid    (2),
+                                    valid      (3),
+                                    delete     (4),
+                                    create     (5),
+                                    clear      (6)
+                                 }
+
+CntTableStatusVal ::=            TEXTUAL-CONVENTION
+                                 STATUS       current
+                                 DESCRIPTION
+                                 "Status for controlling of the table."
+                                 SYNTAX       INTEGER { 
+                                    none          (1),
+                                    invalidTbl    (2),
+                                    validTbl      (3),
+                                    clearAll      (4)
+                                 }
+
+CntPortIndex ::=                TEXTUAL-CONVENTION
+                                DISPLAY-HINT "d"
+                                STATUS       current
+                                DESCRIPTION
+                                "A unique value, greater than zero, for each Port or
+                                in the managed system.                               
+                                Actual limit is SNMP object osPortCfgMaxNumberOfPort (osPort.mib).
+                                All Ports with PortIndex greater or equal osPortCfgBaseTrunkPortIndex (osPort.mib) 
+                                are Ethernet Channels."
+                                SYNTAX       Unsigned32 (1..2147483647)
+
+CntPortIndexOrAll ::=           TEXTUAL-CONVENTION
+                                DISPLAY-HINT "d"
+                                STATUS       current
+                                DESCRIPTION
+                                "Like CntPortIndex plus '0' value for 'all' ports."
+                                SYNTAX       Unsigned32 (0|1..2147483647)
+
+CntVlanId ::=                   TEXTUAL-CONVENTION
+                                DISPLAY-HINT "d"
+                                STATUS      current
+                                DESCRIPTION
+                                "The VLAN-ID that uniquely identifies a VLAN.  This
+                                is the 12-bit VLAN-ID used in the VLAN Tag header.
+                                The range is defined by the REFERENCEd specification."
+                                REFERENCE
+                                "IEEE Std 802.1Q 2003 Edition, Virtual Bridged
+                                Local Area Networks."
+                                SYNTAX      Unsigned32 (1..4095)
+
+CntVlanIdOrAll ::=              TEXTUAL-CONVENTION
+                                DISPLAY-HINT "d"
+                                STATUS      current
+                                DESCRIPTION
+                                "Like CntVlanId plus '0' value for 'all' vlans."
+                                SYNTAX      Unsigned32 (0|1..4095)
+
+CntServiceLevelOrAll ::=        TEXTUAL-CONVENTION
+                                DISPLAY-HINT "d"
+                                STATUS       current
+                                DESCRIPTION
+                                "Service level values, plus '0' means 'all' servive levels." 
+                                SYNTAX     Unsigned32 (0|1..8)
+
+CntDpLevelOrAll ::=             TEXTUAL-CONVENTION
+                                 STATUS       current
+                                 DESCRIPTION
+                                 "Drop precedence levels (colors),  '0' means 'all' levels." 
+                                 SYNTAX       INTEGER {
+                                    all           (0),
+                                    green         (1),
+                                    yellow        (2),
+                                    red           (3)
+                                 }
+
+CntDirection ::=                TEXTUAL-CONVENTION
+                                 STATUS       current
+                                 DESCRIPTION
+                                 "Counter direction ingress or egress." 
+                                 SYNTAX  INTEGER { 
+                                    ingress   (1),
+                                    egress    (2)
+                                 }
+
+CntMatchingId ::=               TEXTUAL-CONVENTION
+                                 DISPLAY-HINT "d"
+                                 STATUS      current
+                                 DESCRIPTION
+                                 "Matching counter ID."
+                                 SYNTAX      Unsigned32 (1..2048)
+
+-- ************************************************************
+-- Support and Status
+-- ************************************************************
+
+osCountersFeaturesSupport OBJECT-TYPE
+    SYNTAX       BITS {
+        portIngressCounters         (0), 
+        portEgressCounters          (1), 
+        vifIngressCounters          (2), 
+        vifEgressCounters           (3), 
+        ingressSetCounters          (4),
+        egressSetCounters           (5),
+        ingressMatchingCounters     (6),
+        egressMatchingCounters      (7),
+        tunnelCounters              (8)
+    }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates features, that supported by this agent. Additionally this object serves as
+       a SupportValue"
+    ::= { osCountersCapabilities 1 }
+
+osCntPrtEgrTblStatus  OBJECT-TYPE
+    SYNTAX             CntTableStatusVal
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Status for controlling of the table."
+    ::= { osCountersCapabilities 2 }
+
+osCntPrtEgrCaps   OBJECT-TYPE
+    SYNTAX       BITS {
+        hasPassGrnOcts        (0),
+        hasPassGrnPkts        (1),
+        hasPassYelOcts        (2),
+        hasPassYelPkts        (3),
+        hasPassRedOcts        (4),
+        hasPassRedPkts        (5),
+        hasDropGrnOcts        (6),
+        hasDropGrnPkts        (7),
+        hasDropYelOcts        (8),
+        hasDropYelPkts        (9),
+        hasDropRedOcts       (10),
+        hasDropRedPkts       (11)
+    }
+    MAX-ACCESS   read-only
+    STATUS       current       
+    DESCRIPTION  "The MIB object shows which counters are supported by the table."
+    ::= { osCountersCapabilities 3 }
+
+osCntVifDirTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntVifDirEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table handles status of interface counters tables."
+    ::= { osCountersCapabilities 4 }
+
+
+osCntVifDirEntry OBJECT-TYPE
+    SYNTAX      OsCntVifDirEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntVifDirTable table."
+    INDEX { osCntVifDirection  }
+    ::= { osCntVifDirTable 1 }
+
+OsCntVifDirEntry ::= SEQUENCE {
+    osCntVifDirection         CntDirection,
+    osCntVifDirTblStatus      CntTableStatusVal
+}
+
+osCntVifDirection   OBJECT-TYPE
+    SYNTAX      CntDirection
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The type of the counters table - ingress or egress."
+    ::= { osCntVifDirEntry 1 }
+
+osCntVifDirTblStatus  OBJECT-TYPE
+    SYNTAX             CntTableStatusVal
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Status for controlling of the table."
+    ::= { osCntVifDirEntry 2 }
+
+osCntVifCaps   OBJECT-TYPE
+    SYNTAX       BITS {
+        hasIngPassOcts        (0),
+        hasIngPassPkts        (1),
+        hasEgrPassOcts        (2),
+        hasEgrPassPkts        (3)
+    }
+    MAX-ACCESS   read-only
+    STATUS       current       
+    DESCRIPTION  "The MIB object shows which counters are supported by the table."
+    ::= { osCountersCapabilities 5 }
+
+osCntIngSuiteTblStatus  OBJECT-TYPE
+    SYNTAX             CntTableStatusVal
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Status for controlling of the table."
+    ::= { osCountersCapabilities 6 }
+
+osCntIngSuiteCaps   OBJECT-TYPE
+    SYNTAX       BITS {
+        hasPassPkts        (0),
+        hasVlanDropPkts    (1),
+        hasSecDropPkts     (2),
+        hasOtherDropPkts   (3),
+        hasServiceLevel    (4)
+    }
+    MAX-ACCESS   read-only
+    STATUS       current       
+    DESCRIPTION  "The MIB object shows which counters are supported by the table."
+    ::= { osCountersCapabilities 7 }
+
+osCntEgrSuiteTblStatus  OBJECT-TYPE
+    SYNTAX             CntTableStatusVal
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Status for controlling of the table."
+    ::= { osCountersCapabilities 8 }
+
+osCntEgrSuiteCaps   OBJECT-TYPE
+    SYNTAX       BITS {
+        hasUcPassPkts         (0),
+        hasMcPassPkts         (1),
+        hasBcPassPkts         (2),
+        hasTxqDropPkts        (3),
+        hasYellow             (4),
+        hasSkip               (5),
+        hasIntPort            (6)
+    }
+    MAX-ACCESS   read-only
+    STATUS       current       
+    DESCRIPTION  "The MIB object shows which counters are supported by the table."
+    ::= { osCountersCapabilities 9 }
+
+osCountersVFeaturesSupport OBJECT-TYPE
+    SYNTAX       BITS {
+      hasAclIngress            (0),
+      hasAclSecondIngress      (1),
+      hasAclEgress             (2),
+      hasVlanPassIngress       (3),
+      hasVlanDropIngress       (4),
+      hasVlanPassEgress        (5),
+      hasVlanDropEgress        (6),
+      hasPortEgress            (7),
+      hasReserved1VBit         (8),
+      hasReserved2VBit         (9),
+      hasTrafficManager        (10)
+    }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates features, that supported by this agent. Additionally this object serves as
+       a SupportValue: if this object exists, use osCntVBindTable instead osCntBindTable."
+    ::= { osCountersCapabilities 10 }
+
+-- ************************************************************
+-- The osCntPrtEgrTable - Table of the Port Egress counters
+-- ************************************************************
+
+osCntPrtEgrTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntPrtEgrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table handles port egress counters."
+   REFERENCE
+      "CLI commands:
+       'show port egress-counters (byte|packet|all) details [PORTS_GROUP]'
+       'clear port egress-counters [PORTS_GROUP]'"
+    ::= { osCounters 2 }
+
+osCntPrtEgrEntry OBJECT-TYPE
+    SYNTAX      OsCntPrtEgrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntPrtEgrTable table.
+        Note: If different counters for 'yellow' are not supported, 
+        then counters for 'green' count both 'green' and 'yellow' units."
+    INDEX { osCntPrtEgrPortIndex, osCntPrtEgrServiceLevel }
+    ::= { osCntPrtEgrTable 1 }
+
+OsCntPrtEgrEntry ::= SEQUENCE {
+    osCntPrtEgrPortIndex          CntPortIndex,
+    osCntPrtEgrServiceLevel       CntServiceLevelOrAll,
+    osCntPrtEgrEntryStatus        CntEntryStatusVal,
+    osCntPrtEgrPassGrnOcts        Counter64,
+    osCntPrtEgrPassGrnPkts        Counter64,
+    osCntPrtEgrPassYlwOcts        Counter64,
+    osCntPrtEgrPassYlwPkts        Counter64,
+    osCntPrtEgrPassRedOcts        Counter64,
+    osCntPrtEgrPassRedPkts        Counter64,
+    osCntPrtEgrPassOcts           Counter64,
+    osCntPrtEgrPassPkts           Counter64,
+    osCntPrtEgrDropGrnOcts        Counter64,
+    osCntPrtEgrDropGrnPkts        Counter64,
+    osCntPrtEgrDropYlwOcts        Counter64,
+    osCntPrtEgrDropYlwPkts        Counter64,
+    osCntPrtEgrDropRedOcts        Counter64,
+    osCntPrtEgrDropRedPkts        Counter64,
+    osCntPrtEgrDropOcts           Counter64,
+    osCntPrtEgrDropPkts           Counter64
+}
+
+osCntPrtEgrPortIndex OBJECT-TYPE
+    SYNTAX           CntPortIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters port."
+    ::= { osCntPrtEgrEntry 1 }
+
+osCntPrtEgrServiceLevel OBJECT-TYPE
+    SYNTAX           CntServiceLevelOrAll
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters service level."
+    ::= { osCntPrtEgrEntry 2 }
+
+osCntPrtEgrEntryStatus   OBJECT-TYPE
+    SYNTAX  CntEntryStatusVal
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+            "Counter entry status (see CntEntryStatusVal)."
+        ::= { osCntPrtEgrEntry 3 }
+
+--
+-- Counters of passed bytes/packets 
+--
+osCntPrtEgrPassGrnOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes marked 'green'."
+    ::= { osCntPrtEgrEntry 4 }
+
+osCntPrtEgrPassGrnPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted packets marked 'green'."
+    ::= { osCntPrtEgrEntry 5 }
+
+osCntPrtEgrPassYlwOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes marked 'yellow'."
+    ::= { osCntPrtEgrEntry 6 }
+
+osCntPrtEgrPassYlwPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted packets marked 'yellow'."
+    ::= { osCntPrtEgrEntry 7 }
+
+osCntPrtEgrPassRedOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes marked 'red'."
+    ::= { osCntPrtEgrEntry 8 }
+
+osCntPrtEgrPassRedPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted packets marked 'red'."
+    ::= { osCntPrtEgrEntry 9 }
+
+osCntPrtEgrPassOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes of all colors."
+    ::= { osCntPrtEgrEntry 10 }
+
+osCntPrtEgrPassPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted packets of all colors."
+    ::= { osCntPrtEgrEntry 11 }
+
+--
+-- Counters of dropped bytes/packets 
+--
+osCntPrtEgrDropGrnOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop bytes marked 'green'."
+    ::= { osCntPrtEgrEntry 12 }
+
+osCntPrtEgrDropGrnPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop packets marked 'green'."
+    ::= { osCntPrtEgrEntry 13 }
+
+osCntPrtEgrDropYlwOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop bytes marked 'yellow'."
+    ::= { osCntPrtEgrEntry 14 }
+
+osCntPrtEgrDropYlwPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop packets marked 'yellow'."
+    ::= { osCntPrtEgrEntry 15 }
+
+osCntPrtEgrDropRedOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop bytes marked 'red'."
+    ::= { osCntPrtEgrEntry 16 }
+
+osCntPrtEgrDropRedPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop packets marked 'red'."
+    ::= { osCntPrtEgrEntry 17 }
+
+osCntPrtEgrDropOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop bytes of all colors."
+    ::= { osCntPrtEgrEntry 18 }
+
+osCntPrtEgrDropPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Drop packets of all colors."
+    ::= { osCntPrtEgrEntry 19 }
+
+-- ************************************************************
+-- The osCntVifTable - Table of the Interface Ingess/Egress counters
+-- ************************************************************
+
+osCntVifTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntVifEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table handles interface egress counters."
+   REFERENCE
+      "CLI commands:
+       'show interface-vlan-counters IFNAME'
+       'clear interface-vlan-counters IFNAME'
+       'vlan-egress-counters'
+       'no vlan-egress-counters'"
+    ::= { osCounters 3 }
+
+osCntVifEntry OBJECT-TYPE
+    SYNTAX      OsCntVifEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntVifTable table."
+    INDEX { osCntVifDirection, osCntVifIndex, osCntVifServiceLevel }
+    ::= { osCntVifTable 1 }
+
+OsCntVifEntry ::= SEQUENCE {
+    osCntVifIndex              CntVlanId,
+    osCntVifServiceLevel       CntServiceLevelOrAll,
+    osCntVifEntryStatus        CntEntryStatusVal,
+    osCntVifPassOcts           Counter64,
+    osCntVifPassPkts           Counter64,
+    osCntVifDropOcts           Counter64,
+    osCntVifDropPkts           Counter64
+}
+
+osCntVifIndex OBJECT-TYPE
+    SYNTAX      CntVlanId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters interface number."
+    ::= { osCntVifEntry 1 }
+
+osCntVifServiceLevel OBJECT-TYPE
+    SYNTAX           CntServiceLevelOrAll
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters service level."
+    ::= { osCntVifEntry 2 }
+
+osCntVifEntryStatus   OBJECT-TYPE
+    SYNTAX  CntEntryStatusVal
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Counter entry status (see CntEntryStatusVal)."
+    ::= { osCntVifEntry 3 }
+
+osCntVifPassOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes."
+    ::= { osCntVifEntry 4 }
+
+osCntVifPassPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted packets."
+    ::= { osCntVifEntry 5 }
+
+osCntVifDropOcts OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes."
+    ::= { osCntVifEntry 6 }
+
+osCntVifDropPkts OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes."
+    ::= { osCntVifEntry 7 }
+
+
+-- ************************************************************
+-- The osCntIngSuiteTable - Table of the Ingress Suite counters
+-- ************************************************************
+
+osCntIngSuiteTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntIngSuiteEntry
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+       "This table handles ingress set counters."
+   REFERENCE
+      "CLI commands:
+        'ingress-counters (set1|set2) port (PORT|all) tag (<1-4096>|all)'
+        'no ingress-counters (set1|set2)'
+        'show ingress-counters (set1|set2)'
+        'clear ingress-counters (set1|set2)'"
+    ::= { osCounters 4 }
+
+osCntIngSuiteEntry OBJECT-TYPE
+    SYNTAX      OsCntIngSuiteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntIngSuiteTable table."
+    INDEX { osCntIngSuiteIndex }
+    ::= { osCntIngSuiteTable 1 }
+
+OsCntIngSuiteEntry ::= SEQUENCE {
+    osCntIngSuiteIndex              Unsigned32,
+    osCntIngSuitePortIndex          CntPortIndexOrAll,
+    osCntIngSuiteVifIndex           CntVlanIdOrAll,
+    osCntIngSuiteServiceLevel       CntServiceLevelOrAll,
+    osCntIngSuiteEntryStatus        CntEntryStatusExtVal,
+    osCntIngSuitePassPkts           Counter64,
+    osCntIngSuiteVlanDropPkts       Counter64,
+    osCntIngSuiteSecDropPkts        Counter64,
+    osCntIngSuiteOtherDropPkts      Counter64
+}
+
+osCntIngSuiteIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters suite number."
+    REFERENCE
+       "set1 and set2 in CLI."
+    ::= { osCntIngSuiteEntry 1 }
+
+osCntIngSuitePortIndex OBJECT-TYPE
+    SYNTAX      CntPortIndexOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters port number."
+    ::= { osCntIngSuiteEntry 2 }
+
+osCntIngSuiteVifIndex OBJECT-TYPE
+    SYNTAX      CntVlanIdOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters interface number."
+    ::= { osCntIngSuiteEntry 3 }
+
+osCntIngSuiteServiceLevel OBJECT-TYPE
+    SYNTAX      CntServiceLevelOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters service level."
+    ::= { osCntIngSuiteEntry 4 }
+
+osCntIngSuiteEntryStatus  OBJECT-TYPE
+    SYNTAX             CntEntryStatusExtVal
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Counter entry status (see CntEntryStatusExtVal)."
+    ::= { osCntIngSuiteEntry 5 }
+
+osCntIngSuitePassPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of received packets. Like to dot1dTpPortInFrames or dot1qTpVlanPortInFrames"
+    REFERENCE
+       "'REC PACKETS' column in 'show ingress-counters' CLI table."    
+    ::= { osCntIngSuiteEntry 6 }
+
+osCntIngSuiteVlanDropPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of packets discarded due to VLAN Ingress Filtering.
+         Like to dot1qTpVlanPortInDiscard."
+    REFERENCE
+       "'DROP VLAN-FILTER' column in 'show ingress-counters' CLI table."    
+    ::= { osCntIngSuiteEntry 7 }
+
+osCntIngSuiteSecDropPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of packets discarded due to Security Filtering measures:
+         MAC SA/DA filtering, Locked port, MAC Range Filtering, Invalid SA."
+    REFERENCE
+       "'DROP SECURITY' column in 'show ingress-counters' CLI table."    
+    ::= { osCntIngSuiteEntry 8 }
+
+osCntIngSuiteOtherDropPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of packets discarded due to: packet is local to receive port, brosdcast
+         rate filtering, IP multicast filtering. Like to dot1dTpPortInDiscards or dot1qTpVlanPortInDiscard"
+    REFERENCE
+       "'DROP OTHER' column in 'show ingress-counters' CLI table."
+    ::= { osCntIngSuiteEntry 9 }
+
+
+-- ************************************************************
+-- The osCntEgrSuiteTable - Table of the Egress Suite counters
+-- ************************************************************
+osCntEgrSuiteTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntEgrSuiteEntry
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+       "This table handles port egress set counters."
+   REFERENCE
+      "CLI commands:
+        'egress-counters (set1|set2) (port|ingress-port) (PORT|all|skip) tag (<1-4096>|all) sl (<1-8>|all) cl (green|red|all)'
+        'no egress-counters (set1|set2)'
+        'show egress-counters (set1|set2)'
+        'clear egress-counters (set1|set2)'"
+    ::= { osCounters 5 }
+
+osCntEgrSuiteEntry OBJECT-TYPE
+    SYNTAX      OsCntEgrSuiteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntEgrSuiteTable table."
+    INDEX { osCntEgrSuiteIndex }
+    ::= { osCntEgrSuiteTable 1 }
+
+OsCntEgrSuiteEntry ::= SEQUENCE {
+    osCntEgrSuiteIndex              Unsigned32,
+    osCntEgrSuitePortIndex          CntPortIndexOrAll,
+    osCntEgrSuiteVifIndex           CntVlanIdOrAll,
+    osCntEgrSuiteServiceLevel       CntServiceLevelOrAll,
+    osCntEgrSuiteDpLevel            CntDpLevelOrAll,
+    osCntEgrSuiteIsSkip             CntBooleanFlag,
+    osCntEgrSuiteIsIntPort          CntBooleanFlag,
+    osCntEgrSuiteEntryStatus        CntEntryStatusExtVal,
+    osCntEgrSuiteUcPassPkts         Counter64,
+    osCntEgrSuiteMcPassPkts         Counter64,
+    osCntEgrSuiteBcPassPkts         Counter64,
+    osCntEgrSuiteTxqDropPkts        Counter64
+}
+
+osCntEgrSuiteIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters suite number."
+    REFERENCE
+       "set1 and set2 in CLI."
+    ::= { osCntEgrSuiteEntry 1 }
+
+osCntEgrSuitePortIndex OBJECT-TYPE
+    SYNTAX      CntPortIndexOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters port number. 
+         If 'osCntEgrSuiteIsSkip' is 'yes', then the 'osCntEgrSuitePortIndex' 
+         is read-only and it shows the current skip port."
+    ::= { osCntEgrSuiteEntry 2 }
+
+osCntEgrSuiteVifIndex OBJECT-TYPE
+    SYNTAX      CntVlanIdOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters interface number."
+    ::= { osCntEgrSuiteEntry 3 }
+
+osCntEgrSuiteServiceLevel OBJECT-TYPE
+    SYNTAX      CntServiceLevelOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters service level."
+    ::= { osCntEgrSuiteEntry 4 }
+
+osCntEgrSuiteDpLevel OBJECT-TYPE
+    SYNTAX      CntDpLevelOrAll
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The counters drop precedence (color) level."
+    ::= { osCntEgrSuiteEntry 5 }
+
+osCntEgrSuiteIsSkip OBJECT-TYPE
+    SYNTAX      CntBooleanFlag
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value 'yes' means the skipping mechanizm is 'on'. 
+         Then the counters suite is skipping each second to the next port
+         so 'osCntEgrSuitePortIndex' and 'osCntEgrSuiteIsIntPort' cannot be set.
+         The value 'no' means the skipping mechanizm is 'off'."
+   REFERENCE
+      "CLI commands:
+        'egress-counters (set1|set2) port skip tag (<1-4096>|all) sl (<1-8>|all) cl (green|red|all)'"
+    ::= { osCntEgrSuiteEntry 6 }
+
+osCntEgrSuiteIsIntPort OBJECT-TYPE
+    SYNTAX      CntBooleanFlag
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value 'yes' means the port is internal port."
+   REFERENCE
+      "CLI commands:
+        'egress-counters (set1|set2) ingress-port skip tag (<1-4096>|all) sl (<1-8>|all) cl (green|red|all)'"
+    ::= { osCntEgrSuiteEntry 7 }
+
+osCntEgrSuiteEntryStatus  OBJECT-TYPE
+    SYNTAX             CntEntryStatusExtVal
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Counter entry status (see CntEntryStatusExtVal)."
+    ::= { osCntEgrSuiteEntry 8 }
+
+osCntEgrSuiteUcPassPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of unicast packets transmitted."
+    REFERENCE
+        "'UNICAST/UNKNOWN' column in 'show egress-counters' CLI command."
+    ::= { osCntEgrSuiteEntry 9 }
+
+osCntEgrSuiteMcPassPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of multicast packets transmitted. This includes 
+         registered multicasts, unregistered multicasts and 
+         unknown unicast packets.."
+    REFERENCE
+        "'MCAST' column in 'show egress-counters' CLI command."
+    ::= { osCntEgrSuiteEntry 10 }
+
+osCntEgrSuiteBcPassPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of brosdcast packets transmitted."
+    REFERENCE
+        "'BCAST' column in 'show egress-counters' CLI command."
+    ::= { osCntEgrSuiteEntry 11 }
+
+osCntEgrSuiteTxqDropPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Number of IN packets that were filtered due to TxQ
+         congestion."
+    REFERENCE
+        "'TxQ Congest' column in 'show egress-counters' CLI command."
+    ::= { osCntEgrSuiteEntry 12 }
+
+-- ************************************************************
+      -- The osCntAclTable - Table of the ACL counters
+-- ************************************************************
+osCntAclTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntAclEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table handles ACL counters."
+    ::= { osCounters 6 }
+
+osCntAclEntry OBJECT-TYPE
+    SYNTAX      OsCntAclEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntAclTable table."
+    INDEX { osCntAclDirection, osCntAclMatchingIndex }
+    ::= { osCntAclTable 1 }
+
+OsCntAclEntry ::= SEQUENCE {
+    osCntAclDirection       CntDirection,
+    osCntAclMatchingIndex   CntMatchingId,
+    osCntAclEntryStatus     CntEntryStatusVal,
+    osCntAclMatchOcts       Counter64,
+    osCntAclMatchPkts       Counter64
+}
+
+osCntAclDirection   OBJECT-TYPE
+    SYNTAX      CntDirection
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The type of the counters table - ingress or egress."
+    ::= { osCntAclEntry 1 }
+
+osCntAclMatchingIndex   OBJECT-TYPE
+    SYNTAX      CntMatchingId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The type of the counters table - ingress or egress."
+    ::= { osCntAclEntry 2 }
+
+osCntAclEntryStatus   OBJECT-TYPE
+    SYNTAX  CntEntryStatusVal
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+            "Counter entry status (see CntEntryStatusVal)."
+        ::= { osCntAclEntry 3 }
+
+osCntAclMatchOcts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted bytes."
+    ::= { osCntAclEntry 4 }
+
+osCntAclMatchPkts  OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  
+        "Admitted packets."
+    ::= { osCntAclEntry 5 }
+
+-- ************************************************************
+--    Adding appropriate table for bind counter:
+-- *************************************************************
+osCntBindTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntBindEntry
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+     "This table handles dynamic counters."
+    REFERENCE
+      "CLI commands:
+             counters-block (port-egress| vlan-egress | vlan-ingress | acl-ingress | acl-egress)"
+    ::= { osCounters 10 }
+
+osCntBindEntry OBJECT-TYPE
+    SYNTAX      OsCntBindEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntBindTable table."
+    INDEX { osCntBindBlockIndex }
+    ::= { osCntBindTable 1 }
+
+OsCntBindEntry ::= SEQUENCE {
+    osCntBindBlockIndex        Unsigned32,
+    osCntBindCountersMode      INTEGER,
+    osCntBindCountersRange     INTEGER,
+    osCntBindLastError         DisplayString
+}
+
+osCntBindBlockIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters suite number."
+    REFERENCE
+       "The Index of the Block."
+    ::= { osCntBindEntry 1 }
+
+osCntBindCountersMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+	               none                (1),
+	               aclIngressCounter   (2),
+	               aclEgressCounter    (3),
+                   portEgressCounter   (4),
+                   vlanEgressCounter   (5),
+                   vlanIngressCounter  (6)
+           }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The mode of the counters"
+    ::= { osCntBindEntry 2 }
+
+osCntBindCountersRange OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   range2k    (1),
+                   range4k    (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counters interface number."
+    ::= { osCntBindEntry 3 }
+  
+
+osCntBindLastError  OBJECT-TYPE
+    SYNTAX           DisplayString (SIZE (2..160))
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Last configuration error description."
+    ::= { osCntBindEntry 4 }
+        
+
+-- ************************************************************
+--    Adding appropriate table for bind counter:
+-- *************************************************************
+osCntVBindTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsCntVBindEntry
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+     "This table handles dynamic counters."
+    REFERENCE
+      "CLI commands:
+             counters-block (...)"
+    ::= { osCounters 11 }
+
+osCntVBindEntry OBJECT-TYPE
+    SYNTAX      OsCntVBindEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osCntVBindTable table."
+    INDEX { osCntVBindClient }
+    ::= { osCntVBindTable 1 }
+
+OsCntVBindEntry ::= SEQUENCE {
+    osCntVBindClient        INTEGER,
+    osCntVBindIsActive      TruthValue,
+    osCntVBindLastError     DisplayString
+}
+
+osCntVBindClient OBJECT-TYPE
+    SYNTAX       INTEGER {
+      cncAclIngress            (1),
+      cncAclSecondIngress      (2),
+      cncAclEgress             (3),
+      cncVlanPassIngress       (4),
+      cncVlanDropIngress       (5),
+      cncVlanPassEgress        (6),
+      cncVlanDropEgress        (7),
+      cncPortEgress            (8),
+      cncReserved1VBit         (9),
+      cncReserved2VBit         (10),
+      cncTrafficManager        (11)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The counters clinet type."
+    ::= { osCntVBindEntry 1 }
+
+osCntVBindIsActive OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The activation status of the client."
+    ::= { osCntVBindEntry 3 }
+  
+
+osCntVBindLastError  OBJECT-TYPE
+    SYNTAX          DisplayString (SIZE (2..160))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "Last configuration error description."
+    ::= { osCntVBindEntry 4 }
+        
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osCountersMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the osCounters MIB implementations."
+    MODULE -- this module 
+    MANDATORY-GROUPS { 
+        osCountersMandatoryGroup
+    }
+    GROUP osCountersOptGroup
+    DESCRIPTION 
+        "Optional objects for the osCounters MIB."
+
+    ::= { osCountersMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osCountersMandatoryGroup  OBJECT-GROUP
+    OBJECTS {
+        osCountersFeaturesSupport
+    }
+    STATUS current 
+    DESCRIPTION 
+        "Mandatory Conformance group."
+    ::= { osCountersMIBGroups 1 }
+
+osCountersOptGroup  OBJECT-GROUP 
+    OBJECTS  { 
+--  osCountersCapabilities
+        osCntPrtEgrTblStatus,
+        osCntPrtEgrCaps,
+        osCntVifDirTblStatus,
+        osCntVifCaps, 
+        osCntIngSuiteTblStatus,
+        osCntIngSuiteCaps,
+        osCntEgrSuiteTblStatus,
+        osCntEgrSuiteCaps,
+        osCountersVFeaturesSupport,
+    
+--  osCntPrtEgrTable
+        osCntPrtEgrEntryStatus, 
+        osCntPrtEgrPassGrnOcts, osCntPrtEgrPassGrnPkts, 
+        osCntPrtEgrPassYlwOcts, osCntPrtEgrPassYlwPkts, 
+        osCntPrtEgrPassRedOcts, osCntPrtEgrPassRedPkts, 
+        osCntPrtEgrPassOcts, osCntPrtEgrPassPkts, 
+        osCntPrtEgrDropGrnOcts, osCntPrtEgrDropGrnPkts, 
+        osCntPrtEgrDropYlwOcts, osCntPrtEgrDropYlwPkts, 
+        osCntPrtEgrDropRedOcts, osCntPrtEgrDropRedPkts, 
+        osCntPrtEgrDropOcts, osCntPrtEgrDropPkts,
+        
+--  osCntVifTable 
+        osCntVifEntryStatus,  -- clear
+        osCntVifPassOcts, osCntVifPassPkts,
+        osCntVifDropOcts, osCntVifDropPkts,
+        
+--  osCntIngSuiteTable
+        osCntIngSuitePortIndex, osCntIngSuiteVifIndex, osCntIngSuiteServiceLevel,
+        osCntIngSuiteEntryStatus, -- invalid/valid/clear
+        osCntIngSuitePassPkts, osCntIngSuiteVlanDropPkts,
+        osCntIngSuiteSecDropPkts, osCntIngSuiteOtherDropPkts,
+
+--  osCntEgrSuiteTable
+        osCntEgrSuitePortIndex, osCntEgrSuiteVifIndex, osCntEgrSuiteServiceLevel, osCntEgrSuiteDpLevel,
+        osCntEgrSuiteIsSkip, osCntEgrSuiteIsIntPort,
+        osCntEgrSuiteEntryStatus, -- invalid/valid/clear
+        osCntEgrSuiteUcPassPkts, osCntEgrSuiteMcPassPkts,
+        osCntEgrSuiteBcPassPkts, osCntEgrSuiteTxqDropPkts,
+        
+--  osCntAclTable
+       osCntAclEntryStatus, osCntAclMatchOcts, osCntAclMatchPkts,
+
+--  osCntBindTable
+       osCntBindCountersMode, osCntBindCountersRange , osCntBindLastError,
+
+--  osCntVBindTable
+       osCntVBindIsActive, osCntVBindLastError
+    } 
+    STATUS current 
+    DESCRIPTION 
+        "Optional objects for the osCounters MIB."
+    ::= { osCountersMIBGroups 2 } 
+
+END

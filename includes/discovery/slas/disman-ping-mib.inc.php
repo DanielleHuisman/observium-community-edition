@@ -76,8 +76,8 @@ foreach ($oids as $sla_owner => $entry2) {
         $data['sla_tag'] = $data['sla_target'];                 // FIXME. Here must be $sla_name, but migrate too hard
 
         // Limits
-        $data['sla_limit_high']      = ($entry['pingCtlTimeOut'] > 0 ? $entry['pingCtlTimeOut'] * 1000 : 5000);
-        $data['sla_limit_high_warn'] = intval($data['sla_limit_high'] / 5);
+        $data['sla_limit_high']      = $entry['pingCtlTimeOut'] > 0 ? $entry['pingCtlTimeOut'] * 1000 : 5000;
+        $data['sla_limit_high_warn'] = (int)($data['sla_limit_high'] / 5);
 
         /*
         // Migrate old indexes

@@ -5,16 +5,16 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
 // Get options before definitions!
-$options = getopt("h:i:m:n:p:U:dquaMV");
+$options = getopt("h:i:m:n:p:U:dfquaMV");
 
 include("includes/observium.inc.php");
 include("includes/discovery/functions.inc.php");
@@ -66,10 +66,22 @@ if (!isset($options['q'])) {
 }
 
 if (isset($options['u']) || isset($options['U']) ||
-    (isset($options['h']) && in_array($options['h'], ['all', 'odd', 'even', 'none']))) {
+    (isset($options['h']) && in_array($options['h'], [ 'all', 'odd', 'even', 'none' ]))) {
     $options['u'] = TRUE;
+    if (isset($options['f'])) {
+        //$options['U'] = TRUE;
+    }
 
     include($config['install_dir'] . '/includes/update/update.php');
+    if ($updating) {
+        // DB schema updated. force alert/groups update
+        $options['a'] = TRUE;
+    }
+
+    // check remote poller params
+    if (OBS_DISTRIBUTED) {
+        check_local_poller();
+    }
 } elseif (!isset($options['q'])) {
     // Warn about need DB schema update
     $db_version = get_db_version();
@@ -154,12 +166,13 @@ OPTIONS:
  -i                                          Discovery instance.
  -n                                          Discovery number.
  -q                                          Quiet output.
- -a                                          Force update Groups/Alerts table
+ -a                                          Update Groups/Alerts table
  -u                                          Upgrade DB schema
  -M                                          Show globally enabled/disabled modules and exit.
  -V                                          Show version and exit.
 
 DEBUGGING OPTIONS:
+ -f                                          Force requested option
  -d                                          Enable debugging output.
  -dd                                         More verbose debugging output.
  -m                                          Specify modules (separated by commas) to be run.
@@ -181,7 +194,7 @@ if (!$where) {
             //run_action_queue('device_delete');
 
             // Update alert and group tables
-            run_action_queue('tables_update');
+            run_action_queue('tables_update', $options);
         } else {
             $silent = isset($options['q']);
             if (function_exists('update_group_tables')) {
@@ -197,7 +210,7 @@ if (!$where) {
 }
 
 // For not new devices discovery, skip down devices
-if ($options['h'] !== 'new') {
+if ($options['h'] !== 'new' && !isset($options['f'])) {
     $where    .= ' AND `status` = ?';
     $params[] = 1;
 }
@@ -223,9 +236,7 @@ foreach (dbFetchRows("SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER 
 
 print_cli_heading("%WFinished discovery run at " . date("Y-m-d H:i:s"), 0);
 
-$end            = utime();
-$run            = $end - $start;
-$discovery_time = substr($run, 0, 5);
+$discovery_time = elapsed_time($start, 4);
 
 // Update Group/Alert tables
 if (($discovered_devices && !isset($options['m'])) || isset($options['a'])) {
@@ -235,9 +246,10 @@ if (($discovered_devices && !isset($options['m'])) || isset($options['a'])) {
         print_message("Update alert and group tables added to queue [$action_id].");
         //log_event("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].", NULL, 'info', NULL, 7);
     } else {
+        // Not exist in CE
         if (function_exists('update_group_tables')) {
             update_group_tables($silent);
-        } // Not exist in CE
+        }
         if (function_exists('update_alert_tables')) {
             update_alert_tables($silent);
         }
@@ -250,22 +262,8 @@ if ($discovered_devices) {
         $doing = $device['hostname'];
 
         // This discovery passed from wrapper and with process id
-        if ($config['poller_id'] > 0 &&
-            $poller = dbFetchRow('SELECT * FROM `pollers` WHERE `poller_id` = ?', [$config['poller_id']])) {
-            print_debug_vars($poller, 1);
-            $host_id = get_local_id();
-            $update  = [];
-            if ($poller['host_id'] != $host_id) {
-                $update['host_id'] = $host_id;
-                log_event("Poller " . $config['poller_id'] . " host ID changed: '" . $poller['host_id'] . "' -> '" . $host_id . "'");
-            }
-            if ($poller['host_uname'] != php_uname()) {
-                $update['host_uname'] = php_uname();
-                log_event("Poller " . $config['poller_id'] . " host uname changed: '" . $poller['host_uname'] . "' -> '" . $update['host_uname'] . "'");
-            }
-            if (count($update)) {
-                dbUpdate($update, 'pollers', '`poller_id` = ?', [$config['poller_id']]);
-            }
+        if (OBS_DISTRIBUTED && !$options['u']) {
+            check_local_poller();
         }
     }
 } elseif (!isset($options['q']) && !$options['u']) {
@@ -278,8 +276,8 @@ logfile($string);
 
 // Clean stale observium processes
 $process_sql = "SELECT * FROM `observium_processes` WHERE `poller_id` = ? AND `process_start` < ?";
-foreach (dbFetchRows($process_sql, [$config['poller_id'], $config['time']['fourhour']]) as $process) {
-    // We found processes in DB, check if it exist on system
+foreach (dbFetchRows($process_sql, [ $config['poller_id'], get_time('fourhour') ]) as $process) {
+    // We found processes in DB, check if it exists on a system
     print_debug_vars($process);
     $pid_info = get_pid_info($process['process_pid']);
     if (is_array($pid_info) && str_contains($pid_info['COMMAND'], $process['process_name'])) {

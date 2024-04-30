@@ -196,10 +196,15 @@ function graph_error($string)
             }
 
             $im = imagecreate($width, $height);
-            imagecolorallocate($im, 255, 224, 224);
+            imagecolorallocatealpha($im, 254, 0,0, 96);
 
             if (str_contains($string, "OK")) {
-                $string = "RRDTool seems to have generated an empty graph. \nPlease ensure that RRDs are being populated for this device.";
+
+                if(isset($GLOBALS['graph_error'])) {
+                    $string = $GLOBALS['graph_error'];
+                } else {
+                    $string = "RRDTool seems to have generated an empty graph. \nPlease ensure that RRDs are being populated for this device.";
+                }
             }
 
 
@@ -209,7 +214,7 @@ function graph_error($string)
             for ($i = 0; $i < $line_count; $i++) {
                 $px = (imagesx($im) - $font_width * strlen($lines[$i])) / 2;
                 $py = ($height - $font_height * $line_count) / 2 + $i * $font_height;
-                imagestring($im, $font, $px, $py, $lines[$i], imagecolorallocate($im, 128, 0, 0));
+                imagestring($im, $font, $px, $py, $lines[$i], imagecolorallocate($im, 254, 0, 0));
             }
 
             header('Content-type: image/png');

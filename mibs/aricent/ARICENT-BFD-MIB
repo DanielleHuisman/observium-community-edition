@@ -1,0 +1,751 @@
+-- Copyright (C) 2010-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsbfd.mib,v 1.6 2013/07/13 12:43:32 siva Exp $
+
+
+-- BFD Proprietary MIB Definition  
+-- This MIB contains tables used to configure a switch running 
+-- BFD in addition to the standard BFD MIB.
+ 
+    ARICENT-BFD-MIB DEFINITIONS ::= BEGIN 
+ 
+    IMPORTS 
+      MODULE-IDENTITY, OBJECT-TYPE, enterprises, Integer32, Unsigned32,
+      Counter32, NOTIFICATION-TYPE
+          FROM SNMPv2-SMI
+
+      RowPointer,TruthValue,TEXTUAL-CONVENTION
+          FROM SNMPv2-TC
+
+      bfdSessEntry, bfdSessDesiredMinTxInterval,
+      bfdSessNegotiatedInterval, bfdSessReqMinRxInterval,
+      bfdSessDiscriminator, bfdSessRemoteDiscr, bfdSessState
+          FROM BFD-STD-MIB
+
+      BfdSessOperModeTC, BfdIntervalTC, BfdMultiplierTC
+          FROM BFD-TC-STD-MIB;
+
+      fsBfd MODULE-IDENTITY 
+      LAST-UPDATED "201209050000Z" 
+      ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE" 
+      CONTACT-INFO "support@aricent.com" 
+      DESCRIPTION
+          "This proprietary MIB for BFD is to provide a proactive
+          mechanism to detect faults using BFD."
+      REVISION "201209050000Z" 
+      DESCRIPTION 
+          "This proprietary MIB for BFD is to provide a proactive
+          mechanism to detect faults using BFD."
+
+      ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 53 }
+
+ 
+-- ------------------------------------------------------------  
+-- groups in the MIB  
+-- ------------------------------------------------------------ 
+ 
+      fsBfdGlobals         OBJECT IDENTIFIER ::= { fsBfd 1 } 
+      fsBfdObjects         OBJECT IDENTIFIER ::= { fsBfd 2 } 
+      fsBfdNotification    OBJECT IDENTIFIER ::= { fsBfd 3 }
+ 
+-- ------------------------------------------------------------
+-- Textual Conventions 
+-- ------------------------------------------------------------
+
+    FsSessionMapTypeTC ::= TEXTUAL-CONVENTION
+        STATUS         current
+        DESCRIPTION
+          "Used to indicate the type of MPLS or MPLS-TP path associated to 
+           the session"
+        SYNTAX INTEGER {
+                 nonteipv4(1),       -- mapping into LDP IPv4
+                 nonteipv6(2),       -- mapping into LDP IPv6
+                 teipv4(3),          -- mapping into TE IPv4 Working LSP
+                 teipv6(4),          -- mapping into TE IPv6
+                 pw(5),              -- mapping into Pseudowires
+                 mep(6),             -- mapping into MEPs in MPLS-TP
+                 teipv4protection(7) -- mapping into TE IPv4 Protecting LSP
+               }
+
+-- ------------------------------------------------------------------ 
+-- BFD Global objects for System Config
+-- ------------------------------------------------------------------ 
+    fsBfdSystemControl OBJECT-TYPE 
+        SYNTAX      INTEGER  { start(1), shutdown(2) } 
+        MAX-ACCESS  read-write 
+        STATUS      current 
+        DESCRIPTION 
+          "The administrative system control status of the BFD module.
+           The value 'start' (1) indicates that the BFD feature should be
+           started in the system and all resources required by 
+           the BFD module should be allocated.
+           The value 'shutdown' (2) indicates that the BFD feature should be 
+           shutdown in the device and all allocated memory must be released."  
+        DEFVAL { start }
+    ::= { fsBfdGlobals 1 }
+
+    fsBfdTraceLevel OBJECT-TYPE 
+        SYNTAX      Integer32          
+        MAX-ACCESS  read-write 
+        STATUS      current 
+        DESCRIPTION 
+          "This object is used to store the trace options that are enabled
+           by the user. The bit positions to enable specific traces are as 
+           shown below :
+ 
+           Bit 0  - init-shut
+           Bit 1  - mgmt
+           Bit 2  - data
+           Bit 3  - ctrl
+           Bit 4  - pkt-dump
+           Bit 5  - resource
+           Bit 6  - all-fail
+           Bit 7  - buf
+
+           Bit 8  - sess-estb
+           Bit 9  - sess-down
+           Bit 10 - poll-seq
+           Bit 11 - critical
+           Bit 12 - redundancy
+           Bit 13 - Offload
+
+           A value of zero(0) indicates traces are disabled and a value with 
+           all bits set to one indicates all traces are enabled.
+           By default critical trace (Bit 11) is set."
+        DEFVAL { '00000800'H }
+    ::= { fsBfdGlobals 2 } 
+
+    fsBfdTrapEnable OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION    
+          "This object is used to enable or disable specific traps in the 
+           system. The bit positions to enable specific traps are as shown
+           below :
+
+           Bit 0  - enables the bfdSessUp/bfdSessDown notification
+           Bit 1  - enables the fsBfdSessBtstrapFailTrap notificaton 
+           Bit 2  - enables the fsBfdSessNegTxIntvlChange notification 
+           Bit 3  - enables the fsBfdSessAdminCtrlErrTrap notification 
+          
+           A value of zero(0) indicates traps are disabled and a value with 
+           all bits set to one indicates all traps are enabled. 
+           By default no traps will be enabled.
+           Note that bfdSessUp and bfdSessDown notifications
+           can be set either using the object bfdSessNotificationsEnable
+           or using this object and the same will be reflected in both the
+           objects"    
+        DEFVAL { 0 }
+    ::= { fsBfdGlobals 3 }
+
+-- ------------------------------------------------------------------ 
+-- BFD Global Objects for Session Config 
+-- ------------------------------------------------------------------ 
+
+    fsBfdGblSessOperMode OBJECT-TYPE
+        SYNTAX     BfdSessOperModeTC
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+          "This object specifies the operating mode applicable to all BFD 
+           sessions in the system. This value will serve as the default 
+           operational mode for all BFD session entries during session entry
+           creation, in the absence of a per-session operational mode being 
+           configured for each session entry.Modification of this object will
+           thereon not be reflected to the individual session enteries.
+           (Modification of session opertional mode for individual session 
+           enteries should be done using the object 'bfdSessOperMode' in the
+           session table.) The modified value of this object will be used only
+           for the session enteries created after modification.
+           The default operational mode is 'asynchModeWOEchoFunction'."
+        DEFVAL { asynchModeWOEchoFunction }
+    ::= { fsBfdGlobals 4 }
+   
+    fsBfdGblDesiredMinTxIntvl OBJECT-TYPE
+        SYNTAX     BfdIntervalTC
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+          "This object specifies the minimum interval, in microseconds, that
+           the local system would like to use when transmitting BFD Control 
+           packets. This value will serve as the default desired transmit 
+           interval for all BFD session entries during session entry creation,
+           in the absence of a per-session desired transmit interval being 
+           configured for each session entry. Modification of this object will
+           thereon not be reflected to the individual session enteries.
+           (Modification of the desired transmit interval for individual 
+            session enteries should be done using the object
+           'bfdSessDesiredMinTxInterval' in the session table.) 
+           The modified value of this object will be used
+           only for the session enteries created after modification.
+           The default desired transmit interval is 1 second."
+         DEFVAL { 1000000 }
+    ::= { fsBfdGlobals 5 }
+
+    fsBfdGblReqMinRxIntvl OBJECT-TYPE
+        SYNTAX     BfdIntervalTC
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+          "This object specifies the minimum interval, in microseconds, 
+           between received BFD Control packets the local system is capable 
+           of supporting. This value will serve as the default receive
+           interval for all BFD session entries during session entry creation,
+           in the absence of a per-session required receive interval being 
+           configured for each session entry. Modification of this object will
+           thereon not be reflected to the individual session enteries.
+           (Modification of the receive interval for individual 
+            session enteries should be done using the object
+           'bfdSessReqMinRxInterval' in the session table.) 
+           The modified value of this object will be used
+           only for the session enteries created after modification.
+           The default required receive interval is 1 second."
+        DEFVAL { 1000000 }
+    ::= { fsBfdGlobals 6 }
+
+    fsBfdGblDetectMult OBJECT-TYPE
+        SYNTAX     BfdMultiplierTC
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+          "This object specifies the Detect time multiplier. This value will
+           serve as the default detect time multiplier for all BFD session 
+           entries during session entry creation , in the absence of a 
+           per-session detect time multiplier being configured for each 
+           session entry. Modification of this object will thereon not 
+           be reflected to the individual session enteries. (Modification 
+           of the detect time multiplier for individual session enteries 
+           should be done using the object 'bfdSessDetectMult' in the
+           session table.) The modified value of this object will be used
+           only for the session enteries created after modification."
+        DEFVAL { 3 }
+    ::= { fsBfdGlobals 7 }
+
+    fsBfdGblSlowTxIntvl OBJECT-TYPE
+        SYNTAX     Unsigned32 (1000000..4294967295)
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+          "This object specifies the interval, in microseconds, between 
+           BFD control packet transmission (bootstrapped or otherwise) during 
+           the BFD session establishment process until the session comes to
+           the UP state at both end systems. 
+           After the session is in the UP state in both the local and remote 
+           system, the packets will be transmitted at an interval influenced 
+           by the session's negotiated transmit interval and the value in 
+           this object will not be used."
+        DEFVAL { 1000000 }
+    ::= { fsBfdGlobals 8 }
+
+-- ------------------------------------------------------------------ 
+-- BFD Global objects for Statistics
+-- ------------------------------------------------------------------ 
+    
+   fsBfdMemAllocFailure  OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+         "This object gives the count of total memory allocation failures in 
+          the BFD module"
+      ::= { fsBfdGlobals 9 }
+
+   fsBfdInputQOverFlows  OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+         "This object gives the count of total input queue overflows for the
+          BFD module"
+      ::= {fsBfdGlobals 10}
+
+    fsBfdClrGblStats   OBJECT-TYPE
+        SYNTAX             TruthValue
+        MAX-ACCESS         read-write
+        STATUS             current
+        DESCRIPTION     
+          "This object is used to clear the global statistics of the BFD
+           module.
+           Setting this object to true will cause the statistics to be reset 
+           and setting this object to false will have no effect. 
+           A Get operation on this object will always return a value of false."
+        DEFVAL { false }
+    ::= { fsBfdGlobals 11 }
+
+    fsBfdClrAllSessStats OBJECT-TYPE 
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write 
+        STATUS      current 
+        DESCRIPTION
+          "This object is used to clear all the statistics and counters of all
+           the BFD sessions currently running in the system. Setting this 
+           object to true will cause the statistics to be reset and setting 
+           this object to false will have no effect. 
+           A Get operation on this object will always return a value of false."
+        DEFVAL  { false }
+    ::= { fsBfdGlobals 13 }
+
+
+-- ------------------------------------------------------------------ 
+-- BFD Objects for Session Config
+-- ------------------------------------------------------------------
+-- fsBfdSessionTable - bfdSessTable Augment
+
+    fsBfdSessionTable   OBJECT-TYPE  
+        SYNTAX              SEQUENCE OF FsBfdSessionEntry  
+        MAX-ACCESS          not-accessible   
+        STATUS              current  
+        DESCRIPTION  
+          "This table is an augment to the bfdSessTable for configuring
+           BFD sessions for MPLS or MPLS-TP paths."
+    ::= { fsBfdObjects 1 } 
+
+    fsBfdSessionEntry   OBJECT-TYPE  
+        SYNTAX              FsBfdSessionEntry  
+        MAX-ACCESS          not-accessible  
+        STATUS              current  
+        DESCRIPTION  
+          "A row in this table augments a row in bfdSessTable."
+        AUGMENTS    { bfdSessEntry }
+    ::= { fsBfdSessionTable 1 }
+ 
+    FsBfdSessionEntry ::= SEQUENCE {  
+        fsBfdSessRole               INTEGER,
+        fsBfdSessMode               INTEGER,
+        fsBfdSessRemoteDiscr        Unsigned32,
+        fsBfdSessEXPValue           Unsigned32,
+        fsBfdSessTmrNegotiate       TruthValue,
+        fsBfdSessOffld              TruthValue,
+        fsBfdSessEncapType          INTEGER,
+        fsBfdSessAdminCtrlReq       TruthValue,
+        fsBfdSessAdminCtrlErrReason INTEGER,
+        fsBfdSessMapType            FsSessionMapTypeTC,
+        fsBfdSessMapPointer         RowPointer,
+        fsBfdSessCardNumber         Unsigned32,
+        fsBfdSessSlotNumber         Unsigned32,
+        fsBfdSessRegisteredClients  Unsigned32
+    }  
+
+ 
+    fsBfdSessRole  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                      active(1),
+                      passive(2)
+                    }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+          "This object specifies whether the system is playing the 
+           active(1) role or the passive(2) role for this BFD session.
+           BFD session will not come up if both the ends of a path are
+           configured to be passive. In case of MPLS and MPLS-TP LSP, 
+           it is expected to configure the BFD session in the 
+           ingress of the LSP as Active. Even in the case of static 
+           provisioning of discriminators, it is recommended to 
+           configure the BFD session as Active at the ingress and 
+           as Passive at the egress. In the case of PW, BFD session
+           at both the ends should be Active." 
+        REFERENCE
+            "RFC 5880, Section 6.1"
+        DEFVAL { active }
+    ::= { fsBfdSessionEntry 1 }
+
+    fsBfdSessMode  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                      cc(1),
+                      ccv(2)
+                    }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+          "This object specifies whether the BFD session is running in
+           Continuity Check(CC) or the Connectivity Verification(CV) mode.
+           This object is  always cc(1) if the value of fsBfdSessMapType is 
+           any value other than mep(6). 
+           
+           When the fsBfdSessMapType is mep(6) and indicates that this
+           BFD session is for an MPLS-TP path, then this object can hold 
+           either a CC(1) or a CCV(2) value."
+        REFERENCE
+            " draft-ietf-mpls-tp-cc-cv-00 "
+        DEFVAL { cc }
+    ::= { fsBfdSessionEntry 2 }
+
+    fsBfdSessRemoteDiscr OBJECT-TYPE
+        SYNTAX     Unsigned32 (0 | 1..4294967295)
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+          "This object specifies the session discriminator that is to be used
+           by the remote system for this BFD session.  This object is 
+           configurable for both MPLS and MPLS-TP paths.
+           
+           The value may be zero(0) if the remote discriminator is not yet
+           known or if session is in the down or adminDown state.
+           
+           A Get operation on the this object will return the same value as
+           the bfdSessRemoteDiscr object for each BFD session."
+        REFERENCE
+            "draft-ieft-mpls-tp-lsp-ping-bfd-procedures-00 Section 3"
+    ::= { fsBfdSessionEntry 3 }
+
+    fsBfdSessEXPValue  OBJECT-TYPE
+        SYNTAX             Unsigned32(0..7)
+        MAX-ACCESS         read-create
+        STATUS             current
+        DESCRIPTION
+          "This object specifies the MPLS experimental field(traffic class 
+           field) value that should be sent in the MPLS header for the 
+           BFD control packets."
+        DEFVAL { 0 }
+    ::= { fsBfdSessionEntry 4 }
+
+    fsBfdSessTmrNegotiate  OBJECT-TYPE
+        SYNTAX             TruthValue
+        MAX-ACCESS         read-create
+        STATUS             current
+        DESCRIPTION
+          "This object specifies if timer negotiation is required for
+           the BFD session. When set to false, timer negotiation is 
+           disabled and if the value of the received DesiredMinTxInterval
+           is different from the locally configured RequiredMinRxInterval,
+           or the received value of the Detect Multiplier field is 
+           different from the locally configured value, then a Period 
+           Mis-Configuration defect will be detected. When this object is 
+           set to true, support for Period Mis-Configuration defect is 
+           not provided."
+        DEFVAL { true }
+    ::= { fsBfdSessionEntry 5 }
+
+    fsBfdSessOffld  OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+          "This object specifies if the BFD session needs to be
+           offloaded onto a specific hardware chipset or an external
+           software component or a seperate CPU/Core. When set to true 
+           the BFD session will be offloaded."
+        DEFVAL { false }
+    ::= { fsBfdSessionEntry 6 }
+
+     fsBfdSessEncapType  OBJECT-TYPE
+        SYNTAX           INTEGER {
+                            mplsIp (1),
+                            mplsAch (2),
+                            mplsAchIp (3),
+                            vccvNegotiated (4)
+                         }                     
+        MAX-ACCESS       read-create
+        STATUS           current
+        DESCRIPTION
+          "This object specifies the encapsulation type of the 
+           BFD Control packets. In case of MPLS LSP/Tunnel, the 
+           encapsulation type should be set to mplsIp, which is the
+           default value for MPLS LSP/Tunnel.Note that for an MPLS
+           LSP/Tunnel,an IP return path, if present, will be used to 
+           send the BFD control packets, in case an MPLS LSP/Tunnel
+           return path is not available.
+
+           For MPLS-TP LSP/Tunnel any one of the following 
+           types: mplsIp, mplsAch or mplsAchIp is applicable, 
+           mplsAch being the default.For MPLS or MPLS-TP PW,
+           the encapsulation type should be set to vccvNegotiated, 
+           which is the default value for MPLS and 
+           MPLS-TP PW."
+    ::= { fsBfdSessionEntry 7 }
+
+    fsBfdSessAdminCtrlReq  OBJECT-TYPE
+        SYNTAX             TruthValue
+        MAX-ACCESS         read-only
+        STATUS             current
+        DESCRIPTION
+          "This object specifies if an administrator control or 
+           intervention is required for the session due to an 
+           error specified by fsBfdSessAdminCtrlErrReason. This object
+           will display True when such an administrator control
+           is required, for eg if a period mis-configuration 
+           defect is detected for a session, the same will be 
+           indicated by fsBfdSessAdminCtrlErrReason and this object will 
+           be set to true. The administrator may then take the necessary
+           action eg in this case change the timer values to rectify the 
+           defect"
+    ::= { fsBfdSessionEntry 8 }
+
+    fsBfdSessAdminCtrlErrReason  OBJECT-TYPE
+        SYNTAX             INTEGER
+                           {
+                              none (0),  
+                              sessOffloadFailure (1),
+                              periodMisConfigDefect (2)  
+                           }
+        MAX-ACCESS         read-only
+        STATUS             current
+        DESCRIPTION
+          "This object specifies the reason for an error in the 
+           BFD session. For instance, when offloading of a BFD session
+           fails due to any reason, this object is set to the value
+           sessOffloadFailure. Similarly if a period mis-configuration
+           defect is detected, this object specifies the same and is set
+           to periodMisConfigDefect(2). By default when there is no error
+           value none(0)is used."
+    ::= { fsBfdSessionEntry 9 }
+
+    fsBfdSessMapType OBJECT-TYPE
+        SYNTAX             FsSessionMapTypeTC
+        MAX-ACCESS         read-create
+        STATUS             current
+        DESCRIPTION
+          "This object indicates the type of path being monitored by this
+           BFD session entry."
+    ::= { fsBfdSessionEntry 10 }
+
+    fsBfdSessMapPointer OBJECT-TYPE
+        SYNTAX           RowPointer
+        MAX-ACCESS       read-create
+        STATUS           current
+        DESCRIPTION
+          "If fsBfdSessMapType is ldpipv4(1) or ldpipv6(2), then this object
+           MUST contain zeroDotZero or point to an instance of the mplsXCEntry 
+           indicating the LDP-based LSP associated with this BFD session.
+           
+           If fsBfdSessMapType is rsvpipv4(3) or rsvpipv6(4), then this object
+           MUST contain zeroDotZero or point to an instance of the 
+           mplsTunnelEntry indicating the RSVP-based MPLS TE tunnel associated 
+           with this BFD session.
+           
+           If fsBfdSessMapType is pw(5), then this object MUST contain 
+           zeroDotZero or point to an instance of the pwEntry indicating the 
+           MPLS Pseudowire associated with this BFD session.
+           
+           If fsBfdSessMapTpye is mep(6). then this object MUST contain 
+           zeroDotZero or point to an instance identifying the MEP entity 
+           configured for monitoring the MPLS-TP path associated with this BFD 
+           session.
+           
+           If this object points to a conceptual row instance in a table 
+           consistent with fsBfdSessMapType but this instance does not 
+           currently exist then no valid path is associated with this session 
+           entry.
+           
+           If this object contains zeroDotZero then no valid path is 
+           associated with this BFD session entry till it is populated with 
+           a valid pointer consistent with the value of fsBfdSessMapType 
+           as explained above."
+      ::= { fsBfdSessionEntry 11 }
+
+    fsBfdSessCardNumber OBJECT-TYPE
+        SYNTAX             Unsigned32
+        MAX-ACCESS         read-create
+        STATUS             current
+        DESCRIPTION
+          "This object specifies the card number to which the BFD session is
+           offloaded."
+    ::= { fsBfdSessionEntry 12 }
+
+    fsBfdSessSlotNumber OBJECT-TYPE
+        SYNTAX             Unsigned32
+        MAX-ACCESS         read-create
+        STATUS             current
+        DESCRIPTION
+          "This object specifies the slot number to which the BFD session 
+           is offloaded."
+    ::= { fsBfdSessionEntry 13 }
+
+    fsBfdSessRegisteredClients OBJECT-TYPE
+        SYNTAX             Unsigned32
+        MAX-ACCESS         read-only
+        STATUS             current
+        DESCRIPTION
+          "This object specifies the BFD clients who are all registered for the
+           particular session. When each client register for the session, the 
+	   bit corresponding to the Client ID will be set in this field.
+	   For Example, if OSPF with client ID 1 registers for the session,then the 
+	   first bit will be set in this field (i.e. 0x80 00 00 00)"
+    ::= { fsBfdSessionEntry 14 }
+
+
+
+-- ------------------------------------------------------------------ 
+-- BFD Objects for Session performance 
+-- ------------------------------------------------------------------
+-- fsBfdSessPerfTable - bfdSessPerfTable Augment
+
+    fsBfdSessPerfTable     OBJECT-TYPE  
+        SYNTAX              SEQUENCE OF FsBfdSessPerfEntry
+        MAX-ACCESS          not-accessible  
+        STATUS              current  
+        DESCRIPTION  
+          "This table is an augment to the bfdSessPerfTable"
+    ::= { fsBfdObjects 2 }
+
+    fsBfdSessPerfEntry OBJECT-TYPE
+        SYNTAX     FsBfdSessPerfEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "A row in this table augments the bfdSessPerfTable"
+        AUGMENTS    { bfdSessEntry }
+    ::= { fsBfdSessPerfTable 1 }
+
+    FsBfdSessPerfEntry ::= SEQUENCE {
+        fsBfdSessPerfCCPktIn    Counter32,
+        fsBfdSessPerfCCPktOut   Counter32,
+        fsBfdSessPerfCVPktIn    Counter32,
+        fsBfdSessPerfCVPktOut   Counter32,
+        fsBfdSessMisDefCount    Counter32,
+        fsBfdSessLocDefCount    Counter32,
+        fsBfdSessRdiInCount     Counter32,
+        fsBfdSessRdiOutCount    Counter32,
+        fsBfdClearStats         TruthValue
+    }    
+
+    fsBfdSessPerfCCPktIn OBJECT-TYPE
+        SYNTAX     Counter32
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "The total number of BFD CC  control messages received for this
+             BFD session."
+        ::= { fsBfdSessPerfEntry 1 }
+
+    fsBfdSessPerfCCPktOut OBJECT-TYPE
+        SYNTAX     Counter32
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "The total number of BFD CC control messages sent for this BFD
+             session."
+        ::= { fsBfdSessPerfEntry 2 }
+
+    fsBfdSessPerfCVPktIn OBJECT-TYPE
+        SYNTAX     Counter32
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "The total number of BFD CV  control messages received for this
+             BFD session."
+        ::= { fsBfdSessPerfEntry 3 }
+
+    fsBfdSessPerfCVPktOut OBJECT-TYPE
+        SYNTAX     Counter32
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "The total number of BFD CV control messages sent for this BFD
+             session."
+        ::= { fsBfdSessPerfEntry 4 }
+
+     fsBfdSessMisDefCount  OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+           "This object gives a count of the misconnectivity defects
+           detected for the BFD session. For instance, this count will be 
+           incremented when the received BFD control packet carries an 
+           incorrect globally unique source MEP identifier. 
+           This count is valid only for MPLS-TP paths. For MPLS paths
+           this count will show a value 0 and will not be incremented."
+    ::= { fsBfdSessPerfEntry 5 }
+
+    fsBfdSessLocDefCount  OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+           "This object gives a count of the Loss of continuity defects 
+           detected in MPLS and MPLS-TP path ."
+    ::= { fsBfdSessPerfEntry 6 }
+
+    fsBfdSessRdiInCount  OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+           "This object gives a count of the Remote Defect Indications
+           received for the BFD session in MPLS-TP environment.
+           It is valid only for bi-directional MPLS-TP paths.For MPLS
+           paths this count will show a value 0 and will not be incremented."
+    ::= { fsBfdSessPerfEntry 7 } 
+
+    fsBfdSessRdiOutCount  OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+           "This object gives a count of the Remote Defect Indications
+           sent by the BFD session in MPLS-TP environment.
+           It is valid only for bi-directional MPLS-TP paths.For MPLS
+           paths this count will show a value 0 and will not be incremented."
+    ::= { fsBfdSessPerfEntry 8 }  
+
+  
+    fsBfdClearStats   OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     
+          "This object is used to clear all the statistic counters for this  
+           BFD session.
+           Setting this object to true will cause the statistics to be reset 
+           and setting this object to false will have no effect. 
+           A Get operation on this object will always return a value of 
+           false."
+        DEFVAL { false }
+    ::= { fsBfdSessPerfEntry 9 }
+   
+-- ------------------------------------------------------------------ 
+-- BFD Notification Group 
+-- ------------------------------------------------------------------ 
+    fsBfdTraps OBJECT IDENTIFIER ::= { fsBfdNotification 0 }
+
+
+    fsBfdSessBtstrapFailTrap NOTIFICATION-TYPE
+        OBJECTS {
+          bfdSessDiscriminator
+        }
+        STATUS      current
+        DESCRIPTION
+          "This notification is generated when session establishment 
+           fails while using LSP Ping Bootstrap."
+    ::= { fsBfdTraps 1 }
+
+
+    fsBfdSessNegTxIntvlChange NOTIFICATION-TYPE
+        OBJECTS {
+          bfdSessDiscriminator,
+          bfdSessRemoteDiscr,
+          bfdSessNegotiatedInterval
+        }
+        STATUS      current
+        DESCRIPTION
+          "This notification is generated when the negotiated transmit 
+           interval changes due to a change in the local DesiredMinTxInterval 
+           value or  remote RequiredMinRxInterval value."
+    ::= { fsBfdTraps 2 }
+
+    fsBfdSessAdminCtrlErrTrap NOTIFICATION-TYPE
+        OBJECTS {
+          bfdSessState,
+          bfdSessDiscriminator,
+          fsBfdSessAdminCtrlErrReason
+        }
+        STATUS      current
+        DESCRIPTION
+          "This notification is generated in case of an error detected in 
+           the BFD sesion. For instance, when fsBfdSessTmrNegotiate is set 
+           to false and the value of the received Desired min TX interval is 
+           different from the locally configured reception period, or the 
+           received value of the Detect Multiplier is different from the 
+           locally configured one, a period misconfiguration defect will be 
+           detected and this trap will be raised.
+          
+           This notification is also generated when any failure occurs 
+           during offloading of the BFD session. This includes failure in 
+           transmission of packets in the Offload module when the same 
+           is indicated to the control plane by the Offload module."
+    ::= { fsBfdTraps 3 }
+
+    END 

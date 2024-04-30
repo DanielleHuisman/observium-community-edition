@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
+ * @package    observium
+ * @subpackage poller
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -21,7 +21,7 @@ echo("WMI Poller:\n");
 
 $wmi_attribs = [];
 foreach (get_entity_attribs('device', $device['device_id']) as $attrib => $entry) {
-    if (str_starts($attrib, 'wmi_')) {
+    if (str_starts_with($attrib, 'wmi_')) {
         $wmi_attribs[$attrib] = $entry;
     }
 }
@@ -44,7 +44,6 @@ if ($wmi_attribs['wmi_override']) {
 // Computer Name - This is set for WMI classes that need a non-FQDN hostname
 
 $wql = "SELECT Name FROM Win32_ComputerSystem";
-//$wmi['computer_name'] = wmi_parse(wmi_query($wql, $override), TRUE, "Name");
 $wmi['computer_name'] = wmi_get($device, $wql, "Name");
 
 if (is_null($wmi['computer_name'])) {
@@ -52,7 +51,7 @@ if (is_null($wmi['computer_name'])) {
     return;
 }
 
-// Operating System - Updates device info to exact OS version installed
+// Operating System - Updates device info to an exact OS version installed
 
 if ($wmi_attribs['wmi_poll_os']) {
     $wql = "SELECT * FROM Win32_OperatingSystem";
@@ -66,19 +65,19 @@ if ($wmi_attribs['wmi_poll_os']) {
     if (isset($wmi['os']['LastBootUpTime']) &&
         preg_match(OBS_PATTERN_WINDOWSTIME, $wmi['os']['LastBootUpTime'], $boot_match) &&
         preg_match(OBS_PATTERN_WINDOWSTIME, $wmi['os']['LocalDateTime'], $local_match)) {
-        $boot_time     = $boot_match['year'] * 31536000 +
-                         $boot_match['month'] * 2628000 +
-                         $boot_match['day'] * 86400 +
-                         $boot_match['hour'] * 3600 +
-                         $boot_match['min'] * 60 +
-                         $boot_match['sec'];
-        $local_time    = $local_match['year'] * 31536000 +
-                         $local_match['month'] * 2628000 +
-                         $local_match['day'] * 86400 +
-                         $local_match['hour'] * 3600 +
-                         $local_match['min'] * 60 +
-                         $local_match['sec'];
-        $wmi['uptime'] = $local_time - $boot_time;
+        $boot_time = int_add((int)$boot_match['year'] * 31536000,
+                     int_add((int)$boot_match['month'] * 2628000,
+                             (int)$boot_match['day'] * 86400 +
+                             (int)$boot_match['hour'] * 3600 +
+                             (int)$boot_match['min'] * 60 +
+                             round($boot_match['sec'])));
+        $local_time = int_add((int)$local_match['year'] * 31536000,
+                      int_add((int)$local_match['month'] * 2628000,
+                              (int)$local_match['day'] * 86400 +
+                              (int)$local_match['hour'] * 3600 +
+                              (int)$local_match['min'] * 60 +
+                              round($local_match['sec'])));
+        $wmi['uptime'] = int_sub($local_time, $boot_time);
         print_debug_vars($local_time);
         print_debug_vars($boot_time);
         print_debug_vars($wmi['uptime']);
@@ -90,7 +89,6 @@ if ($wmi_attribs['wmi_poll_os']) {
 
 if ($wmi_attribs['wmi_poll_processors']) {
     $wql = "SELECT NumberOfLogicalProcessors,Name FROM Win32_Processor";
-    //$wmi['processors'] = wmi_parse(wmi_query($wql, $override));
     $wmi['processors'] = wmi_get_all($device, $wql);
 
     if ($wmi['processors']) {
@@ -101,9 +99,7 @@ if ($wmi_attribs['wmi_poll_processors']) {
 // Logical Disks
 
 if ($wmi_attribs['wmi_poll_storage']) {
-    //$wql = "SELECT * FROM Win32_LogicalDisk WHERE Description='Local Fixed Disk'";
     $wql = "SELECT * FROM Win32_LogicalDisk WHERE FileSystem != 'CDFS'";
-    //$wmi['disk']['logical'] = wmi_parse(wmi_query($wql, $override));
     $wmi['disk']['logical'] = wmi_get_all($device, $wql);
 
     /* Example
@@ -198,7 +194,6 @@ if ($wmi_attribs['wmi_poll_storage']) {
 
 if ($wmi_attribs['wmi_poll_exchange']) {
     $wql = "SELECT Name FROM Win32_Service WHERE Name LIKE '%MSExchange%'";
-    //$wmi['exchange']['services'] = wmi_parse(wmi_query($wql, $override), TRUE);
     $wmi['exchange']['services'] = wmi_get($device, $wql);
 
     if ($wmi['exchange']['services']) {
@@ -210,7 +205,6 @@ if ($wmi_attribs['wmi_poll_exchange']) {
 
 if ($wmi_attribs['wmi_poll_mssql']) {
     $wql = "SELECT Name, ProcessId FROM Win32_Service WHERE Name LIKE '%MSSQL$%' OR Name = 'MSSQLSERVER'";
-    //$wmi['mssql']['services'] = wmi_parse(wmi_query($wql, $override));
     $wmi['mssql']['services'] = wmi_get_all($device, $wql);
 
     if ($wmi['mssql']['services']) {
@@ -231,7 +225,6 @@ if ($wmi_attribs['wmi_poll_winservices']) {
         $wql .= "'";
     }
 
-    //$wmi['winservices'] = wmi_parse(wmi_query($wql, $override), TRUE);
     $wmi['winservices'] = wmi_get($device, $wql);
 
     if ($wmi['winservices']) {

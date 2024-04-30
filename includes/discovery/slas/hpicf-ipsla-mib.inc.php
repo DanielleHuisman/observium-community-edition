@@ -102,7 +102,7 @@ foreach ($oids as $sla_index => $entry) {
 
     // Limits
     $data['sla_limit_high']      = ($entry['hpicfIpSlaMsgResTimeout'] > 0 ? $entry['hpicfIpSlaMsgResTimeout'] : 5000);
-    $data['sla_limit_high_warn'] = intval($data['sla_limit_high'] / 5);
+    $data['sla_limit_high_warn'] = (int)($data['sla_limit_high'] / 5);
 
     $sla_table['HPICF-IPSLA-MIB'][$sla_index] = $data; // Pull to array for main processing
 }

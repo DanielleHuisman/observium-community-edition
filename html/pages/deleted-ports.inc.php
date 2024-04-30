@@ -39,7 +39,7 @@ echo('<table class="table table-condensed table-striped  table-condensed">
 
 foreach (dbFetchRows('SELECT * FROM `ports` WHERE `deleted` = ?', ['1']) as $port) {
     humanize_port($port);
-    $since = $config['time']['now'] - strtotime($port['ifLastChange']);
+    $since = get_time('now') - strtotime($port['ifLastChange']);
     if (port_permitted($port['port_id'], $port['device_id'])) {
         echo('<tr class="list">');
         echo('<td style="width: 200px;" class="strong">' . generate_device_link($port) . '</td>');

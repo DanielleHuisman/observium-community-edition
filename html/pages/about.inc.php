@@ -61,7 +61,7 @@
                                   style="font-size: small;" class="icon-globe"></i>&nbsp; Web</a></td>
                         <td style="width: 12%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_DOCS_URL; ?>"><i
                                   style="font-size: small;" class="icon-info"></i>&nbsp; Docs</a></td>
-                        <td style="width: 18%; text-align: center;"><a class="btn btn" target="_blank" href="https://jira.observium.org/"><i
+                        <td style="width: 18%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_BUG_URL; ?>"><i
                                   style="font-size: small;" class="icon-bug"></i>&nbsp; Bugtracker</a></td>
                         <td style="width: 19%; text-align: center;"><a class="btn btn" target="_blank" href="https://discord.gg/GjpNXKWm8W"><i
                                   class="icon-gamepad"></i> Discord</a></td>

@@ -1,0 +1,2130 @@
+-- Copyright (C) 2009-2016 Aricent. All Rights Reserved
+
+-- $Id: fselps.mib,v 1.15 2016/03/24 10:16:12 siva Exp $
+--    ELPS Proprietary MIB Definition
+
+--    This file explains the proprietary MIB implemented
+--    for ELPS (Enhanced Linear Protection Switching) feature.
+--    This MIB provides management support for the Linear protection switching functionality described in:
+--      ITU-T specification :  G.8031 / Y.1342 (Ethernet Linear Protection Switching)
+--      IETF draft          :  draft-ietf-mpls-tp-linear-protection-06 (MPLS-TP Linear protection)
+
+ARICENT-ELPS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+    OBJECT-TYPE, MODULE-IDENTITY, enterprises, Unsigned32, Counter32, 
+    NOTIFICATION-TYPE 
+        FROM SNMPv2-SMI
+    RowStatus, RowPointer, TruthValue, DisplayString, TEXTUAL-CONVENTION 
+        FROM SNMPv2-TC
+    Dot1agCfmMepId
+        FROM IEEE8021-CFM-MIB 
+    InterfaceIndex, InterfaceIndexOrZero 
+        FROM IF-MIB;
+    
+fselps MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com"
+         DESCRIPTION
+        "This MIB is a proprietary MIB for ELPS to provide Enhanced
+         linear protection switching as per ITU-T G.8031/Y.1342 for vlan
+	 services and draft-ietf-mpls-tp-linear-protection-02 for
+	 MPLS LSP and Pseudowires."
+         REVISION "201209050000Z"
+         DESCRIPTION
+        "This MIB is a proprietary MIB for ELPS to provide Enhanced
+         linear protection switching as per ITU-T G.8031/Y.1342 for vlan
+	 services and draft-ietf-mpls-tp-linear-protection-02 for
+	 MPLS LSP and Pseudowires."
+
+::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 25 }
+
+-- *****************************************************************************
+--              subtrees in the ELPS MIB
+-- *****************************************************************************
+    fsElpsSystem           OBJECT IDENTIFIER ::= { fselps 1 }
+    fsElpsContext          OBJECT IDENTIFIER ::= { fselps 2 }
+    fsElpsPg               OBJECT IDENTIFIER ::= { fselps 3 }
+    fsElpsPgNotifications  OBJECT IDENTIFIER ::= { fselps 4 }
+    fsElpsScalars          OBJECT IDENTIFIER ::= { fselps 5 }
+
+-- *****************************************************************************
+--              start of ELPS Scalars
+-- *****************************************************************************
+
+fsElpsStatsOneIsToOneApsPktTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets attempted to
+       be transmitted out for 1:1 protection type architecture."
+   ::= { fsElpsScalars 1 }
+
+fsElpsStatsOneIsToOneApsPktRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets received for
+       1:1 protection type architecture."
+   ::= { fsElpsScalars 2 }
+
+fsElpsStatsOneIsToOneApsPktDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets discarded for
+       1:1 protection type architecture."
+   ::= { fsElpsScalars 3 }
+
+fsElpsStatsOnePlusOneApsPktTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets attempted to
+       be transmitted out for 1+1 protection type architecture."
+   ::= { fsElpsScalars 4 }
+
+fsElpsStatsOnePlusOneApsPktRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object records the total number of APS/PSC packets received for
+       1+1 protection type architecture."
+   ::= { fsElpsScalars 5 }
+
+fsElpsStatsOnePlusOneApsPktDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets discarded for
+       1+1 protection type architecture."
+   ::= { fsElpsScalars 6 }
+
+-- *****************************************************************************
+--              Textual conventions
+-- *****************************************************************************
+
+PgId ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+        "This object specifies a Protection Group.
+        This is an administrator defined value. Administrator can give any
+        value for a protection group within the valid range. If a protection
+        group with the same id is already existing for the current 
+        virtual context then it will return failure."
+    SYNTAX      Unsigned32 (1..4294967295)
+
+PgType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This object specifies a value that represents the type of the protection group. The value can 
+        be one of the following: 
+        
+         individual(1) -  If protection group is to protect a single service.
+         list(2)       -  If protection group is to protect a list of 
+                          services.
+         all(3)        -  If protection group is to protect all the services.
+	"
+    SYNTAX      INTEGER { individual(1), list(2), all(3) }
+
+PgServiceType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This object specifies a value that represents the type of service to be protected by this 
+        protection group. The value can be one of the following: 
+        
+         vlan(1)      - IEEE802.1Q VLAN  
+	 mplsLSP(2)   - MPLS Label Switched Path (LSP)
+	 mplsPW(3)    - MPLS Pseudowire
+         reserved(x)  - Reserved for future use. [x values can be 4...7]
+
+        The protection group service type indicates the type of the transporting
+        service that needs to be protected for this protection group.
+
+        Implementations MUST ensure that PgServiceType objects and any dependent
+        objects (e.g.: PgServiceValue objects) are consistent. An 
+        inconsistentValue error MUST be generated if an attempt to change 
+        PgServiceType object would, for example, lead to an undefined 
+        PgServiceValue value. 
+        An inconsistentValue error MUST also be generated if the value in the
+        PgServiceValue object is outside the range of what is supported for the
+        PgServiceType object."
+    SYNTAX      INTEGER { vlan(1), mplsLSP(2), mplsPW(3) }
+
+PgServiceValue ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+        "This object specifies an integer that uniquely identifies a service.  A PgServiceValue value 
+        (service identifier) is always interpreted within the context of an 
+        PgServiceType value. 
+        Every usage of the PgServiceValue textual convention is required to 
+        specify the PgServiceType object that provides the context. 
+        It is suggested that the PgServiceType object be registered/configured 
+        before the object(s) that use the PgServiceValue textual convention,
+        if they appear in the same logical row.
+
+        The value of an PgServiceValue object must be consistent with the 
+        value of the associated PgServiceType object. Attempts to set the 
+        PgServiceValue object to a value inconsistent with the associated 
+        PgServiceType must fail with an inconsistentValue error.
+
+	For 'vlan' service type:
+           - the service value indicates the vlan identifier which ranges between (1..4094)
+	For 'mplsPW' service type:
+           - pgService value does not identify any applicable service value.
+        For 'mplsLSP' service type:
+           - pgService value does not identify any applicable service value.
+           "
+    SYNTAX      Unsigned32 (1..4294967295)
+
+PgServiceValueOrNone ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+        "This object specifies an integer that uniquely identifies a service.  A PgServiceValue value 
+        is always interpreted within the context of an PgServiceType value. 
+        Every usage of the PgServiceValue textual convention is required to 
+        specify the PgServiceType object that provides the context. 
+        It is suggested that the PgServiceType object be logically registered 
+        before the object(s) that use the PgServiceValue textual convention,
+        if they appear in the same logical row.
+
+        The value of an PgServiceValue object must be consistent with the 
+        value of the associated PgServiceType object. Attempts to set the 
+        PgServiceValue object to a value inconsistent with the associated 
+        PgServiceType must fail with an inconsistentValue error.
+
+        The special value of zero indicates 'no service' for the entry.
+
+	For 'vlan' service type:
+           - the service value indicates the vlan identifier which ranges 
+           between (1..4094)
+	For 'mplsPW' service type:
+           - pgService value does not identify any applicable service value.
+        For 'mplsLSP' service type:
+           - pgService value does not identify any applicable service value.
+        "
+    SYNTAX      Unsigned32 (0 | 1..4294967295)
+
+PgMonitorMechanismType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This object specifies a value representing the type of monitoring mechanism used to monitor 
+    the services (as defined by the PgServiceType object) of the 
+    protection group. The value can be one of the following: 
+
+    cfm(1)  Using Connectivity Fault Management via OAM functions and 
+            mechanisms for Ethernet based networks (ITU-T  Y.1731) for 
+            monitoring the working and protection  services.
+
+    mplsOam(2)	Using MPLS-OAM functions for MPLS LSP's and 
+                Pseudowires in MPLS TP  networks for monitoring the 
+                working and protection services.
+
+    none(3)     No monitoring mechanism is used. 
+                Only the manual trigger is possible.
+
+    reserved(x) Reserved for other monitoring mechanisms for future use."
+
+    SYNTAX      INTEGER { cfm(1), mplsOam(2), none(3) }
+
+PgExtCmd ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This object is used to represent the administrative 
+         commands that can be issued to a protection group. The commands
+         'freeze' and 'clearFreeze' are local (near-end) commands whereas all
+         the other commands are signalled to the far-end through the APS
+         protocol, when present.'manualSwitchToWorking' is applicable only 
+         for non-revertive mode of operation" 
+    SYNTAX      INTEGER {
+                  lockOutProtection(1), 
+                  forceSwitchToProtection(2), 
+                  manualSwitchToProtection(3), 
+                  exercise(4), 
+                  clear(5), 
+                  freeze(6), 
+                  clearFreeze(7), 
+                  manualSwitchToWorking(8) 
+                }
+
+PgLocalCondition ::= TEXTUAL-CONVENTION
+    STATUS        current
+    DESCRIPTION
+        "This object is used to represent the local conditions
+         that occur for a protection group." 
+    SYNTAX      INTEGER {
+                  signalFailOnWorking(1), 
+                  recoverSignalFailOnWorking(2),
+                  signalFailOnProtection(3), 
+                  recoverSignalFailOnProtection(4), 
+                  waitToRestoreExpiry(5)
+                }
+
+PgFarEndRequest ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This object is used to represent the far-end requests
+         that are received from the peer node that are applicable to the state
+         machine for the protection group. The 'waitToRestore' request is 
+         applicable only for the revertive mode of operation whereas the 
+         'exerciseOnProtection', 'reverseRequestOnProtection', 
+         'manualSwitchToWorking'and the 'doNotRevert' requests are applicable 
+         only for the non-revertive mode of operation." 
+    SYNTAX      INTEGER {
+                  lockOutProtection(1), 
+                  signalFailOnProtection(2), 
+                  forceSwitchToProtection(3), 
+                  signalFailOnWorking(4), 
+                  manualSwitchToProtection(5), 
+                  waitToRestore(6), 
+                  exerciseOnWorking(7), 
+                  exerciseOnProtection(8), 
+                  reverseRequestOnWorking(9), 
+                  reverseRequestOnProtection(10), 
+                  noRequestOnWorking(11), 
+                  noRequestOnProtection(12), 
+                  doNotRevert(13),
+                  manualSwitchToWorking(14) 
+    }
+
+PgActiveRequest ::= TEXTUAL-CONVENTION
+    STATUS           current
+    DESCRIPTION
+        "This textual convention is used to represent the currently active 
+         request for a protection group. This includes local requests (commands 
+         or conditions) and the far end requests that are received from the peer
+         node through APS. At any moment, either a local request or a far end 
+         request can be active for a protection group and cause a state 
+         transition for the state event machine."
+    SYNTAX           INTEGER {
+                  localLockOutProtection(0),
+                  localForcedSwitchToProtection(1),
+                  localSignalFailOnWorking(2),
+                  localRecoverSignalFailOnWorking(3),
+                  localSignalFailOnProtection(4),
+                  localRecoverSignalFailOnProtection(5),
+                  localManualSwitchToProtection(6),
+                  localManualSwitchToWorking(7),
+                  localClear(8),
+                  localExercise(9),
+                  localWaitToRestoreExpiry(10),
+                  farLockOutProtection(11),
+                  farSignalFailOnProtection(12),
+                  farForceSwitchToProtection(13),
+                  farSignalFailOnWorking(14),
+                  farManualSwitchToProtection(15),
+                  farManualSwitchToWorking(16),
+                  farWaitToRestore(17),
+                  farExerciseOnWorking(18),
+                  farExerciseOnProtection(19),
+                  farReverseRequestOnWorking(20),
+                  farReverseRequestOnProtection(21),
+                  farNoRequestOnWorking(22),
+                  farNoRequestOnProtection(23),
+                  farDoNotRevert(24)
+    }
+
+PgSemState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This textual convention is used to represent the various states that   
+         are available in the ELPS State Event Machines for each protection
+         group. The 'waitToRestore' state is applicable only for the state
+         machine used in the revertive mode of operation whereas the 
+         'doNotRevert', 'exerciseOnProtection', 'manualSwitchToWorking' and the 
+         'reverseRequestOnProtection' states are applicable only for the state 
+         machine used in the non-revertive mode of operation." 
+    SYNTAX      INTEGER {
+                  noRequestOnWorking(0), 
+                  noRequestOnProtection(1), 
+                  lockOutProtection(2), 
+                  forceSwitchToProtection(3), 
+                  signalFailOnWorking(4), 
+                  signalFailOnProtection(5), 
+                  manualSwitchToProtection(6), 
+                  manualSwitchToWorking(7), 
+                  waitToRestore(8), 
+                  doNotRevert(9), 
+                  exerciseOnWorking(10), 
+                  exerciseOnProtection(11), 
+                  reverseRequestOnWorking(12), 
+                  reverseRequestOnProtection(13)
+                }
+   
+PgStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This textual convention is used to represent the current status of the 
+         protection group.
+         If the value is 'protectionDisabled(0)', then this means that the
+         rowstatus of the protection group entry is not in active state.
+
+         If the value is 'workingPathActive(1)', then this means that the 
+         working entity has been chosen/selected to carry the normal traffic by
+         the action of the protection switching operation. This indicates the 
+         'normal state' of the protection group.
+
+         If the value is 'protectionPathActive(2)', then this means that the
+         protection entity has been chosen/selected to carry the 
+         normal traffic by the action of the protection switching operation 
+         due to signal failure on working or due to operator commands. 
+         The pgSemState would indiate the specific reason for switching the normal
+         traffic on the protection path.
+         The pgSemState 'signalFailOnWorking' in protectionPathActive condition means
+         a 'protecting failure state' (ie) protection switching operation 
+         due to signal failure on working.
+         The pgSemState 'forceSwitchToProtection'/'manualSwitchToProtection' in 
+         protectionPathActive condition means a 'protecting administrative state' 
+         (ie) protection switching operation is based on operator command.
+
+         
+         If the value is 'waitToRestoreState(3)', then this means that
+         the protection group is waiting for the expiry of the WTR timer to 
+         switch back to the working entity.  
+
+         If the value is 'holdOffState(4)', then this means that the 
+         protection group is waiting for the expiry of the HoldOff timer to
+         initiate the switch process to the protection/working entity.
+
+         If the value is 'switchingFailed(5), then this means that the switching
+         from working entity to protection entity or vice-versa 
+         has failed due to a failure in programming the hardware (i.e.) the 
+         setup of the hardware for the newly chosen/selected active path as 
+         determined by the protection switching operation has failed.
+
+         If the value is 'unavailable(6)', then this means that the protection
+	 path is unavailable - either as a result of an operator Lockout
+	 command or a signal failure/signal degrade condition detected 
+         on the protection path.
+
+         If the value is 'doNotRevert(7), then this means that the protection
+	 domain is recovering from a Protecting state, but the operator has
+	 configured the protection domain to not automatically revert to the
+	 Normal state upon recovery. The protection domain SHALL remain in
+	 this state until the operator issues a command to revert to the Normal
+	 state or there is a new trigger to switch to a different state."
+
+    SYNTAX      INTEGER {
+                  protectionDisabled(0),
+                  workingPathActive(1), 
+                  protectionPathActive(2),  
+                  waitToRestoreState(3), 
+                  holdOffState(4),
+                  switchingFailed(5),
+                  unavailable(6),
+                  doNotRevert(7)
+                }
+
+-- *****************************************************************************
+--              fsElpsSystem subtree
+-- *****************************************************************************
+
+fsElpsGlobalTraceOption OBJECT-TYPE
+   SYNTAX        TruthValue
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION
+      "This object is used to enable the global trace statements which are not 
+       context specific. For example, 
+              - Traces present in the Task Initialization. 
+              - Traces present during context creation on ELPS
+              - Any other trace statements before identifying the virtual 
+                context in ELPS APIs."
+   DEFVAL  { false }
+   ::= { fsElpsSystem 1 }
+
+
+fsElpsPSCChannelCode OBJECT-TYPE
+    SYNTAX		Unsigned32 ( 9..32 )
+    MAX-ACCESS	read-write
+    STATUS		obsolete
+    DESCRIPTION
+	"*******************Objobsoleteobsolete****************
+         This object specifies the G-ACh channel number to be used for
+	 transmitting the Protection State Coordination (PSC) control
+	 packet through the generic associated channel (G-ACh) for LSP/pseudowire.
+	
+         This channel code will be carried in the 'Channel Type' field
+	 of the G-ACh header which carries the PSC packet.
+          
+         The modified value takes effect for the next 
+         PSC transmission / reception flow."
+   DEFVAL { 9 }
+  ::=  {fsElpsSystem 2}
+
+fsElpsRapidTxTime OBJECT-TYPE
+   SYNTAX      Unsigned32( 1000..3300 )
+   UNITS       "microseconds"
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This objects specifies the time interval for rapid transmission of 
+       first three APS/PSC messages upon a protection state change in a protection
+       group. Unit of this time duration is microseconds."
+   DEFVAL { 3300 }
+   ::= { fsElpsSystem 3 }
+
+
+   
+-- *****************************************************************************
+--              fsElpsContext subtree
+-- *****************************************************************************
+
+fsElpsContextTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsContextEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This object specifies the List of ELPS Module parameters per Virtual Context."
+   ::= { fsElpsContext 1 }
+
+fsElpsContextEntry OBJECT-TYPE
+   SYNTAX       FsElpsContextEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the Per virtual context ELPS module parameters. An entry in this table gets 
+      created as and when a virtual context is created."
+   INDEX { fsElpsContextId }
+   ::= { fsElpsContextTable 1 }
+
+FsElpsContextEntry ::=
+   SEQUENCE {
+          fsElpsContextId
+            Unsigned32,
+          fsElpsContextSystemControl
+            INTEGER,
+          fsElpsContextModuleStatus
+            INTEGER,
+          fsElpsContextTraceInputString
+            DisplayString,
+          fsElpsContextEnableTrap
+            TruthValue,
+          fsElpsContextVlanGroupManager
+            INTEGER
+        }
+
+fsElpsContextId OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This object is used to distinguish between the
+       multiple virtual bridge contexts within a bridge."
+   ::= { fsElpsContextEntry 1 }
+
+fsElpsContextSystemControl OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        start(1),
+                        shutdown(2)
+                      }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the administrative system control status requested by management 
+       for ELPS. 
+       The value start(1) indicates that ELPS should be active in the 
+       virtual context and on all ports in that virtual context. Memory
+       is reserved in the form of memory pools for the context for which
+       ELPS has been started.
+       The value shutdown(2) indicates that ELPS should be shutdown in 
+       the virtual context and on all ports in that virtual context. 
+       All used memory will be released back to the memory pools and the
+       memory pools will be deleted.
+       By default this object is set to shutdown(2) for all virtual contexts."
+   DEFVAL { shutdown }
+   ::= { fsElpsContextEntry 2 }
+
+fsElpsContextModuleStatus OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        enable(1),
+                        disable(2)
+                      }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The administrative module status requested by management 
+       for ELPS. 
+       The value enable(1) indicates that ELPS should be enabled in the 
+       virtual context and on all ports in that virtual context. 
+       The value disable(2) indicates that ELPS should be disabled in 
+       the virtual context and on all ports in that virtual context. 
+       In the disabled state, all the protection groups will be
+       operationally non-functional, though configurations can still be
+       done.
+       By default this object is set to disable(2) for all virtual contexts."
+   DEFVAL { disable }
+   ::= { fsElpsContextEntry 3 }
+
+fsElpsContextTraceInputString OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE(1..255))
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to store the trace option string input given by the user.
+       Based on the input to this object, trace statements corresponding
+       to the given options are displayed for this virtual context.
+       To enable particular trace the user has to enter the corresponding 
+       string(given below) assigned for that. For enabling more than one 
+       traces the user has to enter the corresponding strings with SPACE 
+       (delimiter) between each string.
+             For example, 
+             To enable the below traces:
+                 - Start and Shutdown traces
+                 - Management traces
+                 - Control plane traces and
+                 - Packet Dump traces 
+
+             The input should be fed as follows:
+             enable init-shut mgmt ctrl pkt-dump
+
+             To disable the below traces:
+                 - Start and Shutdown traces
+                 - Control plane traces
+
+             The input should be,
+             disable init-shut ctrl 
+
+             The entered input string is parsed to get the trace options.
+
+             enable          - Enables the corresponding option.
+             disable         - Disables the corresponding option.
+             init-shut       - Start and Shutdown traces
+             mgmt            - Management traces
+             ctrl            - Control Plane traces for protocol actions
+             pkt-dump        - Packet Dump traces
+             resource        - Traces related to all
+                               resources except buffers
+             all-fail        - All Failure traces
+             buffer          - Buffer allocation/
+                               release traces
+             critical        - ELPS Critical traces"
+             
+   DEFVAL  { "critical" }
+   ::= { fsElpsContextEntry 4 }
+
+fsElpsContextEnableTrap OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The column is used to enable or disable the transmission of 
+       TRAP notification messages."
+   DEFVAL { true }
+   ::= { fsElpsContextEntry 5 }
+
+fsElpsContextVlanGroupManager OBJECT-TYPE
+   SYNTAX      INTEGER { mstp(1), elps(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+          "This object specifies the module that manages the grouping of
+           vlans in this virtual context.
+
+           mstp(1) - MSTP(Multiple Spanning Tree Protocol) module manages
+                     the grouping of vlans. In this case, MSTI(MSTP
+                     instance Id) identifies the group (or vlan list).
+                     If a MSTI is mapped to a Protection Group, then that 
+                     Protection group will protect the list of vlan mapped 
+                     to that MSTI.
+                     Administrator should make sure that MSTP module is
+                     started and enabled, if this object is set to mstp(1).
+
+           elps(2) - ELPS module manages the grouping of vlans.
+                     If this value is set, In this case ELPS instance
+                     identifies the group. The group will be created for the
+                     fsElpsPgConfigWorkingInstanceId and fsElpsPgConfigProtectionInstanceId and 
+                     the VLAN mapping will be done for the 
+                     objects fsElpsPgConfigWorkingServiceValue and 
+                     fsElpsPgConfigprotectionServiceValue or fsElpsPgServiceListValue 
+                     based on the fsElpsPgConfigType when the fsElpsPgConfigRowStatus is Active"
+   DEFVAL { mstp }
+   ::= { fsElpsContextEntry 6 }
+		  
+-- *****************************************************************************
+--              fsElpsPg subtree
+-- *****************************************************************************
+
+-- ---------------------------------------------
+-- Table : Protection Group Configuration Table
+-- ---------------------------------------------
+fsElpsPgConfigTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table is used to create and configure the
+      protection groups in any virtual context. Each entry in this table 
+      corresponds to a protection group on a virtual context.
+      
+      The protection switching for MPLS LSP/PW is supported only in the
+      default context and not in any other contexts."
+   ::= { fsElpsPg 1 }
+
+fsElpsPgConfigEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgConfigEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the protection group table entry. Each entry in this table contains the 
+      required attribute values which define the protection group entry." 
+   INDEX { fsElpsContextId, 
+           fsElpsPgConfigPgId }
+   ::= { fsElpsPgConfigTable 1 }
+
+FsElpsPgConfigEntry ::=
+   SEQUENCE {
+          fsElpsPgConfigPgId
+            PgId,
+          fsElpsPgConfigType
+            PgType,
+          fsElpsPgConfigServiceType
+            PgServiceType,
+          fsElpsPgConfigMonitorMechanism
+            PgMonitorMechanismType,
+          fsElpsPgConfigIngressPort
+            InterfaceIndexOrZero,
+          fsElpsPgConfigWorkingPort
+            InterfaceIndexOrZero,
+          fsElpsPgConfigProtectionPort
+            InterfaceIndexOrZero,
+          fsElpsPgConfigWorkingServiceValue
+            PgServiceValueOrNone,
+          fsElpsPgConfigProtectionServiceValue
+            PgServiceValueOrNone,
+          fsElpsPgConfigOperType
+            INTEGER,
+          fsElpsPgConfigProtType
+            INTEGER,
+          fsElpsPgConfigName
+            DisplayString,
+          fsElpsPgConfigRowStatus
+            RowStatus,
+          fsElpsPgConfigWorkingServicePointer
+            RowPointer,
+          fsElpsPgConfigWorkingReverseServicePointer
+            RowPointer,
+          fsElpsPgConfigProtectionServicePointer
+            RowPointer,
+          fsElpsPgConfigProtectionReverseServicePointer
+            RowPointer,
+          fsElpsPgConfigWorkingInstanceId
+            Unsigned32,
+          fsElpsPgConfigProtectionInstanceId
+            Unsigned32,
+          fsElpsPgPscVersion
+            Unsigned32
+        }
+
+fsElpsPgConfigPgId OBJECT-TYPE
+   SYNTAX      PgId
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the unique identifier for the protection group."
+   ::= { fsElpsPgConfigEntry 1 }
+
+fsElpsPgConfigType OBJECT-TYPE
+   SYNTAX      PgType
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies if the protection group needs to provide 
+       protection for an individual service or a list of services. 
+       
+       If the value is 'individual(1)', the protection is available only for 
+       the single service present in fsElpsPgConfigWorkingServiceValue which is
+       protected by the service present in fsElpsPgConfigProtectionServiceValue.
+       
+       If the value is 'list(2)', the protection is available for a list of 
+       services as indicated by the fsElpsServiceListTable table. The 
+       protection group entry for which this object is configured as 'list(2)' 
+       MUST have at least one active entry for this protection group in the 
+       fsElpsServiceListTable before this protection group entry can be made 
+       active. Additionally, the 'individual' protection group service values 
+       such as the fsElpsPgConfigWorkingServiceValue object and the 
+       fsElpsPgConfigProtectionServiceValue object for this row will not be 
+       allowed to be configured and will always return a value of '0'.
+
+       If the value is 'all(3)', the protection is available for all the
+       services that are using the working port. This option is supported 
+       for 'vlan' service type. Not supported for 'mplsLSP' and 'mplsPW' 
+       service types."
+
+   DEFVAL  { individual }
+   ::= { fsElpsPgConfigEntry 2 }
+
+fsElpsPgConfigServiceType OBJECT-TYPE
+   SYNTAX      PgServiceType
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the type of transport service for which this 
+       protection group will provide protection. 
+       The following service types are supported
+	            - vlan(1)
+		    - mplsLSP(2)
+		    - mplsPW(3)"
+   DEFVAL  { vlan }
+   ::= { fsElpsPgConfigEntry 3 }
+
+fsElpsPgConfigMonitorMechanism OBJECT-TYPE
+   SYNTAX      PgMonitorMechanismType
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the type of monitoring mechanism used for 
+       detecting faults for this protection group entry. 
+       If the value of this object is not 'none' for any fsElpsPgConfigEntry, then 
+       the fsElpsPgCfmTable table MUST have an active entry for this 
+       fsElpsPgConfigPgId, else the fsElpsPgConfigRowStatus for this entry 
+       cannot be made active."
+   DEFVAL  { cfm }
+   ::= { fsElpsPgConfigEntry 4 }
+
+fsElpsPgConfigIngressPort OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the port through which the traffic ingresses for  
+       the working and protection transport services into the protection 
+       domain. This port defines the boundary of the protection domain on both 
+       the end bridges. This object is optional and can be configured to a 
+       value of '0' if the service protection is to be provided when the 
+       traffic egresses out of this bridge from either the working or 
+       protection ports instead of while ingressing into this bridge." 
+   ::= { fsElpsPgConfigEntry 5 }
+
+fsElpsPgConfigWorkingPort OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the working port which carries the normal traffic 
+       in the absence of any failure.
+       For 'vlan' service type, this object is mandatory and should be configured with a 
+       non-zero value.
+       For other service types, this object is optional and can be configured as 0."
+   ::= { fsElpsPgConfigEntry 6 }
+
+fsElpsPgConfigProtectionPort OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the protection port which carries the normal 
+       traffic upon failure of the working transport entity.
+       For 'vlan' service type, this object is mandatory and should be configured with a 
+       non-zero value.
+       For other service types, this object is optional and can be configured as 0." 
+   ::= { fsElpsPgConfigEntry 7 }
+
+fsElpsPgConfigWorkingServiceValue OBJECT-TYPE
+   SYNTAX      PgServiceValueOrNone
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the service identifier of the working service 
+       which carries the normal traffic in the absence of any failure. 
+      
+       This object is applicable only for 'vlan' type of services.
+
+       This object is applicable only when the fsElpsPgConfigType object is 
+       configured as 'individual' type. When the fsElpsPgConfigType object is 
+       configured as 'list', this object will return a value of '0' and any 
+       attempt to configure this object to any value will throw an error."
+   ::= { fsElpsPgConfigEntry 8 }
+
+
+fsElpsPgConfigProtectionServiceValue OBJECT-TYPE
+   SYNTAX      PgServiceValueOrNone
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      
+      "This object specifies the service identifier of the protection service  
+       which carries the normal traffic upon failure of the working entity. 
+      
+       This object is applicable only for 'vlan' type of services.
+
+       This object is applicable only when the fsElpsPgConfigType object is 
+       configured as 'individual' type. When the fsElpsPgConfigType object is 
+       configured as 'list', this object will return a value of '0' and any 
+       attempt to configure this object to any value will throw an error."
+   ::= { fsElpsPgConfigEntry 9 }
+
+
+fsElpsPgConfigOperType OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 revertive(1), 
+                 nonRevertive(2)
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to indicate the operation type/mode of the 
+       protection group entry. If the value is set to 'revertive(1)', then 
+       normal traffic will be shifted from the protection entity back to the 
+       working entity upon recovery of the working entity from the fault. If 
+       the value is set to 'nonRevertive(2)', then the normal traffic will not 
+       be shifted from the protection entity back to the working entity even 
+       after the recovery of the working entity from the fault."
+   DEFVAL  { revertive }
+   ::= { fsElpsPgConfigEntry 10 }
+
+fsElpsPgConfigProtType OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 oneIsToOneBidirectionalWithAps(1),
+                 onePlusOneBidirectionalWithAps(2),
+                 onePlusOneUnidirectionalWithAps(3),
+                 onePlusOneUnidirectionalWithOutAps(4)
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to indicate the protection architecture type of the
+       protection group entry. Protection architecture types supported are 
+       given below: 
+       - 'oneIsToOneBidirectionalWithAps(1)', then the selector bridge will be
+         established at the time of protection switching and its based 
+         on global priority logic. APS communication channel is required.
+       - 'onePlusOneBidirectionalWithAps(2)', then the permanent bridge will be
+         established at the source and selector bridge at the sink. Protection 
+         switching is based on global priority logic. APS communication channel
+         is required.
+       - 'onePlusOneUnidirectionalWithAps(3)', then the permanent bridge will
+         be established at the source and selector bridge at the sink. 
+         Protection switching is based on local priority logic and Far-end
+         requests will not be considered for switching the traffic. APS 
+         communication channel is present.
+       - 'onePlusOneUnidirectionalWithoutAps(4)', then protection switching 
+         is based on local priority logic only. APS communication channel 
+         is not present."
+   DEFVAL  { oneIsToOneBidirectionalWithAps }
+   ::= { fsElpsPgConfigEntry 11 }
+
+fsElpsPgConfigName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This object is used to refer the protection group in addition to the 
+        protection group Id. The default value for this object will be the 
+        null string. This object can be configured even when the row status 
+        of this table entry is active."
+    ::= {fsElpsPgConfigEntry 12 }
+
+fsElpsPgConfigRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the status of this row/entry.
+       Setting this object to Active is not allowed in the following 
+       scenarios: 
+         - If the value of the column fsElpsPgConfigMonitorMechanism is set 
+           to 'cfm/mplsOam' and there is no active entry corresponding to this 
+           protection group present in the fsElpsPgCfmTable table. 
+         - If the value of the column fsElpsPgConfigType is set to 'list' and 
+           there is no active entry corresponding to this protection group in 
+           the fsElpsPgServiceListTable table or fsElpsPgServiceListPointerTable.
+         - If the value of the column fsElpsPgConfigType is set to 'list' and 
+           a valid non-zero value is set in the 
+           fsElpsPgConfigWorkingServiceValue and 
+           fsElpsPgConfigProtectionServiceValue columns of this table. 
+       Setting the rowstatus value 'destroy' to this object will delete the 
+       related entries present in fsElpsPgCfmTable, 
+       fsElpsPgServiceListTable / fsElpsPgServiceListPointerTable.
+       The writable columns in any row of this table cannot be changed while 
+       the row is active."
+   ::= { fsElpsPgConfigEntry 13 }
+
+fsElpsPgConfigWorkingServicePointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable for 'mplsLSP' and 'mplsPw' service types.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table corresponding to 
+          the LSP being protected (working LSP).
+          
+        - In case of co-routed MPLS LSP, this object indicates the co-routed 
+          (forward and reverse) path of the LSP.
+          In case of associated MPLS LSP, this object indicates the forward path of
+          the LSP being protected.
+
+       When fsElpsPgConfigServiceType is 'mplsPw' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS Pseudo wire table corresponding to 
+          the PW being protected (working PW).
+          
+
+       This object is applicable only when the fsElpsPgConfigType object is 
+       configured as 'individual' type. When the fsElpsPgConfigType object is 
+       configured as 'list', this object will return a value of '0' and any 
+       attempt to configure this object to any value will throw an error."
+   ::= { fsElpsPgConfigEntry 14 }
+
+fsElpsPgConfigWorkingReverseServicePointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "This object is applicable for 'mplsLSP' service type only.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - Configuring this object is optional.
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table corresponding to the reverse path of
+          the LSP being protected (reverse path of working LSP).
+        - This configuration is required only in case of associated MPLS LSP.
+        - In case of co-routed mplsLSP, this object is not applicable.
+ 
+       This object is applicable only when the fsElpsPgConfigType object is 
+       configured as 'individual' type. When the fsElpsPgConfigType object is 
+       configured as 'list', this object will return a value of '0' and any 
+       attempt to configure this object to any value will throw an error."
+   ::= { fsElpsPgConfigEntry 15 }
+
+fsElpsPgConfigProtectionServicePointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+       
+      "This object is applicable for 'mplsLSP' and 'mplsPw' service types.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table corresponding to 
+          the protection instance of the working LSP (ie. protection LSP).
+          
+        - In case of co-routed MPLS LSP, this object indicates the co-routed 
+          (forward and reverse) path of the protection LSP.
+          In case of associated MPLS LSP, this object indicates the forward path of
+          the protection LSP.
+
+       When fsElpsPgConfigServiceType is 'mplsPw' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS Pseudo wire table corresponding to 
+          the protection instance of the working PW (ie. protection PW).
+
+       This object is applicable only when the fsElpsPgConfigType object is 
+       configured as 'individual' type. When the fsElpsPgConfigType object is 
+       configured as 'list', this object will return a value of '0' and any 
+       attempt to configure this object to any value will throw an error."
+   ::= { fsElpsPgConfigEntry 16 }
+
+fsElpsPgConfigProtectionReverseServicePointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "This object is applicable for 'mplsLSP' service type only.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - Configuring this object is optional.
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table, for the reverse path of
+          the protecting LSP, corresponding to the working LSP.
+        - This configuration is required only in case of associated MPLS LSP configured
+          to protect the working LSP.
+        - In case of co-routed mpls LSP, this object is not applicable.
+
+       This object is applicable only when the fsElpsPgConfigType object is 
+       configured as 'individual' type. When the fsElpsPgConfigType object is 
+       configured as 'list', this object will return a value of '0' and any 
+       attempt to configure this object to any value will throw an error."
+   ::= { fsElpsPgConfigEntry 17 }
+
+fsElpsPgConfigWorkingInstanceId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..64)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the working instance which contains the VLAN to be protected 
+       in this protection group.  
+
+       If fsElpsContextVlanGroupManager is 'mstp' then vlan group Id should be 
+       from one of the MSTIs created in MSTP.
+
+       If fsElpsContextVlanGroupManager is 'elps' then group Id will be created 
+       by ELPS when fsElpsPgConfigRowStatus is active"
+
+   DEFVAL { 0 }
+   ::= { fsElpsPgConfigEntry 18 }
+
+fsElpsPgConfigProtectionInstanceId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..64)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the protection instance which contains the protection VLANs 
+       in this protection group.  
+
+       If fsElpsContextVlanGroupManager is 'mstp' then vlan group Id should be 
+       from one of the MSTIs created in MSTP.
+
+       If fsElpsContextVlanGroupManager is 'elps' then group Id will be created 
+       by ELPS when fsElpsPgConfigRowStatus is active"
+
+   DEFVAL { 0 }
+   ::= { fsElpsPgConfigEntry 19 }
+
+fsElpsPgPscVersion OBJECT-TYPE
+    SYNTAX      Unsigned32 ( 0..1 )
+    MAX-ACCESS  read-write
+    STATUS              current
+    DESCRIPTION
+        "This object specifies the PSC header version number to be used for
+         transmitting the Protection State Coordination (PSC) control
+         packet through the generic associated channel (G-ACh) for LSP/pseudowire.
+
+         Also determines the PSC state machine behavior, If the value is set to 0,
+         PSC protocol behavior will be according to draft-ietf-mpls-tp-linear-protection-06.
+         If the value is set to 1 the PSC protocol behaviour will be according to RFC-6378."
+   DEFVAL { 0 }
+   ::=  { fsElpsPgConfigEntry 20 }
+
+-- --------------------------------------------
+-- Table : Protection Group Command Table
+-- --------------------------------------------
+fsElpsPgCmdTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgCmdEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This object specifies the protection group command table. Each entry in this table 
+      corresponds to a configured protection group on a virtual context in this
+      bridge. Entry in this table is implicitly created when an entry for 
+      protection group is created in the fsElpsPgConfigTable table. 
+      This table contains commands and parameters that are configured for a 
+      protection group entry which is active and status objects providing the
+      local and far end requests and states."
+   ::= { fsElpsPg 2 }
+
+fsElpsPgCmdEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgCmdEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the protection group command table entry. Each entry in this table 
+      contains objects that operate on the state event machine for the 
+      protection group and can be configured when the protection group entry 
+      is active. 
+      
+      There are 3 types of triggers that influence the operation, and
+      therefore, the currently operational state for each protection group -:
+      (a) External commands that can be issued by administrator on the local 
+          (self/near-end) bridge
+      (b) Signalling conditions that occur on the local bridge
+      (c) Requests from the far-end bridge carried received through the APS 
+          PDUs
+      The result of whether any of the above triggers are accepted and applied 
+      to the state machine for the protection group or not, is indicated by
+      the corresponding 'status' objects in each entry in this table. 
+      The last applicable and currently operational trigger (whether local or 
+      far end) that was accepted by the state machine is indicated by the 
+      'ActiveRequest' object for this entry and the current state is indicated
+      by the 'SemState' object." 
+   INDEX { fsElpsContextId, 
+           fsElpsPgConfigPgId }
+   ::= { fsElpsPgCmdTable 1 }
+
+FsElpsPgCmdEntry ::=
+   SEQUENCE {
+          fsElpsPgCmdHoTime
+            Unsigned32,
+          fsElpsPgCmdWTR
+            Unsigned32,
+          fsElpsPgCmdExtCmd
+            PgExtCmd,
+          fsElpsPgCmdExtCmdStatus
+            INTEGER,
+          fsElpsPgCmdLocalCondition
+            PgLocalCondition,
+          fsElpsPgCmdLocalConditionStatus
+            INTEGER,
+          fsElpsPgCmdFarEndRequest
+            PgFarEndRequest, 
+          fsElpsPgCmdFarEndRequestStatus
+            INTEGER, 
+          fsElpsPgCmdActiveRequest
+            PgActiveRequest, 
+          fsElpsPgCmdSemState
+            PgSemState,
+          fsElpsPgCmdPgStatus
+            PgStatus,
+          fsElpsPgCmdApsPeriodicTime
+            Unsigned32
+   }
+
+fsElpsPgCmdHoTime OBJECT-TYPE
+   SYNTAX      Unsigned32( 0..1000 )
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to configure the hold-off timer. The purpose is 
+       to allow a server layer protection mechanism to have a chance to fix  
+       the problem before switching at the client layer, or to allow an 
+       upstream protected domain to switch before a downstream domain. 
+       The hold-off timer has a period from 0 to 100 seconds, configurable in  
+       steps (units) of 100ms.  Each configured value in this object represents
+       a multiple of 100ms. Eg: 1 = 100ms, 2 = 200ms and so on." 
+   DEFVAL  { 0 }
+   ::= { fsElpsPgCmdEntry 1 }
+
+fsElpsPgCmdWTR OBJECT-TYPE
+   SYNTAX      Unsigned32 ( 1..1000 )
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to configure the wait-to-restore timer for the  
+       protection group. The timer has a period from 1 to 1000 minutes, 
+       configurable in steps of 1 minute.  
+
+       This object is applicable only if this protection group is operating in 
+       the revertive mode of operation. In the non-revertive mode of operation, 
+       any value configured for this object will not be used."
+   DEFVAL  { 5 }
+   ::= { fsElpsPgCmdEntry 2 }
+
+fsElpsPgCmdExtCmd OBJECT-TYPE
+   SYNTAX      PgExtCmd
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used by the operator to request that the protection group
+       state machine perform some administrative operation. The operator 
+       requests a command by writing the command value to this column. The 
+       command may or may not affect the operation of the state machine based 
+       on the current state and the ELPS protocol indicates the result of this 
+       command on the state machine by setting the value of the 
+       fsElpsPgCmdExtCmdStatus column of this table. If the command is not 
+       accepted, then the fsElpsPgCmdActiveRequest indicates the last accepted 
+       and currently operating request for this protection group. The 
+       configuration of this object is allowed and meaningful only when the 
+       the protection group entry for this fsElpsPgConfigPgId is active. 
+       
+       The default value for this object will be 'clear' command indicating 
+       that no command has been issued.
+       
+       The 'freeze' command is volatile and will not be restored after a 
+       configuration save-and-restore operation."
+   DEFVAL { clear }
+   ::= { fsElpsPgCmdEntry 3 }
+
+fsElpsPgCmdExtCmdStatus OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 accepted(1), 
+                 overruled(2), 
+                 notApplicable(3),
+                 rejected(4) 
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the status of the most recent administrative 
+       command issued to this protection group through the fsElpsPgCmdExtCmd 
+       object."
+   ::= { fsElpsPgCmdEntry 4 }
+
+fsElpsPgCmdLocalCondition OBJECT-TYPE
+   SYNTAX      PgLocalCondition
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the most recent local condition that had occurred  
+       for this protection group."   
+   ::= { fsElpsPgCmdEntry 5 }
+
+fsElpsPgCmdLocalConditionStatus OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 accepted(1), 
+                 overruled(2), 
+                 notApplicable(3),
+                 rejected(4) 
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the status of the most recent local condition 
+       as indicated by the fsElpsPgCmdLocalCondition that occured for this 
+       protection group."
+   ::= { fsElpsPgCmdEntry 6 }
+
+fsElpsPgCmdFarEndRequest OBJECT-TYPE
+   SYNTAX      PgFarEndRequest
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the most recent far-end request received for this 
+       protection group through the reception of APS PDU."
+   ::= { fsElpsPgCmdEntry 7 }
+
+fsElpsPgCmdFarEndRequestStatus OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 accepted(1), 
+                 overruled(2), 
+                 notApplicable(3), 
+                 rejected(4) 
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the status of the most recent far-end request
+       as indicated by the fsElpsPgCmdFarEndRequest object received for this 
+       protection group."
+   ::= { fsElpsPgCmdEntry 8 }
+
+fsElpsPgCmdActiveRequest OBJECT-TYPE
+   SYNTAX      PgActiveRequest
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the last local request (command or condition) or 
+       far end request (received for this protection group through the 
+       reception of APS PDU) that was accepted and applied to this 
+       protection group. The value indicated by this object is influenced by
+       either one of the fsElpsPgCmdExtCmd, fsElpsPgCmdLocalCondition or 
+       fsElpsPgCmdFarEndRequest objects when these are accepted by the 
+       operation of the state machine for this protection group."
+   ::= { fsElpsPgCmdEntry 9 }
+
+fsElpsPgCmdSemState OBJECT-TYPE
+   SYNTAX      PgSemState
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the current state of the State Event Machine    
+       for this protection group."
+   ::= { fsElpsPgCmdEntry 10 }
+
+fsElpsPgCmdPgStatus OBJECT-TYPE
+   SYNTAX      PgStatus
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "The object is to indicate the status of the protection group."
+   ::= { fsElpsPgCmdEntry 11 }
+
+fsElpsPgCmdApsPeriodicTime OBJECT-TYPE
+   SYNTAX      Unsigned32 ( 1..1000 )
+   UNITS       "seconds"
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This column is used to configure the time interval for the periodic  
+       transmission of 
+       - Protection Switching PDUs, namely, APS PDU for 'vlan' service 
+       - Protection State Coordination Protocol messages, namely, PSC packet 
+       for 'mplsLSP' and 'mplsPW' services. 
+       
+       Periodic time interval is not valid for the PDU transmission happened due to
+       SEM state change.
+       The time interval has to be configured in seconds."
+   DEFVAL  { 5 }
+   ::= { fsElpsPgCmdEntry 12 }
+
+-- --------------------------------------------
+-- Table : Protection Group CFM Table
+-- --------------------------------------------
+fsElpsPgCfmTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgCfmEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains the configurations related to the monitoring entities
+      for each protection group as denoted by the fsElpsPgConfigPgId object. 
+      Currently, fault monitoring using the Y.1731 mechanism and BFD are supported. 
+      The creation of an entry in this table does not create the 
+      Y.1731 / MPLS-OAM Monitoring entities. These Monitoring entities have to be created 
+      explicitly in ECFM or in MPLS-OAM accordingly." 
+   ::= { fsElpsPg 3 }
+
+fsElpsPgCfmEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgCfmEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the entry that indicate the monitoring entities for each protection group." 
+   INDEX { fsElpsContextId, 
+           fsElpsPgConfigPgId }
+   ::= { fsElpsPgCfmTable 1 }
+
+FsElpsPgCfmEntry ::=
+   SEQUENCE {
+          fsElpsPgCfmWorkingMEG
+            Unsigned32,
+          fsElpsPgCfmWorkingME
+            Unsigned32,
+          fsElpsPgCfmWorkingMEP
+            Dot1agCfmMepId,
+          fsElpsPgCfmProtectionMEG
+            Unsigned32,
+          fsElpsPgCfmProtectionME
+            Unsigned32,
+          fsElpsPgCfmProtectionMEP
+            Dot1agCfmMepId,
+          fsElpsPgCfmRowStatus
+            RowStatus,
+          fsElpsPgCfmWorkingReverseMEG
+            Unsigned32,
+          fsElpsPgCfmWorkingReverseME
+            Unsigned32,
+          fsElpsPgCfmWorkingReverseMEP
+            Dot1agCfmMepId,
+          fsElpsPgCfmProtectionReverseMEG
+            Unsigned32,
+          fsElpsPgCfmProtectionReverseME
+            Unsigned32,
+          fsElpsPgCfmProtectionReverseMEP
+            Dot1agCfmMepId
+        }
+
+fsElpsPgCfmWorkingMEG OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Maintenance Entity Group (MEG) that the working 
+       entity of the protection group denoted by fsElpsPgConfigPgId 
+       corresponds to.
+       "
+   ::= { fsElpsPgCfmEntry 1 }
+
+fsElpsPgCfmWorkingME OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Maintenance Entity (ME) that the working entity of 
+       the protection group denoted by fsElpsPgConfigPgId corresponds to.
+       "
+   ::= { fsElpsPgCfmEntry 2 }
+
+fsElpsPgCfmWorkingMEP OBJECT-TYPE
+   SYNTAX      Dot1agCfmMepId
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Maintenance Entity Group (MEG) End Point (MEP) 
+       that monitors the working entity of the protection group denoted by the 
+       fsElpsPgConfigPgId value.
+       "
+   ::= { fsElpsPgCfmEntry 3 }
+
+fsElpsPgCfmProtectionMEG OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This  object specifies the Maintenance Entity Group (MEG) that the protection 
+       entity of the protection group denoted by fsElpsPgConfigPgId 
+       corresponds to.
+       "
+   ::= { fsElpsPgCfmEntry 4 }
+
+fsElpsPgCfmProtectionME OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Maintenance Entity (ME) that the protection entity of
+       the protection group denoted by fsElpsPgConfigPgId corresponds to.
+       "
+   ::= { fsElpsPgCfmEntry 5 }
+
+fsElpsPgCfmProtectionMEP OBJECT-TYPE
+   SYNTAX      Dot1agCfmMepId
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Maintenance Entity Group (MEG) End Point (MEP) that 
+       monitors the protection entity of the protection group denoted by the 
+       fsElpsPgConfigPgId value.
+       "
+   ::= { fsElpsPgCfmEntry 6 }
+
+fsElpsPgCfmRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The status of this row.
+       The writable columns in any row of this table cannot be changed while 
+       the row is active. Furthermore, creation of any entry or modification to
+       any entry in this table is allowed only when the corresponding entry 
+       present in the fsElpsPgConfigTable is not active."
+   ::= { fsElpsPgCfmEntry 7 }
+
+fsElpsPgCfmWorkingReverseMEG OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable only when the fsElpsPgConfigServiceType is
+      'mplsLSP'. 
+      In case of associated mplsLSP, this object refers to 
+      the Maintenance Entity Group (MEG) for the reverse working entity.
+      In case of co-routed mplsLSP, this object is not valid"
+   ::= { fsElpsPgCfmEntry 8 }
+
+fsElpsPgCfmWorkingReverseME OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable only when the fsElpsPgConfigServiceType is
+       'mplsLSP'.
+       In case of associated mplsLSP, this object refers to 
+       the Maintenance Entity (ME) for the reverse working entity. 
+       In case of co-routed mplsLSP, this object is not valid."
+   ::= { fsElpsPgCfmEntry 9 }
+
+fsElpsPgCfmWorkingReverseMEP OBJECT-TYPE
+   SYNTAX      Dot1agCfmMepId
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable only when the fsElpsPgConfigServiceType is
+       'mplsLSP'. 
+       In case of associated mplsLSP, this object refers to 
+       the Maintenance Entity Group(MEG) End Point (MEP) that monitors the 
+       reverse working entity of the protection group.
+       In case of co-routed mplsLSP, this object is not valid." 
+   ::= { fsElpsPgCfmEntry 10 }
+
+fsElpsPgCfmProtectionReverseMEG OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable only when the fsElpsPgConfigServiceType is
+       'mplsLSP'. In case of associated mplsLSP, this object refers to 
+       the Maintenance Entity Group (MEG) for the reverse protection entity 
+       of the protection group.
+       In case of co-routed mplsLSP, this object is not valid."
+   ::= { fsElpsPgCfmEntry 11 }
+
+fsElpsPgCfmProtectionReverseME OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable only when the fsElpsPgConfigServiceType is
+       'mplsLSP'. In case of associated mplsLSP, this object refers to
+       the Maintenance Entity (ME) for the reverse protection entity of the 
+       protection group.
+       In case of co-routed mplsLSP, this object is not valid." 
+   ::= { fsElpsPgCfmEntry 12 }
+
+fsElpsPgCfmProtectionReverseMEP OBJECT-TYPE
+   SYNTAX      Dot1agCfmMepId
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable only when the fsElpsPgConfigServiceType is
+       'mplsLSP'. In case of associated mplsLSP, this object refers to the 
+       Maintenance Entity Group (MEG) End Point (MEP) that monitors the reverse 
+       protection entity of the protection group.
+       In case of co-routed mplsLSP, this object is not valid."
+   ::= { fsElpsPgCfmEntry 13 }
+
+-- --------------------------------------------
+-- Table : Protection Group Service List Table
+-- --------------------------------------------
+fsElpsPgServiceListTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgServiceListEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains the list of services   
+      that needs to be protected for the corresponding protection group entry. 
+      This table needs to be populated only for those protection groups which 
+      have the value of the object fsElpsPgConfigType as 'list'. Protecting 
+      a list of services is only possible when the same set of services (and
+      therefore service identifiers) are used for both the working and 
+      protection entities.
+ 
+      This table is applicable for service type 'vlan' only.
+     "
+   ::= { fsElpsPg 4 }
+
+fsElpsPgServiceListEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgServiceListEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the protection group service list table entry. Creation of this entry is
+      allowed only if the value of the object fsElpsPgConfigType is configured 
+      as 'list'."
+   INDEX { fsElpsContextId, 
+           fsElpsPgConfigPgId, 
+           fsElpsPgServiceListValue }
+   ::= { fsElpsPgServiceListTable 1 }
+
+FsElpsPgServiceListEntry ::=
+   SEQUENCE {
+          fsElpsPgServiceListValue
+            PgServiceValue,
+          fsElpsPgServiceListRowStatus
+            RowStatus
+        }
+
+fsElpsPgServiceListValue OBJECT-TYPE
+   SYNTAX      PgServiceValue
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the services which needs to be protected
+       for this protection group and which will have its traffic shifted from
+       the port indicated by fsElpsPgConfigWorkingPort object to the port 
+       indicated by the fsElpsPgConfigProtectionPort object upon failure of the
+       working entity.
+       
+       Currently only vlan service type is supported for this table. Hence this 
+       object can hold any value between the range 1 to 4094."
+
+   ::= { fsElpsPgServiceListEntry 1 }
+
+
+fsElpsPgServiceListRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the status of this row. The valid options supported for this table are
+       'createAndGo' and 'destroy'. Entries in this table cannot be created or
+        modified when the corresponding entry in the protection group config
+        table for this fsElpsPgConfigPgId is active."
+   
+  ::= { fsElpsPgServiceListEntry 2 }
+
+
+-- ----------------------------------------------------
+-- Table : Protection Group Service List Pointer Table 
+-- ----------------------------------------------------
+fsElpsPgServiceListPointerTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgServiceListPointerEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains the 
+      object identifiers for the list of services that needs to be protected 
+      and the corresponding the protection services.
+      
+      This table is applicable only when the protection group type is 'list'.
+
+      This table is useful when each of the working service has a specific protection 
+      service who's service value is different from the working service value. 
+
+      This table also helps to generically configure the working and protection services
+      in terms of specifying their 'object identifiers', instead of directly configuring 
+      the value of the services.
+     "
+   ::= { fsElpsPg 7 }
+
+fsElpsPgServiceListPointerEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgServiceListPointerEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the protection group service list pointer table entry. 
+      Creation of this entry is allowed only if the value of the object fsElpsPgConfigType 
+      is configured  as 'list'."
+   INDEX { fsElpsContextId, 
+           fsElpsPgConfigPgId, 
+           fsElpsPgServiceListId }
+   ::= { fsElpsPgServiceListPointerTable 1 }
+
+FsElpsPgServiceListPointerEntry ::=
+   SEQUENCE {
+          fsElpsPgServiceListId
+            Unsigned32,      
+          fsElpsPgWorkingServiceListPointer
+            RowPointer,
+          fsElpsPgWorkingReverseServiceListPointer
+            RowPointer,
+          fsElpsPgProtectionServiceListPointer
+            RowPointer,
+          fsElpsPgProtectionReverseServiceListPointer
+            RowPointer,
+          fsElpsPgServiceListPointerRowStatus
+            RowStatus
+        }
+
+fsElpsPgServiceListId OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Unique numeric identifier for a working and protection service set in a protection list 
+       within the protection group."
+   ::= { fsElpsPgServiceListPointerEntry 1 }
+
+fsElpsPgWorkingServiceListPointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies a working service which needs to be protected. 
+ 
+      This object is applicable for 'mplsLSP' and 'mplsPw' service type.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table corresponding to 
+          the LSP being protected (working LSP).
+          
+        - In case of co-routed MPLS LSP, this object indicates the co-routed 
+          (forward and reverse) path of the LSP.
+          In case of associated MPLS LSP, this object indicates the forward path of
+          the LSP being protected.
+
+       When fsElpsPgConfigServiceType is 'mplsPw' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS Pseudo wire table corresponding to 
+          the PW being protected (working PW)." 
+
+   ::= { fsElpsPgServiceListPointerEntry 2 }
+
+fsElpsPgWorkingReverseServiceListPointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This object specifies the reverse path of the working service that is protected.
+    This object is optional and is applicable only when the forward and resverse paths 
+    are different for certain type of services.
+ 
+    This object is applicable for 'mplsLSP' service type only.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - Configuring this object is optional.
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table corresponding to the reverse path of
+          the LSP being protected (reverse path of working LSP).
+        - This configuration is required only in case of associated MPLS LSP.
+        - In case of co-routed mplsLSP, this object is not applicable.
+   "
+   ::= { fsElpsPgServiceListPointerEntry 3 }
+
+fsElpsPgProtectionServiceListPointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies to the protection service corresponding to the working service.
+ 
+      This object is applicable for 'mplsLSP' and 'mplsPw' service types.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table corresponding to 
+          the protection instance of the working LSP (ie. protection LSP).
+          
+        - In case of co-routed MPLS LSP, this object indicates the co-routed 
+          (forward and reverse) path of the protection LSP.
+          In case of associated MPLS LSP, this object indicates the forward path of
+          the protection LSP.
+
+       When fsElpsPgConfigServiceType is 'mplsPw' :
+        - This object should be configured with the object identifier 
+          of the row in the MPLS Pseudo wire table corresponding to 
+          the protection instance of the working PW (ie. protection PW)."
+
+   ::= { fsElpsPgServiceListPointerEntry 4 }
+
+fsElpsPgProtectionReverseServiceListPointer OBJECT-TYPE
+   SYNTAX      RowPointer
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the reverse path of the protection service.
+       Configuring this object is optional and is applicable only when the 
+       forward and resverse paths are different for certain type of services.
+
+     This object is applicable for 'mplsLSP' service type only.
+       
+       When fsElpsPgConfigServiceType is 'mplsLSP' :
+        - Configuring this object is optional.
+        - This object should be configured with the object identifier 
+          of the row in the MPLS tunnel table, for the reverse path of
+          the protecting LSP, corresponding to the working LSP.
+        - This configuration is required only in case of associated MPLS LSP configured
+          to protect the working LSP.
+        - In case of co-routed mpls LSP, this object is not applicable.
+      "
+   ::= { fsElpsPgServiceListPointerEntry 5 }
+
+fsElpsPgServiceListPointerRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This object specifies the status of this row. Entries in this table cannot be created or modified 
+    when the corresponding entry in the protection group config table for this 
+    fsElpsPgConfigPgId is active.
+    
+    RowStatus can be made active only when a valid working and protection services
+    are configured for this entry."
+
+   ::= { fsElpsPgServiceListPointerEntry 6 }
+
+-- -------------------------------------
+-- Table : Protection Group Share Table
+-- -------------------------------------
+fsElpsPgShareTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgShareEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains the set of protection groups
+      that shares the same protection entity (i.e. protection port)."
+   ::= { fsElpsPg 5 }
+
+fsElpsPgShareEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgShareEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "The protection group share table entry. Each entry indicates a protection
+      group that shares the protection port."
+   INDEX { fsElpsContextId, 
+           fsElpsPgShareProtectionPort, 
+           fsElpsPgConfigPgId }
+   ::= { fsElpsPgShareTable 1 }
+
+FsElpsPgShareEntry ::=
+   SEQUENCE {
+          fsElpsPgShareProtectionPort
+            InterfaceIndex,
+          fsElpsPgSharePgStatus
+            PgStatus
+        }
+
+fsElpsPgShareProtectionPort OBJECT-TYPE
+   SYNTAX      InterfaceIndex
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the protection entity (port) which 
+       carries the normal traffic upon failure of the working transport 
+       entity." 
+   ::= { fsElpsPgShareEntry 1 }
+
+fsElpsPgSharePgStatus OBJECT-TYPE
+   SYNTAX      PgStatus
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "The object is used to indicate the status of the protection group that shares
+       the protection port as indicated by the fsElpsPgConfigProtectionPort 
+       object."
+   ::= { fsElpsPgShareEntry 2 }
+
+-- ------------------------------------------
+-- Table : Protection Group Statistics Table
+-- ------------------------------------------
+fsElpsPgStatsTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsElpsPgStatsEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains statistics information for each of the protection
+      groups present in the system. Entries in this table are created 
+      implicitly by the creation of entries in the fsElpsPgConfigTable."
+   ::= { fsElpsPg 6 }
+
+fsElpsPgStatsEntry OBJECT-TYPE
+   SYNTAX       FsElpsPgStatsEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This object specifies the protection group statistics table entry. There is one entry in this  
+      table for each entry in the fsElpsPgConfigTable table."
+   INDEX { fsElpsContextId, 
+           fsElpsPgConfigPgId }
+   ::= { fsElpsPgStatsTable 1 }
+
+FsElpsPgStatsEntry ::=
+   SEQUENCE {
+          fsElpsPgStatsAutoProtectionSwitchCount
+            Counter32,
+          fsElpsPgStatsForcedSwitchCount
+            Counter32,
+          fsElpsPgStatsManualSwitchCount
+            Counter32,
+          fsElpsPgStatsClearStatistics
+            TruthValue,
+          fsElpsPgStatsApsPktTxCount
+            Counter32,
+          fsElpsPgStatsApsPktRxCount
+            Counter32,
+	  fsElpsPgStatsApsPktDiscardCount
+	    	Counter32,
+          fsElpsPgLRSFRxTime
+            Unsigned32,
+          fsElpsPgLRSFTxTime
+            Unsigned32,
+          fsElpsPgFRSFRxTime
+            Unsigned32,
+          fsElpsPgStateChgTime
+            Unsigned32
+        }
+
+fsElpsPgStatsAutoProtectionSwitchCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the number of times automatic protection switching 
+       has happened for this protection group entry."
+   ::= { fsElpsPgStatsEntry 1 }
+
+fsElpsPgStatsForcedSwitchCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the number of times a forced protection switch has 
+       happened for this protection group entry."
+   ::= { fsElpsPgStatsEntry 2 }
+
+fsElpsPgStatsManualSwitchCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the number of times a manual protection switch has
+       happened for this protection group entry."
+   ::= { fsElpsPgStatsEntry 3 }
+
+fsElpsPgStatsClearStatistics OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to reset all the statistics counter objects present 
+       in this table. 
+       This will be done by setting the value of this column to 'true(1)'. 
+       This column will always return 'false(2)' when read."
+   ::= { fsElpsPgStatsEntry 4 }
+
+fsElpsPgStatsApsPktTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets attempted to 
+       be transmitted out of this protection group entry. "
+   ::= { fsElpsPgStatsEntry 5 }
+
+fsElpsPgStatsApsPktRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets received by
+	   this protection group entry." 
+   ::= { fsElpsPgStatsEntry 6 }
+
+fsElpsPgStatsApsPktDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used to record the total number of APS/PSC packets discarded in
+       this protection group entry." 
+   ::= { fsElpsPgStatsEntry 7 }
+
+fsElpsPgLRSFRxTime OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the timestamp when receiving Local Request -
+       signal fail message. This is detected in local node and it is not got
+       from the packet. The time is in milliseconds."
+   ::= { fsElpsPgStatsEntry 8 }
+
+fsElpsPgLRSFTxTime OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the timestamp when sending Local Request - signal
+       fail packet to the peer node. The time is in milliseconds."
+   ::= { fsElpsPgStatsEntry 9 }
+
+fsElpsPgFRSFRxTime OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the timestamp when receiving Far end Request - 
+       signal fail packet from the peer node. The time is in milliseconds."
+   ::= { fsElpsPgStatsEntry 10 }
+
+fsElpsPgStateChgTime OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the timestamp when the protection path becomes
+       active after processing the signal fail packet that is received from
+       the peer. The time is in milliseconds."
+   ::= { fsElpsPgStatsEntry 11 }
+
+-- *****************************************************************************
+--              fsElpsPgNotifications subtree
+-- *****************************************************************************
+
+fsElpsTraps OBJECT IDENTIFIER ::= { fsElpsPgNotifications 0 }
+
+fsElpsTrapContextName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the name given to the virtual context."
+    ::= { fsElpsPgNotifications 1 }
+
+fsElpsTrapSwitchingMechanism OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object provides the text indicating the mechanism by which the 
+         switching of traffic occurred from the working to the protection 
+         transport entity.
+
+         'AutoProtectionSwitch' will be set when the switching happens  
+         automatically through the operation of the APS protocol.
+
+         'ForcedSwitch' will be set when the switching happens by means of 
+         an administrator-issued Force Switch command.
+
+         'ManualSwitch' will be set when the switching happens by means of 
+         an administrator-issued Manual Switch command."
+    ::= { fsElpsPgNotifications 2 }
+
+fsElpsTrapMismatchType OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object is used to provide the text indicating the mismatches found 
+         in the APS PDUs exchanged between the near-end and the far-end 
+         switches.
+
+         'BbitMismatch' will be set when there is a mismatch found in the 
+         B bit of the received APS PDU. 
+
+         'ConfigurationMismatch' will be set when an APS PDU is received 
+         through the working transport entity instead of the protection 
+         transport entity.
+
+         'LackOfResponse' will be set when there is a lack of response to a 
+         bridge request for a period greater than 50 ms (i.e., no match in sent
+         'Requested Signal' and received 'Requested Signal' for > 50ms).
+
+         'AbitMismatch' will be set when there is a mismatch found in the A bit
+         of the received APS PDU.
+
+         'DbitMismatch' will be set when there is a mismatch found in the D bit
+         of the received APS PDU.
+
+         'RbitMismatch' will be set when there is a mismatch found in the R bit
+		  of the received APS/PSC PDU."
+		  
+
+    ::= { fsElpsPgNotifications 3 }
+
+fsElpsTypeOfFailure OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object is used to provide the text indicating a particular failure 
+         condition. 
+
+         'HwProtectionGroupCreationFailed' will be indicated when the setting  
+         up of the protection group in the hardware has failed.
+
+         'HwProtectionGroupDeletionFailed' will be indicated when the deletion 
+         of the protection group from the hardware has failed.
+
+         'HwSwitchToWorkingPathFailed' will be indicated when the setting up of 
+         the working path as the active path for a protection group in the 
+         hardware has failed.
+
+         'HwSwitchToProtectionPathFailed' will be indicated when the setting up 
+         of the protection path as the active path for a protection group in 
+         the hardware has failed.
+
+         'ApsPduTxFailed' will be set when the state machine is unable to 
+          transmit an APS PDU upon a protection group state change." 
+    ::= { fsElpsPgNotifications 4 }
+
+fsElpsProtectionSwitchTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        fsElpsTrapContextName, 
+        fsElpsPgCmdPgStatus, 
+        fsElpsTrapSwitchingMechanism
+    }
+    STATUS   current
+    DESCRIPTION
+        "This object specifies the trap that is generated when the switching happens from working 
+         transport entity to protection transport entity (and vice-versa). 
+         The generated trap will carry the information about the context-name, 
+         the protection group status indicating whether the service is carried 
+         over the working path or the protection path currently and the 
+         mechanism (Auto Protection Switch, Forced Switch, Manual Switch) 
+         by which the switching happened."
+    ::= { fsElpsTraps 1 }
+
+fsElpsProtectionSwitchFailureTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        fsElpsTrapContextName, 
+        fsElpsPgCmdPgStatus, 
+        fsElpsTypeOfFailure
+    }
+    STATUS   current
+    DESCRIPTION
+        "This object specifies the trap that is generated when there is a hardware failure 
+        for a protection group or the state machine is unable to transmit APS  
+        PDUs upon a protection group state change."
+    ::= { fsElpsTraps 2 }
+
+fsElpsProtectionTypeMismatchTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        fsElpsTrapContextName, 
+        fsElpsPgCmdPgStatus, 
+        fsElpsTrapMismatchType
+    }
+    STATUS   current
+    DESCRIPTION
+        "This trap is generated whenever a mismatch is found through the APS    
+         protocol operation. The mismatches can be a B-bit mismatch, 
+         a Configuration mismatch, a Lack Of Response, an A-bit mismatch or
+         a D-bit mismatch."
+    ::= { fsElpsTraps 3 }
+
+END 

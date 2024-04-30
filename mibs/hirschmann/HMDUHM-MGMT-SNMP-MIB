@@ -1,0 +1,270 @@
+-- **************************************************************************
+-- *                                                                        *
+-- *                                                                        *
+-- *                   Hirschmann Electronics GmbH & Co. KG                 *
+-- *                                                                        *
+-- *                             P.O. Box 1649                              *
+-- *                           D-72602 Nuertingen                           *
+-- *                                Germany                                 *
+-- *                                                                        *
+-- *                                                                        *
+-- *                        MACH3000 SNMP PRIVATE MIB                       * 
+-- *                                                                        *
+-- *                 Dual Homing Configuration  Release 2.21                *
+-- *                                                                        *
+-- *                          Date:  16-mar-2001                            *
+-- *                                                                        *
+-- *                                                                        *
+-- *    Dies ist die SNMP MIB fuer Hirschmann MACH3000 und RS2              *
+-- *                                                                        *
+-- *    Sollten Sie weitere Fragen haben, wenden Sie sich bitte an ihren    *
+-- *    Hirschmann-Vertragspartner.                                         *
+-- *                                                                        *
+-- *    Aktuelle Hirschmann-Infos zu unseren Produkten erhalten Sie ueber   *
+-- *    unseren WWW-Server unter http://www.hirschmann.com                  *
+-- *                                                                        *
+-- *    This is the SNMP MIB for the Hirschmann MACH3000 and RS2            *
+-- *                                                                        *
+-- *    If you have any further questions please contact your               *
+-- *    Hirschmann contractual partner.                                     *
+-- *                                                                        *
+-- *    You can access current information about Hirschmann products        *
+-- *    via our WWW server on http://www.hirschmann.com                     *
+-- *                                                                        *
+-- **************************************************************************
+
+HMDUHM-MGMT-SNMP-MIB   DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE                          FROM RFC-1212
+    enterprises,
+    Counter, TimeTicks, IpAddress        FROM RFC1155-SMI
+    mib-2,
+    DisplayString                        FROM RFC1213-MIB
+    hmConfiguration			 FROM HMPRIV-MGMT-SNMP-MIB;
+
+hmDualHoming      OBJECT IDENTIFIER ::= { hmConfiguration 4 }
+
+--
+-- common Dual homing Variables  --
+--
+
+hmDualHomingTable OBJECT-TYPE
+                SYNTAX          SEQUENCE OF HmDuHmEntry
+                ACCESS          not-accessible
+                STATUS          mandatory
+                DESCRIPTION     "This table contains variables to define
+                                an entry in the dual homing database."
+                ::= { hmDualHoming 1 }
+
+hmDuHmEntry     OBJECT-TYPE
+                SYNTAX          HmDuHmEntry
+                ACCESS          not-accessible
+                STATUS          mandatory
+                INDEX           { hmDuHmPrimGroupID, hmDuHmPrimIfIndex }
+                ::= { hmDualHomingTable 1 }
+
+HmDuHmEntry ::= SEQUENCE {
+                hmDuHmPrimGroupID         INTEGER,
+                hmDuHmPrimIfIndex         INTEGER,
+                hmDuHmPrimIfOpState       INTEGER,
+                hmDuHmRedGroupID          INTEGER,
+                hmDuHmRedIfIndex          INTEGER,
+                hmDuHmRedIfOpState        INTEGER,
+                hmDuHmDesiredAction       INTEGER,
+                hmDuHmOperState           INTEGER,
+                hmDuHmPortRevivalDelay    INTEGER,
+                hmDuHmLinkMode            INTEGER,
+                hmDuHmRedCheckEnable      INTEGER,
+                hmDuHmRedCheckState       INTEGER
+                }
+
+hmDuHmPrimGroupID   OBJECT-TYPE
+                SYNTAX          INTEGER (1..5)
+                ACCESS          read-only
+                STATUS          mandatory
+                DESCRIPTION     "Unique index to identify the slot number of
+                                the primary link port. This value is never
+                                greater than hmSysGroupCapacity. Note that
+                                row creation is done only by writing to
+                                hmDuHmDesiredAction"
+                ::= { hmDuHmEntry 1 }
+
+hmDuHmPrimIfIndex   OBJECT-TYPE
+                SYNTAX          INTEGER (1..32)
+                ACCESS          read-only
+                STATUS          mandatory
+                DESCRIPTION     "interface index of the primary link.
+                                Note that row creation is only done by
+                                writing to hmDuHmDesiredAction"
+                ::= { hmDuHmEntry 2 }
+
+hmDuHmPrimIfOpState   OBJECT-TYPE
+                SYNTAX           INTEGER {
+                                 not-available(1),
+                                 active(2),
+                                 active-by-mgmt(3),
+                                 inactive-by-mgmt(4),
+                                 inactive(5),
+                                 absent(6)
+                                 }
+                ACCESS           read-only
+                STATUS           mandatory
+                DESCRIPTION      "operational state of the primary interface."
+                ::= { hmDuHmEntry 3 }
+
+hmDuHmRedGroupID   OBJECT-TYPE
+                SYNTAX          INTEGER
+                ACCESS          read-write
+                STATUS          mandatory
+                DESCRIPTION     "Unique index to identify the slot number of
+                                the redundant link port. This value is never
+                                greater than hmSysGroupCapacity.
+                                To change this value if it is not 0 the the
+                                whole entry has to be deleted. "
+                ::= { hmDuHmEntry 4 }
+
+hmDuHmRedIfIndex   OBJECT-TYPE
+                SYNTAX          INTEGER
+                ACCESS          read-write
+                STATUS          mandatory
+                DESCRIPTION     "interface index of the redundant link
+                                To change this value if it is not 0 the the
+                                whole entry has to be deleted. "
+                ::= { hmDuHmEntry 5 }
+
+hmDuHmRedIfOpState   OBJECT-TYPE
+                SYNTAX           INTEGER {
+                                 not-available(1),
+                                 active(2),
+                                 active-by-mgmt(3),
+                                 inactive-by-mgmt(4),
+                                 inactive(5),
+                                 absent(6)
+                                 }
+                ACCESS           read-only
+                STATUS           mandatory
+                DESCRIPTION      "operational state of the redundant interface."
+                ::= { hmDuHmEntry 6 }
+
+hmDuHmDesiredAction   OBJECT-TYPE
+                SYNTAX           INTEGER {
+                                 create(1),
+                                 deactivate(2),
+                                 activate(3),
+                                 delete(4)
+                                 }
+                ACCESS           read-write
+                STATUS           mandatory
+                DESCRIPTION      "if a value is written to this variable, the
+                                 desired action will be performed. If it is not
+                                 possible to perform the action, a result of
+                                 bad value is returned."
+                ::= { hmDuHmEntry 7 }
+
+    -- A manager is restricted to changing the state of
+    -- the desiredAction in the following ways:
+    --
+    --                       create   under
+    --      To:       create   deactivate activate delete
+    -- From:
+    -- (non-existent)    YES       NO        NO        NO
+    -- create            NO        NO        YES       YES
+    -- deactivate        OK        NO        YES       YES
+    -- activate          NO        YES       NO        YES
+    -- delete            N/A       N/A       N/A       N/A
+    --
+
+hmDuHmOperState OBJECT-TYPE
+                SYNTAX           INTEGER {
+                                 underCreation(1),
+                                 checking(2),
+                                 active(3),
+                                 inactive(4),
+                                 invalid(5),
+                                 OutOfOrder(6)
+                                 }
+                ACCESS           read-only
+                STATUS           mandatory
+                DESCRIPTION      "operational state of an entry. if a new entry
+                                 is created by setting hmDuHmDesiredAction to create(1),
+                                 the operState returns a value of underCreation(1).
+                                 A value of checking(2) is returned if the action of
+                                 activate is desired and the dual homing machine is trying
+                                 to check whether the configuration is possible.
+                                 If the activate action is successful, active(3)
+                                 is returned, otherwise invalid(5). A value of inactive(4)
+                                 signals that dual homing is deactivated for this port pair.
+                                 Only in the state of underCreation(1)
+                                 it is possible to change the values of hmDuHmRedGroupID
+                                 and hmDuHmRedIfIndex.
+                                 OutOfOrder report an inactiv entry, because the enabled 
+                                 redundancy check failed"
+
+                ::= { hmDuHmEntry 8 }
+
+hmDuHmPortRevivalDelay   OBJECT-TYPE
+                SYNTAX          INTEGER
+                ACCESS          read-write
+                STATUS          mandatory
+                DESCRIPTION     "the time in milliseconds for a primary link to become active
+                                again when the cause of switching to the redundant link
+                                disappears. If the variable is set to 0, the primary link
+                                becomes not active automatically again.
+                                Recommended minimum values: 60000 for Spanning Tree enabled
+                                or 10000 for Spanning Tree disabled."
+                ::= { hmDuHmEntry 9 }
+
+hmDuHmLinkMode   OBJECT-TYPE
+                SYNTAX          INTEGER {
+                                physical(1),
+                                layer2Frames(2)
+                                }
+                ACCESS          read-write
+                STATUS          mandatory
+                DESCRIPTION     "supervisory mode of the link"
+                ::= { hmDuHmEntry 10 }
+
+hmDuHmRedCheckEnable   OBJECT-TYPE
+                SYNTAX          INTEGER {
+                                enable(1),
+                                disable(2)
+                                }
+                ACCESS          read-write
+                STATUS          mandatory
+                DESCRIPTION     "Variable to enable or disable the redundancy check for
+                                the given dual homing entry."
+                ::= { hmDuHmEntry 11 }
+
+hmDuHmRedCheckState   OBJECT-TYPE
+                SYNTAX          INTEGER {
+                                ok(1),
+                                failed(2)
+                                }
+                ACCESS          read-only
+                STATUS          mandatory
+                DESCRIPTION     "state of the redundancy check for the given
+                                 dual homing entry."
+                ::= { hmDuHmEntry 12 }
+
+
+--
+-- DUHM traps
+--
+
+hmDuHmReconfig  TRAP-TYPE
+         ENTERPRISE  hmDualHoming
+	     VARIABLES   { hmDuHmPrimGroupID, hmDuHmPrimIfIndex, hmDuHmPrimIfOpState,
+					   hmDuHmRedGroupID, hmDuHmRedIfIndex, hmDuHmRedIfOpState }
+         DESCRIPTION "The Dual-Homing Protocol has exchanged the port roles"
+       ::= 1
+
+hmDuHmRedundancy  TRAP-TYPE
+         ENTERPRISE  hmDualHoming
+	     VARIABLES   { hmDuHmRedCheckState }
+         DESCRIPTION "The Result of the redudance-test changed"
+       ::= 2
+
+
+END
+

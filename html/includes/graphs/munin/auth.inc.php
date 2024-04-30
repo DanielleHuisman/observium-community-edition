@@ -17,7 +17,7 @@ if (is_numeric($vars['plugin'])) {
 }
 
 if (is_numeric($mplug['device_id']) && ($auth || device_permitted($mplug['device_id']))) {
-    $device   = device_by_id_cache($oid['device_id']);
+    $device   = device_by_id_cache($mplug['device_id']);
 
     $plugfile = get_rrd_path($device, "munin/" . $mplug['mplug_type']);
 

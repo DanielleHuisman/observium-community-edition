@@ -1,0 +1,574 @@
+
+
+ZTE-DSL-VLAN-MIB    DEFINITIONS ::= BEGIN
+    IMPORTS
+        zxDsl                                    FROM ZTE-DSL-MIB
+        RowStatus, TEXTUAL-CONVENTION, DisplayString    FROM SNMPv2-TC
+        ifIndex                                  FROM IF-MIB
+        dot1dBasePort                            FROM BRIDGE-MIB
+        dot1qVlanIndex, dot1qVlanStaticEntry     FROM Q-BRIDGE-MIB
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32  FROM SNMPv2-SMI;
+
+    zxDslVlanMib    MODULE-IDENTITY
+        LAST-UPDATED    "200707241030Z"
+        ORGANIZATION    "ZTE Corporation"
+        CONTACT-INFO    "su chunshan
+                  Mail: suchunshan@zte.com.cn
+                  Tel : 021-68896292"
+        DESCRIPTION     "This MIB defines zte dsl managed objects."
+        ::=  {  zxDsl  40  }
+
+    zxDslVlanObjects           OBJECT IDENTIFIER   ::=  {  zxDslVlanMib  1  }      
+    zxDslArpObjects  OBJECT IDENTIFIER   ::=  {  zxDslVlanMib  2  }
+    
+
+    zxDslVlanGlobalObjects     OBJECT IDENTIFIER   ::=  {  zxDslVlanObjects  1 }
+    
+--------------------------------------------------------------------------------
+-- Following objects are defined.
+-- 1.Vlan Extended Table
+-- 2.OneToOne Vlan Table
+-- 3.TLS Vlan Table
+-- 4.Vlan Interface Table
+-- 5.MAC Learning Disable Table
+-- 6.VLAN Extends Table
+-- 7.Arp Relay Agent Table
+-- 8.Arp Proxy Table
+-- 9.VLAN Batch Operation
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- 9.VLAN Batch Operation
+--------------------------------------------------------------------------------
+    zxDslVlanBatchOperObjects OBJECT IDENTIFIER ::= { zxDslVlanGlobalObjects 1 }
+
+    zxDslVlanBatchOperType  OBJECT-TYPE
+        SYNTAX      INTEGER {
+            createVlan(1),
+            bindVlan(2),
+            unbindVlan(3),
+            setPvid(4)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The type of VLAN batch operation. Manager should set this
+            object and zxDslVlanBatchOperCmd at the same time."
+        ::= { zxDslVlanBatchOperObjects 1 }
+
+    zxDslVlanBatchOperCmd   OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE (0..4096))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The content of VLAN batch operation. Manager should set this object 
+            and zxDslVlanBatchOperType at the same time.
+
+            The format of this command string should following the rules below.
+            Rule description refers to terms 'VLAN', 'VLANLIST' and 'PORTLIST'
+            that are explained at the end.
+
+            '|' is used to separate operations and '_' is used to separate the
+            parameters of one operation.
+
+            If zxDslVlanBatchOperType is 'createVlan', the format is 'VLANLIST'.
+            It means creating VLAN.
+
+            If zxDslVlanBatchOperType is 'bindVlan', the format is
+            'VLANLIST1_PORTLIST1_U|VLANLIST2_PORTLIST2_T'. It means binding port
+            to VLAN by tag or untag mode. T indicates tag mode and U indicates
+            untag mode. T and U must be capital.
+
+            If zxDslVlanBatchOperType is 'unbindVlan', the format is
+            'VLANLIST1_PORTLIST1|VLANLIST2_PORTLIST2'. It means unbinding port
+            from VLAN.
+
+            If zxDslVlanBatchOperType is 'setPvid', the format is
+            'VLAN1_PORTLIST1|VLANLIST2_PORTLIST2'. It means setting VLAN to the
+            PVID of port.
+
+            Below is term explanation.
+            VLAN : a certain VLAN.
+                1)  101             VLAN101
+            VLANLIST : VLAN list
+                1)  101             VLAN101
+                2)  101,103         VLAN101, VLAN103
+                3)  101,103-104     VLAN101, VLAN103 to VLAN104
+            PORTLIST : port list
+                1)  2/1             Slot2Port1
+                2)  2/1,3           Slot2Port1, Slot2Port3
+                3)  2/1,3-4         Slot2Port1, Slot2Port3 to Slot2Port4
+                4)  2/1,3-4/1       PVC1 of Slot2Port1, Slot2Port3 to Slot2Port4
+                5)  2/1,3/1,3-4     PVC1 of Slot2Port1, Slot2Port3
+                                    PVC3 of Slot2Port1, Slot2Port3
+                                    PVC4 of Slot2Port1, Slot2Port3
+            "
+        ::= { zxDslVlanBatchOperObjects 2 }
+
+    zxDslVlanBatchOperStatus    OBJECT-TYPE
+        SYNTAX      INTEGER {
+            inProgress(1),
+            completed(2)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION 
+            "The status of VLAN batch operation."
+        ::= { zxDslVlanBatchOperObjects 3 }
+
+    zxDslVlanBatchOperResult    OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE (0..1024))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION 
+            "The result of operations specified in zxDslVlanBatchOperCmd.
+
+            The format of this string should following the rules below.
+
+            '|' is used to separate operation results. It seems like '0|1|0'.
+            0 means success and 1 means fail.
+            The number of '|' should be equal to that in zxDslVlanBatchOperCmd"
+        ::= { zxDslVlanBatchOperObjects 4 }
+
+--------------------------------------------------------------------------------
+-- 1.Vlan Extended Table
+--------------------------------------------------------------------------------
+    zxDslVlanTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Vlan extended table "
+        ::=  { zxDslVlanObjects  2 }
+
+    zxDslVlanEntry    OBJECT-TYPE
+        SYNTAX      ZxDslVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslVlanTable."
+        INDEX       {  zxDslVlanSvid  }
+        ::=  { zxDslVlanTable 1 }
+        
+        
+    ZxDslVlanEntry  ::=  SEQUENCE {
+        zxDslVlanSvid                  Integer32,
+        zxDslVlanUsrToUsrTrafficCtrl   Integer32,
+        zxDslVlanForwardingParadigm    Integer32,
+        zxDslVlanNtoOneVlanType        Integer32,
+        zxDslVlanDsNUcastFiltering     Integer32,
+        zxDslVlanDiscardUsMulticast    Integer32,
+        zxDslVlanUsrToUsrMode          Integer32 
+        }
+
+
+    zxDslVlanSvid OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The S-VLAN ID number."
+        ::=  {  zxDslVlanEntry  1  }
+
+        
+    zxDslVlanUsrToUsrTrafficCtrl    OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Configures per S-VLAN ID whether or not to prevent 
+            traffic between user bridge ports."
+        ::=  {  zxDslVlanEntry  2  }
+
+
+    zxDslVlanForwardingParadigm OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                nToOneVlan(1),
+                oneToOneVlan(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Determines the forwarding paradigm."
+        ::=  {  zxDslVlanEntry  3  }
+                
+    zxDslVlanMacLearningCtrl    OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "If Forwarding Paradigm attribute is oneToOneVlan, 
+            controls (enable/disable) the MAC address learning."
+        ::=  {  zxDslVlanEntry  4  }              
+        
+
+    zxDslVlanNtoOneVlanType OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                multicastVlan(1),
+                unicastVlan(2),
+                sharedVlan(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "
+            When Forwarding Paradigm attribute is set to nToOneVlan this 
+            attribute indicates if this is a 
+              dedicated Multicast VLAN, 
+              Unicast VLAN or 
+              Shared VLAN, i.e., provides both unicast and multicast traffic.
+            For Multicast/Shared VLANs 'IGMP Processing Mode' attribute cannot 
+            be set to Forward. "
+        ::=  {  zxDslVlanEntry  5  }
+                
+
+    zxDslVlanDsNUcastFiltering  OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Control whether the AN filters out downstream 
+            Broadcast/Multicast frames."
+        ::=  {  zxDslVlanEntry  6  }
+
+    zxDslVlanDiscardUsMulticast OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Defines whether or not (enable/disable) the Access Node 
+            should discard multicast traffic on upstream direction in the 
+            context of this VLAN."
+        ::=  {  zxDslVlanEntry  7  }
+        
+    zxDslVlanUsrToUsrMode OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                single(1),
+                double(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "The mode for user to user cross connection.
+            single means identify by S-VLAN,
+            double means identify by S-VLAN and C-VLAN."
+        ::=  {  zxDslVlanEntry  8  }
+
+
+--------------------------------------------------------------------------------
+-- 2.OneToOne Vlan Table
+--------------------------------------------------------------------------------
+
+    zxDslOneToOneVlanTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslOneToOneVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "OneToOne Vlan table "
+        ::=  { zxDslVlanObjects  3 }
+
+    zxDslOneToOneVlanEntry    OBJECT-TYPE
+        SYNTAX      ZxDslOneToOneVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslOneToOneVlanTable."
+        INDEX       {  zxDslOneToOneSvid,zxDslOneToOneCvid  }
+        ::=  { zxDslOneToOneVlanTable 1 }
+        
+        
+    ZxDslOneToOneVlanEntry  ::=  SEQUENCE {
+        zxDslOneToOneSvid                Integer32,
+        zxDslOneToOneCvid                Integer32,
+        zxDslOneToOneVlanFirstBasePort   Integer32,
+        zxDslOneToOneVlanSecndBasePort   Integer32,
+        zxDslOneToOneRowStatus            RowStatus
+        }
+
+    zxDslOneToOneSvid OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The S-VLAN ID number."
+        ::=  {  zxDslOneToOneVlanEntry  1  }
+
+    zxDslOneToOneCvid OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The C-VLAN ID number."
+        ::=  {  zxDslOneToOneVlanEntry  2  }
+        
+    zxDslOneToOneVlanFirstBasePort  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "First base port in neToOne Vlan."
+        ::=  {  zxDslOneToOneVlanEntry  3  }
+
+    zxDslOneToOneVlanSecndBasePort  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Second base port in neToOne Vlan."
+        ::=  {  zxDslOneToOneVlanEntry  4  }
+
+
+
+    zxDslOneToOneRowStatus  OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Rowstatus of this entry."
+        ::=  {  zxDslOneToOneVlanEntry  5  }
+
+
+
+--------------------------------------------------------------------------------
+-- 3.TLS Vlan Table
+--------------------------------------------------------------------------------
+
+    zxDslTlsVlanTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslTlsVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "TLS(Transparent LAN Service) Vlan table "
+        ::=  { zxDslVlanObjects  4 }
+
+    zxDslTlsVlanEntry    OBJECT-TYPE
+        SYNTAX      ZxDslTlsVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslTlsVlanTable."
+        INDEX       {  zxDslTlsVlanId  }
+        ::=  { zxDslTlsVlanTable 1 }
+        
+        
+    ZxDslTlsVlanEntry  ::=  SEQUENCE {
+        zxDslTlsVlanId               Integer32,
+        zxDslTlsVlanRowStatus        RowStatus
+        }
+
+    zxDslTlsVlanId  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     " VLAN ID of Transparent LAN Servic."
+        ::=  {  zxDslTlsVlanEntry  1  }
+        
+    zxDslTlsVlanRowStatus  OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Rowstatus of this entry."
+        ::=  {  zxDslTlsVlanEntry  2  }
+        
+
+
+
+
+--------------------------------------------------------------------------------
+-- 4. Vlan Interface Table
+--------------------------------------------------------------------------------
+
+    zxDslVlanInterfaceTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslVlanInterfaceEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "TLS(Transparent LAN Service) Vlan table "
+        ::=  { zxDslVlanObjects  5 }
+
+    zxDslVlanInterfaceEntry    OBJECT-TYPE
+        SYNTAX      ZxDslVlanInterfaceEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslVlanInterfaceTable."
+        INDEX       {  zxDslVlanIfVlanId  }
+        ::=  { zxDslVlanInterfaceTable 1 }
+        
+        
+    ZxDslVlanInterfaceEntry  ::=  SEQUENCE {
+        zxDslVlanIfVlanId                  Integer32,
+        zxDslVlanIfSvcEncapType            Integer32
+        }
+
+    zxDslVlanIfVlanId  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     " VLAN ID."
+        ::=  {  zxDslVlanInterfaceEntry  1  }
+        
+
+    zxDslVlanIfSvcEncapType  OBJECT-TYPE 
+        SYNTAX          Integer32
+            {
+                pppoe(1),
+                ipoe(2),
+                all(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     
+            "The encapsulation type on a service interface."
+        ::=  {  zxDslVlanInterfaceEntry  2  }
+        
+        
+        
+--------------------------------------------------------------------------------
+-- 5. MAC Learning Disable Table
+--------------------------------------------------------------------------------
+
+    zxDslVlanMacLearnDisableTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslVlanMacLearnDisableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Mac learning disable table of VLAN"
+        ::=  { zxDslVlanObjects  6 }
+
+    zxDslVlanMacLearnDisableEntry    OBJECT-TYPE
+        SYNTAX      ZxDslVlanMacLearnDisableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslVlanInterfaceTable."
+        INDEX       {  zxDslVlanId  }
+        ::=  { zxDslVlanMacLearnDisableTable 1 }
+        
+        
+    ZxDslVlanMacLearnDisableEntry  ::=  SEQUENCE {
+        zxDslVlanId                        Integer32,
+        zxDslVlanMacLearnDisableRowStatus  Integer32
+        }                    
+                    
+    zxDslVlanId  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     " VLAN ID."
+        ::=  {  zxDslVlanMacLearnDisableEntry  1  }
+            
+    zxDslVlanMacLearnDisableRowStatus  OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Rowstatus of this entry."
+        ::=  {  zxDslVlanMacLearnDisableEntry  2  }
+        
+--------------------------------------------------------------------------------
+-- 6. VLAN Extends Table
+--------------------------------------------------------------------------------
+
+    zxDslVlanStaticExtTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslVlanStaticExtEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The extend vlan table."
+        ::=  { zxDslVlanObjects  7 }
+
+    zxDslVlanStaticExtEntry    OBJECT-TYPE
+        SYNTAX      ZxDslVlanStaticExtEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The extend vlan entry."
+        AUGMENTS    { dot1qVlanStaticEntry }
+        ::=  { zxDslVlanStaticExtTable 1 }        
+        
+    ZxDslVlanStaticExtEntry  ::=  SEQUENCE {
+        zxDslVlanBindUniPortsLimit  Integer32
+        }               
+            
+    zxDslVlanBindUniPortsLimit  OBJECT-TYPE 
+        SYNTAX          Integer32(0..128)
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "The bind UNI port limit of current vlan, 
+                         and value 0 means unlimited."
+        ::=  {  zxDslVlanStaticExtEntry  1  }        
+
+--------------------------------------------------------------------------------
+-- 7.Arp Relay Agent Table
+--------------------------------------------------------------------------------
+    
+    zxDslArpRelayAgentEnableTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslArpRelayAgentEnableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "arp relay agent enable table."
+        ::=  { zxDslArpObjects  1 }
+
+    zxDslArpRelayAgentEnableEntry    OBJECT-TYPE
+        SYNTAX      ZxDslArpRelayAgentEnableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslArpRelayAgentEnableTable."
+        INDEX       {  zxDslArpRelayAgentEnableVlanId  }
+        ::=  { zxDslArpRelayAgentEnableTable 1 }        
+        
+    ZxDslArpRelayAgentEnableEntry  ::=  SEQUENCE {
+        zxDslArpRelayAgentEnableVlanId       Integer32,
+        zxDslArpRelayAgentEnableRowStatus    Integer32
+        }
+
+    zxDslArpRelayAgentEnableVlanId  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The VLAN-ID or other identifier refering to this VLAN."
+        ::=  {  zxDslArpRelayAgentEnableEntry  1  }
+
+        
+    zxDslArpRelayAgentEnableRowStatus  OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Rowstatus of this entry."
+        ::=  {  zxDslArpRelayAgentEnableEntry  2  }        
+        
+        
+        
+--------------------------------------------------------------------------------
+-- 8.Arp Proxy Table
+--------------------------------------------------------------------------------
+    
+    zxDslArpProxyEnableTable    OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxDslArpProxyEnableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "arp proxy enable table."
+        ::=  { zxDslArpObjects  2 }
+
+    zxDslArpProxyEnableEntry    OBJECT-TYPE
+        SYNTAX      ZxDslArpProxyEnableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxDslArpProxyEnableTable."
+        INDEX       {  zxDslArpProxyEnableVlanId  }
+        ::=  { zxDslArpProxyEnableTable 1 }        
+        
+    ZxDslArpProxyEnableEntry  ::=  SEQUENCE {
+        zxDslArpProxyEnableVlanId       Integer32,
+        zxDslArpProxyEnableRowStatus    Integer32
+        }
+
+    zxDslArpProxyEnableVlanId  OBJECT-TYPE 
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The VLAN-ID or other identifier refering to this VLAN."
+        ::=  {  zxDslArpProxyEnableEntry  1  }
+
+        
+    zxDslArpProxyEnableRowStatus  OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Rowstatus of this entry."
+        ::=  {  zxDslArpProxyEnableEntry  2  }       
+END

@@ -5,6 +5,10 @@ $config['install_dir'] = $base_dir;
 
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/../includes/definitions.inc.php');
 include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing

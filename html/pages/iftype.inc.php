@@ -104,7 +104,7 @@ if ($port_count) {
         $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
         if (rrd_is_file($rrdfile, TRUE)) {
             $graph_array['type'] = 'port_bits';
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $port['port_id'];
 
             print_graph_row($graph_array);

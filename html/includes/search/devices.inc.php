@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -18,11 +18,11 @@
  */
 
 /// SEARCH DEVICES
-$where  = '(`hostname` LIKE ? OR `sysName` LIKE ? OR `ip` LIKE ? OR `location` LIKE ? OR `sysDescr` LIKE ? OR `os` LIKE ? OR `vendor` LIKE ? OR `purpose` LIKE ?)';
-$params = [$query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param];
+$where  = '(`hostname` LIKE ? OR `sysName` LIKE ? OR `ip` LIKE ? OR `location` LIKE ? OR `sysDescr` LIKE ? OR `os` LIKE ? OR `vendor` LIKE ? OR `purpose` LIKE ? OR `asset_tag` LIKE ?)';
+$params = [$query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param];
 
 $sql = "SELECT * FROM `devices`" .
-       generate_where_clause($GLOBALS['cache']['where']['device_permitted'], $where) . "
+       generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], $where) . "
         ORDER BY `hostname` LIMIT $query_limit";
 
 $results = dbFetchRows($sql, $params);
@@ -49,6 +49,10 @@ if (safe_count($results)) {
         }
         if (strlen($result['purpose'])) {
             $descr .= $result['purpose'] . ' | ';
+        }
+
+        if(strlen($result['asset_tag'])) {
+            $descr .= $result['asset_tag'] . ' | ';
         }
 
         $device_search_results[] = [

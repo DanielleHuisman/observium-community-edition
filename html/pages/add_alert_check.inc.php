@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -30,6 +30,7 @@ include($config['html_dir'] . "/includes/alerting-navbar.inc.php");
 
 if (!isset($vars['entity_type'])) {
 
+    register_html_title('Add Alert Checker: Select Entity Type');
     print generate_box_open(['title' => 'Select Alert Checker Entity Type', 'padding' => TRUE, 'header-border' => TRUE]);
 
     //echo '<h4>Select Entity Type</h4>';
@@ -111,6 +112,8 @@ if (!isset($vars['entity_type'])) {
  */
 
 } else {
+
+    register_html_title('Add Alert Checker');
 
     if (isset($vars['duplicate_id']) && $alert_dupe = get_alert_test_by_id($vars['duplicate_id'])) {
         humanize_alert_check($alert_dupe);
@@ -227,7 +230,7 @@ if (!isset($vars['entity_type'])) {
                                      'size'    => 'big',
                                      'view'    => 'toggle',
                                      'palette' => 'blue',
-                                     'value'   => (isset($vars['alert_send_recovery']) ? $vars['alert_send_recovery'] : 1)]; // Set to on by default
+                                     'value'   => $vars['alert_send_recovery'] ?? 1 ]; // Set to on by default
                             echo(generate_form_element($item, 'toggle'));
                             ?>
                         </div>
@@ -277,79 +280,36 @@ if (!isset($vars['entity_type'])) {
 
                 <div style="margin-bottom: 10px;">
                     <?php
-                    $item = ['id'          => 'alert_and',
-                             //'name'        => 'Severity',
-                             'live-search' => FALSE,
-                             'width'       => '220px',
-                             'value'       => (isset($vars['alert_and']) ? $vars['alert_and'] : 1), // Set to and by default
-                             'values'      => ['0' => ['name' => 'Require any condition',
-                                                       'icon' => $config['icon']['or-gate']],
-                                               '1' => ['name' => 'Require all conditions',
-                                                       'icon' => $config['icon']['and-gate']],
+                    $item = [ 'id'          => 'alert_and',
+                              //'name'        => 'Severity',
+                              'live-search' => FALSE,
+                              'width'       => '220px',
+                              'value'       => $vars['alert_and'] ?? 1, // Set to and by default
+                              'values'      => [ '0' => [ 'name' => 'Require any condition',
+                                                          'icon' => $config['icon']['or-gate'] ],
+                                                 '1' => [ 'name' => 'Require all conditions',
+                                                          'icon' => $config['icon']['and-gate'] ],
                              ]
                     ];
                     echo(generate_form_element($item, 'select'));
 
                     echo(PHP_EOL . '          </div>' . PHP_EOL);
 
-                    /// FIXME. Better styling on page...
-                    $metrics_list = [];
-                    foreach ($config['entities'][$vars['entity_type']]['metrics'] as $metric => $entry) {
-                        $metric_list           = [
-                          'metric'      => $metric,
-                          'description' => $entry['label'],
-                        ];
-                        $metric_list['values'] = '';
-                        if (is_array($entry['values'])) {
-                            if (is_array_list($entry['values'])) {
-                                $values = $entry['values'];
-                            } else {
-                                $values = [];
-                                foreach ($entry['values'] as $value => $descr) {
-                                    $values[] = "$value ($descr)";
-                                }
-                            }
-                            $metric_list['values'] = '<span class="label">' . implode('</span>  <span class="label">', $values) . '</span>';
-                        } elseif ($entry['type'] === 'integer') {
-                            $metric_list['values'] = escape_html('<numeric>');
-                            if (str_contains($metric, 'value')) {
-                                $metric_list['values'] .= '<br />';
-                                // some table fields
-                                foreach (['limit_high', 'limit_high_warn', 'limit_low', 'limit_low_warn'] as $field) {
-                                    if (isset($config['entities'][$vars['entity_type']]['table_fields'][$field])) {
-                                        $metric_list['values'] .= '<span class="label">@' . $config['entities'][$vars['entity_type']]['table_fields'][$field] . '</span>  ';
-                                    }
-                                }
-                            }
-                        } else {
-                            $metric_list['values'] = escape_html('<' . $entry['type'] . '>');
-                        }
-                        $metrics_list[] = $metric_list;
-                        //$metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
-                    }
-                    //$form_params['metrics'] = implode(',<br/>', $metrics_list);
-                    $metrics_opts = [
-                      'columns'     => [
-                        ['Metrics', 'style="width: 5%;"'],
-                        'Description',
-                        'Values'
-                      ],
-                      'metric'      => ['class' => 'label'],
-                      'description' => ['class' => 'text-nowrap'],
-                      'values'      => ['escape' => FALSE]
-                    ];
+                    $metrics_box = generate_alert_metrics_table($vars['entity_type'], $metrics_list);
 
-                    $item = ['id'          => 'alert_conditions',
-                             'name'        => 'Metric Conditions',
-                             'placeholder' => TRUE,
-                             //'width'       => '220px',
-                             'class'       => 'col-md-10',
-                             'style'       => 'margin-right: 10px',
-                             'rows'        => count($metrics_list) > 3 ? count($metrics_list) : 3,
-                             'value'       => $vars['alert_conditions']];
+                    $item = [ 'id'          => 'alert_conditions',
+                              'name'        => 'Metric Conditions',
+                              'placeholder' => TRUE,
+                              //'width'       => '220px',
+                              'class'       => 'col-md-10',
+                              'style'       => 'margin-right: 10px',
+                              'rows'        => max(count($metrics_list), 3),
+                              'value'       => $vars['alert_conditions']
+                    ];
                     echo generate_form_element($item, 'textarea');
 
-                    echo('<div class="col-md-12"><b>List of known metrics:</b><br />' . build_table($metrics_list, $metrics_opts) . '</div>');
+                    echo $metrics_box;
+                    unset($metrics_box, $metrics_list);
 
                     echo generate_box_close();
 

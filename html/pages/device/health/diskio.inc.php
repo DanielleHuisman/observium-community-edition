@@ -51,8 +51,8 @@ foreach (dbFetchRows("SELECT * FROM `ucd_diskio` WHERE device_id = ? ORDER BY di
     $graph_array_zoom['type']   = "diskio_ops";
     $graph_array_zoom['width']  = "400";
     $graph_array_zoom['height'] = "125";
-    $graph_array_zoom['from']   = $config['time']['twoday'];
-    $graph_array_zoom['to']     = $config['time']['now'];
+    $graph_array_zoom['from']   = get_time('twoday');
+    $graph_array_zoom['to']     = get_time();
 
     echo("<tr><td><h3>");
     echo(overlib_link($fs_url, $drive['diskio_descr'], generate_graph_tag($graph_array_zoom), NULL));

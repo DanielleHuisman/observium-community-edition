@@ -5,20 +5,21 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage common
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ *
  */
 
 // Debug nicer functions
-if (!defined('OBS_API') && PHP_SAPI !== 'cli' && PHP_VERSION_ID >= 70200) {
-    //$config['devel'] = TRUE; // DEVEL
-    if (isset($config['devel']) && $config['devel']) {
-        Tracy\Debugger::enable(Tracy\Debugger::Development);
-    }
+//$config['devel'] = TRUE; // DEVEL
+if (!defined('OBS_API') && PHP_SAPI !== 'cli' && PHP_VERSION_ID >= 70200 &&
+    isset($config['devel']) && $config['devel']) {
+    Tracy\Debugger::enable(Tracy\Debugger::Development);
 }
 
 if ((defined('OBS_DEBUG') && OBS_DEBUG) || !empty($_SERVER['REMOTE_ADDR']) ||
-    (PHP_SAPI === 'cli' && is_array($options['d']))) { // this include called before definitions :(
+    (PHP_SAPI === 'cli' && is_array($options['d']))) {
+    // this include called before definitions :(
     if (function_exists('token_get_all') && !class_exists('ref')) {
         // Class ref loaded by class_exist call
         include_once($config['install_dir'] . "/libs/ref.inc.php");
@@ -36,8 +37,7 @@ if (isset($_SESSION['mode']) && $_SESSION['mode'] === 'dark' &&
 // Fallback debugging functions
 
 if (!function_exists('r')) {
-    function r($var)
-    {
+    function r($var) {
         if (function_exists('dump')) {
             dump($var);
         } else {
@@ -45,9 +45,9 @@ if (!function_exists('r')) {
         }
     }
 }
+
 if (!function_exists('rt')) {
-    function rt($var)
-    {
+    function rt($var) {
         if (function_exists('dump')) {
             dump($var);
         } else {
@@ -57,8 +57,7 @@ if (!function_exists('rt')) {
 }
 
 if (!function_exists('dump')) {
-    function dump($var)
-    {
+    function dump($var) {
         if (PHP_SAPI === 'cli' && class_exists('ref', FALSE)) {
             rt($var);
         } elseif (class_exists('ref', FALSE)) {
@@ -70,8 +69,7 @@ if (!function_exists('dump')) {
 }
 
 if (!function_exists('bdump')) {
-    function bdump($var)
-    {
+    function bdump($var) {
         if (PHP_SAPI === 'cli' && class_exists('ref', FALSE)) {
             rt($var);
         } else {
@@ -92,8 +90,139 @@ if (!function_exists('bdump')) {
     }
 }
 
-function whimsical_error_handler($errno, $errstr, $errfile, $errline)
-{
+/**
+ * Observium's variable debugging. Chooses nice output depending upon web or cli
+ *
+ * @param $vars
+ * @param $trace
+ *
+ * @return void
+ */
+function print_vars($vars, $trace = NULL) {
+
+    if (PHP_SAPI === 'cli' || (defined('OBS_CLI') && OBS_CLI)) {
+        // In cli, still prefer ref
+        if (class_exists('ref', FALSE)) {
+            try {
+                ref::config('shortcutFunc', [ 'print_vars', 'print_debug_vars' ]);
+                ref::config('showUrls', FALSE);
+                if (defined('OBS_DEBUG') && OBS_DEBUG > 0) {
+                    if (is_null($trace)) {
+                        $backtrace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
+                    } else {
+                        $backtrace = $trace;
+                    }
+                    ref::config('Backtrace', $backtrace); // pass original backtrace
+                    ref::config('showStringMatches', FALSE);
+                } else {
+                    ref::config('showBacktrace', FALSE);
+                    ref::config('showResourceInfo', FALSE);
+                    ref::config('showStringMatches', FALSE);
+                    ref::config('showMethods', FALSE);
+                }
+                rt($vars);
+            } catch (Exception $e) {
+                print_r($vars);
+                echo PHP_EOL;
+            }
+        } else {
+            print_r($vars);
+            echo PHP_EOL;
+        }
+    } elseif (class_exists('ref')) {
+        // in Web use old ref class, when Tracy not possible to use
+        try {
+            ref::config('shortcutFunc', [ 'print_vars', 'print_debug_vars' ]);
+            ref::config('showUrls', FALSE);
+            if (defined('OBS_DEBUG') && OBS_DEBUG > 0) {
+                if (is_null($trace)) {
+                    $backtrace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
+                } else {
+                    $backtrace = $trace;
+                }
+                ref::config('Backtrace', $backtrace); // pass original backtrace
+            } else {
+                ref::config('showBacktrace', FALSE);
+                ref::config('showResourceInfo', FALSE);
+                ref::config('showStringMatches', FALSE);
+                ref::config('showMethods', FALSE);
+            }
+            //ref::config('stylePath',  $GLOBALS['config']['html_dir'] . '/css/ref.css');
+            //ref::config('scriptPath', $GLOBALS['config']['html_dir'] . '/js/ref.js');
+            r($vars);
+        } catch (Exception $e) {
+            echo '<div class="code">';
+            print_r($vars);
+            echo '</div>';
+        }
+    } else {
+        // Just fallback to php var dump
+        echo '<div class="code">';
+        print_r($vars);
+        echo '</div>';
+    }
+}
+
+/**
+ * Call to print_vars in debug mode only
+ * By default var displayed only for debug level 2
+ *
+ * @param mixed $vars Variable to print
+ * @param integer $debug_level Minimum debug level, default 2
+ *
+ * @return void
+ */
+function print_debug_vars($vars, $debug_level = 2) {
+    // For level 2 display always (also empty), for level 1 only non empty vars
+    if (defined('OBS_DEBUG') && OBS_DEBUG &&
+        OBS_DEBUG >= $debug_level && (OBS_DEBUG > 1 || !safe_empty($vars))) {
+        $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
+        print_vars($vars, $trace);
+    } elseif (defined('OBS_CACHE_DEBUG') && OBS_CACHE_DEBUG) {
+        $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
+        print_vars($vars, $trace);
+    }
+}
+
+/**
+ * Observium's SQL debugging. Chooses nice output depending upon web or cli.
+ * Use format param:
+ *  'compress' (default) print compressed and highlight query;
+ *  'full', 'html' print fully formatted query (multiline);
+ *  'log' for a return compressed query.
+ *
+ * @param string $query
+ * @param string $format
+ */
+function print_sql($query, $format = 'compress') {
+    switch ($format) {
+        case 'full':
+        case 'format':
+        case 'html':
+            // Fully formatted
+            $output = (new Doctrine\SqlFormatter\SqlFormatter())->format($query);
+            break;
+
+        case 'log':
+            // Only compress and return for log
+            return (new Doctrine\SqlFormatter\SqlFormatter())->compress($query);
+
+        default:
+            // Only compress and highlight in single line (default)
+            $compressed = (new Doctrine\SqlFormatter\SqlFormatter())->compress($query);
+            $output     = (new Doctrine\SqlFormatter\SqlFormatter())->highlight($compressed);
+    }
+
+    if (PHP_SAPI === 'cli' || (isset($GLOBALS['cli']) && $GLOBALS['cli'])) {
+        $output = rtrim($output);
+    } else {
+        $output = '<p>' . $output . '</p>';
+    }
+
+    echo $output;
+}
+
+function whimsical_error_handler($errno, $errstr, $errfile, $errline) {
     // Handle only fatal errors
     if (!($errno & (E_ERROR | E_USER_ERROR))) {
         return FALSE;
@@ -104,8 +233,7 @@ function whimsical_error_handler($errno, $errstr, $errfile, $errline)
     exit();
 }
 
-function whimsical_shutdown_handler()
-{
+function whimsical_shutdown_handler() {
     $error = error_get_last();
 
     if ($error !== NULL && $error['type'] & (E_ERROR | E_USER_ERROR | E_COMPILE_ERROR | E_PARSE)) {
@@ -114,8 +242,7 @@ function whimsical_shutdown_handler()
     }
 }
 
-function get_context_lines($file, $line_number, $context = 5)
-{
+function get_context_lines($file, $line_number, $context = 5) {
     $lines         = file($file);
     $start         = max(0, $line_number - $context - 1);
     $length        = $context * 2 + 1;
@@ -130,8 +257,7 @@ function get_context_lines($file, $line_number, $context = 5)
     ];
 }
 
-function display_error_page($errno, $errstr, $errfile, $errline, $backtrace)
-{
+function display_error_page($errno, $errstr, $errfile, $errline, $backtrace) {
     // Log the error
     //error_log("Custom error: [$errno] $errstr in $errfile on line $errline");
 
@@ -242,11 +368,11 @@ function display_error_page($errno, $errstr, $errfile, $errline, $backtrace)
         echo "\n";
 
         exit();
-    } else {
+    }
 
-        // Display the whimsical error page
-        http_response_code(500);
-        ?>
+    // Display the whimsical error page
+    http_response_code(500);
+    ?>
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -340,9 +466,8 @@ function display_error_page($errno, $errstr, $errfile, $errline, $backtrace)
         </div>
         </body>
         </html>
-        <?php
-        exit();
-    }
+    <?php
+    exit();
 }
 
 function display_error_http($errno, $message = NULL)
@@ -430,14 +555,13 @@ function display_error_http($errno, $message = NULL)
     die();
 }
 
-function display_exception($exception)
-{
+function display_exception($exception) {
     display_error_page(
-      $exception -> getCode(),
-      $exception -> getMessage(),
-      $exception -> getFile(),
-      $exception -> getLine(),
-      $exception -> getTrace()
+        $exception -> getCode(),
+        $exception -> getMessage(),
+        $exception -> getFile(),
+        $exception -> getLine(),
+        $exception -> getTrace()
     );
 }
 

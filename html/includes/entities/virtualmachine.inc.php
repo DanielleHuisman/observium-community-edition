@@ -22,28 +22,28 @@ function generate_vm_query($vars)
             case "group":
             case "group_id":
                 $values = get_group_entities($value);
-                $where[] = generate_query_values_ng($values, 'vm_id');
+                $where[] = generate_query_values($values, 'vm_id');
                 break;
             case 'device_group_id':
             case 'device_group':
                 $values = get_group_entities($value, 'device');
-                $where[] = generate_query_values_ng($values, 'device_id');
+                $where[] = generate_query_values($values, 'device_id');
                 break;
             case "device":
             case "device_id":
-                $where[] = generate_query_values_ng($value, 'device_id');
+                $where[] = generate_query_values($value, 'device_id');
                 break;
             case "os":
-                $where[] = generate_query_values_ng($value, 'vm_guestos');
+                $where[] = generate_query_values($value, 'vm_guestos');
                 break;
             case "state":
-                $where[] = generate_query_values_ng($value, 'vm_state');
+                $where[] = generate_query_values($value, 'vm_state');
                 break;
             case "memory":
-                $where[] = generate_query_values_ng($value, 'vm_memory');
+                $where[] = generate_query_values($value, 'vm_memory');
                 break;
             case "cpu":
-                $where[] = generate_query_values_ng($value, 'vm_cpucount');
+                $where[] = generate_query_values($value, 'vm_cpucount');
                 break;
         }
     }

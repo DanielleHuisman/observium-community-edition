@@ -187,7 +187,7 @@ if ($vars['subview'] == "top10") {
                 $asn = "No Session";
             }
 
-            $graph_array = ['id' => $acc['ma_id'], 'type' => $graph_type, 'from' => $config['time']['twoday'], 'to' => $config['time']['now'], 'width' => '215', 'height' => '100'];
+            $graph_array = ['id' => $acc['ma_id'], 'type' => $graph_type, 'from' => get_time('twoday'), 'to' => get_time('now'), 'width' => '215', 'height' => '100'];
 
 
             echo '<div class="col-md-3">';
@@ -221,7 +221,7 @@ if ($vars['subview'] == "top10") {
                 $graph_array['type']   = $graph_type;
                 $graph_array['id']     = $acc['ma_id'];
                 $graph_array['height'] = "100";
-                $graph_array['to']     = $config['time']['now'];
+                $graph_array['to']     = get_time();
                 echo('<tr><td colspan="8">');
 
                 print_graph_row($graph_array);

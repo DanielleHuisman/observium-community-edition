@@ -77,7 +77,7 @@ DEBUGGING OPTIONS:
 print_cli_heading("%WStarting notifications run at " . date("Y-m-d H:i:s"), 0);
 
 if ($res = process_notifications($params)) {
-    $runtime = utime() - $start;
+    $runtime = elapsed_time($start);
     // Send all notifications (also for syslog from queue)
     logfile('observium.log', count($res) . " notifications processed in " . substr($runtime, 0, 5) . "s.");
 } else {

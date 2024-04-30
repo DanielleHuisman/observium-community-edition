@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage syslog
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -36,149 +36,13 @@ function get_cache($host, $value)
     if (!isset($dev_cache[$host][$value]) || $expired) {
         switch ($value) {
             case 'device_id':
-                // Try by map in config
-                if (isset($GLOBALS['config']['syslog']['host_map'][$host])) {
-                    $new_host = $GLOBALS['config']['syslog']['host_map'][$host];
-                    if (is_numeric($new_host)) {
-                        // Check if device id exist
-                        $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [$new_host]);
-                    } else {
-                        $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [$new_host, $new_host]);
-                    }
-                    // If syslog host map correct, return device id or try onward
-                    if ($dev_cache[$host]['device_id']) {
-                        return $dev_cache[$host]['device_id'];
-                    }
-                } elseif (isset($GLOBALS['config']['syslog']['host_map_regexp'])) {
-                    // Regexp conversions for hosts
-                    foreach ($GLOBALS['config']['syslog']['host_map_regexp'] as $pattern => $to) {
-                        $new_host = preg_replace($pattern, $to, $host);
-                        if (!$new_host || $new_host === $host) {
-                            continue;
-                        } // skip same of false
-                        $dev_new = FALSE;
-                        if (is_intnum($new_host)) {
-                            $dev_new = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [$new_host]);
-                        } elseif (is_valid_hostname($new_host) || get_ip_version($new_host)) {
-                            $dev_new = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [$new_host, $new_host]);
-                        }
-
-                        // If syslog host map correct, return device id or try onward
-                        if ($dev_new) {
-                            //print_cli("'$host' -> '$new_host' ($dev_new)");
-                            $dev_cache[$host]['device_id'] = $dev_new;
-                            return $dev_cache[$host]['device_id'];
-                        }
-                    }
-                }
-
-                // Localhost IPs, try detect as local system
-                if (in_array($host, ['127.0.0.1', '::1'])) {
-                    if ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ?', [get_localhost()])) {
-                        $dev_cache[$host]['device_id'] = $localhost_id;
-                    } elseif ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `sysName` = ?', [get_localhost()])) {
-                        $dev_cache[$host]['device_id'] = $localhost_id;
-                    }
-                    // NOTE in other cases localhost IPs associated with random device
-                } else {
-                    // Try by hostname
-                    $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [$host, $host]);
-                }
-
-                // If failed, try by IP
-                if (!is_numeric($dev_cache[$host]['device_id'])) {
-
-                    if ($ip_version = get_ip_version($host)) {
-                        $ip = $host;
-                        if ($ip_version === 6 && preg_match('/::ffff:(\d+\.\d+\.\d+\.\d+)/', $ip, $matches)) {
-                            // IPv4 mapped to IPv6, like ::ffff:192.0.2.128
-                            // See: http://jira.observium.org/browse/OBSERVIUM-1274
-                            $ip         = $matches[1];
-                            $ip_version = 4;
-                        }
-                        $ip = ip_uncompress($ip);
-
-                        // Detect associated device by IP address, exclude deleted ports
-                        // IS NULL allow to search addresses without associated port
-                        $query         = 'SELECT * FROM `ipv' . $ip_version . '_addresses` LEFT JOIN `ports` USING (`device_id`, `port_id`) WHERE `ipv' . $ip_version . '_address` = ? AND (`ports`.`deleted` = ? OR `ports`.`deleted` IS NULL);';
-                        $addresses     = dbFetchRows($query, [$ip, 0]);
-                        $address_count = safe_count($addresses);
-
-                        // Try to check cached IP addresses
-                        if ($address_count === 0 && $GLOBALS['config']['syslog']['use_ip']) {
-                            // Cached IPs compressed
-                            $query         = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
-                            $addresses     = dbFetchRows($query, [ip_compress($host)]);
-                            $address_count = safe_count($addresses);
-                        }
-
-                        if ($address_count) {
-                            $dev_cache[$host]['device_id'] = $addresses[0]['device_id'];
-
-                            // Additional checks if multiple addresses found
-                            if ($address_count > 1) {
-                                foreach ($addresses as $entry) {
-                                    if (isset($entry['ifAdminStatus'])) {
-                                        // IP & ports table query
-                                        $device_tmp = device_by_id_cache($entry['device_id']);
-                                        if ($device_tmp['disabled'] || !$device_tmp['status']) {
-                                            continue;
-                                        }   // Skip disabled and down devices
-                                        if ($entry['ifAdminStatus'] === 'down' ||                                         // Skip disabled ports
-                                            in_array($entry['ifOperStatus'], ['down', 'lowerLayerDown'])) {
-                                            continue;
-                                        } // Skip down ports
-                                    } elseif ($entry['disabled'] || !$entry['status']) {
-                                        // Cached IP & devices table query
-                                        continue; // Skip disabled and down devices
-                                    }
-
-                                    // Override cached host device_id
-                                    $dev_cache[$host]['device_id'] = $entry['device_id'];
-                                    break; // End loop on first founded entry
-                                }
-                                unset($device_tmp);
-                            }
-
-                        }
-                    }
-                } elseif ($GLOBALS['config']['syslog']['use_ip']) {
-                    // Try associate hosts by DNS IP query
-                    $dns_found = FALSE;
-                    $dns_ip    = gethostbyname6($host, OBS_DNS_A); // IPv4
-                    if (!$dns_ip) {
-                        $dns_ip = gethostbyname6($host, OBS_DNS_AAAA); // IPv6
-                    }
-                    if ($dns_ip) {
-                        $query = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
-                        if ($addresses = dbFetchRows($query, [ip_compress($dns_ip)])) {
-                            $dns_found                     = TRUE;
-                            $dev_cache[$host]['device_id'] = $addresses[0]['device_id'];
-
-                            foreach ($addresses as $entry) {
-                                if ($entry['disabled'] || !$entry['status']) {
-                                    // Cached IP & devices table query
-                                    continue; // Skip disabled and down devices
-                                }
-
-                                // Override cached host device_id
-                                $dev_cache[$host]['device_id'] = $entry['device_id'];
-                                break; // End loop on first founded entry
-                            }
-                        }
-                    }
-
-                    if (!$dns_found) {
-                        // Set empty device_id for prevent other DNS queries while not expired
-                        $dev_cache[$host]['device_id'] = 0;
-                    }
-                }
+                $dev_cache[$host]['device_id'] = get_device_id_by_syslog_host($host);
                 break;
 
             case 'os':
             case 'version':
                 if ($device_id = get_cache($host, 'device_id')) {
-                    $dev_cache[$host][$value] = dbFetchCell('SELECT `' . $value . '` FROM `devices` WHERE `device_id` = ?', [$device_id]);
+                    $dev_cache[$host][$value] = dbFetchCell('SELECT `' . $value . '` FROM `devices` WHERE `device_id` = ?', [ $device_id ]);
                 } else {
                     return NULL;
                 }
@@ -197,8 +61,7 @@ function get_cache($host, $value)
     return $dev_cache[$host][$value];
 }
 
-function cache_syslog_rules()
-{
+function cache_syslog_rules() {
 
     $rules = [];
     foreach (dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_disable` = ?", ['0']) as $lat) {
@@ -208,8 +71,7 @@ function cache_syslog_rules()
     return $rules;
 }
 
-function cache_syslog_rules_assoc()
-{
+function cache_syslog_rules_assoc() {
 
     $device_rules = [];
     foreach (dbFetchRows("SELECT * FROM `syslog_rules_assoc`") as $laa) {
@@ -231,12 +93,8 @@ function cache_syslog_rules_assoc()
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function process_syslog($line, $update)
-{
-    global $config;
-    global $rules;
-    global $device_rules;
-    global $maint;
+function process_syslog($line, $update) {
+    global $config, $rules, $device_rules, $maint;
 
     $entry = process_syslog_line($line);
 
@@ -357,8 +215,7 @@ function process_syslog($line, $update)
     return $entry;
 }
 
-function syslog_generate_tags($entry, $rule)
-{
+function syslog_generate_tags($entry, $rule) {
     //$alert_unixtime = strtotime($entry['timestamp']);
     $alert_unixtime = $entry['unixtime'];
 
@@ -370,6 +227,9 @@ function syslog_generate_tags($entry, $rule)
     $severity_def = $GLOBALS['config']['syslog']['priorities'][$severity];
     $alert_emoji  = $severity_def['emoji'];
     $alert_color  = $severity_def['color'];
+    // Custom alert statuses
+    $entry['alert_status'] = 0; // Currently always ALERT
+    $alert_status_custom = $GLOBALS['config']['alerts']['status'][$entry['alert_status']] ?? $entry['alert_status'];
 
     $device = device_by_id_cache($entry['device_id']);
 
@@ -377,14 +237,15 @@ function syslog_generate_tags($entry, $rule)
       'ALERT_STATE'      => "SYSLOG",
       'ALERT_EMOJI'      => get_icon_emoji($alert_emoji),   // https://unicodey.com/emoji-data/table.htm
       'ALERT_EMOJI_NAME' => $alert_emoji,
-      'ALERT_STATUS'     => 0,                              // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED)
+      'ALERT_STATUS'     => $entry['alert_status'],         // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED)
+      'ALERT_STATUS_CUSTOM' => $alert_status_custom,        // Tag for templates (as defined in $config['alerts']['status'] array)
       'ALERT_SEVERITY'   => ucfirst($severity_def['name']), // Critical, Warning, Informational, Other
       'ALERT_COLOR'      => ltrim($alert_color, '#'),
-      'ALERT_URL'        => generate_url(['page'        => 'device',
-                                          'device'      => $device['device_id'],
-                                          'tab'         => 'alert',
-                                          'entity_type' => 'syslog']),
-
+      'ALERT_URL'        => generate_url([ 'page'    => 'device',
+                                           'device'  => $device['device_id'],
+                                           'tab'     => 'logs',
+                                           'section' => 'logalert',
+                                           'la_id'   => $la_id ]),
       'ALERT_UNIXTIME'          => $alert_unixtime,                        // Standard unixtime
       'ALERT_TIMESTAMP'         => date('Y-m-d H:i:s P', $alert_unixtime), //           ie: 2000-12-21 16:01:07 +02:00
       'ALERT_TIMESTAMP_RFC2822' => date('r', $alert_unixtime),             // RFC 2822, ie: Thu, 21 Dec 2000 16:01:07 +0200
@@ -408,7 +269,7 @@ function syslog_generate_tags($entry, $rule)
       'DEVICE_DESCRIPTION'      => $device['purpose'],
       'DEVICE_ID'               => $device['device_id'],
       'DEVICE_URL'              => generate_device_url($device),
-      'DEVICE_LINK'             => generate_device_link($device, NULL, ['tab' => 'logs', 'section' => 'logalert', 'la_id' => $la_id]),
+      'DEVICE_LINK'             => generate_device_link($device),
       'DEVICE_HARDWARE'         => $device['hardware'],
       'DEVICE_OS'               => $device['os_text'] . ' ' . $device['version'] . ($device['features'] ? ' (' . $device['features'] . ')' : ''),
       'DEVICE_TYPE'             => $device['type'],
@@ -619,14 +480,14 @@ function process_syslog_line($line)
                 // Remove prior seqno and timestamp from msg
                 $entry['msg'] = preg_replace('/^\s*(?<seq>\d+:)*\s*(?<timestamp>.*?\d+\:\d+\:\d+(?:\.\d+)?(?:\ [\w\-\+]+)?): /', '', $entry['msg']);
             }
-        } elseif (in_array($os, ['junos', 'junose'])) {
+        } elseif ($os_group === 'juniper') {
             //1.1.1.1||9||6||6||/usr/sbin/cron[1305]:||2015-04-08 14:30:01|| (root) CMD (   /usr/libexec/atrun)||
-            if (str_contains_array($entry['tag'], '/')) {
+            if (str_contains($entry['tag'], '/')) {
                 $tmp          = explode('/', $entry['tag']);
                 $entry['tag'] = end($tmp); // /usr/sbin/cron[1305]: -> cron[1305]:
             }
             if (empty($entry['program'])) {
-                [$entry['program']] = explode('[', rtrim($entry['tag'], ':')); // cron[1305]: -> cron
+                $entry['program'] = explode('[', rtrim($entry['tag'], ':'))[0]; // cron[1305]: -> cron
             }
             //1.1.1.1||3||4||4||mib2d[1230]:||2015-04-08 14:30:11|| SNMP_TRAP_LINK_DOWN: ifIndex 602, ifAdminStatus up(1), ifOperStatus down(2), ifName ge-0/1/0||mib2d
             //1.1.1.1||3||6||6||chassism[1210]:||2015-04-08 14:30:16|| ethswitch_eth_devstop: called for port ge-0/1/1||chassism
@@ -776,10 +637,10 @@ function process_syslog_line($line)
                 $entry['tag']     = $matches['tag'];
             }
 
-        } elseif (str_contains_array($entry['program'], ',')) {
+        } elseif (str_contains($entry['program'], ',')) {
             // Mikrotik (and some other)
             // mikrotik||user||5||notice||0d||2018-03-23 07:48:39||dhcp105 assigned 192.168.58.84 to 80:BE:05:7A:73:6E||dhcp,info
-            [$entry['program'], $entry['tag']] = explode(',', $entry['program'], 2);
+            [ $entry['program'], $entry['tag'] ] = explode(',', $entry['program'], 2);
 
             // Mikrotik report all syslog with single priority 5 (but with tags). ie: system,info
             foreach (explode(',', $entry['tag']) as $tag) {

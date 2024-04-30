@@ -176,7 +176,7 @@ function generate_storage_row($storage, $vars)
     if (isset($vars['graph_type']) && $vars['graph_type'] === "perc") {
         $graph_array = [];
     }
-    $graph_array['to']     = $config['time']['now'];
+    $graph_array['to']     = get_time();
     $graph_array['id']     = $storage['storage_id'];
     $graph_array['type']   = 'storage_usage';
     $graph_array['legend'] = "no";
@@ -193,7 +193,7 @@ function generate_storage_row($storage, $vars)
     $graph_array['width']  = 80;
     $graph_array['height'] = 20;
     $graph_array['bg']     = 'ffffff00';
-    $graph_array['from']   = $config['time']['day'];
+    $graph_array['from']   = get_time('day');
     $mini_graph            = generate_graph_tag($graph_array);
 
     $total = format_bytes($storage['storage_size']);
@@ -243,7 +243,7 @@ function generate_storage_row($storage, $vars)
             $row .= '<td colspan="' . $table_cols . '">';
 
             unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $storage['storage_id'];
             $graph_array['type'] = $graph_type;
 

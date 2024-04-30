@@ -263,7 +263,10 @@ Hm2SigConCommonEntry ::= SEQUENCE {
    hm2SigConSenseModuleRemoval HmEnabledStatus,
    hm2SigConSenseExtNvmRemoval HmEnabledStatus,
    hm2SigConSenseExtNvmNotInSync HmEnabledStatus,
-   hm2SigConSenseRingRedundancy HmEnabledStatus
+   hm2SigConSenseRingRedundancy HmEnabledStatus,
+   hm2SigConSenseEthernetLoops HmEnabledStatus,
+   hm2SigConSenseHumidity HmEnabledStatus,
+   hm2SigConSenseStpPortBlock HmEnabledStatus
    }
 
 hm2SigConID OBJECT-TYPE
@@ -310,7 +313,11 @@ hm2SigConTrapCause OBJECT-TYPE
       https-certificate-warning(23),
       modbus-tcp-enabled(24),
       ethernet-ip-enabled(25),
-      profinet-io-enabled(26)
+      profinet-io-enabled(26),
+      ethernet-loops(27),
+      humidity(28),
+      pml-disabled(29),
+      stp-port-blocked(30)
       }
    MAX-ACCESS read-only
    STATUS current
@@ -334,6 +341,9 @@ hm2SigConTrapCauseIndex OBJECT-TYPE
       ring-redundancy:		(1) MRP, (2) PRP, (3) HSR, (4) DLR  
       ext-nvm-update-enabled:	(1) sd, (2) usb, (3) serial (not supported yet)
       no-link:			index of interface table
+      ethernet-loops:       index of interface table
+      humidity:         0
+      stp-port-blocked:          index of interface table    
       0: other errors"
    ::= { hm2SigConCommonEntry 4 }
 
@@ -408,9 +418,8 @@ hm2SigConSenseFan OBJECT-TYPE
    MAX-ACCESS read-write
    STATUS current
    DESCRIPTION
-      "Sets the monitoring of the device fan. 
-      (currently not supported)"
-   DEFVAL  { disable }                
+      "Sets the monitoring of the device fan modules." 
+   DEFVAL  { enable }                
    ::= { hm2SigConCommonEntry 11 }
 
 hm2SigConSenseModuleRemoval OBJECT-TYPE
@@ -449,7 +458,34 @@ hm2SigConSenseRingRedundancy OBJECT-TYPE
       "Sets the monitoring of the ring redundancy."
    DEFVAL  { disable }                
    ::= { hm2SigConCommonEntry 15 }
+
+hm2SigConSenseEthernetLoops OBJECT-TYPE
+   SYNTAX HmEnabledStatus
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Sets the monitoring for Ethernet loops."
+   DEFVAL  { disable }                
+   ::= { hm2SigConCommonEntry 16 }
    
+hm2SigConSenseHumidity OBJECT-TYPE
+   SYNTAX HmEnabledStatus
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Sets the monitoring of the device humidity."
+   DEFVAL  { enable }
+   ::= { hm2SigConCommonEntry 17 }
+
+hm2SigConSenseStpPortBlock OBJECT-TYPE
+   SYNTAX HmEnabledStatus
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Sets the monitoring for STP loops."
+   DEFVAL  { enable }
+   ::= { hm2SigConCommonEntry 18 }
+
 -- *************************************************************
 -- Signal Contact Power Supply Table
 -- *************************************************************
@@ -565,6 +601,51 @@ hm2SigConSenseModule OBJECT-TYPE
       associated module will be produced or not."
    DEFVAL { disable }                
    ::= { hm2SigConModuleEntry 2 }
+   
+-- *************************************************************
+-- Signal Contact Fan Module Table
+-- *************************************************************
+hm2SigConFanModuleTable OBJECT-TYPE
+   SYNTAX SEQUENCE OF Hm2SigConFanModuleEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION
+      "This table contains all variables to mask a fan module for the
+      signaling relay. The index for a module corresponds with the 
+      module number."
+   ::= { hm2SignalContactGroup 5 }
+
+hm2SigConFanModuleEntry OBJECT-TYPE
+   SYNTAX Hm2SigConFanModuleEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION
+      "The entry of the hm2SigConFanModuleTable."
+   INDEX { hm2SigConID, hm2SigConFanModID }
+   ::= { hm2SigConFanModuleTable 1 }
+
+Hm2SigConFanModuleEntry ::= SEQUENCE {
+   hm2SigConFanModID Integer32,
+   hm2SigConSenseFanModule HmEnabledStatus
+   }
+
+hm2SigConFanModID OBJECT-TYPE
+   SYNTAX Integer32 (1..7)
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION
+      "This index is used to identify the associated fan module."
+   ::= { hm2SigConFanModuleEntry 1 }
+   
+hm2SigConSenseFanModule OBJECT-TYPE
+   SYNTAX HmEnabledStatus 
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Indicates whether an alarm for the signalling relay of the
+      associated fan module will be produced or not."
+   DEFVAL { enable }                
+   ::= { hm2SigConFanModuleEntry 2 }
 
 -- *************************************************************
 -- Signal Contact Status Table
@@ -637,7 +718,10 @@ hm2SigConStatusTrapCause OBJECT-TYPE
       https-certificate-warning(23),
       modbus-tcp-enabled(24),
       ethernet-ip-enabled(25),
-      profinet-io-enabled(26)
+      profinet-io-enabled(26),
+      ethernet-loops(27),
+      humidity(28),
+      stp-port-blocked(30)
       }
    MAX-ACCESS 	read-only
    STATUS 		current
@@ -661,6 +745,9 @@ hm2SigConStatusTrapCauseIndex OBJECT-TYPE
       ring-redundancy:			(1) MRP, (2) PRP, (3) HSR, (4) DLR 
       ext-nvm-update-enabled:	(1) sd, (2) usb, (3) serial (not supported yet)
       no-link:					index of interface table
+      ethernet-loops:           index of interface table
+      humidity:                 0
+      stp-port-blocked:              index of interface table
       0: 						other errors"
    ::= { hm2SigConStatusEntry 4 }
    
@@ -706,7 +793,9 @@ Hm2DevMonCommonEntry ::= SEQUENCE {
    hm2DevMonSenseModuleRemoval HmEnabledStatus,
    hm2DevMonSenseExtNvmRemoval HmEnabledStatus,
    hm2DevMonSenseExtNvmNotInSync HmEnabledStatus,
-   hm2DevMonSenseRingRedundancy HmEnabledStatus
+   hm2DevMonSenseRingRedundancy HmEnabledStatus,
+   hm2DevMonSenseHumidity HmEnabledStatus,
+   hm2DevMonSenseStpPortBlock HmEnabledStatus
    }
 
 hm2DevMonID OBJECT-TYPE
@@ -738,7 +827,9 @@ hm2DevMonTrapCause OBJECT-TYPE
       module-removal(6),
       ext-nvm-removal(7),
       ext-nvm-not-in-sync(8),
-      ring-redundancy(9)
+      ring-redundancy(9),
+      humidity(28),
+      stp-port-blocked(30)
       }
    MAX-ACCESS read-only
    STATUS current
@@ -760,6 +851,8 @@ hm2DevMonTrapCauseIndex OBJECT-TYPE
       ext-nvm-removal:		(1) sd, (2) usb, (3) Serial (not supported yet)
       ext-nvm-not-in-sync: 	(1) sd, (2) usb, (3) Serial (not supported yet)
       ring-redundancy:		(1) MRP, (2) PRP, (3), HSR, (4) DLR 
+      humidity:         0
+      stp-port-blocked:          index of interface table    
       0: other errors"
    ::= { hm2DevMonCommonEntry 4 }
 
@@ -805,9 +898,8 @@ hm2DevMonSenseFan OBJECT-TYPE
    MAX-ACCESS read-write
    STATUS current
    DESCRIPTION
-      "Sets the monitoring of the device fan. 
-      (currently not supported)"
-   DEFVAL  { disable }                
+      "Sets the monitoring of the device fan modules."
+   DEFVAL  { enable }                
    ::= { hm2DevMonCommonEntry 9 }
 
 hm2DevMonSenseModuleRemoval OBJECT-TYPE
@@ -846,6 +938,24 @@ hm2DevMonSenseRingRedundancy OBJECT-TYPE
       "Sets the monitoring of the ring redundancy."
    DEFVAL  { disable }                
    ::= { hm2DevMonCommonEntry 13 }
+
+hm2DevMonSenseHumidity OBJECT-TYPE
+   SYNTAX HmEnabledStatus
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Sets the monitoring of the device humidity."
+   DEFVAL  { enable }
+   ::= { hm2DevMonCommonEntry 14 }
+
+hm2DevMonSenseStpPortBlock OBJECT-TYPE
+   SYNTAX HmEnabledStatus
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Sets the monitoring whether a port was blocked by STP."
+   DEFVAL  { enable }
+   ::= { hm2DevMonCommonEntry 15 }
 
 -- *************************************************************
 -- Device Monitor Power Supply Table
@@ -962,6 +1072,51 @@ hm2DevMonSenseModule OBJECT-TYPE
       associated module will be produced or not."
    DEFVAL { disable }                
    ::= { hm2DevMonModuleEntry 2 }
+   
+-- *************************************************************
+-- Device Monitor Fan Module Table
+-- *************************************************************
+hm2DevMonFanModuleTable OBJECT-TYPE
+   SYNTAX SEQUENCE OF Hm2DevMonFanModuleEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION
+      "This table contains all variables to mask a fan module for the
+      device status. The index for a module corresponds with the
+      module number."
+   ::= { hm2DeviceMonitorGroup 5 }
+
+hm2DevMonFanModuleEntry OBJECT-TYPE
+   SYNTAX Hm2DevMonFanModuleEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION
+      "The entry of the hm2DevMonFanModuleTable."
+   INDEX { hm2DevMonID, hm2DevMonFanModID }
+   ::= { hm2DevMonFanModuleTable 1 }
+
+Hm2DevMonFanModuleEntry ::= SEQUENCE {
+   hm2DevMonFanModID Integer32,
+   hm2DevMonSenseFanModule HmEnabledStatus   
+   }
+
+hm2DevMonFanModID OBJECT-TYPE
+   SYNTAX Integer32 (1..7)
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION
+      "This index is used to identify the associated fan module."
+   ::= { hm2DevMonFanModuleEntry 1 }
+   
+hm2DevMonSenseFanModule OBJECT-TYPE
+   SYNTAX HmEnabledStatus 
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Indicates whether an alarm for the device status of the
+      associated fan module will be produced or not."
+   DEFVAL { enable }                
+   ::= { hm2DevMonFanModuleEntry 2 }
 
 -- *************************************************************
 -- Device Monitor Status Table
@@ -1017,7 +1172,9 @@ hm2DevMonStatusTrapCause OBJECT-TYPE
       module-removal(6),
       ext-nvm-removal(7),
       ext-nvm-not-in-sync(8),
-      ring-redundancy(9)
+      ring-redundancy(9),
+      humidity(28),
+      stp-port-blocked(30)
       }
    MAX-ACCESS 	read-only
    STATUS 		current
@@ -1039,6 +1196,8 @@ hm2DevMonStatusTrapCauseIndex OBJECT-TYPE
       ext-nvm-removal:		(1) sd, (2) usb, (3) Serial (not supported yet)
       ext-nvm-not-in-sync: 	(1) sd, (2) usb, (3) Serial (not supported yet)
       ring-redundancy:		(1) MRP, (2) PRP, (3) HSR, (4) DLR 
+      humidity:         0
+      stp-port-blocked: 		    index of interface table
       0: other errors"
    ::= { hm2DevMonStatusEntry 4 }
          
@@ -1083,7 +1242,8 @@ hm2DevSecTrapCause OBJECT-TYPE
       https-certificate-warning(23),
       modbus-tcp-enabled(24),
       ethernet-ip-enabled(25),
-      profinet-io-enabled(26)
+      profinet-io-enabled(26),
+      pml-disabled(29)
       }
    MAX-ACCESS read-only
    STATUS current
@@ -1279,6 +1439,15 @@ hm2DevSecSenseProfinetIOEnabled OBJECT-TYPE
    DEFVAL { enable }
    ::= { hm2DevSecConfigGroup 22 }
    
+hm2DevSecSensePMLDisabled OBJECT-TYPE
+   SYNTAX HmEnabledStatus
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "Enable or disable to check if Port MAC Locking is disabled on the switch."
+   DEFVAL { enable }   
+   ::= { hm2DevSecConfigGroup 23 }
+
 -- *************************************************************
 -- Device Security Interface Table
 -- *************************************************************
@@ -1378,7 +1547,8 @@ hm2DevSecStatusTrapCause OBJECT-TYPE
       https-certificate-warning(23),
       modbus-tcp-enabled(24),
       ethernet-ip-enabled(25),
-      profinet-io-enabled(26)
+      profinet-io-enabled(26),
+      pml-disabled(29)
       }
    MAX-ACCESS 	read-only
    STATUS 		current
@@ -1569,7 +1739,7 @@ hm2DiagIfaceUtilizationControlInterval    OBJECT-TYPE
    STATUS current
    DESCRIPTION
       "The interval in seconds over which the data is
-      sampled for hmIfaceUtilization.
+      sampled for hm2DiagIfaceUtilization.
       This interval can be any number of seconds
       between 1 and 3600 (1 hour).
       The first historyControlInterval (rfc1757) of this
@@ -1582,7 +1752,7 @@ hm2DiagIfaceUtilizationAlarmLowerThreshold OBJECT-TYPE
    MAX-ACCESS read-write
    STATUS current
    DESCRIPTION
-        "Surveys the interface utilization hm2InfaceUtilization and
+        "Surveys the interface utilization hm2DiagIfaceUtilization and
          generates an alarm for this interfaces, if  
          the utilization value is below the given limit.
          A value of 0 disables the alarm generation."
@@ -1616,6 +1786,102 @@ hm2DiagIfaceUtilizationAlarmCondition OBJECT-TYPE
          hm2DiagIfaceUtilizationAlarmUpperThreshold."
    
    ::= { hm2DiagIfaceUtilizationEntry 5 }
+
+-- *************************************************************
+-- hm2DiagEgressIfaceUtilizationTable
+-- *************************************************************
+
+hm2DiagEgressIfaceUtilizationTable   OBJECT-TYPE
+   SYNTAX SEQUENCE OF Hm2DiagEgressIfaceUtilizationEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION
+       "This table contains egress variables for each interface of
+       the switch."
+   ::= { hm2DiagIfaceUtilizationGroup 2 }
+
+hm2DiagEgressIfaceUtilizationEntry     OBJECT-TYPE
+   SYNTAX Hm2DiagEgressIfaceUtilizationEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION "The entry of the hm2DiagEgressIfaceUtilizationTable."
+   INDEX { ifIndex }
+   ::= { hm2DiagEgressIfaceUtilizationTable 1 }
+
+Hm2DiagEgressIfaceUtilizationEntry ::= SEQUENCE {
+   hm2DiagEgressIfaceUtilization Integer32,
+   hm2DiagEgressIfaceUtilizationControlInterval Integer32,
+   hm2DiagEgressIfaceUtilizationAlarmLowerThreshold Integer32,
+   hm2DiagEgressIfaceUtilizationAlarmUpperThreshold Integer32,
+   hm2DiagEgressIfaceUtilizationAlarmCondition TruthValue
+   }
+
+hm2DiagEgressIfaceUtilization OBJECT-TYPE
+   SYNTAX Integer32 (0..10000)
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION
+       "The best estimate of the mean physical layer
+       network egress utilization on this interface during the
+       last sampling interval, in hundredth of one percent.
+       The first historyControlInterval (rfc1757) of this
+       interface is used as sampling interval."
+   DEFVAL { 0 }
+   ::= { hm2DiagEgressIfaceUtilizationEntry 1 }
+
+hm2DiagEgressIfaceUtilizationControlInterval    OBJECT-TYPE
+   SYNTAX Integer32 (1..3600)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+      "The interval in seconds over which the egress data is
+      sampled for hm2DiagEgressIfaceUtilization.
+      This interval can be any number of seconds
+      between 1 and 3600 (1 hour).
+      The first historyControlInterval (rfc1757) of this
+      interface is used as sampling interval."
+   DEFVAL { 30 }
+   ::= { hm2DiagEgressIfaceUtilizationEntry 2 }
+
+hm2DiagEgressIfaceUtilizationAlarmLowerThreshold OBJECT-TYPE
+   SYNTAX Integer32 (0..10000)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+        "Surveys the egress interface utilization hm2DiagEgressIfaceUtilization and
+         generates an alarm for this interface, if
+         the utilization value is below the given limit.
+         A value of 0 disables the alarm generation."
+   DEFVAL { 0 }
+   ::= { hm2DiagEgressIfaceUtilizationEntry 3 }
+
+hm2DiagEgressIfaceUtilizationAlarmUpperThreshold OBJECT-TYPE
+   SYNTAX Integer32 (0..10000)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION
+        "Surveys the egress interface utilization hm2DiagEgressIfaceUtilization and
+         generates an alarm for this interface, if the given
+         limit is exceeded.
+         A value of 0 disables the alarm generation."
+   DEFVAL { 0 }
+   ::= { hm2DiagEgressIfaceUtilizationEntry 4 }
+
+
+hm2DiagEgressIfaceUtilizationAlarmCondition OBJECT-TYPE
+   SYNTAX TruthValue
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION
+        "The alarm condition is given (true), if the given
+         hm2DiagEgressIfaceUtilizationAlarmUpperThreshold limit is exceeded 
+         by the egress interface utilization or if the utilization value falls below 
+         hm2DiagEgressIfaceUtilizationAlarmLowerThreshold limit. 
+         The alarm condition will be removed, when the egress interface utilization 
+         value falls in between hm2DiagEgressIfaceUtilizationAlarmLowerThreshold 
+         hm2DiagEgressIfaceUtilizationAlarmUpperThreshold."
+
+   ::= { hm2DiagEgressIfaceUtilizationEntry 5 }
 
 
 --
@@ -2191,13 +2457,14 @@ hm2PortMonitorConditionSpeedDuplexValue  	OBJECT-TYPE
 						fdx-100(3),
 						hdx-1000(4),
 						fdx-1000(5),
-						fdx-2500(6)
+						fdx-2500(6),
+						fdx-10000(7)
 						}
 	MAX-ACCESS		read-write
 	STATUS			current
 	DESCRIPTION
 		"Speed and duplex combination allowed by port-monitor."
-	DEFVAL			{{ hdx-10, fdx-10, hdx-100, fdx-100, hdx-1000, fdx-1000, fdx-2500 }}
+	DEFVAL			{{ hdx-10, fdx-10, hdx-100, fdx-100, hdx-1000, fdx-1000, fdx-2500, fdx-10000 }}
 ::= { hm2PortMonitorConditionSpeedDuplexEntry 1} 
 	
 -- **************************************************************************
@@ -2449,10 +2716,10 @@ hm2DiagIfaceUtilizationTrap NOTIFICATION-TYPE
       hm2DiagIfaceUtilizationAlarmCondition
       }
    STATUS  current
-   DESCRIPTION "This trap is sent if the value of hmIfaceUtilization 
+   DESCRIPTION "This trap is sent if the value of hm2DiagIfaceUtilization 
       exceeds or falls back below the interface utilization thresholds
-      hmIfaceUtilizationAlarmConditionThreshold and 
-      hmIfaceUtilizationAlarmRemovalThreshold."
+      hm2DiagIfaceUtilizationAlarmConditionThreshold and 
+      hm2DiagIfaceUtilizationAlarmRemovalThreshold."
    ::= { hm2DiagnosticMibNotifications 5 }
    
 -- *************************************************************
@@ -2467,6 +2734,18 @@ hm2DiagIfaceUtilizationTrap NOTIFICATION-TYPE
 		DESCRIPTION
 		"This trap is sent if the a port has been disabled by port disable action by port monitor."
 		::= { hm2DiagnosticMibNotifications 6 }   
+
+-- *************************************************************
+-- hm2DiagEgressIfaceUtilization notifications
+-- *************************************************************
+hm2DiagEgressIfaceUtilizationTrap NOTIFICATION-TYPE
+   OBJECTS { 
+      hm2DiagEgressIfaceUtilization,
+      hm2DiagEgressIfaceUtilizationAlarmCondition
+      }
+   STATUS  current
+   DESCRIPTION "This trap is sent if the value of hm2DiagEgressIfaceUtilizationAlarmCondition is true."
+   ::= { hm2DiagnosticMibNotifications 7 }
 
 --
 -- ***********************************************************

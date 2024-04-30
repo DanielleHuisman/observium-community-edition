@@ -1,0 +1,387 @@
+-- Copyright (C) 2006-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsicch.mib,v 1.9 2016/03/04 11:10:34 siva Exp $
+-- ICCH Proprietary MIB Definition
+
+-- This MIB explains the propreitery information implemented 
+-- for ICCH product.
+
+ARICENT-ICCH-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, IpAddress, 
+    enterprises, Unsigned32                        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, TruthValue, RowStatus, 
+    DisplayString                                  FROM SNMPv2-TC
+    ZeroBasedCounter32                             FROM RMON2-MIB
+    VlanId                                         FROM Q-BRIDGE-MIB;
+
+                                                                                
+fsIcchMIB MODULE-IDENTITY
+    LAST-UPDATED "201412110000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com"
+    DESCRIPTION
+        "The proprietary MIB module for ICCH. This MIB supports Inter-Chassis 
+         Communication Handling." 
+    REVISION "201412110000Z"
+    DESCRIPTION
+        "The proprietary MIB module for ICCH. This MIB supports Inter-Chassis
+         Communication Handling. "
+ ::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 94 }
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+                                                                                
+FsIcchState ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+            "The State of the node."
+    SYNTAX INTEGER {
+                 init(0),   -- Node state is INIT 
+                 master(1), -- Node state is MASTER
+                 slave(2) -- Node state is SLAVE
+                 }
+-- Groups
+fsIcch                OBJECT IDENTIFIER ::= { fsIcchMIB 1 }
+fsIcchStatistics      OBJECT IDENTIFIER ::= { fsIcchMIB 2 }
+fsIcchNotification    OBJECT IDENTIFIER ::= { fsIcchMIB 3 }
+fsIcchTrap            OBJECT IDENTIFIER ::= { fsIcchNotification 0 }
+fsIcclSession         OBJECT IDENTIFIER ::= { fsIcchMIB 4 }
+
+-- Scalar objects
+
+
+fsIcchTrcLevel OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+             "This object indicates the level of trace required for ICCH. 
+              The levels are defined as follows:
+              0x00000001 -- Management Trace.
+              0x00000002 -- Packet dump Trace.
+              0x00000004 -- All failure Trace.
+              0x00000008 -- Critical Trace.
+              0x00000010 -- Sync events trace
+              0x00000020 -- Sync message trace
+              0x00000040 -- Notification trace
+              0x0000007D -- All Trace."
+
+    DEFVAL { '00000000'H }
+    ::= {fsIcch 1}
+
+fsIcchStatsEnable OBJECT-TYPE
+   SYNTAX                   INTEGER {
+                              enabled(1),
+                              disabled(2)
+                                    }
+    MAX-ACCESS        read-write 
+    STATUS            current
+    DESCRIPTION
+               "This object is used to enable/disable the statistics collection 
+                of the Inter-Chassis Communication handler module.
+                By default, statistics collection is enabled on ICCH." 
+    DEFVAL  {enabled}
+    ::= {fsIcch 2}
+
+fsIcchClearStats OBJECT-TYPE
+   SYNTAX            TruthValue 
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+               "This object is used to clear the statistics collection of the
+                Inter Chassis Communication handler module. This object has no 
+                effect when it is set to false. By default, the statistics value 
+                is false. When it is set to true, the statistics are cleared and 
+                the value is set back to false. This object always returns 
+                false when read."
+
+    DEFVAL  {false}
+    ::= {fsIcch 3}
+
+fsIcchEnableProtoSync OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "This object specifies synchronization messages that need to be 
+                enabled in ICCL. By default, all synchronization messages are 
+                blocked on ICCL." 
+
+    DEFVAL { '00000000'H }
+
+    ::= {fsIcch 4}
+
+
+fsIcchFetchRemoteFdb OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "This object is used to fetch remote FDB entries when MC-LAG is
+                enabled  and FDB sync-up is enabled in the system.
+                This object can be used after the complete MAC table is cleared 
+                in the local MC-LAG nodes.This object will be reset once the complete 
+                remote FDB database is Retrieved."
+
+    DEFVAL { false }
+
+    ::= {fsIcch 5}
+
+fsIcchPeerNodeIpAddress OBJECT-TYPE
+    SYNTAX         IpAddress
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+              "This object is used to specify the IP Address of Peer Node
+               used for ICCL TCP /IP communication .
+               This IP address corresponds to the Layer 3 interface that
+               will be created over the remote node ICCL interface."
+
+    ::= {fsIcch 6}
+
+fsIcchPeerNodeState OBJECT-TYPE
+    SYNTAX         FsIcchState
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+              "This object specifies the state of the peer Node.The state of the
+               node is decided after election by heart beat module. Election
+               is based on the fsIcchPeerNodeIpAddress and fsIcclSessionIpAddress."
+
+    ::= {fsIcch 7}
+
+-- *******************************************************************
+-- ICCH session Table
+-- *******************************************************************
+
+fsIcclSessionTable OBJECT-TYPE
+   SYNTAX SEQUENCE OF FsIcclSessionEntry
+   MAX-ACCESS         not-accessible
+   STATUS             current
+   DESCRIPTION
+             "This table is used to access the stored ICCL information"
+
+   ::= { fsIcclSession 1 }
+
+fsIcclSessionEntry OBJECT-TYPE
+   SYNTAX            FsIcclSessionEntry
+   MAX-ACCESS        not-accessible
+   STATUS            current
+   DESCRIPTION
+     "This object specifies the ICCL information entry of a session"
+
+   INDEX { fsIcclSessionInstanceId }
+
+   ::= { fsIcclSessionTable 1 }
+
+FsIcclSessionEntry ::=
+SEQUENCE {
+    fsIcclSessionInstanceId     Unsigned32,
+    fsIcclSessionInterface      DisplayString,
+    fsIcclSessionIpAddress      IpAddress,
+    fsIcclSessionSubnetMask     IpAddress,
+    fsIcclSessionVlan           VlanId,
+    fsIcclSessionNodeState      FsIcchState,
+    fsIcclSessionRowStatus      RowStatus
+    }
+
+fsIcclSessionInstanceId OBJECT-TYPE
+    SYNTAX              Unsigned32 (0..10)
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+         "This object specifies an unique value, that identifies ICCL instance."
+    ::= {fsIcclSessionEntry 1}
+
+fsIcclSessionInterface OBJECT-TYPE
+   SYNTAX            DisplayString  
+   MAX-ACCESS        read-write
+   STATUS            current
+   DESCRIPTION
+             "This object is used to specify the  port to be used 
+              for ICCH TCP/IP Communication . This value is read from iccl.conf
+              file. ICCH interface is a manually aggregated, high bandwidth link
+              to co-ordinate the control information and data exchange of 
+              Multi-chassis LAG. Inter-Chassis Communication Handler Interface 
+              is a trunk port. MAC learning will be disabled on this port. 
+              However, MAC addresses learnt on the remote MC-LAG node can be 
+              installed in the local node, with ICCL interface as the destination
+              port. Spanning tree will be disabled always on ICCL interface to 
+              make sure the ICCL is always in forwarding state. When this object 
+              is configured, the iccl.conf file is updated automatically and 
+              the value will take effect in ISS on next reboot. This ICCL
+              inerface should be a port-channel interface"
+
+    DEFVAL  {"po4094"}              
+    ::= {fsIcclSessionEntry 2}
+
+fsIcclSessionIpAddress OBJECT-TYPE
+    SYNTAX            IpAddress
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+              "This object is used to specify the IP Address to be used 
+               for ICCH TCP /IP communication .
+               This IP address corresponds to the Layer 3 interface that 
+               will be created over the fsIcchInterface.
+               This value is read from iccl.conf file.If it is not available,
+               A link local IP Address 169.254.1.1 is used as the Default IP Address.
+          
+               Configuring this object  will result in an update to iccl.conf.
+               The configured value will take effect in ISS on next reboot."
+
+    DEFVAL  {'A9FE0101'h}
+    ::= {fsIcclSessionEntry 3}
+      
+
+fsIcclSessionSubnetMask OBJECT-TYPE
+    SYNTAX            IpAddress
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+               "This object is used to specify the Subnet Mask to be 
+               associated withIP Address to be used for ICCH TCP /IP 
+               communication.
+
+               Configuring this object  will result in an update to iccl.conf file.
+               The configured value will take effect in ISS on next reboot."
+
+    DEFVAL  {'FF000000'h}               
+    ::= {fsIcclSessionEntry 4}
+
+fsIcclSessionVlan OBJECT-TYPE
+    SYNTAX            VlanId
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+               "This object specifies the VLAN ID to be used for ICCH
+               TCP /IP communication.
+
+               Configuring this object will result in an update to iccl.conf file.
+               The configured value will take effect in ISS on next reboot."
+    DEFVAL  {4094}
+    ::= {fsIcclSessionEntry 5}
+
+fsIcclSessionNodeState OBJECT-TYPE
+    SYNTAX     FsIcchState
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+               "This object specifies the state of the node. The state of the 
+                node is decided after election by heart beat module. Election 
+                is based on the fsIcchIpAddress." 
+    ::= {fsIcclSessionEntry 6} 
+
+fsIcclSessionRowStatus OBJECT-TYPE 
+       SYNTAX      RowStatus 
+       MAX-ACCESS  read-write 
+       STATUS      current 
+       DESCRIPTION 
+                 "This object specifies the row status of ICCH session table entry.
+                  Only 'CreateAndGo' and 'destroy' values are allowed for this
+                  object.
+                  
+                  The value 'CreateAndGo' adds the entry to iccl.conf and 
+                  'destroy' deletes the entry from iccl.conf."
+       ::= { fsIcclSessionEntry 7 } 
+
+
+-- *******************************************************************
+-- END of ICCH session Table
+-- ******************************************************************* 
+
+-- *******************************************************************
+--   Statistics Counters
+-- *******************************************************************
+
+--
+-- TX Statistics
+--
+
+fsIcchStatsSyncMsgTxCount  OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+               "This object specifies the total number of synchronization messages
+                successfully sent from this node."
+    ::= {fsIcchStatistics 1}
+
+fsIcchStatsSyncMsgTxFailedCount  OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+               "This object specifies the total number of sync-up messages failed
+                while sending."
+    ::= {fsIcchStatistics 2}
+
+--
+-- RX Statistics
+--
+
+fsIcchStatsSyncMsgRxCount  OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+               "This object specifies the total number of sync-up messages 
+                received at this node."
+    ::= {fsIcchStatistics 3}
+
+fsIcchStatsSyncMsgProcCount OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+               "This object specifies the total number of sync-up messages 
+                received and processed at this node."
+    ::= {fsIcchStatistics 4}
+
+fsIcchStatsSyncMsgMissedCount OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+               "The ICCH module receives and processes the synchronization 
+                messages with the help of the sequence number in the message.
+                In some failure cases, when the message with a particular 
+                sequence number is lost, this counter is incremented."
+    ::= {fsIcchStatistics 5}
+
+
+-- *******************************************************************
+--   Trap Definitions
+-- *******************************************************************
+
+fsIcchTrapNodeStatusChange NOTIFICATION-TYPE
+     OBJECTS      {
+                      fsIcclSessionNodeState,
+                      fsIcclSessionInstanceId,
+                      fsIcclSessionInterface,
+                      fsIcclSessionIpAddress, 
+                      fsIcclSessionSubnetMask,
+                      fsIcclSessionVlan
+                  }
+     STATUS       current
+     DESCRIPTION
+                "This object indicates that there is a significant status change 
+                 in the Inter-chassis communication handler state. 
+                 This trap should be generated when the node status changes"
+  ::= { fsIcchTrap 1 }
+
+fsIcchTrapPeerNodeStatusChange NOTIFICATION-TYPE
+     OBJECTS      {
+                      fsIcchPeerNodeIpAddress,
+                      fsIcchPeerNodeState
+                  }
+     STATUS       current
+     DESCRIPTION
+               "This object indicates that there is a significant status change
+                in the Peer node.This trap should be generated when peer node
+                status changes"
+  ::= { fsIcchTrap 2 }
+
+END    

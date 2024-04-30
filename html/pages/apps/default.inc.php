@@ -11,8 +11,8 @@
  *
  */
 
-$graph_array['to']   = $config['time']['now'];
-$graph_array['from'] = $config['time']['day'];
+$graph_array['to']   = get_time();
+$graph_array['from'] = get_time('day');
 //$graph_array_zoom           = $graph_array;
 //$graph_array_zoom['height'] = "150";
 //$graph_array_zoom['width']  = "400";
@@ -20,6 +20,8 @@ $graph_array['from'] = $config['time']['day'];
 
 $where_clause = generate_where_clause(['`app_type` = ?', generate_query_permitted_ng(['devices'])]);
 
+
+// Merge device and app arrays for ease of sorting. This may not scale well to huge numbers of apps.
 $app_devices = [];
 foreach (dbFetchRows("SELECT * FROM `applications` " . $where_clause, [$vars['app']]) as $app) {
     $devices[$app['app_id']] = array_merge($app, device_by_id_cache($app['device_id']));
@@ -27,11 +29,10 @@ foreach (dbFetchRows("SELECT * FROM `applications` " . $where_clause, [$vars['ap
 
 $devices = array_sort_by($devices, 'hostname', SORT_ASC, SORT_STRING);
 
-//echo generate_box_open();
-
-//echo '<table class="table table-hover table-condensed table-striped ">';
-
 foreach ($devices as $device) {
+
+    // Faux $app array for easier code reading
+    $app = &$device;
 
     echo generate_box_open();
 

@@ -1,0 +1,928 @@
+--  =======================================================================
+--  File        : osVif.mib
+--  Description : Private MIB support the functionality of 
+--                virtual intefaces (VIF).
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-VIF-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE,
+                TimeTicks, Unsigned32,Integer32               FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION, DisplayString,
+                TruthValue, MacAddress                        FROM SNMPv2-TC
+                InetAddressType, InetAddress,
+                InetAddressPrefixLength                       FROM INET-ADDRESS-MIB           -- RFC2851
+                InterfaceIndex                                FROM IF-MIB
+                VlanIdOrNone                                  FROM IEEE8021-CFM-MIB
+                oaOptiSwitch, PortList                        FROM OS-COMMON-TC-MIB
+                NOTIFICATION-GROUP,
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osVif           MODULE-IDENTITY
+                LAST-UPDATED "202008270000Z" -- 27 Aug. 2020
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                          
+                DESCRIPTION
+                    "This MIB obsoletes nbVifTable in RT-CFG-MIB (file rt-cfg.mib)."
+
+                REVISION     "202008270000Z" -- 27 Aug. 2020
+                DESCRIPTION
+                  "Object osVifMflgMac for notification"
+
+                REVISION     "201912260000Z" -- 26 Dec. 2019
+                DESCRIPTION
+                "1. Several DEFVALs
+                 2. osVifMflgThreshold, osVifIsolatedPorts and osVifRecoverPorts
+                 3. osVifMflgCfg.
+                 4. Notifications: osVifPortIsolation, osVifPortRecovery and osVifPortDetection ."
+                
+                REVISION     "201903110000Z" -- 11 Mar. 2019
+                DESCRIPTION
+                "Add osVifIspTag, osVifIspPortList."    
+                
+                REVISION     "201710150000Z" -- 15 Oct. 2017
+                DESCRIPTION
+                "The values of osVifSlaSlaAvailable are extended as backward compatible as possible."
+                
+                REVISION     "201410210000Z" -- 21 Oct. 2014
+                DESCRIPTION
+                  "1. A TEXTUAL-CONVENTION for VifDevNo was renamed to IfnDevNo.
+                   2. A new TEXTUAL-CONVENTION for IfRowValidator.
+                   3. New tables osDummyIfTable and osRtVifTable."
+
+                REVISION     "201205230000Z" -- 23 May 2012
+                DESCRIPTION
+                  "1. A few TEXTUAL-CONVENTION were renamed or imported.
+                   2. Definfion of OBJECT IDENTIFIER 'oaOptiSwitch' was imported.
+                   3. New object osVifIfIndex."
+
+                REVISION "200801080000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 2 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osVifNotifications  OBJECT IDENTIFIER ::= { osVif 0 }
+osVifGen            OBJECT IDENTIFIER ::= { osVif 1 }
+osVifMflgCfg        OBJECT IDENTIFIER ::= { osVif 11 }
+osVifConfigGrp      OBJECT IDENTIFIER ::= { osVif 99 }
+osVifConformance    OBJECT IDENTIFIER ::= { osVif 101 }
+osVifMIBCompliances OBJECT IDENTIFIER ::= { osVifConformance 1 }
+osVifMIBGroups      OBJECT IDENTIFIER ::= { osVifConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+IfnDevNo           ::= TEXTUAL-CONVENTION
+                       DISPLAY-HINT "d"
+                       STATUS       current
+                       DESCRIPTION
+                         "Interface Device Number."
+                       SYNTAX Unsigned32 (0..4095)
+
+VifEntryValidator  ::= TEXTUAL-CONVENTION
+                       STATUS       current
+                       DESCRIPTION
+                       "Status for controlling of the entry. Allows to create and delete the entry."
+                       SYNTAX       INTEGER { valid(1), invalid(2) }
+
+IfRowValidator     ::= TEXTUAL-CONVENTION
+                       STATUS       current
+                       DESCRIPTION
+                       "Status for controlling of the entry. Allows to create, enable, disable and delete the entry."
+                       SYNTAX       INTEGER 
+                       {
+                          nothing    (2),
+                          delete     (3),
+                          create     (4),
+                          enable     (5),
+                          disable    (6)
+                        }
+
+
+
+-- ************************************************************
+-- The feature support reflector
+-- ************************************************************
+osVifAddrTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  ipv4     (0),
+                  ipv6     (1),
+                  ipv4z    (2),
+                  ipv6z    (3)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of supported Internet address In terms of RFC 3291 (INET-ADDRESS-MIB).
+       Additionally this object serves as a SupportValue."
+    ::= { osVifGen 2 }
+
+osVifLastError OBJECT-TYPE
+    SYNTAX           DisplayString (SIZE (0..160))
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Last configuration error description."
+    ::= { osVifGen 3 }
+
+
+osVifMflgMac      OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+       "MAC address, that was reason of MFLG detection"
+    ::= { osVifGen 5 }
+
+
+-- *******************************************************************
+--  osVifMflgCfg - Global MAC Flapping Loop Guard configuration
+--  CLI commands are in 'mac-flapping-loop-guard' node
+-- *******************************************************************
+
+osVifMflgDetectOnly OBJECT-TYPE
+   SYNTAX     TruthValue
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+       "Detection only, not isolate.
+       CLI command:
+          detect-only
+          no detect-only
+       "
+   DEFVAL { false }       
+   ::= { osVifMflgCfg 1 }
+
+osVifMflgTrustedPorts OBJECT-TYPE
+   SYNTAX     PortList
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+       "Ports, that will not be isolated by port-based MFLG.
+       CLI commands:
+          trusted-ports PORTS-GROUP
+          no trusted-ports (PORTS-GROUP|)
+       "
+   DEFVAL { "" }
+   ::= { osVifMflgCfg 2 }
+
+osVifMflgRecoveryDelay OBJECT-TYPE
+   SYNTAX     Unsigned32 (0|10..60000)
+   UNITS      "seconds"
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+      "Auto recovery delay.
+      A value of '0' means that automatic recovery is disabled.
+      CLI commands:
+         auto-recovery
+         auto-recovery-delay (no|<10-60000>)
+         no auto-recovery
+         no auto-recovery-delay (no|<10-60000>|)
+      "
+   DEFVAL { 60 } 
+   ::= { osVifMflgCfg 3 }
+
+osVifMflgPortThreshold OBJECT-TYPE
+   SYNTAX     Unsigned32 (0|10..200)
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+      "The number of repeated re-learnings of the MAC per second, after
+      which the port is isolated. A value of '0' means that port-based MFLG is disabled.
+      This objects acts if loop was detected in VIF, with osVifMflgThreshold equal to 0.
+      If MFLG isolates a port due to osVifMflgPortThreshold (not due to osVifMflgThreshold),
+      then it isolats it for all VLANs.
+      CLI commands:
+         port-threshold (no|<10-200>)
+         no port-threshold (no|<10-200>|)
+      "
+   DEFVAL { 20 } 
+   ::= { osVifMflgCfg 4 }
+
+osVifMflgPbEnabled OBJECT-TYPE
+   SYNTAX     TruthValue
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+       "Enables and disables port-based MFLG.
+        CLI commands:
+           enable-port-based
+           no enable-port-based
+       "
+   DEFVAL { true }       
+   ::= { osVifMflgCfg 5 }
+
+osVifMflgVbEnabled OBJECT-TYPE
+   SYNTAX     TruthValue
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+       "Enables and disables VLAN-based MFLG.
+        CLI commands:
+           enable-vlan-based
+           no enable-vlan-based
+       "
+   DEFVAL { true }       
+   ::= { osVifMflgCfg 6 }
+
+osVifMflgEnabled OBJECT-TYPE
+   SYNTAX     TruthValue
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+       "Enables and disables MFLG.
+        CLI commands:
+           enable
+           no enable
+       "
+   DEFVAL { false }       
+   ::= { osVifMflgCfg 7 }
+
+-- ************************************************************
+-- The main VIF table
+-- ************************************************************
+
+osVifTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsVifEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Allows to manage a set of virtual interfaces"
+    ::= { osVif 2 }
+
+osVifEntry   OBJECT-TYPE
+    SYNTAX      OsVifEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osVifDevNo }
+    ::= { osVifTable 1 }
+
+OsVifEntry ::= SEQUENCE {
+      osVifDevNo           IfnDevNo,
+      osVifTag             VlanIdOrNone,
+      osVifPortList        PortList,
+      osVifName            DisplayString,
+      osVifDescr           DisplayString,
+      osVifMtuProfile      Unsigned32,
+      osVifAdminStatus     IfRowValidator,
+
+      osVifLocked          TruthValue,
+      osVifLastChange      TimeTicks,
+      osVifOperState       INTEGER,
+      osVifIfIndex         InterfaceIndex,
+      osVifIspTag          VlanIdOrNone,
+      osVifIspPortList     PortList,
+      osVifMflgThreshold   Unsigned32,
+      osVifIsolatedPorts   PortList,
+      osVifRecoverPorts    TruthValue,
+      osVifNatPfExternalMode TruthValue,
+      osVifNatPfInternalMode TruthValue
+    }
+
+osVifDevNo            OBJECT-TYPE
+     SYNTAX           IfnDevNo
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifEntry 1 }
+
+osVifTag              OBJECT-TYPE
+     SYNTAX           VlanIdOrNone
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "."
+     DEFVAL { 0 }
+     ::= { osVifEntry 2 }
+
+osVifPortList         OBJECT-TYPE
+     SYNTAX           PortList
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "."
+     DEFVAL { "" }
+     ::= { osVifEntry 3 }
+     
+osVifName             OBJECT-TYPE
+     SYNTAX           DisplayString (SIZE (0..20))
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifEntry 4 }
+
+osVifDescr            OBJECT-TYPE
+     SYNTAX           DisplayString (SIZE (0..80))
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "."
+     DEFVAL { "" }
+     ::= { osVifEntry 5 }
+
+osVifMtuProfile       OBJECT-TYPE
+     SYNTAX           Unsigned32 (1..8)
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "."
+     DEFVAL { 1 }
+     ::= { osVifEntry 6 }
+
+osVifAdminStatus      OBJECT-TYPE
+     SYNTAX           IfRowValidator
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+       "This object allows to create, delete, enable or disable a VIF. GET/GETNEXT operation
+       returns nothing(2)."
+     ::= { osVifEntry 7 }
+
+osVifLocked           OBJECT-TYPE
+     SYNTAX           TruthValue
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+        "The value true(1) means, that this VIF is tied with ethernet provision service
+        (see osEthServ.mib) and cannot be changed with osVif.mib"
+     ::= { osVifEntry 8 }
+
+osVifLastChange       OBJECT-TYPE
+     SYNTAX           TimeTicks
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifEntry 9 }
+
+osVifOperState        OBJECT-TYPE
+     SYNTAX           INTEGER
+                        {
+                          unknown              (1),
+                          active               (2),
+                          inactive             (3),
+                          activeAndDisabled    (4)
+                        }
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifEntry 10 }
+
+osVifIfIndex          OBJECT-TYPE
+    SYNTAX            InterfaceIndex
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+            "The index value which uniquely identifies the interface to
+            which this entry is applicable.  The interface identified by
+            a particular value of this index is the same interface as
+            identified by the same value of ifIndex from IF-MIB."
+    ::= { osVifEntry 11 }
+
+osVifIspTag           OBJECT-TYPE
+     SYNTAX           VlanIdOrNone
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "isp-tag"
+     DEFVAL { 0 }
+     ::= { osVifEntry 12 }
+
+osVifIspPortList      OBJECT-TYPE
+     SYNTAX           PortList
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "isp-ports"
+     DEFVAL { "" }
+     ::= { osVifEntry 13 }
+
+
+osVifMflgThreshold    OBJECT-TYPE
+     SYNTAX           Unsigned32 (0|10..200)
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+        "The number of repeated re-learnings of the MAC per second, after
+        which the port is isolated. A value of '0' means that VLAN-based
+        MFLG is disabled for this VIF.
+        CLI commands:
+           mac-flapping-loop-guard (threshold (0|<10-200>)|)
+           no mac-flapping-loop-guard (threshold (<0-200>|)|)
+        "
+     DEFVAL { 0 }
+     ::= { osVifEntry 14 }
+
+osVifIsolatedPorts    OBJECT-TYPE
+     SYNTAX           PortList
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+        "Isolated in this VIF ports, for example, by VLAN-based MFLG."
+     ::= { osVifEntry 15 }
+
+osVifRecoverPorts     OBJECT-TYPE
+     SYNTAX           TruthValue
+     MAX-ACCESS       read-write
+     STATUS           current
+     DESCRIPTION
+       "When an agent receives this object with the value true(1) in SNMP SET operations,
+        it immediately recovers all ports of VIF that are isolated, for example, by
+        VLAN-based MFLG.
+        When SNMP GET/GETNEXT operation this object always returns the value of false(2).
+        CLI commands:
+         'recover vlan IFNAME' - in ENABLE mode
+         'recover;             - in INTERFACE mode."
+    DEFVAL { false }
+     ::= { osVifEntry 16 }
+
+osVifNatPfExternalMode        OBJECT-TYPE
+     SYNTAX           TruthValue
+     MAX-ACCESS       read-write
+     STATUS           current
+     DESCRIPTION
+        "When interface is used for NAT port-forwarding external management, 
+	the value externalMngIf works as CLI-command 'nat-service'."
+     ::= { osVifEntry 17 }
+
+osVifNatPfInternalMode        OBJECT-TYPE
+     SYNTAX           TruthValue
+     MAX-ACCESS       read-write
+     STATUS           current
+     DESCRIPTION
+        "When interface is used for NAT port-forwarding management, 
+	the value internalMngIf wokrs as CLI-command 'nat-server-management'."
+     ::= { osVifEntry 18 }
+
+
+-- ************************************************************
+-- The osVifSlaTable Table
+-- ************************************************************
+osVifSlaTable   OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsVifSlaEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table allows to define source IP address for the virtual interface of the
+       service on the edge point."
+    ::= { osVif 3 }
+
+osVifSlaEntry   OBJECT-TYPE
+    SYNTAX       OsVifSlaEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    AUGMENTS { osVifEntry }
+--  INDEX { osVifDevNo } 
+    ::= { osVifSlaTable 1 }
+
+OsVifSlaEntry ::= SEQUENCE {
+      osVifSlaSlaAvailable       INTEGER,
+      osVifSlaRespMac            MacAddress
+}
+
+osVifSlaSlaAvailable OBJECT-TYPE
+    SYNTAX           INTEGER {
+                        inService      (0),
+                        serviceTurnUp  (1),                        
+                        disabled       (2)
+                     }
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "Service participation mode in RFC2544 tests:
+       If this object is set to inService(0), then in-service tests are supported (low rates) 
+       If this object is set to serviceTurnUp(1), then service turn-up tests are supported (high rates)
+       If this object is set to disabled(2), then turn-up/in-service tests are disabled.
+       The corresponding CLI commands in the interface node are:
+       ip sla (equivalent to serviceTurnUp)
+       ip sla in-service (equivalent to inService)"
+    DEFVAL { disabled }
+    ::= { osVifSlaEntry 8 }
+
+osVifSlaRespMac     OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "If this object is set to the value, not equal to 00:00:00:00:00:00, then the service
+       may reply on requests of RFC2544 tests with osRfc2544PrflProtocol equal to dmmITUtY1731(1),
+       which contains osRfc2544DstMac with this value."
+    ::= { osVifSlaEntry 9 }
+
+-- ************************************************************
+-- The osVifIpTable Table
+-- ************************************************************
+osVifIpTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsVifIpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "."
+    ::= { osVif 4 }
+
+osVifIpEntry   OBJECT-TYPE
+    SYNTAX      OsVifIpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osVifDevNo, osVifAddressType, osVifAddress, osVifPrefixLength }
+    ::= { osVifIpTable 1 }
+
+OsVifIpEntry ::= SEQUENCE {
+      osVifAddressType     InetAddressType,
+      osVifAddress         InetAddress,
+      osVifPrefixLength    InetAddressPrefixLength,
+      osVifIpAdminStatus   VifEntryValidator
+      }
+
+osVifAddressType      OBJECT-TYPE
+     SYNTAX           InetAddressType
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifIpEntry 3 }
+
+osVifAddress          OBJECT-TYPE
+     SYNTAX           InetAddress (SIZE (4|16))
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifIpEntry 4 }
+
+osVifPrefixLength     OBJECT-TYPE
+     SYNTAX           InetAddressPrefixLength
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifIpEntry 5 }
+
+
+osVifIpAdminStatus    OBJECT-TYPE
+     SYNTAX           VifEntryValidator
+     MAX-ACCESS       read-write
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifIpEntry 6 }
+
+-- ************************************************************
+-- The osVifMgmtTable Table
+-- ************************************************************
+osVifMgmtTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsVifMgmtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "."
+    ::= { osVif 5 }
+
+osVifMgmtEntry   OBJECT-TYPE
+    SYNTAX      OsVifMgmtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osVifDevNo, osVifMgmtProtocol, osVifMgmtAddressType, osVifMgmtAddress, osVifMgmtPrefixLength }
+    ::= { osVifMgmtTable 1 }
+
+OsVifMgmtEntry ::= SEQUENCE {
+      osVifMgmtProtocol     INTEGER,
+      osVifMgmtAddressType  InetAddressType,
+      osVifMgmtAddress      InetAddress,
+      osVifMgmtPrefixLength InetAddressPrefixLength,
+      osVifMgmtAdminStatus  VifEntryValidator
+      }
+
+osVifMgmtProtocol     OBJECT-TYPE
+     SYNTAX           INTEGER {
+                        ssh    (22),
+                        telnet (23),
+                        tftp   (69),
+                        http   (80),
+                        snmp   (161),
+                        syslog (514),
+                        netconf(830)
+                      }
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifMgmtEntry 2 }
+
+osVifMgmtAddressType  OBJECT-TYPE
+     SYNTAX           InetAddressType
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifMgmtEntry 3 }
+
+osVifMgmtAddress      OBJECT-TYPE
+     SYNTAX           InetAddress (SIZE (4|16))
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifMgmtEntry 4 }
+
+osVifMgmtPrefixLength OBJECT-TYPE
+     SYNTAX           InetAddressPrefixLength
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifMgmtEntry 5 }
+
+osVifMgmtAdminStatus    OBJECT-TYPE
+     SYNTAX           VifEntryValidator
+     MAX-ACCESS       read-write
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osVifMgmtEntry 6 }
+
+-- ************************************************************
+-- The dummy interfaces table
+-- ************************************************************
+
+osDummyIfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsDummyIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Allows to manage a set of dummy interfaces"
+    ::= { osVif 7 }
+
+osDummyIfEntry   OBJECT-TYPE
+    SYNTAX      OsDummyIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osDummyIfDevNo }
+    ::= { osDummyIfTable 1 }
+
+OsDummyIfEntry ::= SEQUENCE {
+      osDummyIfDevNo           IfnDevNo,
+      osDummyIfIfIndex         InterfaceIndex,
+      osDummyIfAddressType     InetAddressType,
+      osDummyIfAddress         InetAddress,
+      osDummyIfPrefixLength    InetAddressPrefixLength,
+      osDummyIfName            DisplayString,
+      osDummyIfAdminStatus     IfRowValidator
+      }
+
+osDummyIfDevNo  OBJECT-TYPE
+    SYNTAX      IfnDevNo
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Device number. For example for dummy5 IfnDevNo will be equal 5."
+     ::= { osDummyIfEntry 1 }
+
+
+osDummyIfIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "."
+     ::= { osDummyIfEntry 2 }
+
+
+osDummyIfAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Currently we support only ipv4."
+    DEFVAL { unknown }
+     ::= { osDummyIfEntry 3 }
+
+
+osDummyIfAddress OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "It must come together with osDummyIfPrefixLength."
+    DEFVAL { '00000000'H } -- 0.0.0.0
+     ::= { osDummyIfEntry 4 }
+
+
+osDummyIfPrefixLength OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "It must come together with osDummyIfAddress."
+    DEFVAL { 0 }
+     ::= { osDummyIfEntry 5 }
+
+osDummyIfName         OBJECT-TYPE
+     SYNTAX           DisplayString (SIZE (0..20))
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+        "."
+     ::= { osDummyIfEntry 6 }
+
+
+osDummyIfAdminStatus OBJECT-TYPE
+    SYNTAX      IfRowValidator
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object allows to create, delete, enable or disable a VIF. GET/GETNEXT operation
+       returns enable(5) or disable(6)."
+    DEFVAL { enable }
+     ::= { osDummyIfEntry 99 }
+
+-- ************************************************************
+-- The Generic virtual interfaces router table 
+-- ************************************************************
+
+osRtVifTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRtVifEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Allows to routing information in all types of interfaces."
+    ::= { osVif 10 }
+
+osRtVifEntry   OBJECT-TYPE
+    SYNTAX      OsRtVifEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+--  INDEX { osVifDevNo }
+    AUGMENTS { osVifEntry }
+    ::= { osRtVifTable 1 }
+
+OsRtVifEntry ::= SEQUENCE {
+      osRtVifLabelSwitching  Integer32
+      }
+
+osRtVifLabelSwitching OBJECT-TYPE
+    SYNTAX           Integer32 (-1|0..60000)
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "Enables/disables label-switching on interface."
+    ::= { osRtVifEntry 2 }
+-- ******************************************************************
+-- NOTIFICATIONS (TRAPS)
+-- ******************************************************************
+
+osVifPortIsolation NOTIFICATION-TYPE
+    OBJECTS     {
+                  osVifTag,
+                  osVifMflgMac
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when ports in the VIF are isolated by MFLG."
+    ::= { osVifNotifications 1 }
+
+osVifPortRecovery NOTIFICATION-TYPE
+    OBJECTS     {
+                  osVifTag
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when the ports are recovered after isolation by MFLF."
+    ::= { osVifNotifications 2 }
+
+osVifPortDetection NOTIFICATION-TYPE
+    OBJECTS     {
+                  osVifTag,
+                  osVifMflgMac
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when the MFLG detects an loop on the VIF."
+    ::= { osVifNotifications 3 }
+
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osVifMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osVifMandatoryGroup,
+                          osVifNotificationsGroup
+                         }
+
+    ::= { osVifMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osVifMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+              osVifAddrTypesSupported, osVifLastError, osVifMflgMac,
+
+              osVifMflgDetectOnly, osVifMflgTrustedPorts, osVifMflgRecoveryDelay, osVifMflgPortThreshold,
+              osVifMflgPbEnabled, osVifMflgVbEnabled, osVifMflgEnabled,
+
+              osVifTag, osVifPortList, osVifIspTag, osVifIspPortList, osVifName, osVifDescr, osVifMtuProfile,
+              osVifMflgThreshold, osVifIsolatedPorts, osVifRecoverPorts, osVifNatPfExternalMode,
+	      osVifNatPfInternalMode,
+
+              osVifAdminStatus,
+              osVifLocked, osVifLastChange, osVifOperState, osVifIfIndex,
+
+              osVifSlaSlaAvailable, osVifSlaRespMac,
+
+              osVifIpAdminStatus,
+
+              osVifMgmtAdminStatus,
+
+              osDummyIfIfIndex, osDummyIfAddressType,
+              osDummyIfAddress, osDummyIfPrefixLength, osDummyIfName,
+              osDummyIfAdminStatus,
+
+              osRtVifLabelSwitching
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+    ::= { osVifMIBGroups 1 }
+
+osVifNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+             osVifPortIsolation,
+             osVifPortRecovery,
+             osVifPortDetection
+          }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osVifMIBGroups 2 }
+
+
+
+END
+

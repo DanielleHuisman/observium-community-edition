@@ -853,12 +853,16 @@ HM2-PLATFORM-ROUTING-MIB DEFINITIONS ::= BEGIN
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                     "HiOS: Specifies the time interval between tokens being placed in the bucket
-                      for ICMP Ratelimit.
+                     "HiOS: Specifies the burst-interval parameter to calculate the average rate 
+					  (determined as interval/burst-size) which is the minimum time between subsequent
+					  ICMP packets for each destination. A granularity of less than 10ms is not
+					  guaranteed. The minimum possible configurable rate is 10. To disable the rate limit,
+					  set the interval to 0.
                      HiSecOS: Specifies the average minimum time between subsequent ICMP packets for
                       each destination, using a token bucket algorithm. In times without ICMP packets,
-                      the tokens accumulate to allow for bursts of up to
-                      hm2AgentSwitchIpIcmpRateLimitBurstSize packets."
+                      the tokens accumulate to allow for bursts of up to hm2AgentSwitchIpIcmpRateLimitBurstSize
+					  packets. A granularity of less than 10ms is not guaranteed. the minimum possible configurable
+					  average time is 10. To disable the rate limit, set the interval to 0."
          DEFVAL 	{ 1000 }
          ::= { hm2AgentSwitchIpIcmpControlGroup 3 }
 
@@ -867,7 +871,8 @@ HM2-PLATFORM-ROUTING-MIB DEFINITIONS ::= BEGIN
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                     "HiOS: Specifies the number of tokens to be placed after timeout.
+                     "HiOS: Specifies the burst-size parameter to calculate the average rate 
+					 (interval/burst-size). A granularity of less than 10ms is not guaranteed.
                      HiSecOS: The size of the token bucket, fixed at 6 tokens."
          DEFVAL 	{ 100 }
          ::= { hm2AgentSwitchIpIcmpControlGroup 4 }
@@ -1538,7 +1543,6 @@ HM2-PLATFORM-ROUTING-MIB DEFINITIONS ::= BEGIN
 		DEFVAL { externalType2 }
 	::= { hm2AgentOspfRouteRedistEntry 5 }
 
---#ifdef HM_MODIFIED     /* More details : https://haczilla.belden.eu.com/show_bug.cgi?id=30813 */	 
 	hm2AgentOspfRouteRedistTag OBJECT-TYPE
 		SYNTAX Unsigned32
 		MAX-ACCESS read-write
@@ -3941,7 +3945,8 @@ HM2-PLATFORM-ROUTING-MIB DEFINITIONS ::= BEGIN
 		hm2AgentVrrpExtNotifyLinkdown 	INTEGER,
 		hm2AgentVrrpExtPreemptionDelay 	Integer32,
 		hm2AgentVrrpPrimaryVirtualAddress 	IpAddress,
-		hm2AgentVrrpExtMethod			INTEGER
+		hm2AgentVrrpExtMethod			INTEGER,
+		hm2AgentVrrpExtProxyarp			TruthValue
 		}
 
 	 
@@ -4096,6 +4101,21 @@ HM2-PLATFORM-ROUTING-MIB DEFINITIONS ::= BEGIN
 		DEFVAL { none }
    	::= { hm2AgentVrrpExtEntry 13 }
 
+	hm2AgentVrrpExtProxyarp  OBJECT-TYPE 
+		SYNTAX       TruthValue
+		MAX-ACCESS   read-write
+		STATUS       current
+		DESCRIPTION 
+			"This object specifies if proxy arp functionality must be 
+			 associated with a vrrp instance.
+			 Possible values:
+			 - true: enable proxy arp on change of vrrpOperState to master
+			 - false: No impact
+			 NOTE: Set the value to true when using 1:1 NAT along with VRRP.
+			       Proxy arp on the physical interface must be disabled.
+			 "
+		DEFVAL { false }
+		::= { hm2AgentVrrpExtEntry 14 }
 
 --
 -- hm2AgentVrrpDomainTable
@@ -4568,5 +4588,211 @@ HM2-PLATFORM-ROUTING-MIB DEFINITIONS ::= BEGIN
     	STATUS      current
     	DESCRIPTION "Routing cannot be used together with the vlan unaware mode."
     ::= { hm2AgentRoutingSNMPExtensionGroup 41 }
-    
+
+    hm2AgentRoutingInvalidNetworkAddress OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the routing table entry contains an invalid value for 
+                       network address that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 42 }
+
+    hm2AgentRoutingTypeInvalidValue OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the type is invalid."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 43 }
+
+    hm2AgentRoutingLocalRoutePreference OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the local type and local protocol should have the preference
+                       value zero."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 44 }
+
+    hm2AgentRoutingMetricInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the routing table entry contains an invalid value for
+                        metric that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 45 }
+
+    hm2AgentRoutingMetricNotSupported OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the route metric except 1 is not supported and cannot be set."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 46 }
+
+    hm2AgentRoutingNexthopAtLocalInterface OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the entry has Nexthop address that is set on a local interface."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 47 }
+
+    hm2AgentRoutingNexthopInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the routing table entry contains an invalid value for
+                        next hop IP address that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 48 }
+
+    hm2AgentRoutingMaxEntryCountReached OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the route entry cannot be added as maximum count has reached."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 49 }
+
+    hm2AgentRoutingNoPreferenceUpdate OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the preference value cannot be updated."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 50 }
+
+    hm2AgentRoutingPortInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the routing table entry contains an invalid value for
+                        port that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 51 }
+
+    hm2AgentRoutingStaticRoutePreference OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the remote type and netmgmt protocol should have the preference
+                       value in range 1..255."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 52 }
+
+    hm2AgentRoutingSameNetworkAddrErrorReturn OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the entry with same network address already exists."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 53 }
+
+    hm2AgentRoutingTypeInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the routing table entry contains an invalid value for
+                        route type that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 54 }
+
+    hm2AgentRoutingMacAddressInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the entry contains an invalid value for MAC address that
+                        cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 55 }
+
+    hm2AgentRoutingIPAddressExist OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that IP address already exists."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 56 }
+
+    hm2AgentRoutingPingPortInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the ping port contains an invalid value
+                       that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 57 }
+
+    hm2AgentRoutingIntervalTimeInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains invalid
+                       characters or is out of range for ping interval time that cannot
+                       be processed. The allowed range is 100..20000."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 58 }
+
+    hm2AgentRoutingPingLoseTimeInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains invalid
+                       characters or is out of range for ping replies to lose time
+                       that cannot be processed. The allowed range is 1..10."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 59 }
+
+    hm2AgentRoutingPingReceiveTimeInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains invalid
+                       characters or is out of range for ping replies to receive time
+                       that cannot be processed. The allowed range is 1..10."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 60 }
+
+    hm2AgentRoutingPingTimeoutInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains invalid
+                       characters or is out of range for ping timeout that cannot be
+                       processed. The allowed range is 10..10000."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 61 }
+
+    hm2AgentRoutingPingTTLInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains invalid
+                       characters or is out of range for ping TTL that cannot be
+                       processed. The allowed range is 1..125."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 62 }
+
+    hm2AgentRoutingLogicalOperandInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains an
+                       invalid value for logical operand A|B that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 63 }
+
+    hm2AgentRoutingOperatorInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains an invalid
+                       value for operator that cannot be processed. Possible values
+                       'and' and 'or'."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 64 }
+
+    hm2AgentRoutingLinkDelayInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains an invalid
+                       value for link up/down delay which is out of range and cannot be
+                       processed. The allowed range is 0..255."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 65 }
+
+    hm2AgentRoutingL3RelayFunctionInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the L3 relay function contains an invalid value
+                       that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 66 }
+
+    hm2AgentRoutingBootpDhcpHopsInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that L3 configuration entry contains invalid characters
+                       or is out of range for bootp/dhcp hops (max.) that cannot be
+                       processed. The allowed range is 1..16."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 67 }
+
+    hm2AgentRoutingBootpDhcpWaitTimeInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that L3 configuration entry contains invalid characters
+                       or is out of range for bootp/dhcp wait time (min.) that cannot be
+                       processed. The allowed range is 0..100."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 68 }
+
+    hm2AgentRoutingCircuitIDInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the tracking configuration entry contains
+                       an invalid value for circuit ID that cannot be processed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 69 }
+
+    hm2AgentRoutingTrackTypeEnableError OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the process of enabling tracking instance {0} has
+                       failed because track type is invalid."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 70 }
+
+    hm2AgentRoutingTrackingEnableErrorReturn OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the process of enabling tracking instance {0}
+                       admin state has failed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 71 }
+
+    hm2AgentRoutingTrackingDisableErrorReturn OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the process of disabling tracking instance {0}
+                       admin state has failed."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 72 }
+
+    hm2AgentRoutingTrackTypeDisableError OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the process of disabling tracking instance {0} has
+                       failed because track type is invalid."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 73 }
+
+    hm2AgentRoutingTrackIDCreateError OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the creation of tracking instance {0} has failed
+                       because track ID is invalid."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 74 }
+
+    hm2AgentRoutingTrackTypeCreateError OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the creation of tracking instance {0} has failed
+                       because track type is invalid."
+          ::= { hm2AgentRoutingSNMPExtensionGroup 75 }
+
 END

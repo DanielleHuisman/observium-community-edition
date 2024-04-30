@@ -69,9 +69,9 @@ print_debug_vars($os_maps, 1);
 // Limit devices with rancid supported os
 $where_array   = [];
 if (!isset($options['a'])) {
-    $where_array[] = generate_query_values_ng($config['poller_id'], 'poller_id');
+    $where_array[] = generate_query_values($config['poller_id'], 'poller_id');
 }
-$where_array[] = generate_query_values_ng(array_keys($os_maps), 'os');
+$where_array[] = generate_query_values(array_keys($os_maps), 'os');
 $sql           = "SELECT `hostname`, `os`, `version`, `hardware`, `disabled`, `status` FROM `devices` " . generate_where_clause($where_array) . " ORDER BY `hostname`";
 foreach (dbFetchRows($sql) as $device) {
     // blacklisted hosts

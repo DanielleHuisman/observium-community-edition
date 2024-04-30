@@ -1,0 +1,199 @@
+ELTEX-ERRDISABLE-MIB DEFINITIONS ::= BEGIN
+                    
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+      FROM SNMPv2-SMI
+        
+    InterfaceIndexOrZero,
+    ifIndex
+      FROM IF-MIB
+                    
+    TEXTUAL-CONVENTION,
+    TruthValue
+      FROM SNMPv2-TC
+                    
+    eltexLtd
+      FROM ELTEX-SMI-ACTUAL;
+                    
+  eltexErrdisableMIB MODULE-IDENTITY
+    LAST-UPDATED "202303060000Z" -- Mon Mar 06 00:00:00 GMT 2023
+    ORGANIZATION "Eltex Enterprise Co, Ltd."
+    CONTACT-INFO 
+        "www.eltex-co.ru"
+    DESCRIPTION  
+        "The MIB module for port errdisable management."
+    REVISION "202303060000Z"
+    DESCRIPTION "EltexErrdisableCauseType syntax changed."
+
+  ::= { eltexLtd 53 }
+    
+-------------------------------------------------------------------------------
+-- Textual Conversions.
+
+EltexErrdisableCauseType::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Errdisable cause type."
+    SYNTAX  INTEGER {
+        storm-control(1),
+        loopback-detection(2),
+        udld(3),
+        port-security(4)
+    }                
+                    
+-------------------------------------------------------------------------------
+
+eltexErrdisableObjects       OBJECT IDENTIFIER ::= { eltexErrdisableMIB 1 }
+eltexErrdisableNotifications OBJECT IDENTIFIER ::= { eltexErrdisableMIB 2 }
+                    
+eltexErrdisableGlobals       OBJECT IDENTIFIER ::= { eltexErrdisableObjects 1 }
+eltexErrdisableConfigs       OBJECT IDENTIFIER ::= { eltexErrdisableObjects 2 }
+eltexErrdisableStatistics    OBJECT IDENTIFIER ::= { eltexErrdisableObjects 3 }
+
+-------------------------------------------------------------------------------                    
+
+--
+-- Globals
+--
+
+eltexErrdisableReactivateInterface OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This scalar reactivates (enables) interface which was suspended.
+        Set the scalar to 0 to reactivate ALL suspended interfaces."
+    ::= { eltexErrdisableGlobals 1 }    
+
+eltexErrdisableGlobalRecoveryInterval OBJECT-TYPE
+    SYNTAX      INTEGER(30..86400)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Global timeout interval in seconds for automatic recovery of 
+         suspended interfaces."
+    DEFVAL { 300 }
+    ::= { eltexErrdisableGlobals 2 }
+    
+-------------------------------------------------------------------------------        
+
+--
+-- Errdisable auto-recovery configuration
+--
+
+eltexErrdisableConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexErrdisableConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The table is used for automatic recovery configuration 
+        per specific suspend causes."
+    ::=  { eltexErrdisableConfigs 1 }
+    
+eltexErrdisableConfigEntry OBJECT-TYPE
+    SYNTAX      EltexErrdisableConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the eltexErrdisableConfigTable."
+    INDEX  { eltexErrdisableConfigCause }
+    ::= { eltexErrdisableConfigTable 1 }
+    
+EltexErrdisableConfigEntry ::= 
+    SEQUENCE {
+        eltexErrdisableConfigCause            EltexErrdisableCauseType,
+        eltexErrdisableConfigRecoveryEnable   TruthValue,
+        eltexErrdisableConfigTrapEnable       TruthValue
+    }
+    
+eltexErrdisableConfigCause OBJECT-TYPE
+    SYNTAX      EltexErrdisableCauseType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Suspend cause."
+    ::= { eltexErrdisableConfigEntry 1 }
+
+eltexErrdisableConfigRecoveryEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable/Disable automatic recovery."
+    ::= { eltexErrdisableConfigEntry 2 }
+    
+eltexErrdisableConfigTrapEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable/Disable SNMP trap generation when port 
+         errdisable state is changed."
+    ::= { eltexErrdisableConfigEntry 3 }    
+
+-------------------------------------------------------------------------------        
+
+--
+-- Errdisable status per interface
+--
+
+eltexErrdisableIfStatusTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexErrdisableIfStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The table shows detailed information about suspended ports."
+    ::= {  eltexErrdisableStatistics 1 }
+
+eltexErrdisableIfStatusEntry OBJECT-TYPE
+    SYNTAX      EltexErrdisableIfStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the eltexErrdisableIfStatusTable."
+    INDEX  { ifIndex }
+    ::= { eltexErrdisableIfStatusTable 1 }
+
+EltexErrdisableIfStatusEntry ::= 
+    SEQUENCE {
+        eltexErrdisableIfStatusCause            EltexErrdisableCauseType,
+        eltexErrdisableIfStatusRecoveryEnable   TruthValue
+    }
+
+eltexErrdisableIfStatusCause OBJECT-TYPE
+    SYNTAX      EltexErrdisableCauseType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Port suspend cause."
+    ::= { eltexErrdisableIfStatusEntry 1 }
+
+eltexErrdisableIfStatusRecoveryEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Automatic recovery status."
+    ::= { eltexErrdisableIfStatusEntry 2 }
+                    
+-------------------------------------------------------------------------------        
+
+--
+-- Errdisable notifications
+--
+
+eltexErrdisableNotificationsPrefix OBJECT IDENTIFIER ::= 
+                { eltexErrdisableNotifications 0 }
+
+eltexErrdisableIfSuspendedTrap NOTIFICATION-TYPE
+    OBJECTS     { ifIndex, eltexErrdisableIfStatusCause }
+    STATUS      current
+    DESCRIPTION
+        "An eltexErrdisableIfTrap is generated when an interface is
+         suspended by cause specified in eltexErrdisableIfStatusCause."
+    ::= { eltexErrdisableNotificationsPrefix 1 }
+                    
+END

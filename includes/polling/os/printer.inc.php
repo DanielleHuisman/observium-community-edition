@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -17,7 +17,7 @@ if (!safe_empty($hardware)) {
 // Printers hardware
 
 if ($printer = snmp_get_oid($device, 'hrDeviceDescr.1', 'HOST-RESOURCES-MIB')) {
-    [$hardware] = explode(';', $printer);
+    $hardware = explode(';', $printer)[0];
 } elseif (is_device_mib($device, 'HP-LASERJET-COMMON-MIB')) {
     // HP-LASERJET-COMMON-MIB::gdStatusId.0 = STRING: MFG:Hewlett-Packard;CMD:PJL,PML,PCLXL,URP,PCL,PDF,POSTSCRIPT;MDL:HP LaserJet 500 colorMFP M570dw;CLS:PRINTER;DES:Hewlett-Packard LaserJet 500 colorMFP M570dw;MEM:MEM=230MB;COMMENT:RES=600x8;LEDMDIS:USB#ff#04#01;CID:HPLJPDLV1;
     // MFG:Hewlett-Packard;CMD:PJL,MLC,BIDI-ECP,PCL,POSTSCRIPT,PCLXL;MDL:hp LaserJet 1320 series;CLS:PRINTER;DES:Hewlett-Packard LaserJet 1320 series;MEM:9MB;COMMENT:RES=1200x1;
@@ -31,7 +31,9 @@ if ($printer = snmp_get_oid($device, 'hrDeviceDescr.1', 'HOST-RESOURCES-MIB')) {
 
 if ($hardware) {
     // Strip off useless brand fields
-    $hardware = str_ireplace(['HP ', 'Hewlett-Packard ', ' Series', 'Samsung ', 'Epson ', 'Brother ', 'OKI '], '', $hardware);
+    $hardware = str_ireplace([ 'HP ', 'Hewlett-Packard ', ' Series', 'Samsung ', 'Epson ', 'Brother ', 'OKI ' ], '', $hardware);
 }
+
+unset($printer);
 
 // EOF

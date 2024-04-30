@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -260,7 +260,7 @@ if (is_device_mib($device, "IF-MIB")) {
         }
     }
     // MIB timing
-    $include_stats['IF-MIB'] = microtime(TRUE) - $inc_start;
+    $include_stats['IF-MIB'] = elapsed_time($inc_start);
     // End IF-MIB permitted
 }
 //else {
@@ -548,7 +548,7 @@ foreach ($ports as $port) {
                              is_numeric($this_port['ifInMulticastPkts']) && is_numeric($this_port['ifOutMulticastPkts']);
 
             if ($port['port_mcbc'] == NULL) {
-                // We have Broadcast/Multicast traffic counters. Lets set port_mcbc
+                // We have Broadcast/Multicast traffic counters. Let's set port_mcbc
                 if ($port_has_mcbc) {
                     $port['port_mcbc']           = 1;
                     $port['update']['port_mcbc'] = 1;
@@ -600,37 +600,7 @@ foreach ($ports as $port) {
         $this_port['ifPhysAddress'] = mac_zeropad($this_port['ifPhysAddress']);
 
         // ifSpeed processing
-        if (isset($port['ifSpeed_custom']) && $port['ifSpeed_custom'] > 0) {
-            // Custom ifSpeed from WebUI
-            $this_port['ifSpeed'] = (int)$port['ifSpeed_custom'];
-            print_debug('Port ifSpeed manually set.');
-        } else {
-            // Detect port speed by ifHighSpeed
-            if (is_numeric($this_port['ifHighSpeed'])) {
-                // Use old ifHighSpeed if current speed '0', seems as some error on device
-                if ($this_port['ifHighSpeed'] == '0' && $port['ifHighSpeed'] > '0') {
-                    $this_port['ifHighSpeed'] = $port['ifHighSpeed'];
-                    print_debug('Port ifHighSpeed fixed from zero.');
-                }
-
-                // Maximum possible ifSpeed value is 4294967295
-                // Overwrite ifSpeed with ifHighSpeed if it's over 4G or ifSpeed equals to zero
-                // ifSpeed is more accurate for low speeds (ie: ifSpeed.60 = 1536000, ifHighSpeed.60 = 2)
-                // other case when (incorrect ifSpeed): ifSpeed.6 = 1000, ifHighSpeed.6 = 1000)
-                $ifSpeed_max = max($this_port['ifHighSpeed'] * 1000000, $this_port['ifSpeed']);
-                if ($this_port['ifHighSpeed'] > 0 &&
-                    ($ifSpeed_max > 4000000000 || $this_port['ifSpeed'] == 0 ||
-                     $this_port['ifSpeed'] == $this_port['ifHighSpeed'])) {
-                    // echo("HighSpeed, ");
-                    $this_port['ifSpeed'] = $ifSpeed_max;
-                }
-            }
-            if ($this_port['ifSpeed'] == '0' && $port['ifSpeed'] > '0') {
-                // Use old ifSpeed if current speed '0', seems as some error on device
-                $this_port['ifSpeed'] = $port['ifSpeed'];
-                print_debug('Port ifSpeed fixed from zero.');
-            }
-        }
+        process_port_speed($this_port, $device, $port);
         $port['alert_array']['ifSpeed'] = is_numeric($this_port['ifSpeed']) ? $this_port['ifSpeed'] : 0;
         if (is_numeric($this_port['ifHighSpeed'])) {
             $port['alert_array']['ifHighSpeed'] = $this_port['ifHighSpeed'];
@@ -800,13 +770,13 @@ foreach ($ports as $port) {
         }
 
         // Store average in/out packets size
-        if ($in_pkts_delta = int_add($port['state']['ifInUcastPkts_delta'], $port['state']['ifInNUcastPkts_delta'])) {
-            $port['alert_array']['rx_ave_pktsize'] = $port['state']['ifInOctets_delta'] / $in_pkts_delta;
+        if ($in_pkts_delta = int_add($port['alert_array']['ifInUcastPkts_delta'], $port['alert_array']['ifInNUcastPkts_delta'])) {
+            $port['alert_array']['rx_ave_pktsize'] = $port['alert_array']['ifInOctets_delta'] / $in_pkts_delta;
         } else {
             $port['alert_array']['rx_ave_pktsize'] = 0;
         }
-        if ($out_pkts_delta = int_add($port['state']['ifOutUcastPkts_delta'], $port['state']['ifOutNUcastPkts_delta'])) {
-            $port['alert_array']['tx_ave_pktsize'] = $port['state']['ifOutOctets_delta'] / $out_pkts_delta;
+        if ($out_pkts_delta = int_add($port['alert_array']['ifOutUcastPkts_delta'], $port['alert_array']['ifOutNUcastPkts_delta'])) {
+            $port['alert_array']['tx_ave_pktsize'] = $port['alert_array']['ifOutOctets_delta'] / $out_pkts_delta;
         } else {
             $port['alert_array']['tx_ave_pktsize'] = 0;
         }
@@ -825,6 +795,7 @@ foreach ($ports as $port) {
         $port['alert_array']['ifBroadcastPkts_rate'] = $port['stats']['ifOutBroadcastPkts_rate'] + $port['stats']['ifInBroadcastPkts_rate'];
         $port['alert_array']['ifMulticastPkts_rate'] = $port['stats']['ifOutMulticastPkts_rate'] + $port['stats']['ifInMulticastPkts_rate'];
         $port['alert_array']['ifDiscards_rate']      = $port['state']['ifDiscards_rate'];
+        print_debug_vars($port['alert_array']);
 
         // Set per port RRD options
         $rrd_options = [ 'speed' => $this_port['ifSpeed'] ];

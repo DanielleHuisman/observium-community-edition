@@ -1,0 +1,448 @@
+--  =======================================================================
+--  File        : osEthServProtection.mib
+--  Description : Private MIB support protection for MEF services
+--  By          : Gur
+
+-- Copyright (c) 2013 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-ETH-SERV-PROTECTION-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE,
+                Counter32, Integer32               FROM SNMPv2-SMI
+                oaOptiSwitch, OsCfmMepIdOrZero     FROM OS-COMMON-TC-MIB
+                osEthServId                        FROM OS-ETH-SERV-MIB
+                TEXTUAL-CONVENTION, MacAddress     FROM SNMPv2-TC
+                MODULE-COMPLIANCE, OBJECT-GROUP,
+                NOTIFICATION-GROUP                 FROM SNMPv2-CONF;
+
+osEthServProtection MODULE-IDENTITY
+                LAST-UPDATED "201301210000Z" -- 21 Jan 2013
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Gur Stavi
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  gstavi@mrv.com"
+                DESCRIPTION
+                    "Protection for MEF Ethernet Virtual Connections MIB."
+
+                REVISION     "201301210000Z" -- 21 Jan 2013
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 33 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osEthServProtNotifications OBJECT IDENTIFIER ::= { osEthServProtection 0 }
+osEthProtConformance       OBJECT IDENTIFIER ::= { osEthServProtection 100 }
+osEthProtMIBCompliances    OBJECT IDENTIFIER ::= { osEthProtConformance 1 }
+osEthProtMIBGroups         OBJECT IDENTIFIER ::= { osEthProtConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+CcmTrackState ::= TEXTUAL-CONVENTION
+    STATUS        current
+    DESCRIPTION "State of ccm-tracking for a trail.
+      disabled - no CCM tracking for the trail
+      up - CCMs of the ma/mep associated with the trail arrive
+      down - A CCM timeout event detected for the ma/mep
+          associated with the trail. The timeout is considered
+          a signal failure on the trail that is injected into
+          the .8031 logic."
+    SYNTAX INTEGER {
+        disabled (1),
+        up       (2),
+        down     (3)
+        }
+
+TrailSignalState ::= TEXTUAL-CONVENTION
+    STATUS        current
+    DESCRIPTION "The state of a trail based on port link down
+      events or CCM timeout events. A state other than 'normal'
+      may cause active trail switch by the G.8031 logic."
+    SYNTAX INTEGER {
+        unknown  (1),
+        normal   (2),
+        fail     (3),
+        degrade  (4)
+        }
+
+ElpCommand ::= TEXTUAL-CONVENTION
+    STATUS        current
+    DESCRIPTION "A management that can be injected as an input
+      into the G.8031 logic and may cause state change and switch
+      over of the active trail."
+    SYNTAX INTEGER {
+        unknown                 (1),
+        nothing                 (2),
+        clear                   (3),
+        lockout                 (4),
+        forcedSwitch            (5),
+        manualSwitchWorking     (6),
+        manualSwitchProtection  (7),
+        exercise                (8),
+        freeze                  (9),
+        clearFreeze             (10)
+        }
+
+-- ************************************************************
+-- The osEthServElpTable Table
+-- ************************************************************
+osEthServElpTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsEthServElpEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+      "Ethernet Linear Protection (G.8031) per service configuration table."
+    ::= { osEthServProtection 1 }
+
+osEthServElpEntry OBJECT-TYPE
+    SYNTAX       OsEthServElpEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+      "Contains an entry of the table."
+    INDEX { osEthServId }
+    ::= { osEthServElpTable 1 }
+
+OsEthServElpEntry ::= SEQUENCE {
+      osEthElpApsMacAddress            MacAddress,
+      osEthElpTrackCcm                 INTEGER,
+      osEthElpRemoteMepIdWorking       OsCfmMepIdOrZero,
+      osEthElpRemoteMepIdProtection    OsCfmMepIdOrZero,
+      osEthElpHoldOffDelay             Integer32,
+      osEthElpRevertDelay              Integer32,
+      osEthElpCommand                  ElpCommand,
+      osEthElpActiveTrail              INTEGER,
+      osEthElpPendingCommand           ElpCommand,
+      osEthElpApsRxCount               Counter32,
+      osEthElpApsTxCount               Counter32,
+      osEthElpFsmStateName             OCTET STRING,
+      osEthElpFarEndFsmStateName       OCTET STRING,
+      osEthElpTrackCcmStateWorking     CcmTrackState,
+      osEthElpTrackCcmStateProtection  CcmTrackState,
+      osEthElpTimeToRevert             Integer32,
+      osEthElpWorkingSignalState       INTEGER,
+      osEthElpProtectionSignalState    INTEGER,
+      osEthElpProtectionIndexName      OCTET STRING,
+      osEthElpAdminStatus              INTEGER
+      }
+
+osEthElpApsMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+      "The MAC Address that is used as destination in TX APS PDUs
+      and also used to trap RX APS PDUs."
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:b"
+    ::= { osEthServElpEntry 1 }
+
+osEthElpTrackCcm      OBJECT-TYPE
+    SYNTAX           INTEGER {
+                       none           (1),
+                       all            (2),
+                       onlyWorking    (3),
+                       onlyProtection (4)
+                     }
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+      "Enable tracking of CCM timeout events. Timeout on the
+      specified MA (and optionally RMEP) assigned to the service
+      will be considered as signal failure."
+    DEFVAL { none }
+    ::= { osEthServElpEntry 2 }
+
+osEthElpRemoteMepIdWorking  OBJECT-TYPE
+    SYNTAX                  OsCfmMepIdOrZero
+    MAX-ACCESS              read-write
+    STATUS                  current
+    DESCRIPTION
+      "Indicates a remote MEP Id that send CCMs. A timeout
+      event for that remote MEP will be considered an ELP signal
+      failure on the WORKING trail"
+    DEFVAL { 0 }
+    ::= { osEthServElpEntry 3 }
+
+osEthElpRemoteMepIdProtection  OBJECT-TYPE
+    SYNTAX                     OsCfmMepIdOrZero
+    MAX-ACCESS                 read-write
+    STATUS                     current
+    DESCRIPTION
+      "Indicates a remote MEP Id that send CCMs. A timeout
+      event for that remote MEP will be considered an ELP signal
+      failure on the PROTECTION trail"
+    DEFVAL { 0 }
+    ::= { osEthServElpEntry 4 }
+
+osEthElpHoldOffDelay  OBJECT-TYPE
+    SYNTAX            Integer32 (0|100..60000)
+    UNITS             "milliseconds"
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+      "Time in milliseconds to hold-off switch over in case
+      of a failure event."
+    DEFVAL { 0 }
+    ::= { osEthServElpEntry 5 }
+
+osEthElpRevertDelay   OBJECT-TYPE
+    SYNTAX            Integer32 (-1|0|10..86400000)
+    UNITS             "milliseconds"
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+      "Following a recovery from signal failure on the WORKING
+      trail, time in milliseconds to wait until switching over
+      to the WORKING trail.
+      (-1) indicates Do-Not-Revert.
+      0 indicates revert immediately when recovery is detected"
+    DEFVAL { -1 }
+    ::= { osEthServElpEntry 6 }
+
+osEthElpCommand      OBJECT-TYPE
+    SYNTAX           ElpCommand
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+      "Issue a Command to mainpulate the G.8031 state
+      machine. Note that command may be rejected if a higher
+      priority condition is in effect.
+      This is effectively a write-only field. GET will always
+      return 'nothing'"
+    DEFVAL { nothing }
+    ::= { osEthServElpEntry 7 }
+
+osEthElpActiveTrail  OBJECT-TYPE
+    SYNTAX           INTEGER {
+                        working     (1),
+                        protection  (2)
+                     }
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Current active trail for the service."
+    DEFVAL { working }
+    ::= { osEthServElpEntry 20 }
+
+osEthElpPendingCommand OBJECT-TYPE
+    SYNTAX           ElpCommand
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The pending managment command within the G.8031 logic.
+      Note that a pending command may be silently cleared by
+      the G.8031 logic once a higher priority condition is
+      encountered."
+    DEFVAL { nothing }
+    ::= { osEthServElpEntry 21 }
+
+osEthElpApsRxCount    OBJECT-TYPE
+    SYNTAX            Counter32
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+      "The total number of APS packets received with valid
+      content."
+    DEFVAL { 0 }
+    ::= { osEthServElpEntry 22 }
+
+osEthElpApsTxCount    OBJECT-TYPE
+    SYNTAX            Counter32
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+      "The total number of APS packets transmitted"
+    DEFVAL { 0 }
+    ::= { osEthServElpEntry 23 }
+
+osEthElpFsmStateName  OBJECT-TYPE
+    SYNTAX            OCTET STRING (SIZE (1..12))
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+      "The current state of the G.8031 Final-State-Machine.
+      This value is a string with the name of the state."
+    ::= { osEthServElpEntry 24 }
+
+osEthElpFarEndFsmStateName  OBJECT-TYPE
+    SYNTAX                  OCTET STRING (SIZE (1..12))
+    MAX-ACCESS              read-only
+    STATUS                  current
+    DESCRIPTION
+      "The far-end's last reported state of the G.8031
+      Final-State-Machine.
+      This value is a string with the name of the state."
+    ::= { osEthServElpEntry 25 }
+
+osEthElpTrackCcmStateWorking  OBJECT-TYPE
+    SYNTAX           CcmTrackState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The CCM tracking state of the WORKING trail."
+    DEFVAL { disabled }
+    ::= { osEthServElpEntry 26 }
+
+osEthElpTrackCcmStateProtection  OBJECT-TYPE
+    SYNTAX           CcmTrackState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The CCM tracking state of the PROTECTION trail."
+    DEFVAL { disabled }
+    ::= { osEthServElpEntry 27 }
+
+osEthElpTimeToRevert  OBJECT-TYPE
+    SYNTAX            Integer32
+    UNITS             "seconds"
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+      "Time in seconds until ELP is going to revert from
+      PROTECTION to WORKING."
+    DEFVAL { 0 }
+    ::= { osEthServElpEntry 28 }
+
+osEthElpWorkingSignalState  OBJECT-TYPE
+    SYNTAX           TrailSignalState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The signal state of the WORKING trail.
+      Based on CCM tracking and port link state."
+    DEFVAL { unknown }
+    ::= { osEthServElpEntry 29 }
+
+osEthElpProtectionSignalState  OBJECT-TYPE
+    SYNTAX           TrailSignalState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The signal state of the PROTECTION trail.
+      Based on CCM tracking and port link state."
+    DEFVAL { unknown }
+    ::= { osEthServElpEntry 30 }
+
+osEthElpProtectionIndexName OBJECT-TYPE
+    SYNTAX                  OCTET STRING (SIZE (1..30))
+    MAX-ACCESS              read-only
+    STATUS                  current
+    DESCRIPTION
+      "Service identifier of the row that holds the protection
+      information for the service"
+    ::= { osEthServElpEntry 40 }
+
+osEthElpAdminStatus OBJECT-TYPE
+    SYNTAX           INTEGER {
+                       unknown       (1),
+                       nothing       (2),
+                       delete        (3),
+                       create        (4),
+                       enable        (5),
+                       disable       (6)
+                     }
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+      "Create - create a protection row in osEthServTable in
+      which proteection trail properties such as s-vlan and
+      s-ports should be configured.
+      delete - delete the protection row in osEthServTable.
+      enable/disable - Turn Ethernet Linear Protection on or off.
+      nothing - protection row has not been created.
+      unknown - primary row was not found for the index (error)."
+    ::= { osEthServElpEntry 98 }
+
+osEthElpTrailSwitch NOTIFICATION-TYPE
+    OBJECTS     { osEthElpActiveTrail,
+                  osEthElpWorkingSignalState,
+                  osEthElpProtectionSignalState
+                }
+    STATUS                  current
+    DESCRIPTION
+      "ELP switched the active trail"
+    ::= { osEthServProtNotifications 1 }
+
+-- *******************************************************************
+--  Conformance Information
+-- *******************************************************************
+
+osEthProtMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+      "The core compliance statement for all the implementations."
+    MODULE -- this module
+        MANDATORY-GROUPS {
+            osEthProtectionMandatoryGroup,
+            osEthProtectionNotificationsGroup
+            }
+
+    ::= { osEthProtMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups
+-- ...................................................................
+
+osEthProtectionMandatoryGroup  OBJECT-GROUP
+    OBJECTS {
+        osEthElpAdminStatus, osEthElpApsMacAddress, osEthElpTrackCcm,
+        osEthElpRemoteMepIdWorking, osEthElpRemoteMepIdProtection,
+        osEthElpHoldOffDelay, osEthElpRevertDelay,
+        osEthElpCommand, osEthElpActiveTrail, osEthElpPendingCommand,
+        osEthElpApsRxCount, osEthElpApsTxCount,
+        osEthElpFsmStateName, osEthElpFarEndFsmStateName,
+        osEthElpTrackCcmStateWorking, osEthElpTrackCcmStateProtection,
+        osEthElpTimeToRevert,
+        osEthElpWorkingSignalState, osEthElpProtectionSignalState,
+        osEthElpProtectionIndexName
+        }
+    STATUS current
+    DESCRIPTION
+      "."
+    ::= { osEthProtMIBGroups 1 }
+
+osEthProtectionNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+        osEthElpTrailSwitch
+        }
+    STATUS current
+    DESCRIPTION
+      "."
+    ::= { osEthProtMIBGroups 2 }
+
+
+END
+

@@ -10,126 +10,6 @@
  *
  */
 
-/// CONTACTS ACTIONS
-
-$readonly = $_SESSION['userlevel'] < 9;
-
-if (!$readonly) {
-    // FIXME: move all actions to separate include(s) with common options!
-    if (isset($vars['submit']) && !isset($vars['action'])) {
-        // Convert submit to action (for compatibility)
-        $vars['action'] = $vars['submit'];
-    }
-    if (isset($vars['action']) && isset($vars['contact_id'])) {
-        switch ($vars['action']) {
-            case 'add_alert_checker_contact': // new ([action]_[type]_[action_target]_[param_to_change])
-            case 'associate_alert_check':     // old
-                if (is_numeric($vars['alert_checker_id'])) {
-                    $vars['alert_test_id'] = $vars['alert_checker_id'];
-                } elseif (is_numeric($vars['alert_test_id'])) {
-                    // ok
-                } else {
-                    break;
-                }
-
-                //$vars['contact_id'] = (array)$vars['contact_id'];
-                foreach ((array)$vars['contact_id'] as $contact_id) {
-                    if (!is_numeric($contact_id)) {
-                        continue;
-                    }
-
-                    $id = dbInsert('alert_contacts_assoc', ['aca_type'         => 'alert', // $vars['type']
-                                                            'contact_id'       => $contact_id,
-                                                            'alert_checker_id' => $vars['alert_test_id']]);
-                    if ($id) {
-                        $rows_updated++;
-                    }
-                }
-                break;
-
-            case 'add_alert_checker_contactall':
-                if (!is_numeric($vars['alert_test_id']) || !$vars['confirm_add_all']) {
-                    break;
-                }
-                $exist_contacts = dbFetchColumn('SELECT `contact_id` FROM `alert_contacts_assoc` WHERE `aca_type` = ? AND `alert_checker_id` = ?', ['alert', $vars['alert_test_id']]);
-                //print_vars($exist_contacts);
-                $sql = "SELECT `contact_id` FROM `alert_contacts` WHERE `contact_disabled` = 0 AND `contact_method` != 'syscontact'" .
-                       generate_query_values_and($exist_contacts, 'contact_id', '!='); // exclude exist contacts
-                //print_vars($sql);
-                foreach (dbFetchColumn($sql) as $contact_id) {
-                    $id = dbInsert('alert_contacts_assoc', ['aca_type'         => 'alert',
-                                                            'contact_id'       => $contact_id,
-                                                            'alert_checker_id' => $vars['alert_test_id']]);
-                    if ($id) {
-                        $rows_updated++;
-                    }
-                }
-                unset($exist_contacts);
-                break;
-
-            case 'delete_alert_checker_contact': // new
-            case 'delete_alert_contact_assoc':   // old
-                if (!is_numeric($vars['alert_test_id'])) {
-                    break;
-                }
-                //$vars['contact_id'] = (array)$vars['contact_id'];
-                foreach ((array)$vars['contact_id'] as $contact_id) {
-                    if (!is_numeric($contact_id)) {
-                        continue;
-                    }
-
-                    $rows_updated += dbDelete('alert_contacts_assoc', '`aca_type` = ? AND `contact_id` = ? AND `alert_checker_id` = ?', ['alert', $contact_id, $vars['alert_test_id']]);
-                }
-                break;
-
-            case 'delete_alert_checker_contactall':
-                if (!is_numeric($vars['alert_test_id']) || !$vars['confirm_delete_all']) {
-                    break;
-                }
-                $rows_updated += dbDelete('alert_contacts_assoc', '`aca_type` = ? AND `alert_checker_id` = ?', ['alert', $vars['alert_test_id']]);
-                break;
-
-            case 'associate_syslog_rule':
-                if (is_numeric($vars['la_id'])) {
-                    //$vars['contact_id'] = (array)$vars['contact_id'];
-                    foreach ((array)$vars['contact_id'] as $contact_id) {
-                        $id = dbInsert('alert_contacts_assoc', ['aca_type'         => 'syslog', // $vars['type']
-                                                                'contact_id'       => $vars['contact_id'],
-                                                                'alert_checker_id' => $vars['la_id']]);
-                        if ($id) {
-                            $rows_updated++;
-                        }
-                    }
-
-                    set_obs_attrib('syslog_rules_changed', time()); // Trigger reload syslog script
-
-                }
-                break;
-
-            case 'delete_syslog_checker_contact': // new
-                if (!is_numeric($vars['alert_test_id'])) {
-                    break;
-                }
-                //$vars['contact_id'] = (array)$vars['contact_id'];
-                foreach ((array)$vars['contact_id'] as $contact_id) {
-                    if (!is_numeric($contact_id)) {
-                        continue;
-                    }
-
-                    $rows_updated += dbDelete('alert_contacts_assoc', '`aca_type` = ? AND `contact_id` = ? AND `alert_checker_id` = ?', ['syslog', $contact_id, $vars['alert_test_id']]);
-                }
-
-                set_obs_attrib('syslog_rules_changed', time()); // Trigger reload syslog script
-
-                break;
-        }
-        // Clean common action vars
-        //unset($vars['submit'], $vars['action'], $vars['confirm']);
-    }
-}
-
-/// END CONTACTS ACTIONS
-
 
 if (!is_array($alert_rules)) {
     $alert_rules = cache_alert_rules();
@@ -154,13 +34,15 @@ if ($_SESSION['userlevel'] >= 7 &&
 $navbar['class'] = 'navbar-narrow';
 $navbar['brand'] = 'Alerting';
 
-$pages = ['alerts'            => 'Alerts',
-          'alert_checks'      => 'Alert Checkers',
-          'alert_log'         => 'Alert Logging',
-          'alert_maintenance' => 'Scheduled Maintenance',
-          'syslog_alerts'     => 'Syslog Alerts',
-          'syslog_rules'      => 'Syslog Rules',
-          'contacts'          => 'Contacts'];
+$pages = [
+    'alerts'            => 'Alerts',
+    'alert_checks'      => 'Alert Checkers',
+    'alert_log'         => 'Alert Logging',
+    'alert_maintenance' => 'Scheduled Maintenance',
+    'syslog_alerts'     => 'Syslog Alerts',
+    'syslog_rules'      => 'Syslog Rules',
+    'contacts'          => 'Contacts'
+];
 
 foreach ($pages as $page_name => $page_desc) {
     if ($vars['page'] == $page_name) {
@@ -176,6 +58,7 @@ foreach ($pages as $page_name => $page_desc) {
 }
 $navbar['options']['alert_maintenance']['community'] = FALSE; // Not exist in Community Edition
 
+/* No longer used. Alert table entries are managed automatically.
 $navbar['options']['update']['url']       = generate_url(['page' => 'alert_regenerate', 'action' => 'update']);
 $navbar['options']['update']['text']      = 'Rebuild';
 $navbar['options']['update']['icon']      = $config['icon']['rebuild'];
@@ -183,6 +66,7 @@ $navbar['options']['update']['right']     = TRUE;
 $navbar['options']['update']['userlevel'] = 10; // Minimum user level to display item
 // We don't really need to highlight Regenerate, as it's not a display option, but an action.
 // if ($vars['action'] == 'update') { $navbar['options']['update']['class'] = 'active'; }
+*/
 
 $navbar['options']['sadd']['url']       = generate_url(['page' => 'add_syslog_rule']);
 $navbar['options']['sadd']['text']      = 'Add Syslog Rule';

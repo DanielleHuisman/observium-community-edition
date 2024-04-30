@@ -1,0 +1,531 @@
+--  =======================================================================
+--  File        : osProvBins.mib
+--  Description : Private MIB support the functionality of measurement bins
+--  By          : Inna
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-PROV-BINS-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                Unsigned32, Gauge32                           FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION,            
+                DateAndTime                                   FROM SNMPv2-TC
+                osEthServ, osEthServId, osEthServFlowId       FROM OS-ETH-SERV-MIB
+                EntityName, EntryValidator, ProfileStatus     FROM OS-COMMON-TC-MIB
+
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osProvBins   MODULE-IDENTITY
+                LAST-UPDATED "201104110000Z"
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "Functionality of bins."
+
+                REVISION     "201104110000Z"
+                DESCRIPTION
+                  "New object osProvBinSetCurrStatsHistIndex was added."
+
+                REVISION     "201012160000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { osEthServ 20 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osProvBinsGen               OBJECT IDENTIFIER ::= { osProvBins 1 }
+osProvBinsConformance       OBJECT IDENTIFIER ::= { osProvBins 100 }
+osProvBinsMIBCompliances    OBJECT IDENTIFIER ::= { osProvBinsConformance 1 }
+osProvBinsMIBGroups         OBJECT IDENTIFIER ::= { osProvBinsConformance 2 }
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+MeasTestType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+      "This enumeration data type is used to distinguish between types of of tests."
+     SYNTAX      INTEGER {
+                  dmm(1) -- for future: , rfc254492)
+                }
+
+
+MeasTestResultType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "This enumeration data type is used to distinguish between 
+        measurement bins for different test result variation.
+        Is was stolen from MefSoamTcDelayMeasurementBinType of MEF-SOAM-PM-MIB."
+    SYNTAX      INTEGER {
+                  roundTripFrameDelay(1),
+                  forwardFrameDelay(2),  -- For future
+                  backwardFrameDelay(3), -- For future
+                  roundTripIFDV(4),      -- jitter
+                  forwardIFDV(5),        -- SDJitter
+                  backwardIFDV(6)        -- DSJitter
+                }
+
+
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+
+osProvBinsSupported OBJECT-TYPE
+    SYNTAX          INTEGER { notSupported(1), supported(2) }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+      "Indicates that this MIB is supported."
+    ::= { osProvBinsGen 1 }
+
+
+-- ************************************************************
+-- The osProvBinPrflTable 
+-- ************************************************************
+osProvBinPrflTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF OsProvBinPrflEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Bins profile table"
+    ::= { osProvBins 2 }
+
+osProvBinPrflEntry    OBJECT-TYPE
+    SYNTAX          OsProvBinPrflEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osProvBinPrflId }
+    ::= { osProvBinPrflTable 1 }
+
+OsProvBinPrflEntry ::= SEQUENCE {
+      osProvBinPrflId            EntityName,
+      osProvBinPrflBinsNumber    Unsigned32,
+      osProvBinPrflAdminStatus   EntryValidator,
+      osProvBinPrflOperStatus    ProfileStatus
+}
+
+osProvBinPrflId         OBJECT-TYPE
+    SYNTAX          EntityName
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Bins profile name."
+    ::= { osProvBinPrflEntry 1 }
+
+osProvBinPrflBinsNumber   OBJECT-TYPE
+    SYNTAX          Unsigned32 (1..10)
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "A SOAM implementation must support a configurable 
+        number of bins per bin collection interval."
+    REFERENCE
+       "[MEF SOAM-PM] P17, D6, P18, D7, P19, D8, P20, D9"
+    DEFVAL { 1 }
+    ::= { osProvBinPrflEntry 2 }
+
+
+osProvBinPrflAdminStatus OBJECT-TYPE
+    SYNTAX          EntryValidator
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Allows to create new rows or delete old rows"
+    ::= { osProvBinPrflEntry 98 }
+
+osProvBinPrflOperStatus  OBJECT-TYPE
+    SYNTAX          ProfileStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "."
+    ::= { osProvBinPrflEntry 99 }
+
+-- ************************************************************
+-- The osProvBinCfgTable 
+-- ************************************************************
+osProvBinCfgTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF OsProvBinCfgEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Bin configuration table"
+    ::= { osProvBins 3 }
+
+osProvBinCfgEntry    OBJECT-TYPE
+    SYNTAX          OsProvBinCfgEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osProvBinPrflId, osProvBinCfgBinIndex }
+    ::= { osProvBinCfgTable 1 }
+
+OsProvBinCfgEntry ::= SEQUENCE {
+      osProvBinCfgBinIndex    Unsigned32,
+      osProvBinCfgBinBound    Unsigned32
+}
+
+osProvBinCfgBinIndex OBJECT-TYPE
+    SYNTAX          Unsigned32 (1..10)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Bin index."
+    ::= { osProvBinCfgEntry 1 }
+
+osProvBinCfgBinBound   OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..5000000)
+    UNITS           "microseconds (us)"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "This attribute specifies the lower boundary for a 
+        bin. The upper boundary is defined by the next bin
+        value or infinite for the last bin defined.
+        The boundary for each bin must 
+        be larger than the boundary of the preceding 
+        bin. By default, the next bin is set to 5000us larger 
+        than the lower bin boundary. 
+
+        The values in a bin boundary object represents the time range 
+        used to segregate delay data into the appropriate statistical
+        data bin. For five bins with default values, each bin has the 
+        following time range:
+
+        bin 1 =     0,  represents a range is 0u <= measurement < 5,000us
+        bin 2 =  5000, represents a range is 5,000us <= measurement < 10,000us
+        bin 3 = 10000, represents a range is 10,000us <= measurement < 15,000us
+        bin 4 = 15000, represents a range is 15,000us <= measurement < 20,000us
+        bin 5 = 20000, represents a range is 20,000us <= measurement < infinity
+
+        The values in a bin boundary object represents the time range 
+        used to segregate delay data into the appropriate statistical
+        data bin. The first bin boundary always contains 
+        the value of 0. Attempting to write a non-zero value to this bin will 
+        result in an error.
+        
+        Note that the upper limit of the range for the last measurement 
+        bin is effectively 5 seconds (or 5,000,000 us).
+       "
+    REFERENCE
+       "[MEF SOAM-PM] P10"
+    ::= { osProvBinCfgEntry 2 }
+
+-- ************************************************************
+-- The osProvBinBindTable
+-- ************************************************************
+osProvBinBindTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvBinBindEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Allows to bind the bins configuration to a service/flow."
+    ::= { osProvBins 4 }
+
+osProvBinBindEntry    OBJECT-TYPE
+    SYNTAX      OsProvBinBindEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEthServFlowId, osProvBinBindTestType, osProvBinBindResultType }
+    ::= { osProvBinBindTable 1 }
+
+OsProvBinBindEntry ::= SEQUENCE {
+    osProvBinBindTestType        MeasTestType,    
+    osProvBinBindResultType      MeasTestResultType,
+    osProvBinBindPrflId          EntityName,
+    osProvBinBindAdminStatus     EntryValidator
+}
+
+osProvBinBindTestType OBJECT-TYPE
+    SYNTAX          MeasTestType
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Test type."
+    ::= { osProvBinBindEntry 1 }
+
+osProvBinBindResultType OBJECT-TYPE
+    SYNTAX          MeasTestResultType
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Test result type."
+    ::= { osProvBinBindEntry 2 }
+
+osProvBinBindPrflId OBJECT-TYPE
+    SYNTAX          EntityName
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Bound Bins profile name."
+    ::= { osProvBinBindEntry 3 }
+
+osProvBinBindAdminStatus OBJECT-TYPE
+    SYNTAX          EntryValidator
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Binding is enable."
+    ::= { osProvBinBindEntry 4 }
+
+-- ************************************************************
+-- R E S U L T S
+-- ************************************************************
+
+-- ************************************************************
+-- The osProvBinSetCurrStatsTable
+-- ************************************************************
+osProvBinSetCurrStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvBinSetCurrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This table contains the result bins for the current bin-collection
+       interval in one session."
+    ::= { osProvBins 5 }
+
+osProvBinSetCurrStatsEntry    OBJECT-TYPE
+    SYNTAX      OsProvBinSetCurrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEthServFlowId, osProvBinBindTestType }
+    ::= { osProvBinSetCurrStatsTable 1 }
+
+OsProvBinSetCurrStatsEntry ::= SEQUENCE {
+    osProvBinSetCurrStatsStart      DateAndTime,
+    osProvBinSetCurrStatsHistIndex  Unsigned32 
+}
+
+osProvBinSetCurrStatsStart  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osProvBinSetCurrStatsEntry 1 }
+    
+osProvBinSetCurrStatsHistIndex  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "The index will be used as history index of the bin-set."
+    ::= { osProvBinSetCurrStatsEntry 2 }
+
+
+-- ************************************************************
+-- The osProvBinSetHistStatsTable
+-- ************************************************************
+osProvBinSetHistStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvBinSetHistStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains the result bins for the historic bin-collection
+        intervals in one session."
+    ::= { osProvBins 6 }
+
+osProvBinSetHistStatsEntry    OBJECT-TYPE
+    SYNTAX      OsProvBinSetHistStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEthServFlowId, osProvBinBindTestType, osProvBinSetHistIndex }
+    ::= { osProvBinSetHistStatsTable 1 }
+
+OsProvBinSetHistStatsEntry ::= SEQUENCE {
+    osProvBinSetHistIndex              Unsigned32,
+    osProvBinSetHistStatsStart         DateAndTime,
+    osProvBinSetHistStatsFinish        DateAndTime
+}
+
+osProvBinSetHistIndex OBJECT-TYPE
+    SYNTAX          Unsigned32 (1..4294967295)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "An implementation MUST start assigning
+        osProvBinSetHistIndex values at 1 and wrap after
+        exceeding the maximum possible value as defined by
+        the limit of this object (4294967295)."
+    ::= { osProvBinSetHistStatsEntry 1 }
+
+osProvBinSetHistStatsStart OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osProvBinSetHistStatsEntry 2 }
+
+osProvBinSetHistStatsFinish OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osProvBinSetHistStatsEntry 3 }
+
+-- ************************************************************
+-- The osProvBinCurrStatsTable
+-- ************************************************************
+osProvBinCurrStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvBinCurrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This table contains the result bins for the current bin-collection
+       interval in one session."
+    ::= { osProvBins 7 }
+
+osProvBinCurrStatsEntry    OBJECT-TYPE
+    SYNTAX      OsProvBinCurrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEthServFlowId, osProvBinBindTestType, osProvBinBindResultType, osProvBinCfgBinIndex }
+    ::= { osProvBinCurrStatsTable 1 }
+
+OsProvBinCurrStatsEntry ::= SEQUENCE {
+    osProvBinCurrStatsCounter    Gauge32
+}
+
+osProvBinCurrStatsCounter OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the number of completed
+             measurements initiated in this bin-collection interval whose value
+             falls within the range specified for this bin (that is, greater
+             than or equal to the boundary for the bin, and
+             (unless the bin is the last bin) less than the
+             boundary for the following bin.
+            "
+    REFERENCE
+       "MEF SOAM-PM-MIB mefSoamDmCurrStatsBinsCounter."
+    ::= { osProvBinCurrStatsEntry 1 }
+
+-- ************************************************************
+-- The osProvBinHistStatsTable
+-- ************************************************************
+osProvBinHistStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsProvBinHistStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains the result bins for the historic bin-collection
+        intervals in one session."
+    ::= { osProvBins 8 }
+
+osProvBinHistStatsEntry    OBJECT-TYPE
+    SYNTAX      OsProvBinHistStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEthServFlowId, osProvBinBindTestType, osProvBinSetHistIndex, osProvBinBindResultType, osProvBinCfgBinIndex }
+    ::= { osProvBinHistStatsTable 1 }
+
+OsProvBinHistStatsEntry ::= SEQUENCE {
+    osProvBinHistStatsCounter       Gauge32
+}
+
+osProvBinHistStatsCounter OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the number of completed
+             measurements initiated in this measurement interval whose value
+             falls within the range specified for this bin (that is, greater
+             than or equal to the boundary for the bin, and
+             (unless the bin is the last bin) less than the
+             boundary for the following bin.
+            "
+    REFERENCE
+       "MEF SOAM-PM-MIB mefSoamDmCurrStatsBinsCounter."
+    ::= { osProvBinHistStatsEntry 1 }
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osProvBinsMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osProvBinsMandatoryGroup
+                         }
+
+    ::= { osProvBinsMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osProvBinsMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+               osProvBinsSupported,
+               osProvBinPrflBinsNumber, osProvBinPrflAdminStatus, osProvBinPrflOperStatus,
+               osProvBinCfgBinBound,
+               osProvBinBindPrflId, osProvBinBindAdminStatus,
+               osProvBinCurrStatsCounter, osProvBinSetCurrStatsStart, osProvBinSetCurrStatsHistIndex,
+               osProvBinHistStatsCounter, osProvBinSetHistStatsStart, osProvBinSetHistStatsFinish
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osProvBinsMIBGroups 1 }
+
+
+END
+
+

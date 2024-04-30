@@ -38,13 +38,19 @@ HP-ICF-OSPF DEFINITIONS ::= BEGIN
             FROM OSPF-MIB;
 
     hpicfOspf MODULE-IDENTITY
-        LAST-UPDATED "201705180000Z" -- May 18,2017
+        LAST-UPDATED "201803070000Z" -- March 7, 2018
         ORGANIZATION "HP Networking"
         CONTACT-INFO "Hewlett-Packard Company
                       8000 Foothills Blvd. M/S 5557
                       Roseville, CA 95747-5557"
         DESCRIPTION  "This MIB module contains HP proprietary
                      extensions to the OSPF-MIB module."
+
+        REVISION     "201803070000Z" -- March 7, 2018
+        DESCRIPTION  "1.Added hpicfOspfDistributeListEntry.
+                      2.Deprecated hpicfOspfCompliance.
+                      3.Defined hpicfOspfDistributeListGroup.
+                      4.Defined hpicfOspfComplaince5."
 
         REVISION     "201705180000Z" -- May 18,2017
         DESCRIPTION  "1.Added hpicfOspfReferenceCost.
@@ -380,7 +386,7 @@ HP-ICF-OSPF DEFINITIONS ::= BEGIN
          { hpicfOspfConformance 2 }
 
     hpicfOspfCompliance MODULE-COMPLIANCE
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "The compliance statement for HP Routing
                 Switches that support OSPF."
         MODULE
@@ -390,6 +396,23 @@ HP-ICF-OSPF DEFINITIONS ::= BEGIN
         DESCRIPTION  "This group is mandatory for systems
                      that support route redistribution."
         ::= { hpicfOspfCompliances 1 }
+
+    hpicfOspfCompliance5 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION "The compliance statement for HP Routing
+                Switches that support OSPF."
+        MODULE
+        MANDATORY-GROUPS { hpicfOspfBaseGroup }
+
+        GROUP        hpicfOspfRedistGroup
+        DESCRIPTION  "This group is mandatory for systems
+                     that support route redistribution."
+
+        GROUP        hpicfOspfDistributeListGroup
+        DESCRIPTION  "This group is mandatory for systems
+                     that support OSPF intra-area routes."
+
+        ::= { hpicfOspfCompliances 11 }
 
 --  OSPF route classification used in CIDR Route Table with extensions for 
 --  NSSA route types.
@@ -1944,6 +1967,7 @@ HP-ICF-OSPF DEFINITIONS ::= BEGIN
 
     ::= {hpicfOspfCompliances 9}
 
+
     hpicfOspfReqManGroup OBJECT-GROUP
     OBJECTS {
            hpicfOspfReqType,
@@ -2132,6 +2156,64 @@ HP-ICF-OSPF DEFINITIONS ::= BEGIN
         DEFVAL { 2 }
         ::= { hpicfOspfAreaAggregateEntry 2 }
 
+    hpicfOspfDistributeListTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF HpicfOspfDistributeListEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of route prefixes for filtering out
+                    intra-area routes that OSPF should not install into
+                    local routing table.  Any route that is contained by
+                    a range in this table (in other words, has a longer mask
+                    than that specified by hpicfOspfDistributeListMask and
+                    where the route destination ANDed with the
+                    hpicfOspfDistributeListMask is equal to
+                    hpicfOspfDistributeListAddr) will not be
+                    installed into FIB by OSPF."
+        ::= { hpicfOspfObjects 7 }
+
+    hpicfOspfDistributeListEntry OBJECT-TYPE
+        SYNTAX      HpicfOspfDistributeListEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A single entry in the table. Any intra-area route,
+                    which is contained within the specified range will not
+                    be installed into FIB by OSPF.  Entries in this
+                    table are created dynamically using the
+                    hpicfOspfDistributeListStatus object."
+        INDEX       { hpicfOspfDistributeListAddr,
+                      hpicfOspfDistributeListMask }
+        ::= { hpicfOspfDistributeListTable 1 }
+
+    HpicfOspfDistributeListEntry ::=
+        SEQUENCE {
+            hpicfOspfDistributeListAddr      IpAddress,
+            hpicfOspfDistributeListMask      IpAddress,
+            hpicfOspfDistributeListStatus    RowStatus
+        }
+
+    hpicfOspfDistributeListAddr OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The IP address of the range of route entries
+                    to exclude from installing into FIB by OSPF."
+        ::= { hpicfOspfDistributeListEntry 1 }
+
+    hpicfOspfDistributeListMask OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The mask for the range of route entries to
+                    exclude from installing into FIB by OSPF."
+        ::= { hpicfOspfDistributeListEntry 2 }
+
+    hpicfOspfDistributeListStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The status of this entry."
+        ::= { hpicfOspfDistributeListEntry 3 }
+
     hpicfOspfIfGroup OBJECT-GROUP
         OBJECTS {
                    hpicfOspfIfPassive,
@@ -2233,5 +2315,12 @@ HP-ICF-OSPF DEFINITIONS ::= BEGIN
         DESCRIPTION "Flags to identify global or manual OSPF cost
                      configuration."
         ::= { hpicfOspfGroups 16 }
+
+    hpicfOspfDistributeListGroup OBJECT-GROUP
+        OBJECTS     { hpicfOspfDistributeListStatus }
+        STATUS      current
+        DESCRIPTION "A collection of objects for controlling the
+                    installation of intra-area routes by OSPF."
+        ::= { hpicfOspfGroups 18 }
 
 END

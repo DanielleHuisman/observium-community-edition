@@ -1,0 +1,2076 @@
+-- Copyright (C) 2009-2012 Aricent Group . All Rights Reserved
+
+-- /*****************************************************************
+--  *                                                               *
+--  * $Id: fsmio3.mib,v 1.6 2015/03/08 11:07:34 siva Exp $          *
+--  * fsmio3.mib                                                    *
+--  *                                                               *
+--  * OSPFv3 Proprietary MIB.                               *
+--  *                                                               *
+--  ****************************************************************/
+
+
+ARICENT-MIOSPFV3-MIB DEFINITIONS ::= BEGIN
+
+-- Enterprises MIB for MI OSPFV3 source code product.
+
+
+   IMPORTS
+      MODULE-IDENTITY, OBJECT-TYPE, Counter32, Gauge32,
+      Integer32, IpAddress, enterprises, NOTIFICATION-TYPE 
+                                                 FROM SNMPv2-SMI
+      TruthValue, RowStatus,DisplayString, DateAndTime
+                                                 FROM SNMPv2-TC
+      InterfaceIndex
+                                                 FROM IF-MIB
+      InetAddressType, InetAddress, InetAddressPrefixLength 
+      			              		FROM INET-ADDRESS-MIB
+      AreaID, BigMetric, Status, RouterID
+				                FROM OSPF-MIB 
+      fsMIStdOspfv3Entry, fsMIStdOspfv3NbrEntry, fsMIStdOspfv3ContextId, fsMIStdOspfv3RouterId,
+      fsMIStdOspfv3RestartStatus, fsMIStdOspfv3RestartInterval, 
+      fsMIStdOspfv3RestartExitReason,
+      fsMIStdOspfv3NbrRestartHelperStatus, fsMIStdOspfv3NbrRestartHelperAge,
+      fsMIStdOspfv3NbrRestartHelperExitReason, fsMIStdOspfv3VirtNbrRestartHelperStatus, 
+      fsMIStdOspfv3VirtNbrRestartHelperAge, fsMIStdOspfv3VirtNbrRestartHelperExitReason,
+        fsMIStdOspfv3VirtIfEntry
+				                FROM ARICENT-MISTDOSPFV3-MIB; 
+                                                 
+--    org         OBJECT IDENTIFIER ::=  { iso(1) 3 }
+--    dod         OBJECT IDENTIFIER ::=  { org 6 }
+--    internet    OBJECT IDENTIFIER ::=  { dod 1 }
+--    mgmt        OBJECT IDENTIFIER ::=  { internet 2 }
+--    private     OBJECT IDENTIFIER ::= { internet 4 }
+--    enterprises OBJECT IDENTIFIER ::=  { iso(1) org(3) dod(6) internet(1)  private(4) 1 }
+--    mib-2      OBJECT IDENTIFIER ::= { mgmt 1 }
+
+
+fsMIOspfv3  MODULE-IDENTITY
+        LAST-UPDATED "201209050000Z" 
+        ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+        CONTACT-INFO "support@aricent.com"
+        DESCRIPTION
+            "The Proprietary MI OSPF3 MIB modified
+	    from FS OSPF3 MIB"
+	REVISION "201209050000Z"
+        DESCRIPTION
+            "The Proprietary MI OSPF3 MIB modified
+	    from FS OSPF3 MIB"
+
+        ::= { enterprises aricent-communication-holding-ltd (29601) iss(2) 24 }
+
+-- OSPF General Variables
+-- These parameters apply globally to the Router's
+-- OSPF Process.
+
+   fsMIOspfv3GeneralGroup OBJECT IDENTIFIER ::=  { fsMIOspfv3 1 }
+   fsMIOspfv3Notification OBJECT IDENTIFIER ::=  { fsMIOspfv3 101 }
+
+-- SCALAR VARIABLE
+
+   fsMIOspfv3GlobalTraceLevel OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This is the global trace and not specific to any 
+           context. Levels are defined as follows. 
+	         0x00000100 -- Packet High Level Dump Trace.
+	         0x00000200 -- Packet Low Level Dump Trace.
+	         0x00000400 -- Packet Hex Dump Trace.
+	         0x00000800 -- Critical Trace.
+	         0x00001000 -- Function Entry Trace.
+	         0x00002000 -- Function Exit Trace.
+	         0x00004000 -- Memory Allocation Success Trace.
+	         0x00008000 -- Memory Allocation Failure Trace.
+	         0x00010000 -- Hello packet Trace.
+             0x00020000 -- DDP packet Trace.
+	         0x00040000 -- Link State Request Packet Trace.
+	         0x00080000 -- Link State Update Packet Trace.
+	         0x00100000 -- Link State Acknowledge Packet Trace.
+             0x00200000 -- Interface State Machine Trace.
+	         0x00400000 -- Neighbor State Machine Trace.
+	         0x00800000 -- Routing Table Calculation Trace.
+	         0x01000000 -- RTM Module Trace.  
+	         0x02000000 -- Interface Trace.  
+	         0x04000000 -- NSSA Trace.
+	         0x08000000 -- Route Aggregation Trace.
+	         0x10000000 -- Configuration Trace.
+	         0x20000000 -- Adjacency formation Trace.
+	         0x40000000 -- Link State Database Trace.
+	         0x80000000 -- Protocol Packet Processing Trace."
+     ::= { fsMIOspfv3GeneralGroup 1}
+
+    fsMIOspfv3VrfSpfInterval OBJECT-TYPE
+       SYNTAX      Integer32 (10..1000)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Minimum time between two consecutive SPF calculations 
+	   across two ospf instances. Time is configured in milli 
+	   seconds."
+       DEFVAL {10}
+     ::= { fsMIOspfv3GeneralGroup 2}
+
+    fsMIOspfv3RTStaggeringStatus  OBJECT-TYPE
+       SYNTAX      INTEGER {
+                       enable (1),
+                       disable (2)
+                       }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object indicates the status of route table calculation
+           staggering option"
+       DEFVAL { enable }
+     ::= { fsMIOspfv3GeneralGroup 3 }
+
+
+-- Start of MIB objects related to OSPFv3 Hot-Standby
+
+    fsMIOspfv3HotStandbyAdminStatus OBJECT-TYPE
+      SYNTAX    INTEGER { 
+                          enabled (1),
+                          disabled (2)
+                        }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+                 "High Availabilty feature enabled or disabled in OSPFv3"
+      ::= { fsMIOspfv3GeneralGroup 4 }
+
+    fsMIOspfv3HotStandbyState OBJECT-TYPE
+       SYNTAX      INTEGER { 
+                             init(1),
+                             activeStandbyUp(2),
+                             activeStandbyDown(3),
+                             standby(4)
+                           }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+                "Internal State of the OSPFv3 instance
+                 init(1) - OSPFv3 instance is up and RM State is undetermined.
+                 activeStandbyUp(2) - The RM state is active & standby is up.
+                 activeStandbyDown(3) - The RM state is active & standby down.
+                 standby(4) - The RM state is standby."
+
+       ::= { fsMIOspfv3GeneralGroup 5 }
+
+    fsMIOspfv3DynamicBulkUpdStatus OBJECT-TYPE
+       SYNTAX      INTEGER {
+                             notStarted(1),
+                             inProgress(2),
+                             completed(3),
+                             aborted(4)
+                           }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+                   "Status of dynamic bulk update between active and dynamic
+                    OSPFv3 instance.
+                         notStarted(1): Dynamic Bulk Update has not started.
+			 inProgress(2): Dynamic Bulk Update is in Progress.
+			 completed (3): Dynamic Bulk Update is complete.
+			 aborted   (4): Dynamic Bulk Update is aborted."
+       ::= { fsMIOspfv3GeneralGroup 6 }
+
+    fsMIOspfv3StandbyHelloSyncCount OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+                 "Total number of hello packets synced to standby node."
+       ::= { fsMIOspfv3GeneralGroup 7 }
+
+    fsMIOspfv3StandbyLsaSyncCount OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+                 "Total number of LSAs synced to standby node."
+       ::= { fsMIOspfv3GeneralGroup 8 }
+
+
+--  TABLE_END fsMIOspfv3GeneralGroup
+
+-- END SCALAR VARIABLE
+
+--      OSPF MI Table
+--      contains information regarding various instances
+--      of the router
+
+
+   fsMIOspfv3Table OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3Entry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+           "Information describing the parameters
+	   of router's instances"
+     ::= { fsMIOspfv3 2 }
+   
+   fsMIOspfv3Entry OBJECT-TYPE
+       SYNTAX FsMIOspfv3Entry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+           "Information describing the parameters
+	   of one of the router's instances"
+       AUGMENTS { fsMIStdOspfv3Entry }
+     ::= { fsMIOspfv3Table 1 }
+
+   FsMIOspfv3Entry ::=
+       SEQUENCE {
+       fsMIOspfv3OverFlowState
+           TruthValue,
+       fsMIOspfv3TraceLevel
+           Integer32,
+       fsMIOspfv3ABRType
+           INTEGER,
+       fsMIOspfv3NssaAsbrDefRtTrans
+           INTEGER,
+       fsMIOspfv3DefaultPassiveInterface
+           TruthValue,
+       fsMIOspfv3SpfDelay
+           Integer32,
+       fsMIOspfv3SpfHoldTime
+           Integer32,
+       fsMIOspfv3RTStaggeringInterval
+           Integer32,
+       fsMIOspfv3RestartStrictLsaChecking 
+           TruthValue,
+       fsMIOspfv3HelperSupport
+           BITS,
+       fsMIOspfv3HelperGraceTimeLimit
+           Integer32,
+       fsMIOspfv3RestartAckState  
+           INTEGER,
+       fsMIOspfv3GraceLsaRetransmitCount
+           Integer32,
+       fsMIOspfv3RestartReason
+           INTEGER,
+       fsMIOspfv3ExtTraceLevel
+	       Integer32,
+       fsMIOspfv3SetTraps
+           Integer32,
+       fsMIOspfv3BfdStatus
+           INTEGER,
+       fsMIOspfv3BfdAllIfState
+           INTEGER
+        }
+   
+   fsMIOspfv3OverFlowState OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "Indicates whether router is in overflow state or not."
+       DEFVAL { false }
+     ::=  { fsMIOspfv3Entry 1 }
+   
+   fsMIOspfv3TraceLevel OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           " This object is used to define level of trace required for OSPF. 
+	     Levels are defined as follows.
+	     0x00000100 -- Packet High Level Dump Trace.
+	     0x00000200 -- Packet Low Level Dump Trace.
+	     0x00000400 -- Packet Hex Dump Trace.
+	     0x00000800 -- Critical Trace.
+	     0x00001000 -- Function Entry Trace.
+	     0x00002000 -- Function Exit Trace.
+	     0x00004000 -- Memory Allocation Success Trace.
+	     0x00008000 -- Memory Allocation Failure Trace.
+	     0x00010000 -- Hello packet Trace.
+         0x00020000 -- DDP packet Trace.
+	     0x00040000 -- Link State Request Packet Trace.
+	     0x00080000 -- Link State Update Packet Trace.
+	     0x00100000 -- Link State Acknowledge Packet Trace.
+         0x00200000 -- Interface State Machine Trace.
+	     0x00400000 -- Neighbor State Machine Trace.
+	     0x00800000 -- Routing Table Calculation Trace.
+	     0x01000000 -- RTM Module Trace.  
+	     0x02000000 -- Interface Trace.  
+	     0x04000000 -- NSSA Trace.
+	     0x08000000 -- Route Aggregation Trace.
+	     0x10000000 -- Configuration Trace.
+	     0x20000000 -- Adjacency formation Trace.
+	     0x40000000 -- Link State Database Trace.
+	     0x80000000 -- Protocol Packet Processing Trace."
+       DEFVAL { '00000800'H }
+     ::= { fsMIOspfv3Entry 2 }
+ 
+   fsMIOspfv3ABRType OBJECT-TYPE
+       SYNTAX   INTEGER    {
+                    standardABR (1),
+                    ciscoABR (2),
+                    ibmABR (3)
+                  }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Different Types of ABRs supported"
+       REFERENCE
+           "RFC-3509 -- Alternative Implementations of OSPF Area Border 
+	                Routers"
+       DEFVAL { standardABR }
+     ::= { fsMIOspfv3Entry 3 }
+
+   fsMIOspfv3NssaAsbrDefRtTrans OBJECT-TYPE
+       SYNTAX      INTEGER {
+                             enabled (1) ,
+                             disabled (2)
+                           }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Specifies the P-Bit setting for the default Type-7
+            LSA generated by ASBR(which is not ABR).When set 
+            disabled, P-Bit is clear in the generated default Lsa.
+            When set to enabled, P-Bit is set in the generated
+            Type-7 default Lsa. "
+       DEFVAL { disabled }
+     ::= { fsMIOspfv3Entry 4 }
+
+   fsMIOspfv3DefaultPassiveInterface OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "When set to true all OSPF interfaces created after this
+	    setting will be passive interfaces. 
+	    If set to false OSPF interfaces created after this setting 
+	    will not be passive."
+       DEFVAL { false }
+     ::= { fsMIOspfv3Entry 5 }
+
+   fsMIOspfv3SpfDelay OBJECT-TYPE
+        SYNTAX	     Integer32 (0..65535)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            " The Delay at which routing calculation is carried after a
+			topology change."
+        DEFVAL {5}
+     ::= { fsMIOspfv3Entry 6 }
+
+   fsMIOspfv3SpfHoldTime OBJECT-TYPE
+        SYNTAX	     Integer32 (0..65535)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            " The minimum time between two consecutive SPF calculations."
+        DEFVAL {10}
+     ::= { fsMIOspfv3Entry 7 }
+
+   fsMIOspfv3RTStaggeringInterval OBJECT-TYPE
+        SYNTAX       Integer32 (1000..2147483647)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+           "This object denotes the time interval in milliseconds after which the route
+            calculation is suspended for doing all other OSPFv3 operations. Refault value of
+            this object is equal to Hello Interval"
+        DEFVAL {10000}
+      ::= { fsMIOspfv3Entry 8 }
+
+
+--  OSPFv3 Graceful Restart related MIB objects
+    
+    fsMIOspfv3RestartStrictLsaChecking OBJECT-TYPE
+		SYNTAX      TruthValue
+		MAX-ACCESS  read-write
+		STATUS      current
+		DESCRIPTION
+			"Indicates if strict LSA checking is enabled for graceful restart.
+			 This object is persistent and when written
+			 the entity SHOULD save the change to non-volatile
+			 storage."
+		DEFVAL { false }
+		::= { fsMIOspfv3Entry 9 }
+
+    fsMIOspfv3HelperSupport OBJECT-TYPE
+       SYNTAX      BITS {
+                            unknown (0),
+                            softwareRestart (1),
+                            swReloadUpgrade (2),
+                            switchToRedundant(3)
+                          }
+
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The router's helper support for OSPFv3 graceful restart.
+            Options include: unknown,softwarerestart,swreloadupgrade,
+            switchtoredundant.
+            fsMIOspfv3HelperSupport is indicated by bitmap.
+
+            This object is persistent and when written
+            the entity SHOULD save the change to non-volatile
+            storage.
+            By default, all bits are set."
+
+      ::= { fsMIOspfv3Entry 10 }
+
+    fsMIOspfv3HelperGraceTimeLimit  OBJECT-TYPE
+       SYNTAX      Integer32 (0..1800)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Configured OSPFv3 graceful restart interval limit in helper side. 
+	    Time is configured in seconds. If this object is set to 0, then the 
+            helper accepts the restarting router's grace period received from grace LSA.
+	    This object is persistent and when written the entity
+            SHOULD save the change to non-volatile storage."
+       DEFVAL {0}
+      ::= { fsMIOspfv3Entry 11 }
+
+    fsMIOspfv3RestartAckState OBJECT-TYPE
+       SYNTAX      INTEGER  {
+                            enabled(1),
+                            disabled(2)
+                           }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Indicates Reception required / not-required . whether GraceLSAs
+            sent by this router are expected to be acknowledged by peers.
+
+            This object is persistent and when written
+            the entity SHOULD save the change to non-volatile
+            storage."
+       DEFVAL {enabled}
+      ::= { fsMIOspfv3Entry 12 }
+
+    fsMIOspfv3GraceLsaRetransmitCount OBJECT-TYPE
+       SYNTAX      Integer32 (0..180)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Number of retransmissions for unacknowledged GraceLSAs"
+       DEFVAL {2}
+      ::= { fsMIOspfv3Entry 13 }
+
+    fsMIOspfv3RestartReason  OBJECT-TYPE
+       SYNTAX      INTEGER {
+                            unknown (0),
+                            softwareRestart (1),
+                            swReloadUpgrade (2),
+                            switchToRedundant(3)
+                          }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The router's restarter reason code of OSPFv3 graceful restart.
+            Options include: unknown,softwarerestart,swreloadupgrade,
+            switchtoredundant.
+            This object is persistent and when written
+            the entity SHOULD save the change to non-volatile
+            storage."
+
+       DEFVAL {unknown}
+      ::= { fsMIOspfv3Entry 14 }
+
+   fsMIOspfv3ExtTraceLevel OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           " This object is used to define level of trace required for OSPFv3 GR.  
+	     Levels are defined as follows.
+	     0x00000001 -- Restating router Trace.
+	     0x00000002 -- Helper Trace."
+	::= { fsMIOspfv3Entry 15 }
+
+   fsMIOspfv3SetTraps OBJECT-TYPE
+        SYNTAX   Integer32 
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "This object is used to enable and disable  specific
+           OSPFv3 traps. Currently the following are defined
+           0x00000000 - Traps are not enabled.
+           0x00000001 - Restarting router status changes
+           0x00000002 - Nieghbor Helper status changes
+           0x00000004 - Virtual Neighbor Helper Status Changes
+           0x00000008 - Hot Standby state change Trap Events"
+	::= { fsMIOspfv3Entry 16 }
+  
+    fsMIOspfv3BfdStatus OBJECT-TYPE
+        SYNTAX   INTEGER {
+                           enabled (1),
+                           disabled (2)
+                         }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "This object enables/disables BFD feature in OSPFv3.
+            If enabled, OSPFv3 registers with BFD for neighbor IP path monitoring"
+        DEFVAL { disabled }
+    ::= { fsMIOspfv3Entry 17 }
+
+    fsMIOspfv3BfdAllIfState OBJECT-TYPE
+        SYNTAX   INTEGER {
+                           enabled (1),
+                           disabled (2)
+                         }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "This object enables/disables BFD for all OSPFv3 interfaces.
+            If enabled, OSPFv3 registers with BFD for neighbor IP path monitoring,
+            when the OSPFv3 neighbor state is FULL. Enabling this object
+            internally enables BFD for all the interface entries.
+
+            If disabled, OSPFv3 de-registers from BFD for all the neighbors
+            associated with any of the OSPFv3 interface and does not allow any
+            registration with BFD for neighbor Path monitoring"
+        DEFVAL { disabled }
+       ::= { fsMIOspfv3Entry 18 }
+
+
+--  OSPF Interface Table
+--  The  fsMIOspfv3IfTable is an extention to the ospfIfTable
+--  and has statistical information associted with each interface.
+
+   fsMIOspfv3IfTable OBJECT-TYPE
+       SYNTAX 	SEQUENCE OF FsMIOspfv3IfEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+           "The OSPFv3 Interface Table describes the  inter-
+              faces from the viewpoint of OSPFv3."
+       REFERENCE
+           "OSPF Version 2, Appendix C.3  Router  interface
+             parameters."
+     ::=  { fsMIOspfv3 3 }
+   
+   fsMIOspfv3IfEntry OBJECT-TYPE
+       SYNTAX FsMIOspfv3IfEntry
+       MAX-ACCESS not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The OSPFv3 Interface Entry describes one  inter-
+              face from the viewpoint of OSPFv3."
+       INDEX { fsMIOspfv3IfIndex }
+     ::=  { fsMIOspfv3IfTable 1 }
+   
+   FsMIOspfv3IfEntry ::= SEQUENCE {
+       fsMIOspfv3IfIndex        InterfaceIndex,
+       fsMIOspfv3IfOperState    INTEGER,
+       fsMIOspfv3IfPassive      TruthValue,
+       fsMIOspfv3IfNbrCount     Gauge32,
+       fsMIOspfv3IfAdjCount     Gauge32,
+       fsMIOspfv3IfHelloRcvd    Counter32,
+       fsMIOspfv3IfHelloTxed    Counter32,
+       fsMIOspfv3IfHelloDisd    Counter32,
+       fsMIOspfv3IfDdpRcvd      Counter32,
+       fsMIOspfv3IfDdpTxed      Counter32,
+       fsMIOspfv3IfDdpDisd      Counter32,
+       fsMIOspfv3IfLrqRcvd      Counter32,
+       fsMIOspfv3IfLrqTxed      Counter32,
+       fsMIOspfv3IfLrqDisd      Counter32,
+       fsMIOspfv3IfLsuRcvd      Counter32,
+       fsMIOspfv3IfLsuTxed      Counter32,
+       fsMIOspfv3IfLsuDisd      Counter32,
+       fsMIOspfv3IfLakRcvd      Counter32,
+       fsMIOspfv3IfLakTxed      Counter32,
+       fsMIOspfv3IfLakDisd      Counter32,
+       fsMIOspfv3IfContextId    Integer32,
+       fsMIOspfv3IfLinkLSASuppression TruthValue,
+       fsMIOspfv3IfBfdState     INTEGER,
+       fsMIOspfv3IfCryptoAuthType INTEGER,
+       fsMIOspfv3IfCryptoAuthMode INTEGER,
+       fsMIOspfv3IfAuthTxed      Counter32,
+       fsMIOspfv3IfAuthRcvd      Counter32,
+       fsMIOspfv3IfAuthDisd      Counter32
+
+   }
+   
+   fsMIOspfv3IfIndex OBJECT-TYPE 
+       SYNTAX          InterfaceIndex 
+       MAX-ACCESS      not-accessible 
+       STATUS          current 
+       DESCRIPTION 
+           "The interface index of this OSPFv3 interface. 
+           It corresponds to the interface index of the 
+           IPv6 interface on which OSPFv3 is configured." 
+     ::= { fsMIOspfv3IfEntry 1 } 
+ 
+   fsMIOspfv3IfOperState OBJECT-TYPE
+       SYNTAX      INTEGER {
+                 operup          (1),
+                 operdown        (2),
+                 loopback        (3),
+                 unloop          (4)
+              }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Operational Status of the Interface."
+     ::=  { fsMIOspfv3IfEntry 2 }
+
+   fsMIOspfv3IfPassive OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           " This object is used to make the inteface as passive.
+	      If set to TRUE, then interface will be passive
+	      If set to FALSE then interface will be normal"
+       DEFVAL { false }
+     ::=  { fsMIOspfv3IfEntry 3 }
+
+   fsMIOspfv3IfNbrCount OBJECT-TYPE
+       SYNTAX      Gauge32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Neighbour's through 
+                    that Interface."
+     ::=  { fsMIOspfv3IfEntry 4 }
+   
+   fsMIOspfv3IfAdjCount OBJECT-TYPE
+       SYNTAX      Gauge32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Adjacencies through 
+                    that Interface."
+     ::=  { fsMIOspfv3IfEntry 5 }
+   
+   fsMIOspfv3IfHelloRcvd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Hello packets received
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 6 }
+   
+   fsMIOspfv3IfHelloTxed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Hello packets 
+                    transmitted through that Interface."
+     ::=  { fsMIOspfv3IfEntry 7 }
+   
+   fsMIOspfv3IfHelloDisd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Hello packets 
+                    discarded through that Interface."
+     ::=  { fsMIOspfv3IfEntry 8 }
+   
+   fsMIOspfv3IfDdpRcvd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Ddp packets received
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 9 }
+   
+   fsMIOspfv3IfDdpTxed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Ddp packets 
+                    transmitted through that Interface."
+     ::=  { fsMIOspfv3IfEntry 10 }
+   
+   fsMIOspfv3IfDdpDisd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Ddp packets discarded
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 11 }
+   
+   fsMIOspfv3IfLrqRcvd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lrq packets received
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 12 }
+   
+   fsMIOspfv3IfLrqTxed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lrq packets 
+                    transmitted through that Interface."
+     ::=  { fsMIOspfv3IfEntry 13 }
+   
+   fsMIOspfv3IfLrqDisd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lrq packets discarded
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 14 }
+   
+   fsMIOspfv3IfLsuRcvd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lsu packets received
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 15 }
+   
+   fsMIOspfv3IfLsuTxed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lsu packets 
+                    transmitted through that Interface."
+     ::=  { fsMIOspfv3IfEntry 16 }
+   
+   fsMIOspfv3IfLsuDisd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lsu packets discarded
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 17 }
+   
+   fsMIOspfv3IfLakRcvd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lak packets received
+                    through that Interface."
+     ::=  { fsMIOspfv3IfEntry 18 }
+   
+   fsMIOspfv3IfLakTxed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lak packets 
+                    transmitted through that Interface."
+     ::=  { fsMIOspfv3IfEntry 19 }
+   
+   fsMIOspfv3IfLakDisd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " This gives the Total number of Lak packets discarded
+                    on that Interface."
+     ::=  { fsMIOspfv3IfEntry 20 }
+   
+   fsMIOspfv3IfContextId OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-only
+	   STATUS          current
+	   DESCRIPTION
+	       "A 32-bit unique context id for each entry. 
+            Minimum value is 0 and Maximum depends upon system 
+            configuration. Default value is 0 which will be initialized 
+            during bootup"
+     ::= { fsMIOspfv3IfEntry 21 }
+
+   fsMIOspfv3IfLinkLSASuppression  OBJECT-TYPE
+       SYNTAX       TruthValue
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+            "Specifies whether or not link LSA origination is
+            suppressed for networks other than broadcast or NBMA.
+            The object is set to value true (1) to suppress
+            the origination."
+       REFERENCE
+           "OSPF for IPv6, Appendix C.3, Router Interface
+            Parameters"
+       DEFVAL { false }
+       ::= { fsMIOspfv3IfEntry 22 }
+
+   fsMIOspfv3IfBfdState OBJECT-TYPE
+        SYNTAX   INTEGER {
+                           enabled (1),
+                           disabled (2)
+                         }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+          " This object enables/disables BFD in a specific OSPFv3 interface.
+            This object is set to be enabled internally for particular interface entry
+            when fsMIOspfv3BfdAllIfState is enabled.
+
+            If fsMIOspfv3BfdAllIfState is disabled and this object
+            is enabled, OSPFv3 registers with BFD for monitoring the neighbor
+            IP path, for the neighbors associated with this OSPFv3 interface alone.
+
+            When disabled, OSPFv3 de-registers from BFD and does not allow 
+            registration with BFD for the neighbors associated with this interface."
+
+    DEFVAL { disabled }
+    ::= { fsMIOspfv3IfEntry 23 }
+
+    fsMIOspfv3IfCryptoAuthType OBJECT-TYPE
+        SYNTAX   INTEGER {
+                           sha1(1),
+                           sha256(3),
+                           sha384(4),
+                           sha512(5),
+                           none(6)
+                         }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object specifies the SHA crypto authentication type to be used on the interface"
+
+    DEFVAL { none }
+    ::= { fsMIOspfv3IfEntry 24 }
+
+    fsMIOspfv3IfCryptoAuthMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+                           full(1),
+                           transition(2),
+                           none(3)
+                        }
+
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+        "This object specifies the crypto authentication mode to be used on the interface"
+
+    DEFVAL { none }
+    ::= { fsMIOspfv3IfEntry 25 }
+
+    fsMIOspfv3IfAuthTxed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+        "This object specifies the total number of Authentication Trailer packets
+         transmitted on the interface."
+       ::=  { fsMIOspfv3IfEntry 26 }
+   
+    fsMIOspfv3IfAuthRcvd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "This object specifies the total number of Authentication Trailer packets
+            received on the interface."
+       ::=  { fsMIOspfv3IfEntry 27 }
+   
+    fsMIOspfv3IfAuthDisd OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "This object specifies the Total number of Authentication Trailer packets
+            discarded on the interface."
+       ::=  { fsMIOspfv3IfEntry 28 }
+
+-- Routing Table
+
+   fsMIOspfv3RoutingTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsMIOspfv3RoutingEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table of routing information."
+     ::=  { fsMIOspfv3 4 }
+   
+   fsMIOspfv3RoutingEntry OBJECT-TYPE
+       SYNTAX      FsMIOspfv3RoutingEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The information regarding a single route."
+       INDEX { fsMIStdOspfv3ContextId, 
+               fsMIOspfv3RouteDestType, 
+	       fsMIOspfv3RouteDest,
+	       fsMIOspfv3RoutePfxLength, 
+	       fsMIOspfv3RouteNextHopType,
+	       fsMIOspfv3RouteNextHop }
+     ::=  { fsMIOspfv3RoutingTable 1 }
+   
+   FsMIOspfv3RoutingEntry ::= SEQUENCE {
+       fsMIOspfv3RouteDestType        InetAddressType,
+       fsMIOspfv3RouteDest            InetAddress,
+       fsMIOspfv3RoutePfxLength       InetAddressPrefixLength,
+       fsMIOspfv3RouteNextHopType     InetAddressType,
+       fsMIOspfv3RouteNextHop         InetAddress,
+       fsMIOspfv3RouteType            INTEGER,
+       fsMIOspfv3RouteAreaId          AreaID,
+       fsMIOspfv3RouteCost            BigMetric,
+       fsMIOspfv3RouteType2Cost       BigMetric,
+       fsMIOspfv3RouteInterfaceIndex  Integer32
+       }
+   
+   fsMIOspfv3RouteDestType OBJECT-TYPE 
+       SYNTAX          InetAddressType 
+       MAX-ACCESS      not-accessible 
+       STATUS          current 
+       DESCRIPTION 
+           "The prefix type of fsMIOspfv3RouteDestType. Only 
+           IPv6 addresses are expected." 
+     ::= { fsMIOspfv3RoutingEntry 1 } 
+
+   fsMIOspfv3RouteDest OBJECT-TYPE
+       SYNTAX      InetAddress (SIZE(16))
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " The Desitnation IPv6 Address of this route."
+     ::=  { fsMIOspfv3RoutingEntry 2 }
+   
+   fsMIOspfv3RoutePfxLength OBJECT-TYPE
+       SYNTAX      InetAddressPrefixLength
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " Indicates the prefix length of the destination Address."
+     ::=  { fsMIOspfv3RoutingEntry 3 }
+   
+   fsMIOspfv3RouteNextHopType OBJECT-TYPE 
+       SYNTAX          InetAddressType 
+       MAX-ACCESS      not-accessible 
+       STATUS          current 
+       DESCRIPTION 
+           "The prefix type offsMIOspfv3RouteNextHopType. Only 
+           IPv6 addresses are expected." 
+     ::= { fsMIOspfv3RoutingEntry 4 } 
+
+   fsMIOspfv3RouteNextHop OBJECT-TYPE
+       SYNTAX      InetAddress (SIZE(16))
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " Next Hop IPv6 Address for this route. For direct routes it has the
+           value ::0."
+     ::=  { fsMIOspfv3RoutingEntry 5 }
+   
+   fsMIOspfv3RouteType OBJECT-TYPE
+       SYNTAX      INTEGER {
+                    intraArea (1), 
+                    interArea (2), 
+                    type1External (3), 
+                    type2External (4)
+                	}
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "Type of the route"
+     ::=  { fsMIOspfv3RoutingEntry 6 }
+   
+   fsMIOspfv3RouteAreaId OBJECT-TYPE
+       SYNTAX      AreaID
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " Area ID associated with the route "
+     ::=  { fsMIOspfv3RoutingEntry 7 }
+   
+   fsMIOspfv3RouteCost OBJECT-TYPE
+       SYNTAX BigMetric
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+          " It is a Type 1 external metrics which is 
+	    expressed in the same units as OSPF interface
+	    cost ie. in terms of the OSPF link state metric. 
+	    If Type1 and Type2 cost are present, Type1 external
+	    metrics always take precedence."
+     ::=  { fsMIOspfv3RoutingEntry 8 }
+   
+   fsMIOspfv3RouteType2Cost OBJECT-TYPE
+       SYNTAX BigMetric
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " Type 2 external metrics are configured with  
+	     the cost greater than any path internal to the AS. 
+	     Use of Type 2 external metrics assumes that routing 
+	     between AS is the major cost of routing a packet, and
+             eliminates the need for conversion of external costs to
+	     internal link state metrics."
+     ::=  { fsMIOspfv3RoutingEntry 9 }
+   
+   fsMIOspfv3RouteInterfaceIndex OBJECT-TYPE
+       SYNTAX Integer32 (0..2147483647)
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " Interface Index associated with the route"
+     ::=  { fsMIOspfv3RoutingEntry 10 }
+   
+
+-- AsExternalAggregation  Table
+
+   fsMIOspfv3AsExternalAggregationTable OBJECT-TYPE
+       SYNTAX   SEQUENCE OF FsMIOspfv3AsExternalAggregationEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+           "Indicates whether for the specified address range
+           Type-7/Type-5 LSA will be aggregated or not generated. "   
+     ::= { fsMIOspfv3 5 }
+
+   fsMIOspfv3AsExternalAggregationEntry OBJECT-TYPE
+       SYNTAX   FsMIOspfv3AsExternalAggregationEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION 
+           "Supports configuration of Type-5,Type-7 Address Range specifying
+           whether for the configured range, Type-5,Type-7 LSA will be 
+           generated or not, and if generated whether aggregation is performed. "
+       INDEX { fsMIStdOspfv3ContextId, 
+              fsMIOspfv3AsExternalAggregationNetType, 
+	      fsMIOspfv3AsExternalAggregationNet, 
+	      fsMIOspfv3AsExternalAggregationPfxLength,
+              fsMIOspfv3AsExternalAggregationAreaId }
+     ::= {fsMIOspfv3AsExternalAggregationTable 1 }
+
+   FsMIOspfv3AsExternalAggregationEntry ::=
+       SEQUENCE {
+           fsMIOspfv3AsExternalAggregationNetType
+               InetAddressType,
+           fsMIOspfv3AsExternalAggregationNet
+               InetAddress,
+           fsMIOspfv3AsExternalAggregationPfxLength
+               InetAddressPrefixLength,     
+           fsMIOspfv3AsExternalAggregationAreaId
+               AreaID,
+           fsMIOspfv3AsExternalAggregationEffect
+               INTEGER,
+           fsMIOspfv3AsExternalAggregationTranslation
+               INTEGER,
+           fsMIOspfv3AsExternalAggregationStatus
+               RowStatus
+                }
+
+   fsMIOspfv3AsExternalAggregationNetType OBJECT-TYPE 
+       SYNTAX          InetAddressType 
+       MAX-ACCESS      not-accessible 
+       STATUS          current 
+       DESCRIPTION 
+           "The prefix type of fsMIOspfv3AsExternalAggregationNetType. Only 
+           IPv6 addresses are expected." 
+     ::= { fsMIOspfv3AsExternalAggregationEntry 1 } 
+
+   fsMIOspfv3AsExternalAggregationNet OBJECT-TYPE
+       SYNTAX   InetAddress (SIZE(16))
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+           "The IPv6 address of the Net indicated by 
+           the range. "
+     ::= { fsMIOspfv3AsExternalAggregationEntry 2 }
+
+   fsMIOspfv3AsExternalAggregationPfxLength OBJECT-TYPE
+       SYNTAX   InetAddressPrefixLength
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+           "The prefix length that pertains to the 
+           range. "
+     ::= { fsMIOspfv3AsExternalAggregationEntry 3 }
+
+   fsMIOspfv3AsExternalAggregationAreaId OBJECT-TYPE
+       SYNTAX  AreaID
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+           "Refer to description in fsMIOspfv3AsExternalAggregationEffect."
+     ::= { fsMIOspfv3AsExternalAggregationEntry 4 }
+
+
+   fsMIOspfv3AsExternalAggregationEffect OBJECT-TYPE
+       SYNTAX   INTEGER {
+                       advertise (1),
+                       doNotAdvertise (2),
+                       allowAll (3),
+                       denyAll (4)
+                       }
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION
+           "Indicates whether Type-5/Type-7 will be aggregated or not
+           generated for the specified range. 
+           When set to 'allowAll' (3) and associated areaId is 0.0.0.0
+           aggregated Type-5 are generated for the specified range. In
+           addition aggregated Type-7 are generated in all attached NSSA
+           areas, for the specified range.Value allowAll (3) is not valid
+           for areaId other than 0.0.0.0. 
+           When set to 'denyAll' (4) neither Type-5 nor Type-7 will be
+           generated for the specified range. Value denyAll (4) is not
+           valid for areaID other than 0.0.0.0.
+	   When set to 'advertise' (1) and associated areaId is 0.0.0.0, 
+	   aggregated Type-5 LSA is generated and all the NSSA LSAs falling 
+	   in this address range are flushed out and no aggregated LSA of this 
+	   address range is generated for NSSA Areas.Otherwise, if associated 
+	   area-id is x.x.x.x (other than 0.0.0.0) aggregated Type-7 LSA is 
+	   generated in NSSA area x.x.x.x.
+	   When set to 'doNotAdvertise' (2) and associated area-id is 0.0.0.0, 
+	   Type-5 LSA is not generated for the specified range, while all 
+	   the NSSA LSA falling in this range is flushed out and aggregated 
+	   Type-7 NSSA LSA of this address range is generated in all attached 
+           NSSA areas.Otherwise, if associated area-id is x.x.x.x(other than 0.0.0.0), 
+	   Type-7 are not generated in NSSA area x.x.x.x for the specified range. "
+       DEFVAL { advertise }
+     ::= { fsMIOspfv3AsExternalAggregationEntry 5 }
+
+   fsMIOspfv3AsExternalAggregationTranslation OBJECT-TYPE
+       SYNTAX   INTEGER {
+                       enabled (1),
+                       disabled (2)
+                       }
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION
+           "This when set to enabled, P Bit is set in
+           the generated Type-7 LSA. When set disabled
+           P Bit is clear in the generated Type-7 LSA
+           for the range. "
+       DEFVAL { enabled }
+     ::= { fsMIOspfv3AsExternalAggregationEntry 6 }
+
+   fsMIOspfv3AsExternalAggregationStatus OBJECT-TYPE
+       SYNTAX   RowStatus
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION
+           "This variable displays the status of  the  en-
+           try.  Setting it to 'invalid' has the effect of
+           rendering it inoperative."
+     ::= { fsMIOspfv3AsExternalAggregationEntry 7 }
+
+
+-- ABR/ASBR Routes Table
+
+   fsMIOspfv3BRRouteTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsMIOspfv3BRRouteEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table of routing information."
+     ::=  { fsMIOspfv3 6 }
+   
+   fsMIOspfv3BRRouteEntry OBJECT-TYPE
+       SYNTAX      FsMIOspfv3BRRouteEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The information regarding a single route."
+       INDEX { fsMIStdOspfv3ContextId, 
+	       fsMIOspfv3BRRouteDest, 
+	       fsMIOspfv3BRRouteNextHopType, 
+               fsMIOspfv3BRRouteNextHop, 
+	       fsMIOspfv3BRRouteDestType}
+     ::=  { fsMIOspfv3BRRouteTable 1 }
+   
+   FsMIOspfv3BRRouteEntry ::= SEQUENCE {
+       fsMIOspfv3BRRouteDest          	IpAddress,
+       fsMIOspfv3BRRouteNextHopType    	InetAddressType,
+       fsMIOspfv3BRRouteNextHop       	InetAddress,
+       fsMIOspfv3BRRouteDestType      	INTEGER,
+       fsMIOspfv3BRRouteType          	INTEGER,
+       fsMIOspfv3BRRouteAreaId       	AreaID,
+       fsMIOspfv3BRRouteCost          	BigMetric,
+       fsMIOspfv3BRRouteInterfaceIndex 	InterfaceIndex
+       }
+   
+   fsMIOspfv3BRRouteDest OBJECT-TYPE
+       SYNTAX      IpAddress
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " Router Id of the destination router. 
+	     ABR/ASBR entries will have Router Id as 
+	     the destination network Id "
+     ::=  { fsMIOspfv3BRRouteEntry 1 }
+
+   fsMIOspfv3BRRouteNextHopType OBJECT-TYPE 
+       SYNTAX          InetAddressType 
+       MAX-ACCESS      not-accessible 
+       STATUS          current 
+       DESCRIPTION 
+           "The prefix type of fsMIOspfv3BRRouteNextHopType. Only 
+           IPv6 addresses are expected." 
+     ::= { fsMIOspfv3BRRouteEntry 2 } 
+      
+   fsMIOspfv3BRRouteNextHop OBJECT-TYPE
+       SYNTAX      InetAddress (SIZE(16))
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+	   " Next Hop IPv6 Address for this route. For direct 
+	   routes it has the value ::0."
+     ::=  { fsMIOspfv3BRRouteEntry 3 }
+
+   fsMIOspfv3BRRouteDestType OBJECT-TYPE
+       SYNTAX      INTEGER {
+		            areaBorder (2), 
+			    asBoundary (3) 
+		      	   }
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " Type of the route. The route can be ABR route
+	   entry or ASBR route entry "
+     ::=  { fsMIOspfv3BRRouteEntry 4 }
+
+   fsMIOspfv3BRRouteType OBJECT-TYPE
+       SYNTAX      INTEGER {
+                        intraArea (1), 
+		      	interArea (2) 
+		 	   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " Type of the route "
+     ::=  { fsMIOspfv3BRRouteEntry 5 }
+   
+   fsMIOspfv3BRRouteAreaId OBJECT-TYPE
+       SYNTAX      AreaID
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " Area ID associated with the route "
+     ::=  { fsMIOspfv3BRRouteEntry 6 }
+   
+   fsMIOspfv3BRRouteCost OBJECT-TYPE
+       SYNTAX BigMetric
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+          " The cost associated with the route "
+     ::=  { fsMIOspfv3BRRouteEntry 7 }
+   
+   fsMIOspfv3BRRouteInterfaceIndex OBJECT-TYPE
+       SYNTAX InterfaceIndex
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           " Interface Index associated with the route "
+     ::=  { fsMIOspfv3BRRouteEntry 8 }
+
+-- Redistribution configuration table. Attributes configured for this
+-- table will be applied during redistribution.
+
+   fsMIOspfv3RedistRouteCfgTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3RedistRouteCfgEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           "A table describing the configuration of Metric Cost and Route
+            Type information to be applied to the routes learnt from the RTM."
+     ::= { fsMIOspfv3 7 }
+
+   fsMIOspfv3RedistRouteCfgEntry OBJECT-TYPE
+       SYNTAX FsMIOspfv3RedistRouteCfgEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           "Information describing the configuration of single route entry."
+       INDEX { fsMIStdOspfv3ContextId, 
+               fsMIOspfv3RedistRouteDestType, 
+	       fsMIOspfv3RedistRouteDest, 
+               fsMIOspfv3RedistRoutePfxLength }
+     ::=  { fsMIOspfv3RedistRouteCfgTable 1 }
+
+   FsMIOspfv3RedistRouteCfgEntry ::= SEQUENCE {
+       fsMIOspfv3RedistRouteDestType    InetAddressType,
+       fsMIOspfv3RedistRouteDest        InetAddress,
+       fsMIOspfv3RedistRoutePfxLength   InetAddressPrefixLength,
+       fsMIOspfv3RedistRouteMetric      BigMetric,
+       fsMIOspfv3RedistRouteMetricType  INTEGER,
+       fsMIOspfv3RedistRouteTagType     INTEGER, 
+       fsMIOspfv3RedistRouteTag         Integer32, 
+       fsMIOspfv3RedistRouteStatus      RowStatus
+       }
+
+   fsMIOspfv3RedistRouteDestType OBJECT-TYPE 
+       SYNTAX          InetAddressType 
+       MAX-ACCESS      not-accessible 
+       STATUS          current 
+       DESCRIPTION 
+          "The prefix type of fsMIOspfv3RedistRouteDestType. Only 
+          IPv6 addresses are expected." 
+     ::= { fsMIOspfv3RedistRouteCfgEntry 1 } 
+      
+   fsMIOspfv3RedistRouteDest OBJECT-TYPE
+       SYNTAX InetAddress (SIZE(16))
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           "IPv6 Address of the Destination route."
+     ::=  { fsMIOspfv3RedistRouteCfgEntry 2 }
+
+   fsMIOspfv3RedistRoutePfxLength OBJECT-TYPE
+       SYNTAX  InetAddressPrefixLength
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           "Prefix Length of the Destination route."
+     ::=  { fsMIOspfv3RedistRouteCfgEntry 3 }
+
+   fsMIOspfv3RedistRouteMetric OBJECT-TYPE
+       SYNTAX BigMetric
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+           "The Metric value applied to the route before it is adv. into the
+            OSPFv3 Domain."
+       DEFVAL { 10 }
+     ::=  { fsMIOspfv3RedistRouteCfgEntry 4 }
+
+   fsMIOspfv3RedistRouteMetricType OBJECT-TYPE
+       SYNTAX INTEGER {
+              type1External (3),
+              type2External (4)
+              }
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+           "The Metric Type applied to the route before it is adv. into the
+            OSPFv3 Domain"
+       DEFVAL { type2External }
+     ::=  { fsMIOspfv3RedistRouteCfgEntry 5 }
+    
+   fsMIOspfv3RedistRouteTagType OBJECT-TYPE 
+       SYNTAX INTEGER { 
+              manual (1), 
+              automatic (2) 
+              } 
+       MAX-ACCESS read-write 
+       STATUS current 
+       DESCRIPTION 
+           "The Tag Type MIB object describes whether Tags will be 
+           automatically generated or will be manually configured. 
+           If tags are manually configured , the fsMIOspfv3RedistRouteTag 
+           MIB has to be set with the Tag value needed." 
+       DEFVAL { manual } 
+     ::= { fsMIOspfv3RedistRouteCfgEntry 6 } 
+    
+   fsMIOspfv3RedistRouteTag OBJECT-TYPE 
+       SYNTAX Integer32 
+       MAX-ACCESS read-write 
+       STATUS current 
+       DESCRIPTION 
+           "The Route Tag in case the user configures a Manual option for 
+           the tags." 
+       DEFVAL { 0 } 
+     ::= { fsMIOspfv3RedistRouteCfgEntry 7 } 
+
+   fsMIOspfv3RedistRouteStatus OBJECT-TYPE
+       SYNTAX RowStatus
+       MAX-ACCESS read-create
+       STATUS current
+       DESCRIPTION
+           "The variable dispalys the status of the entry.Setting it to
+           'invalid' has the effect of rendering it inoperative."
+     ::=  { fsMIOspfv3RedistRouteCfgEntry 8 }
+
+
+-- RRD OBJECT DEFINITION BEGIN
+
+   fsMIOspfv3RRDGroup OBJECT IDENTIFIER ::=  { fsMIOspfv3 8 }
+
+   fsMIOspfv3RRDGeneralGroup OBJECT IDENTIFIER ::=  { fsMIOspfv3RRDGroup 1}
+
+--  OSPF RRDRoute Table.
+
+   fsMIOspfv3RRDRouteTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3RRDRouteEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           " Describes RRDRoute Entry "
+     ::= { fsMIOspfv3RRDGeneralGroup 1 }
+
+   fsMIOspfv3RRDRouteEntry OBJECT-TYPE
+       SYNTAX FsMIOspfv3RRDRouteEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           " Information describing the RRDRoute "
+       AUGMENTS { fsMIStdOspfv3Entry }
+     ::= { fsMIOspfv3RRDRouteTable 1 }
+
+   FsMIOspfv3RRDRouteEntry ::= SEQUENCE {
+       fsMIOspfv3RRDStatus
+           Status,
+       fsMIOspfv3RRDSrcProtoMask
+           Integer32,
+       fsMIOspfv3RRDRouteMapName
+           OCTET STRING 
+	   }
+   fsMIOspfv3RRDStatus OBJECT-TYPE
+       SYNTAX Status
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+           "This MIB object enables/disables OSPFv3 to participate in Route 
+            Redistribution. If set to enabled, OSPFv3 will start advertising 
+            the routes learned by other protocols. If set to disabled, OSPFv3 
+            will stop redisbution of routes. However, OSPFv3 will continue 
+	    updating the Common Routing Table using the queue interface."
+      DEFVAL { disabled }
+     ::= { fsMIOspfv3RRDRouteEntry 1 }
+
+   fsMIOspfv3RRDSrcProtoMask OBJECT-TYPE
+       SYNTAX Integer32
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+           "The bit mask of source protocols from which routes are 
+            imported to OSPFv3.
+
+            Bit 1, if set, indicates that local routes are
+            redistributed into OSPFv3. (value = 2)
+	    if reset, indicates that local routes are not
+            redistributed into OSPFv3.
+
+            Bit 2, if set, indicates that static routes are
+            redistributed into OSPFv3. (value = 4)
+            if reset, indicates that static routes are not
+            redistributed into OSPFv3.
+
+            Bit 4, if set, indicates that routes from RIP are
+            redistributed into OSPFv3. (value = 16)
+            if reset, indicates that routes from RIP are not
+            redistributed into OSPFv3. 
+
+            Bit 6, if set, indicates that routes from BGP are
+            redistributed into OSPFv3. (value = 64)
+            if reset, indicates that routes from BGP are not
+            redistributed into OSPFv3.
+
+            Other bits are reserved for future use."
+       DEFVAL { 0 }
+     ::= { fsMIOspfv3RRDRouteEntry 2 }
+
+   fsMIOspfv3RRDRouteMapName    OBJECT-TYPE
+       SYNTAX       OCTET STRING (SIZE (0..20))
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION  "Name  Identifies the  specified route-map 
+                     in the list of route-maps."
+     ::= { fsMIOspfv3RRDRouteEntry 3 }
+
+--   TABLE_END fsMIOspfv3RRDGeneralGroup 
+
+-- FILTERING OBJECT DEFINITION BEGIN
+
+   fsMIOspfv3DistInOutRouteMap OBJECT IDENTIFIER ::= { fsMIOspfv3 9 }
+
+   fsMIOspfv3DistInOutRouteMapTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3DistInOutRouteMapEntry
+       MAX-ACCESS          not-accessible
+       STATUS              current
+       DESCRIPTION
+           "A table describing the configuration of filtering for route map."
+     ::= { fsMIOspfv3DistInOutRouteMap 1 }
+
+   fsMIOspfv3DistInOutRouteMapEntry OBJECT-TYPE
+       SYNTAX FsMIOspfv3DistInOutRouteMapEntry
+       MAX-ACCESS          not-accessible
+       STATUS              current
+       DESCRIPTION
+           "Information describing the filtering configuration of single entry."
+       INDEX {fsMIStdOspfv3ContextId, 
+	      fsMIOspfv3DistInOutRouteMapName, 
+	      fsMIOspfv3DistInOutRouteMapType}
+     ::=  { fsMIOspfv3DistInOutRouteMapTable 1 }
+
+   FsMIOspfv3DistInOutRouteMapEntry ::= SEQUENCE {
+       fsMIOspfv3DistInOutRouteMapName         DisplayString,
+       fsMIOspfv3DistInOutRouteMapType         Integer32,
+       fsMIOspfv3DistInOutRouteMapValue        Integer32,
+       fsMIOspfv3DistInOutRouteMapRowStatus    RowStatus
+   }
+
+   fsMIOspfv3DistInOutRouteMapName OBJECT-TYPE
+       SYNTAX              DisplayString (SIZE (1..20))
+       MAX-ACCESS          not-accessible
+       STATUS              current
+       DESCRIPTION
+           "Route map name."
+     ::=  { fsMIOspfv3DistInOutRouteMapEntry 1 }
+
+   fsMIOspfv3DistInOutRouteMapType OBJECT-TYPE
+       SYNTAX              Integer32(1..3)
+       MAX-ACCESS          not-accessible
+       STATUS              current
+       DESCRIPTION
+           "Type of route map to indicate the route map is for
+           distribute in or for distribute out or for distance.
+           1 - distance
+           2 - distribute in
+           3 - distribute out"
+     ::=  { fsMIOspfv3DistInOutRouteMapEntry 2 }
+
+   fsMIOspfv3DistInOutRouteMapValue  OBJECT-TYPE
+       SYNTAX              Integer32(1..255)
+       MAX-ACCESS          read-write
+       STATUS              current
+       DESCRIPTION
+           "Distance value ( this will be unused for distribute list )"
+     ::=  { fsMIOspfv3DistInOutRouteMapEntry 3 }
+
+   fsMIOspfv3DistInOutRouteMapRowStatus OBJECT-TYPE
+       SYNTAX              RowStatus
+       MAX-ACCESS          read-write
+       STATUS              current
+       DESCRIPTION
+           "The status of this row, by which new entries may be
+           created, or old entries deleted from this table."
+     ::=  { fsMIOspfv3DistInOutRouteMapEntry 4 }
+
+-- FILTERING OBJECT DEFINITION END
+
+-- PREFERENCE OBJECT DEFINITION BEGIN
+
+   fsMIOspfv3PreferenceGroup OBJECT IDENTIFIER ::=  { fsMIOspfv3 10 }
+
+   fsMIOspfv3PreferenceTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3PreferenceEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           " Describes RRDRoute Entry "
+     ::= { fsMIOspfv3PreferenceGroup 1 }
+
+   fsMIOspfv3PreferenceEntry OBJECT-TYPE
+       SYNTAX FsMIOspfv3PreferenceEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           " Information describing the RRDRoute "
+       AUGMENTS { fsMIStdOspfv3Entry }
+     ::= { fsMIOspfv3PreferenceTable 1 }
+
+   FsMIOspfv3PreferenceEntry ::= SEQUENCE {
+       fsMIOspfv3PreferenceValue
+           Integer32
+       }
+
+   fsMIOspfv3PreferenceValue OBJECT-TYPE
+       SYNTAX Integer32 (0..255)
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+           "Preference value for OSPFv3 routes. Use '0' to set default value"
+       DEFVAL { 0 }
+     ::= { fsMIOspfv3PreferenceEntry 1 }
+
+-- PREFERENCE OBJECT DEFINITION END
+
+-- MI OSPFV3 BFD NEIGHBOR OBJECT DEFINITION BEGIN
+
+   fsMIOspfv3NeighborBfdGroup OBJECT IDENTIFIER ::=  { fsMIOspfv3 11 }
+
+   fsMIOspfv3NeighborBfdTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FsMIOspfv3NeighborBfdEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+            " This table Contains neighbor entry for Bfd "
+        ::= { fsMIOspfv3NeighborBfdGroup 1 }
+
+   fsMIOspfv3NeighborBfdEntry OBJECT-TYPE
+        SYNTAX FsMIOspfv3NeighborBfdEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            " This entry contains information describing Bfd neighbor state "
+        AUGMENTS { fsMIStdOspfv3NbrEntry }
+        ::= { fsMIOspfv3NeighborBfdTable 1 }
+
+   FsMIOspfv3NeighborBfdEntry ::= SEQUENCE {
+        fsMIOspfv3NbrBfdState INTEGER
+   }
+
+   fsMIOspfv3NbrBfdState OBJECT-TYPE
+      SYNTAX   INTEGER {
+                         enabled (1),
+                         disabled (2)
+                       }
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+          " This object specifies the Neighbor Bfd state. It is a read-only object.
+            It is be enabled internally only when BFD is
+            enabled for monitoring this neighbor IP path."
+        ::= { fsMIOspfv3NeighborBfdEntry 1 }
+
+-- MI OSPFV3 BFD NEIGHBOR OBJECT DEFINITION END
+--  Future OSPF-V3 Interface Authentication Table
+
+   fsMIOspfv3IfAuthTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3IfAuthEntry
+       MAX-ACCESS not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This OSPF-V3 Interface Authentication Table describes the parameters
+            required for  cryptographic Authentication."
+       ::=  { fsMIOspfv3 12 }
+   
+   fsMIOspfv3IfAuthEntry OBJECT-TYPE
+       SYNTAX      FsMIOspfv3IfAuthEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This object describes one Authentication Key from the viewpoint of OSPF-V3."
+       INDEX { fsMIStdOspfv3ContextId, fsMIOspfv3IfAuthIfIndex, fsMIOspfv3IfAuthKeyId}
+       ::=  { fsMIOspfv3IfAuthTable 1 }
+   
+   FsMIOspfv3IfAuthEntry ::= SEQUENCE {
+       fsMIOspfv3IfAuthIfIndex     InterfaceIndex,
+       fsMIOspfv3IfAuthKeyId             Integer32,
+       fsMIOspfv3IfAuthKey               OCTET STRING,
+       fsMIOspfv3IfAuthKeyStartAccept    DateAndTime,
+       fsMIOspfv3IfAuthKeyStartGenerate  DateAndTime,
+       fsMIOspfv3IfAuthKeyStopGenerate   DateAndTime,
+       fsMIOspfv3IfAuthKeyStopAccept     DateAndTime,
+       fsMIOspfv3IfAuthKeyStatus         RowStatus
+       }
+   
+   fsMIOspfv3IfAuthIfIndex OBJECT-TYPE
+       SYNTAX      InterfaceIndex (0..65535)
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+                "This object specifies the interface index of OSPFv3 interface. 
+                 It corresponds to the interface index of the 
+                 IPv6 interface on which OSPFv3 is configured." 
+       ::=  { fsMIOspfv3IfAuthEntry 1 }
+
+   fsMIOspfv3IfAuthKeyId OBJECT-TYPE
+       SYNTAX      Integer32 (0..65535)
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " This object identifies the secret key used to create the
+             message digest appended to the OSPF-V3 packet."
+       ::=  { fsMIOspfv3IfAuthEntry 2 }
+
+   fsMIOspfv3IfAuthKey OBJECT-TYPE
+       SYNTAX      OCTET STRING (SIZE (0..16)) -- Already existing Max Key size is carried over for all the Algorithms.
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           " This object identifies the secret key which is used to create the
+             message digest appended to the OSPF-V3 packet."
+       ::=  { fsMIOspfv3IfAuthEntry 3 }
+
+   fsMIOspfv3IfAuthKeyStartAccept OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router starts Accepting packets that have
+            been created with the key. If the value is not set, then it
+            will be taken as 0, The value 0 mapped to key creation time"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3IfAuthEntry 4 }
+
+   fsMIOspfv3IfAuthKeyStartGenerate OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router starts generating packets that have
+            been created with the key. If the value is not set, then it
+            will be taken as 0, The value 0 mapped to key creation time"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3IfAuthEntry 5 }
+
+   fsMIOspfv3IfAuthKeyStopGenerate OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object specifies the time at which the router stops using the key for packets
+            generation. If the value is not set, then it will be taken
+            as infinite and displayed as 0 example,
+            Tuesday May 26, 2015 at 1:30 PM should be
+            configured as 26-MAY-2015,13:30"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3IfAuthEntry 6 }
+
+   fsMIOspfv3IfAuthKeyStopAccept OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router stops using the key for packets
+            Verification. If the value is not set, then it will be taken
+            as infinite and displayed as 0 example,
+            Tuesday May 26, 2015 at 1:30 PM should be
+            configured as 26-MAY-2015,13:30"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3IfAuthEntry 7 }
+
+   fsMIOspfv3IfAuthKeyStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object identifies the status of the key."
+       ::=  { fsMIOspfv3IfAuthEntry 8 }
+
+--  Future OSPF-V3 Virtual Interface Authentication Table
+
+   fsMIOspfv3VirtIfAuthTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIOspfv3VirtIfAuthEntry
+       MAX-ACCESS not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This OSPF-V3 Interface Authentication Table describes the parameters
+            required for cryptographic Authentication."
+       ::=  { fsMIOspfv3 13 }
+
+   fsMIOspfv3VirtIfAuthEntry OBJECT-TYPE
+       SYNTAX FsMIOspfv3VirtIfAuthEntry
+       MAX-ACCESS not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This object describes entry of one
+             Authentication Key from the viewpoint of OSPF-V3."
+       INDEX {fsMIStdOspfv3ContextId, fsMIOspfv3VirtIfAuthAreaId,fsMIOspfv3VirtIfAuthNeighbor,
+              fsMIOspfv3VirtIfAuthKeyId}
+       ::=  { fsMIOspfv3VirtIfAuthTable 1 }
+
+   FsMIOspfv3VirtIfAuthEntry ::= SEQUENCE {
+       fsMIOspfv3VirtIfAuthAreaId            AreaID,
+       fsMIOspfv3VirtIfAuthNeighbor          RouterID,
+       fsMIOspfv3VirtIfAuthKeyId             Integer32,
+       fsMIOspfv3VirtIfAuthKey               OCTET STRING,
+       fsMIOspfv3VirtIfAuthKeyStartAccept    DateAndTime,
+       fsMIOspfv3VirtIfAuthKeyStartGenerate  DateAndTime,
+       fsMIOspfv3VirtIfAuthKeyStopGenerate   DateAndTime,
+       fsMIOspfv3VirtIfAuthKeyStopAccept     DateAndTime,
+       fsMIOspfv3VirtIfAuthKeyStatus         RowStatus
+       }
+
+   fsMIOspfv3VirtIfAuthAreaId OBJECT-TYPE
+       SYNTAX      AreaID
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " This object specifies the transit area that the virtual link
+             traverses. By definition, this should not be 0.0.0.0."
+       ::=  { fsMIOspfv3VirtIfAuthEntry 1 }
+
+   fsMIOspfv3VirtIfAuthNeighbor OBJECT-TYPE
+       SYNTAX      RouterID
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            " This object specifies the Router ID of the Virtual Neighbor."
+       ::=  { fsMIOspfv3VirtIfAuthEntry 2 }
+
+   fsMIOspfv3VirtIfAuthKeyId OBJECT-TYPE
+       SYNTAX      Integer32 (0..65535)
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           " This object identifies the secret key used to create the
+             message digest appended to the OSPF-V3 packet."
+       ::=  { fsMIOspfv3VirtIfAuthEntry 3 }
+
+   fsMIOspfv3VirtIfAuthKey OBJECT-TYPE
+       SYNTAX      OCTET STRING (SIZE (0..16)) -- Already existing Max Key size is carried over for all the Algorithms.
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           " This object specifies the secret key which is used to create the
+             message digest appended to the OSPF-V3 packet."
+       ::=  { fsMIOspfv3VirtIfAuthEntry 4 }
+
+   fsMIOspfv3VirtIfAuthKeyStartAccept OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router starts generating packets that have
+            been created with the key. If the value is not set, then it
+            will be taken as 0, The value 0 mapped to key creation time"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3VirtIfAuthEntry 5 }
+
+   fsMIOspfv3VirtIfAuthKeyStartGenerate OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router starts generating packets that have
+            been created with the key. If the value is not set, then it
+            will be taken as 0, The value 0 mapped to key creation time"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3VirtIfAuthEntry 6 }
+
+   fsMIOspfv3VirtIfAuthKeyStopGenerate OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router stops using the key for packets
+            generation. If the value is not set, then it will be taken
+            as infinite and displayed as 0 example,
+            Tuesday May 26, 2015 at 1:30 PM should be
+            configured as 26-MAY-2015,13:30"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3VirtIfAuthEntry 7 }
+
+   fsMIOspfv3VirtIfAuthKeyStopAccept OBJECT-TYPE
+       SYNTAX      DateAndTime
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            "This object specifies the time at which the router stops using the key for packets
+            Verification. If the value is not set, then it will be taken
+            as infinite and displayed as 2136-02-06,06:28:15,
+            DateTime equivalent to max value of UINT4.
+            For example, Tuesday May 26, 2015 at 1:30 PM should be
+            configured as 26-MAY-2015,13:30"
+       DEFVAL { "0000000000000000" }
+       ::=  { fsMIOspfv3VirtIfAuthEntry 8 }
+
+   fsMIOspfv3VirtIfAuthKeyStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object identifies the status of the key."
+       ::=  {fsMIOspfv3VirtIfAuthEntry 9 }
+
+-- CRYPTO AUTH VIRTUAL INTERFACE START
+    fsMIOspfv3VirtIfCryptoAuthTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF FsMIOspfv3VirtIfCryptoAuthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table holds the crypto authentication type."
+    ::= { fsMIOspfv3 14 }
+    fsMIOspfv3VirtIfCryptoAuthEntry OBJECT-TYPE
+    SYNTAX  FsMIOspfv3VirtIfCryptoAuthEntry
+    MAX-ACCESS not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object describes the entry of the cryptographic authentication."
+         AUGMENTS { fsMIStdOspfv3VirtIfEntry }
+    ::= { fsMIOspfv3VirtIfCryptoAuthTable 1 }
+    FsMIOspfv3VirtIfCryptoAuthEntry ::=
+       SEQUENCE {
+                  fsMIOspfv3VirtIfCryptoAuthType
+                          INTEGER,
+                  fsMIOspfv3VirtIfCryptoAuthMode
+                          INTEGER
+
+                }
+    fsMIOspfv3VirtIfCryptoAuthType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                           sha1(1),
+                           sha256(3),
+                           sha384(4),
+                           sha512(5),
+                           none(6)
+                       }
+
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+        "This object specifies the SHA crypto authentication type to be
+         used on the interface"
+
+    DEFVAL { none }
+    ::= { fsMIOspfv3VirtIfCryptoAuthEntry 1 }
+
+    fsMIOspfv3VirtIfCryptoAuthMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+                           full(1),
+                           transition(2),
+                           none(3)
+                        }
+
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+        "This object specifies the crypto authentication mode to be used on the interface
+         for setting transition"
+
+    DEFVAL { none }
+    ::= { fsMIOspfv3VirtIfCryptoAuthEntry 2 }
+
+-- CRYPTO AUTH VIRTUAL INTERFACE END
+
+-- Trap Notification types for Graceful restart
+    
+    fsMIOspfv3Traps OBJECT IDENTIFIER ::=  { fsMIOspfv3Notification 0 }
+    fsMIOspfv3TrapObject OBJECT IDENTIFIER ::= { fsMIOspfv3Notification 1 }
+
+--  Trap objects for index variable to be used in notifications
+
+    fsMIOspfv3TrapNbrIfIndex OBJECT-TYPE 
+            SYNTAX          InterfaceIndex 
+            MAX-ACCESS      accessible-for-notify
+            STATUS          current 
+            DESCRIPTION 
+                "The local link ID of the link over which the
+                 neighbor can be reached. This is used for Trap"
+            ::= { fsMIOspfv3TrapObject 1 } 
+
+    fsMIOspfv3TrapVirtNbrRtrId OBJECT-TYPE 
+            SYNTAX          RouterID 
+            MAX-ACCESS      accessible-for-notify
+            STATUS          current 
+            DESCRIPTION 
+                "A  32-bit  integer  uniquely  identifying  the 
+                neighboring router in the Autonomous System.
+                This is used for Trap" 
+            ::= { fsMIOspfv3TrapObject 2 } 
+
+    fsMIOspfv3TrapNbrRtrId OBJECT-TYPE
+            SYNTAX          RouterID
+            MAX-ACCESS      accessible-for-notify
+            STATUS          current
+            DESCRIPTION
+                "A 32-bit integer (represented as a type  IpAd-
+                dress)  uniquely  identifying  the  neighboring
+                router in the Autonomous System.
+                This is used for Trap"
+            ::= { fsMIOspfv3TrapObject 3 }
+
+    fsMIOspfv3TrapVirtNbrArea OBJECT-TYPE
+            SYNTAX          AreaID
+            MAX-ACCESS      accessible-for-notify
+            STATUS          current 
+            DESCRIPTION 
+                "The Transit Area Identifier. This is used for Trap"
+            ::= { fsMIOspfv3TrapObject 4 }
+
+    fsMIOspfv3TrapBulkUpdAbortReason OBJECT-TYPE
+            SYNTAX        INTEGER {
+                            none(1),
+                            memAllocFailed(2),
+                            sendFailed(3),
+                            processFailed(4)
+                                   }
+            MAX-ACCESS   accessible-for-notify
+            STATUS       current
+            DESCRIPTION
+                "The reason for the failure of particular Bulk Update abort."
+            ::= { fsMIOspfv3TrapObject 5 }
+
+
+
+--  END
+
+    fsMIOspfv3RestartStatusChange NOTIFICATION-TYPE
+        OBJECTS  {
+                   fsMIStdOspfv3RouterId, -- The originator of the trap
+                   fsMIStdOspfv3RestartStatus,
+                   fsMIStdOspfv3RestartInterval,
+                   fsMIStdOspfv3RestartExitReason
+                 }
+        STATUS   current
+        DESCRIPTION
+            "An fsMIOspfv3RestartStatusChange trap signifies that
+             there has been a change in the graceful restart
+             state for the router. This trap should be
+             generated when the router restart status
+             changes."
+        ::= { fsMIOspfv3Traps 1 }
+
+    fsMIOspfv3NbrRestartHelperStatusChange NOTIFICATION-TYPE
+        OBJECTS {
+                  fsMIStdOspfv3RouterId, -- The originator of the trap
+                  fsMIOspfv3TrapNbrIfIndex,
+                  fsMIOspfv3TrapNbrRtrId,
+                  fsMIStdOspfv3NbrRestartHelperStatus,
+                  fsMIStdOspfv3NbrRestartHelperAge,
+                  fsMIStdOspfv3NbrRestartHelperExitReason
+                }
+        STATUS  current
+        DESCRIPTION
+            "An fsMIOspfv3NbrRestartHelperStatusChange trap signifies that
+            there has been a change in the graceful restart
+            helper state for the neighbor. This trap should be
+            generated when the neighbor restart helper status
+            transitions for a neighbor."
+        ::= { fsMIOspfv3Traps 2 }
+
+    fsMIOspfv3VirtNbrRestartHelperStatusChange NOTIFICATION-TYPE
+        OBJECTS {
+                  fsMIStdOspfv3RouterId, -- The originator of the trap
+                  fsMIOspfv3TrapVirtNbrArea,
+                  fsMIOspfv3TrapVirtNbrRtrId,
+                  fsMIStdOspfv3VirtNbrRestartHelperStatus,
+                  fsMIStdOspfv3VirtNbrRestartHelperAge,
+                  fsMIStdOspfv3VirtNbrRestartHelperExitReason
+                }
+        STATUS  current
+        DESCRIPTION
+            "An fsMIOspfv3VirtNbrRestartHelperStatusChange trap signifies
+            that there has been a change in the graceful restart
+            helper state for the virtual neighbor. This trap should
+            be generated when the virtual neighbor restart helper
+            status transitions for a virtual neighbor."
+        ::= { fsMIOspfv3Traps 3 }
+
+    fsMIOspfv3HotStandbyStateChgTrap NOTIFICATION-TYPE
+         OBJECTS {
+                    fsMIStdOspfv3RouterId, -- The originator of the trap
+                    fsMIOspfv3HotStandbyState
+                 }
+         STATUS   current
+         DESCRIPTION 
+                "A notification is sent to the management entity whenever
+                there is a state change in the OSPFv3 hotstandby Module"
+                
+         ::= {fsMIOspfv3Traps 4}
+
+    fsMIOspfv3HotStandbyBulkUpdAbortTrap NOTIFICATION-TYPE
+         OBJECTS {
+                    fsMIStdOspfv3RouterId, -- The originator of the trap
+                    fsMIOspfv3DynamicBulkUpdStatus,
+                    fsMIOspfv3TrapBulkUpdAbortReason
+                 }
+         STATUS   current
+         DESCRIPTION
+                "A notification is sent to the management entity whenever
+                there is a Bulk Update Abort "
+
+         ::= {fsMIOspfv3Traps 5}
+
+    fsMIOspfv3AuthSequenceNumWrap NOTIFICATION-TYPE
+         OBJECTS {
+                     fsMIStdOspfv3RouterId -- The originator of the trap
+                 }
+         STATUS   current
+         DESCRIPTION
+            "This object specifies a notification that is sent to the management entity whenever
+            the Authentication Trailer sequence number is wrapped"
+         ::= {fsMIOspfv3Traps 6}
+
+-- End of Trap notifications
+
+END
+
+

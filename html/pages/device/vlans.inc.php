@@ -1,19 +1,20 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$link_array = ['page'   => 'device',
-               'device' => $device['device_id'],
-               'tab'    => 'vlans'];
+$link_array = [
+    'page'   => 'device',
+    'device' => $device['device_id'],
+    'tab'    => 'vlans'
+];
 
 if (isset($vars['graph'])) {
     $graph_type = "port_" . $vars['graph'];
@@ -35,6 +36,10 @@ $navbar['options']['basic']['text'] = 'No Graphs';
 
 foreach ($config['graph_types']['port'] as $type => $data) {
 
+    if ($type === 'fdb_count' && !is_module_enabled($device, 'ports_fdbcount', 'poller')) {
+        continue;
+    }
+
     if ($vars['graph'] == $type && $vars['view'] == "graphs") {
         $navbar['options'][$type]['class'] = "active";
     }
@@ -43,19 +48,33 @@ foreach ($config['graph_types']['port'] as $type => $data) {
 
 }
 
+// Quick filters
+
+if (isset($vars['graph']) && in_array($vars['graph'], [ 'fdb_count' ])) {
+
+    $vars['filters'] = $vars['filters'] ?? [ 'deleted' => TRUE, 'virtual' => TRUE ];
+
+    $vars['filters'] = navbar_ports_filter($navbar, $vars, [ 'virtual' ]);
+}
+
 print_navbar($navbar);
 
 echo generate_box_open();
 
-echo('<table class="table  table-striped table-hover table-condensed">');
-echo("<thead><tr><th>VLAN</th><th>Description</th><th>Other Ports</th></tr></thead>");
+echo('<table class="table table-striped table-hover table-condensed">');
+$cols = [
+    //[NULL, 'class="state-marker"'],
+    'VLAN',
+    'Description',
+    //'Other Ports'
+    ['Other Ports', 'style="width: 77%;"'],
+];
 
-$i = "1";
+echo get_table_header($cols, $vars);
+//echo("<thead><tr><th>VLAN</th><th>Description</th><th>Other Ports</th></tr></thead>");
 
 foreach (dbFetchRows("SELECT * FROM `vlans` WHERE `device_id` = ? ORDER BY 'vlan_vlan'", [$device['device_id']]) as $vlan) {
-    include("includes/print-vlan.inc.php");
-
-    $i++;
+    print_vlan_ports_row($device, $vlan, $vars);
 }
 
 echo "</table>";

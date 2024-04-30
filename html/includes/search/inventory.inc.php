@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -13,7 +13,7 @@
 /// SEARCH STATUS
 $results = dbFetchRows("SELECT * FROM `entPhysical`
                         LEFT JOIN `devices` USING (`device_id`)" .
-                       generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '`deleted` IS NULL AND (`entPhysicalSerialNum` LIKE ? OR `entPhysicalModelName` LIKE ? OR `entPhysicalAssetID` LIKE ?)') .
+                       generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`deleted` IS NULL AND (`entPhysicalSerialNum` LIKE ? OR `entPhysicalModelName` LIKE ? OR `entPhysicalAssetID` LIKE ?)') .
                        " ORDER BY `entPhysicalName` LIMIT $query_limit", [$query_param, $query_param, $query_param]);
 
 if (!safe_empty($results)) {

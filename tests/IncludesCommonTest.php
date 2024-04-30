@@ -1277,92 +1277,101 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-   * @dataProvider providerGetTime
-   * @group datetime
-   */
-  public function testGetTime($value, $result) {
-    // prevent long time running errors
-    $result = time() - $result;
+    /**
+    * @dataProvider providerGetTime
+    * @group datetime
+    */
+    public function testGetTime($value, $result, $future = FALSE) {
+        // prevent long time running errors
+        if ($future) {
+            $result = time() + $result;
+        } else {
+            $result = time() - $result;
+        }
 
-    $diff = abs((int)$result - get_time($value));
-    $this->assertLessThanOrEqual(10, $diff); // +- 10 sec
-  }
+        $diff = abs((int)$result - get_time($value, $future));
+        $this->assertLessThanOrEqual(5, $diff); // +- 5 sec
+    }
 
-  public function providerGetTime()
-  {
-    //$now = time();
-    return array(
-      [ 'now',         0 ],
-      [ 'fiveminute',  300 ],      //time() - (5 * 60);
-      [ 'fourhour',    14400 ],    //time() - (4 * 60 * 60);
-      [ 'sixhour',     21600 ],    //time() - (6 * 60 * 60);
-      [ 'twelvehour',  43200 ],    //time() - (12 * 60 * 60);
-      [ 'day',         86400 ],    //time() - (24 * 60 * 60);
-      [ 'twoday',      172800 ],   //time() - (2 * 24 * 60 * 60);
-      [ 'week',        604800 ],   //time() - (7 * 24 * 60 * 60);
-      [ 'twoweek',     1209600 ],  //time() - (2 * 7 * 24 * 60 * 60);
-      [ 'month',       2678400 ],  //time() - (31 * 24 * 60 * 60);
-      [ 'twomonth',    5356800 ],  //time() - (2 * 31 * 24 * 60 * 60);
-      [ 'threemonth',  8035200 ],  //time() - (3 * 31 * 24 * 60 * 60);
-      [ 'sixmonth',    16070400 ], //time() - (6 * 31 * 24 * 60 * 60);
-      [ 'year',        31536000 ], //time() - (365 * 24 * 60 * 60);
-      [ 'twoyear',     63072000 ], //time() - (2 * 365 * 24 * 60 * 60);
-      [ 'threeyear',   94608000 ], //time() - (3 * 365 * 24 * 60 * 60);
-    );
-  }
+    public function providerGetTime()
+    {
+        //$now = time();
+        return [
+          [ 'now',         0 ],
+          [ 'fiveminute',  300 ],      //time() - (5 * 60);
+          [ 'fourhour',    14400 ],    //time() - (4 * 60 * 60);
+          [ 'sixhour',     21600 ],    //time() - (6 * 60 * 60);
+          [ 'twelvehour',  43200 ],    //time() - (12 * 60 * 60);
+          [ 'day',         86400 ],    //time() - (24 * 60 * 60);
+          [ 'twoday',      172800 ],   //time() - (2 * 24 * 60 * 60);
+          [ 'week',        604800 ],   //time() - (7 * 24 * 60 * 60);
+          [ 'twoweek',     1209600 ],  //time() - (2 * 7 * 24 * 60 * 60);
+          [ 'month',       2678400 ],  //time() - (31 * 24 * 60 * 60);
+          [ 'twomonth',    5356800 ],  //time() - (2 * 31 * 24 * 60 * 60);
+          [ 'threemonth',  8035200 ],  //time() - (3 * 31 * 24 * 60 * 60);
+          [ 'sixmonth',    16070400 ], //time() - (6 * 31 * 24 * 60 * 60);
+          [ 'year',        31536000 ], //time() - (365 * 24 * 60 * 60);
+          [ 'twoyear',     63072000 ], //time() - (2 * 365 * 24 * 60 * 60);
+          [ 'threeyear',   94608000 ], //time() - (3 * 365 * 24 * 60 * 60);
+          // new formats
+          [ '10years',     315360000 ],
+          [ '10years',     315360000, TRUE ],
+        ];
+    }
 
-  /**
-   * @dataProvider providerFormatTimestamp
-   * @group datetime
-   */
-  public function testFormatTimestamp($value, $result)
-  {
-    $GLOBALS['config']['timestamp_format'] = 'Y-m-d H:i:s'; // force fixed format
-    if ($value === 'now') { $result = date('Y-m-d H:i:s'); } // force same times
-    $this->assertSame($result, format_timestamp($value));
-  }
+    /**
+    * @dataProvider providerFormatTimestamp
+    * @group datetime
+    */
+    public function testFormatTimestamp($value, $result)
+    {
+        $GLOBALS['config']['timestamp_format'] = 'Y-m-d H:i:s'; // force fixed format
+        //if ($value === 'now') { $result = date('Y-m-d H:i:s'); } // force same times
+        $this->assertSame($result, format_timestamp($value));
+    }
 
-  public function providerFormatTimestamp()
-  {
-    return array(
-      array('Aug 30 2014',      '2014-08-30 00:00:00'),
-      array('2012-04-18 14:25', '2012-04-18 14:25:00'),
-      array('now',              date('Y-m-d H:i:s')),
-      array('Star Wars',        'Star Wars'),
-    );
-  }
+    public function providerFormatTimestamp()
+    {
+        return [
+            [ 'Aug 30 2014',      '2014-08-30 00:00:00' ],
+            [ '2012-04-18 14:25', '2012-04-18 14:25:00' ],
+            [ 'now',              date('Y-m-d H:i:s') ],
+            [ 'Star Wars',        'Star Wars' ],
+        ];
+    }
 
-  /**
-   * @dataProvider providerFormatUnixtime
-   * @group datetime
-   */
-  public function testFormatUnixtime($value, $format, $result)
-  {
-    // override local timezone settings or these tests may fail
-    date_default_timezone_set('UTC');
-    $this->assertSame($result, format_unixtime($value, $format));
-  }
-
-  public function providerFormatUnixtime()
-  {
-    return array(
-      array(1409397693,                NULL, '2014-08-30 11:21:33'),
-      array(1409397693,        DATE_RFC2822, 'Sat, 30 Aug 2014 11:21:33 +0000'),
-      array(1551607499,        DATE_RFC2822, 'Sun, 03 Mar 2019 10:04:59 +0000'),
-      array(1551607499.3878,   DATE_RFC2822, 'Sun, 03 Mar 2019 10:04:59 +0000'),
-      array(1551607499.3878,      'H:i:s.u', '10:04:59.387800'),
-      //array(1551607499.3878,      'H:i:s.v', '10:04:59.387'),
-      array(1551607499.3873,      'H:i:s.v', '10:04:59.387'), // just prevent round in php 7.0
-      array(1551607499.387867,    'H:i:s.u', '10:04:59.387867'),
-      array('1551607499.387867',  'H:i:s.u', '10:04:59.387867'),
-      array('1551607499.3878679', 'H:i:s.u', '10:04:59.387868'),
-      // Wrong data
-      array('0',   'r',       ''),
-      array('',    'H:i:s.u', ''),
-      array(FALSE, 'H:i:s.u', ''),
-    );
-  }
+    /**
+    * @dataProvider providerFormatUnixtime
+    * @group datetime
+    */
+    public function testFormatUnixtime($value, $format, $result)
+    {
+        // override local timezone settings or these tests may fail
+        date_default_timezone_set('UTC');
+        $this->assertSame($result, format_unixtime($value, $format));
+    }
+    
+    public function providerFormatUnixtime()
+    {
+        return [
+            [ 1409397693,                NULL, '2014-08-30 11:21:33' ],
+            [ 1409397693,        DATE_RFC2822, 'Sat, 30 Aug 2014 11:21:33 +0000' ],
+            [ 1551607499,        DATE_RFC2822, 'Sun, 03 Mar 2019 10:04:59 +0000' ],
+            [ 1551607499.3878,   DATE_RFC2822, 'Sun, 03 Mar 2019 10:04:59 +0000' ],
+            [ 1551607499.3878,      'H:i:s.u', '10:04:59.387800' ],
+            [ 1551607499,           'H:i:s.v', '10:04:59.000' ],
+            [ 1551607499.3873,      'H:i:s.v', '10:04:59.387' ],             // just prevent round in php less 7.0
+            [ 1698831064,            'jS F Y', '1st November 2023' ],        // 1698831064 -> 1st November 2023 (test on php 7.2 and phpunit 8)
+            [ 1698831064,        'jS F Y s.v', '1st November 2023 04.000' ], // 1698831064 -> 1st November 2023 (test on php 7.2 and phpunit 8)
+            [ 1551607499.387867,    'H:i:s.u', '10:04:59.387867' ],
+            [ '1551607499.387867',  'H:i:s.u', '10:04:59.387867' ],
+            [ '1551607499.3878679', 'H:i:s.u', '10:04:59.387868' ],
+            // Wrong data
+            [ '0',   'r',       '' ],
+            [ '',    'H:i:s.u', '' ],
+            [ FALSE, 'H:i:s.u', '' ],
+        ];
+    }
 
   /**
    * @dataProvider providerUnitStringToNumeric
@@ -2291,6 +2300,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array( TRUE,  TRUE, $test_string1, array(11,   'Observium is a ')),
       array( TRUE,  TRUE, $test_string1, array(11,   'ObserviuM is a ')),
       array( TRUE,  TRUE, $test_string1, array(11,   'bservium is a ')),
+      array( TRUE,  TRUE, '8 times',     array('qwerty', 'times')),
       // Not strings
       array(FALSE,  TRUE, $test_string1, array('fs', array('Observium is a '))),
       array(FALSE, FALSE, $test_string1, NULL),
@@ -2549,26 +2559,28 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     ];
   }
 
-  /**
-   * @dataProvider providerEscapeHtml
-   * @group string
-   */
-  public function testEscapeHtml($value, $result) {
-    $this->assertSame($result, escape_html($value));
-  }
+    /**
+    * @dataProvider providerEscapeHtml
+    * @group string
+    */
+    public function testEscapeHtml($value, $result) {
+        $this->assertSame($result, escape_html($value));
+    }
 
-  public function providerEscapeHtml() {
-    return [
-      [ '<div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button>',
-        '&lt;div class=&quot;alert alert-info&quot;&gt;&lt;button type=&quot;button&quot; class=&quot;close&quot; data-dismiss=&quot;alert&quot;&gt;&amp;times;&lt;/button&gt;' ],
-      // excludes
-      [ '<p>Text with <sup>sup</sup> and <sub>sub</sub> and newline <br/> <br />',
-        '&lt;p&gt;Text with <sup>sup</sup> and <sub>sub</sub> and newline <br/> <br />' ],
-      // entities
-      [ '<p>Text with entities &#x200B; &pi; &pipipi;',
-        '&lt;p&gt;Text with entities &#x200B; &pi; &amp;pipipi;' ],
-    ];
-  }
+    public function providerEscapeHtml() {
+        return [
+            [ '<div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button>',
+              '&lt;div class=&quot;alert alert-info&quot;&gt;&lt;button type=&quot;button&quot; class=&quot;close&quot; data-dismiss=&quot;alert&quot;&gt;&amp;times;&lt;/button&gt;' ],
+            // excludes
+            [ '<p>Text with tags <sup>sup</sup> and <sub>sub</sub> and newline <br/> <br />',
+              '&lt;p&gt;Text with tags <sup>sup</sup> and <sub>sub</sub> and newline <br/> <br />' ],
+            // entities
+            [ '<p>Text with entities &#x200B; &pi; &pipipi;',
+              '&lt;p&gt;Text with entities &#x200B; &pi; &amp;pipipi;' ],
+            // EMPTY
+            [ NULL, NULL ],
+        ];
+    }
 
   /**
    * @dataProvider providerPrintMessage

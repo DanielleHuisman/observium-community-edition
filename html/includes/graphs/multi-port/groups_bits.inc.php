@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -19,8 +18,8 @@ $multiplier = 8;
 
 foreach ($vars['data'] as $entry) {
     $rrds = [];
-    foreach (get_group_entities($entry['group_id']) as $port) {
-        $port     = get_port_by_id_cache($port);
+    foreach (get_group_entities($entry['group_id'], 'port') as $port_id) {
+        $port     = get_port_by_id_cache($port_id);
         $device   = device_by_id_cache($port['device_id']);
         $filename = get_port_rrdfilename($port, NULL, TRUE);
 

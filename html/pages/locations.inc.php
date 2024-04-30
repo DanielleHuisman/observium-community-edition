@@ -57,7 +57,7 @@ echo('      </tr>');
 
 foreach (get_locations() as $location) {
 
-    $location_where = generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], generate_query_values_ng($location, 'location'));
+    $location_where = generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], generate_query_values($location, 'location'));
 
     $num = dbFetchCell('SELECT COUNT(*) FROM `devices`' . $location_where);
 
@@ -92,7 +92,7 @@ foreach (get_locations() as $location) {
         $graph_array['type']   = 'location_bits';
         $graph_array['height'] = 100;
         $graph_array['width']  = 220;
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['legend'] = 'no';
         $graph_array['id']     = $value;
 

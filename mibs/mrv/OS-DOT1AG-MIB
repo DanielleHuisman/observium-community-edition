@@ -1,0 +1,768 @@
+--  =======================================================================
+--  File        : osDot1ag.mib
+--  Description : Private MIB providing dot1ag 
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-DOT1AG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE, 
+                Unsigned32, Counter32                         FROM SNMPv2-SMI
+                MacAddress, TimeStamp, TimeInterval,
+                TruthValue                                    FROM SNMPv2-TC
+                nbSwitchG1Il                                  FROM OS-COMMON-TC-MIB
+                VlanIdOrNone,
+                Dot1agCfmPortStatus, Dot1agCfmInterfaceStatus, 
+                Dot1agCfmFngState,
+                Dot1agCfmMepId, Dot1agCfmHighestDefectPri,
+                Dot1agCfmMaintAssocNameType,
+                Dot1agCfmMaintAssocName, Dot1agCfmLowestAlarmPri,
+                Dot1agCfmCcmInterval, Dot1agCfmMpDirection,
+                Dot1agCfmMepDefects, Dot1agCfmRemoteMepState  FROM IEEE8021-CFM-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF
+                InterfaceIndex                                FROM IF-MIB        -- [RFC2863]
+                osEthOamMdLevel                               FROM OS-ETHOAM-MD-MIB
+                TagList, PortList, EntryValidator             FROM OS-COMMON-TC-MIB;
+
+osDot1ag      MODULE-IDENTITY
+                LAST-UPDATED "201812300000Z" -- 30 Dec. 2018
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "This MIB is used to configure and monitor 802.1ag management
+                    entities for CCM."
+
+                REVISION     "201812300000Z" -- 30 Dec. 2018
+                DESCRIPTION
+                  "Import fro general OS-COMMON-TC-MIB"
+
+                REVISION     "201305140000Z" -- 14 may 2013
+                DESCRIPTION
+                    "Initial version."
+                ::= { nbSwitchG1Il 22 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osDot1agObjects           OBJECT IDENTIFIER ::= { osDot1ag 1 }
+osDot1agConformance       OBJECT IDENTIFIER ::= { osDot1ag 100 }
+osDot1agMIBCompliances    OBJECT IDENTIFIER ::= { osDot1agConformance 1 }
+osDot1agMIBGroups         OBJECT IDENTIFIER ::= { osDot1agConformance 2 }
+osDot1agGen               OBJECT IDENTIFIER ::= { osDot1agObjects 1 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+
+-- ************************************************************
+-- Genaral configurations
+-- ************************************************************
+osDot1agGenCcmIntervals OBJECT-TYPE
+    SYNTAX       BITS {
+                  osDot1agGenSupports300Hz  (0),  -- 3 1/3 millisecond
+                  osDot1agGenSupports10ms   (1),  -- 10 millisecond
+                  osDot1agGenSupports100ms  (2),  -- 100 millisecond
+                  osDot1agGenSupports1s     (3),  -- 1 second - default
+                  osDot1agGenSupports10s    (4),  -- 10 seconds
+                  osDot1agGenSupports60s    (5),  -- 1 minute
+                  osDot1agGenSupports600s   (6)   -- 10 minutes
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Supported values of osDot1agMaCcmInterval.
+       Additionally this object serves to indicate whether this MIB is 
+       supported by agent."
+    ::= { osDot1agGen 1 }
+
+osDot1agGenKeepAlive OBJECT-TYPE
+    SYNTAX       Unsigned32 (3..12)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "CCM keep alive limit. The RMEP fault is detected after timeout with 
+        this value plus 0.5. The units of this parameter depend osDot1agMaCcmInterval.
+        For exaample, if osDot1agMaCcmInterval=interval1s, then the
+        value osDot1agGenKeepAlive=4 means keep alive timeout 4.5 seconds.
+        Another example: osDot1agMaCcmInterval=interval100ms and osDot1agGenKeepAlive=3
+        mean keep alive timeout 350ms"
+    REFERENCE
+       "CLI command 'ccm-keep-alive-number ...'."
+    DEFVAL { 3 }
+    ::= { osDot1agGen 2 }
+
+osDot1agGenAdminStatus OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   unknown (1),
+                   enable  (2),
+                   disable (3)
+                 }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Administratively assigned state of 802.1ag engine."
+    REFERENCE
+       "CLI command 'ethernet oam enable'."
+    DEFVAL { disable }
+    ::= { osDot1agGen 3 }
+    
+osDot1agGenDmmStatus OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   unknown (1),
+                   enable  (2),
+                   disable (3)
+                 }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Administratively assigned generic loopback state of rfc2544 DMM test engine."
+    REFERENCE
+       "CLI command 'ethernet oam generic-loopback-mode enable'."
+    DEFVAL { disable }
+    ::= { osDot1agGen 4 }
+
+
+-- ************************************************************
+-- The osDot1agMdTable Table see instead osEthOamMdTable in osEthOamMd.mib
+-- ************************************************************
+
+-- ************************************************************
+-- The osDot1agMaTable Table
+-- ************************************************************
+osDot1agMaTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsDot1agMaEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table allows to configure Maintenance Associations."
+    ::= { osDot1agObjects 2 }
+
+osDot1agMaEntry   OBJECT-TYPE
+    SYNTAX       OsDot1agMaEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthOamMdLevel, osDot1agMaIndex }
+    ::= { osDot1agMaTable 1 }
+
+OsDot1agMaEntry ::= SEQUENCE {
+      osDot1agMaIndex             Unsigned32,
+      osDot1agMaVlans             TagList,                     -- vlans LIST-OF-VIDS
+      osDot1agMaPrimaryVlanId     VlanIdOrNone,                -- primary-vlan <1-4095>"
+      osDot1agMaOperPrimaryVlanId VlanIdOrNone,                -- primary-vlan <1-4095>"
+      osDot1agMaFormatName        Dot1agCfmMaintAssocNameType, -- name ...
+      osDot1agMaName              Dot1agCfmMaintAssocName,     -- name ...
+      osDot1agMaCcmInterval       Dot1agCfmCcmInterval,        -- ccm-interval ...
+      osDot1agMaRMepAging         Unsigned32,                  -- remote-meps aging <0-86400>
+      osDot1agMaRMeps             TagList,                     -- remote-meps (all|LIST-OF-MEPS)
+      osDot1agMaIgnoreRMeps       TagList,                     -- ignore-rmeps (all|LIST-OF-MEPS)
+      osDot1agMaCPorts            PortList,                    -- c-ports PORTS-GROUP
+      osDot1agMaKeepAlive         Unsigned32,                  -- ccm-keep-alive-number <3-12>
+      osDot1agMaCcmClear          TruthValue,                  -- ccm-clear
+      osDot1agMaAdminSatus        EntryValidator
+}
+
+osDot1agMaIndex  OBJECT-TYPE
+    SYNTAX       Unsigned32(1..4294967295)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+      "Index of the MA table."
+    ::= { osDot1agMaEntry 1 }
+
+osDot1agMaVlans  OBJECT-TYPE
+    SYNTAX       TagList
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command 'vlans LIST-OF-VIDS'"
+    DEFVAL { "" }
+    ::= { osDot1agMaEntry 2 }
+
+osDot1agMaPrimaryVlanId OBJECT-TYPE
+    SYNTAX       VlanIdOrNone
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "Administratively assigned primary VLAN for the MA.
+      If the value equals to 0, then osDot1agMaOperPrimaryVlanId is selected as 
+      first item from osDot1agMaVlans. 
+      osDot1agMaPrimaryVlanId cannot be reassigned if osDot1agMaFormatName
+      equals to primaryVid(1).
+      CLI command  primary-vlan <1-4095>"
+    DEFVAL { 0 }
+    ::= { osDot1agMaEntry 3 }
+
+osDot1agMaOperPrimaryVlanId OBJECT-TYPE
+    SYNTAX       VlanIdOrNone
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "The current operational state of the primary VLAN."
+    ::= { osDot1agMaEntry 4 }
+
+osDot1agMaFormatName OBJECT-TYPE
+    SYNTAX       Dot1agCfmMaintAssocNameType
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command  name ..."
+    DEFVAL { unsignedInt16 }
+    ::= { osDot1agMaEntry 5 }
+
+osDot1agMaName   OBJECT-TYPE
+    SYNTAX       Dot1agCfmMaintAssocName
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command  name ...
+      Default equals to osDot1agMaIndex"
+    ::= { osDot1agMaEntry 6 }
+
+osDot1agMaCcmInterval OBJECT-TYPE
+    SYNTAX       Dot1agCfmCcmInterval
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: ccm-interval ..."
+    DEFVAL { interval1s }
+    ::= { osDot1agMaEntry 7 }
+
+osDot1agMaRMepAging OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..86400)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: remote-meps aging <0-86400>.
+      The value 0 means 'no aging'."
+    DEFVAL { 0 }
+    ::= { osDot1agMaEntry 8 }
+
+osDot1agMaRMeps  OBJECT-TYPE
+    SYNTAX       TagList
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: remote-meps (all|LIST-OF-MEPS)"
+    DEFVAL { "" }
+    ::= { osDot1agMaEntry 9 }
+
+osDot1agMaIgnoreRMeps OBJECT-TYPE
+    SYNTAX       TagList
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: ignore-rmeps (all|LIST-OF-MEPS)"
+    DEFVAL { "" }
+    ::= { osDot1agMaEntry 10 }
+
+osDot1agMaCPorts OBJECT-TYPE
+    SYNTAX       PortList
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: c-ports PORTS-GROUP"
+    DEFVAL { "" }
+    ::= { osDot1agMaEntry 11 }
+
+osDot1agMaKeepAlive OBJECT-TYPE
+    SYNTAX       Unsigned32 (3..12)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: ccm-keep-alive-number <3-12>"
+    DEFVAL { 3 }
+    ::= { osDot1agMaEntry 12 }
+
+osDot1agMaCcmClear OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "CLI command: ccm-clear."
+    DEFVAL { false }
+    ::= { osDot1agMaEntry 60 }
+
+osDot1agMaAdminSatus OBJECT-TYPE
+    SYNTAX       EntryValidator
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "."
+    ::= { osDot1agMaEntry 99 }
+
+-- ************************************************************
+-- The osDot1agMepTable
+-- ************************************************************
+osDot1agMepTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsDot1agMepEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table is used to manage Maintenance End Points."
+    ::= { osDot1agObjects 3 }
+
+osDot1agMepEntry   OBJECT-TYPE
+    SYNTAX       OsDot1agMepEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthOamMdLevel, osDot1agMaIndex, osDot1agMepId }
+    ::= { osDot1agMepTable 1 }
+
+OsDot1agMepEntry ::= SEQUENCE {
+      osDot1agMepId                Dot1agCfmMepId,
+      osDot1agMepIfIndex           InterfaceIndex,
+      osDot1agMepDirection         Dot1agCfmMpDirection,
+      osDot1agMepPrimaryVlanId     VlanIdOrNone,                -- ... primary-vlan <1-4095>"
+      osDot1agMepActive            TruthValue,                  -- ... activate
+      osDot1agMepCciEnabled        TruthValue,                  -- ... ccm-activate
+      osDot1agMepLowPrDef          Dot1agCfmLowestAlarmPri,     -- ... lowest-alarm-prio
+      osDot1agMepFngAlarmTime      TimeInterval,                -- ... fng-alarm-time
+      osDot1agMepFngResetTime      TimeInterval,                -- ... fng-reset-time
+      osDot1agMepPriority          Unsigned32,                  -- ... priority
+      osDot1agMepCcmAlarms         INTEGER,                     -- ... ccm-alarms
+      osDot1agMepSendPortTlv       TruthValue,                  -- ... send-port-tlv
+      osDot1agMepSendIfTlv         TruthValue,                  -- ... send-interface-tlv
+      osDot1agMepCcmClear          TruthValue,                  -- ... clear-ccm-statistics
+
+      -- read-only results and statistics.
+      osDot1agMepFngState          Dot1agCfmFngState,
+      osDot1agMepMacAddress        MacAddress,
+      osDot1agMepHighestPrDefect   Dot1agCfmHighestDefectPri,
+      osDot1agMepDefects           Dot1agCfmMepDefects,
+      osDot1agMepCciSentCcms       Counter32,
+      osDot1agMepCciRecvCcms       Counter32,
+
+      osDot1agMepAdminSatus        EntryValidator
+}
+
+osDot1agMepId    OBJECT-TYPE
+    SYNTAX       Dot1agCfmMepId
+    MAX-ACCESS   not-accessible
+    STATUS       current
+     DESCRIPTION
+       "Integer that is unique among all the MEPs in the same MA.
+        Other definition is: a small integer, unique over a given
+        Maintenance Association, identifying a specific Maintenance
+        association End Point (3.19)."
+    REFERENCE
+       "802.1ag clauses 3.19, 19.2 and 12.14.7"
+    ::= { osDot1agMepEntry 1 }
+
+osDot1agMepIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object is the interface index of the interface either a
+        bridge port, or an aggregated IEEE 802.1 link within a bridge
+        port, to which the MEP is attached."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:b"
+    ::= { osDot1agMepEntry 2 }
+
+osDot1agMepDirection OBJECT-TYPE
+    SYNTAX      Dot1agCfmMpDirection
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The direction in which the MEP faces on the Bridge port.
+       down(1)    Sends Continuity Check Messages away from the
+                   MAC Relay Entity. Also know as 'outward'.
+       up(2)      Sends Continuity Check Messages towards the
+                   MAC Relay Entity. Also know as 'inward'."
+    REFERENCE
+       "802.1ag clauses 12.14.6.3.2:c"
+    DEFVAL { up }
+    ::= { osDot1agMepEntry 3 }
+
+osDot1agMepPrimaryVlanId OBJECT-TYPE
+    SYNTAX      VlanIdOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  primary-vlan <1-4095>"
+    DEFVAL { 0 }
+    ::= { osDot1agMepEntry 4 }
+
+osDot1agMepActive OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  activate"
+    DEFVAL { false }
+    ::= { osDot1agMepEntry 5 }
+
+osDot1agMepCciEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  ccm-activate"
+    DEFVAL { false }
+    ::= { osDot1agMepEntry 6 }
+
+osDot1agMepLowPrDef OBJECT-TYPE
+    SYNTAX      Dot1agCfmLowestAlarmPri
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  lowest-alarm-prio"
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:k and 20.9.5 and Table 20-1"
+    DEFVAL { macRemErrXcon }
+    ::= { osDot1agMepEntry 7 }
+
+osDot1agMepFngAlarmTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  fng-alarm-time"
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:l and 20.33.3"
+    DEFVAL { 250 }
+    ::= { osDot1agMepEntry 8 }
+
+osDot1agMepFngResetTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  fng-reset-time"
+    DEFVAL { 1000 }
+    ::= { osDot1agMepEntry 9 }
+
+osDot1agMepPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  priority"
+    DEFVAL { 0 }
+    ::= { osDot1agMepEntry 10 }
+
+osDot1agMepCcmAlarms OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  all      (1),
+                  fault    (2),
+                  recovery (3)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  ccm-alarms
+         all       Send nbEthOamCcmAlarm when the MEP fails or recovers
+         fault     Send nbEthOamCcmAlarm when the MEP fails (default - no)
+         recovery  Send nbEthOamCcmAlarm when the MEP recovers (default - yes)
+      "
+    DEFVAL { all }
+    ::= { osDot1agMepEntry 11 }
+
+osDot1agMepSendPortTlv OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  send-port-tlv"
+    DEFVAL { true }
+    ::= { osDot1agMepEntry 12 }
+
+osDot1agMepSendIfTlv OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  send-interface-tlv"
+    DEFVAL { true }
+    ::= { osDot1agMepEntry 13 }
+
+osDot1agMepCcmClear  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "CLI command: mep <1-4095>  clear-ccm-statistics"
+    DEFVAL { false }
+    ::= { osDot1agMepEntry 14 }
+
+-- read-only results and statistics.
+
+osDot1agMepFngState OBJECT-TYPE
+    SYNTAX      Dot1agCfmFngState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osDot1agMepEntry 25 }
+
+osDot1agMepMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osDot1agMepEntry 26 }
+
+osDot1agMepHighestPrDefect OBJECT-TYPE
+    SYNTAX      Dot1agCfmHighestDefectPri
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osDot1agMepEntry 27 }
+
+osDot1agMepDefects OBJECT-TYPE
+    SYNTAX      Dot1agCfmMepDefects
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osDot1agMepEntry 28 }
+
+osDot1agMepCciSentCcms OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "."
+    ::= { osDot1agMepEntry 29 }
+
+osDot1agMepCciRecvCcms OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of Continuity Check messages transmitted."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:w and 20.10.2"
+    ::= { osDot1agMepEntry 30 }
+
+osDot1agMepAdminSatus OBJECT-TYPE
+    SYNTAX      EntryValidator
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of Continuity Check messages received from all remote MEPs."
+    ::= { osDot1agMepEntry 99 }
+
+-- ************************************************************
+-- The osDot1agRMepTable
+-- ************************************************************
+
+osDot1agRMepTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsDot1agRMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP Database. A database, maintained by every MEP, that
+        maintains received information about other MEPs in the
+        Maintenance Domain."
+    REFERENCE
+       "802.1ag clause 19.2.15"
+    ::= { osDot1agObjects 4 }
+
+osDot1agRMepEntry OBJECT-TYPE
+    SYNTAX      OsDot1agRMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP Database table entry."
+    INDEX { osEthOamMdLevel, osDot1agMaIndex, osDot1agMepId, osDot1agRMepId }
+    ::= { osDot1agRMepTable 1 }
+
+OsDot1agRMepEntry ::= SEQUENCE {
+      osDot1agRMepId                 Dot1agCfmMepId,
+      osDot1agRMepState              Dot1agCfmRemoteMepState,
+      osDot1agRMepFailedOkTime       TimeStamp,
+      osDot1agRMepMacAddress         MacAddress,
+      osDot1agRMepRdi                TruthValue,
+      osDot1agRMepPortStatusTlv      Dot1agCfmPortStatus,
+      osDot1agRMepInterfaceStatusTlv Dot1agCfmInterfaceStatus,
+      osDot1agRMepRecvCcms           Counter32
+    }
+
+osDot1agRMepId OBJECT-TYPE
+    SYNTAX      Dot1agCfmMepId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Maintenance association End Point Identifier of a remote MEP
+        whose information from the MEP Database is to be returned.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.6.2:b"
+    ::= { osDot1agRMepEntry 1 }
+
+osDot1agRMepState OBJECT-TYPE
+    SYNTAX      Dot1agCfmRemoteMepState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The operational state of the remote MEP IFF State machines."
+    REFERENCE
+       "802.1ag clause 12.14.7.6.3:b and 20.22"
+    ::= { osDot1agRMepEntry 2}
+
+osDot1agRMepFailedOkTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The time (SysUpTime) at which the IFF Remote MEP state machine
+        last entered either the RMEP_FAILED or RMEP_OK state.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.6.3:c"
+    ::= { osDot1agRMepEntry 3 }
+
+osDot1agRMepMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The MAC address of the remote MEP."
+    REFERENCE
+       "802.1ag clause 12.14.7.6.3:d and 20.19.7"
+    ::= { osDot1agRMepEntry 4 }
+
+osDot1agRMepRdi OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "State of the RDI bit in the last received CCM (true for
+        RDI=1), or false if none has been received.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.6.3:e and 20.19.2"
+    ::= { osDot1agRMepEntry 5 }
+
+osDot1agRMepPortStatusTlv OBJECT-TYPE
+    SYNTAX      Dot1agCfmPortStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "An enumerated value of the Port status TLV received in the
+        last CCM from the remote MEP or the default value
+        psNoPortStateTLV indicating either no CCM has been received,
+        or that nor port status TLV was received in the last CCM.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.6.3:f and 20.19.3"
+    DEFVAL { psNoPortStateTLV }
+    ::= { osDot1agRMepEntry 6}
+   
+osDot1agRMepInterfaceStatusTlv OBJECT-TYPE
+    SYNTAX      Dot1agCfmInterfaceStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "An enumerated value of the Interface status TLV received
+        in the last CCM from the remote MEP or the default value
+        isNoInterfaceStatus TLV indicating either no CCM has been
+        received, or that no interface status TLV was received in
+        the last CCM.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.6.3:g and 20.19.4"
+    DEFVAL { isNoInterfaceStatusTLV }
+    ::= { osDot1agRMepEntry 7}
+
+osDot1agRMepRecvCcms OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of Continuity Check messages received from this remote MEPs."
+    ::= { osDot1agRMepEntry 8 }
+
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osDot1agMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osDot1agMandatoryGroup
+                         }
+
+    ::= { osDot1agMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+osDot1agMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+              osDot1agGenCcmIntervals, osDot1agGenKeepAlive, osDot1agGenAdminStatus, osDot1agGenDmmStatus,
+
+              osDot1agMaVlans, osDot1agMaPrimaryVlanId, osDot1agMaOperPrimaryVlanId,
+              osDot1agMaFormatName, osDot1agMaName, osDot1agMaCcmInterval, osDot1agMaRMepAging,
+              osDot1agMaRMeps, osDot1agMaIgnoreRMeps, osDot1agMaCPorts,
+              osDot1agMaKeepAlive, osDot1agMaCcmClear, osDot1agMaAdminSatus,
+
+              osDot1agMepIfIndex, osDot1agMepDirection, osDot1agMepPrimaryVlanId,
+              osDot1agMepActive, osDot1agMepCciEnabled, osDot1agMepLowPrDef,
+              osDot1agMepFngAlarmTime, osDot1agMepFngResetTime, osDot1agMepPriority,
+              osDot1agMepCcmAlarms, osDot1agMepSendPortTlv, osDot1agMepSendIfTlv, osDot1agMepCcmClear,
+              osDot1agMepFngState, osDot1agMepMacAddress, osDot1agMepHighestPrDefect,
+              osDot1agMepDefects, osDot1agMepCciSentCcms, osDot1agMepCciRecvCcms,
+              osDot1agMepAdminSatus,
+
+              osDot1agRMepState, osDot1agRMepFailedOkTime, osDot1agRMepMacAddress,
+              osDot1agRMepRdi, osDot1agRMepPortStatusTlv, osDot1agRMepInterfaceStatusTlv,
+              osDot1agRMepRecvCcms
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osDot1agMIBGroups 1 }
+
+
+END
+

@@ -63,7 +63,8 @@ Hm2CellularNetworks ::= TEXTUAL-CONVENTION
                         lte (4), 
                         gsmumts (5), 
                         gsmlte (6), 
-                        umtslte (7) 
+                        umtslte (7), 
+                        none (8)
                     }
 
 Hm2TechnologyLevel ::= TEXTUAL-CONVENTION
@@ -100,8 +101,9 @@ Hm2ConnectionStatus ::= TEXTUAL-CONVENTION
                         inactive (1), 
                         active (2), 
                         idle (3), 
-                        reconnecting (4), 
-                        failure (5)
+                        connecting (4), 
+                        reconnecting (5), 
+                        failure (6)
                     }
 
 Hm2LimitUnit ::= TEXTUAL-CONVENTION
@@ -181,6 +183,57 @@ Hm2TrapBits ::= TEXTUAL-CONVENTION
                         failoverRegistrationModemReset(10)
                     }
 
+Hm2SimCardsListIndex ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "SIM Cards list."
+    SYNTAX          INTEGER {
+                        sim1 (0), 
+                        sim2 (1), 
+                        sim3 (2), 
+                        sim4 (3)
+                    }
+
+Hm2SimCardsListActive ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "SIM Cards list."
+    SYNTAX          INTEGER {
+                        noSim (0), 
+                        sim1 (1), 
+                        sim2 (2), 
+                        sim3 (3), 
+                        sim4 (4)
+                    }
+
+Hm2ModemOperationalState ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "Modem power states."
+    SYNTAX          INTEGER {
+                        online(0), 
+                        low-power(1), 
+                        offline(2), 
+                        reset(3), 
+                        shutting-down(4), 
+                        persistent-low-power(5), 
+                        unknown(255)
+                    }
+
+Hm2CellularDataTech ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "Data technology list."
+    SYNTAX          INTEGER {
+                        unknown(0), 
+                        gsm(1), 
+                        umts(2), 
+                        edge(3), 
+                        hsdpa(4), 
+                        hsupa(5), 
+                        hsdpa-hsupda(6), 
+                        lte(7), 
+                        hsdpaplus(8), 
+                        hsdpaplus-hsupa(9), 
+                        dchsdpaplus(10), 
+                        dchsdpaplus-hsupa(11)
+                    }
 
 --
 -- *************************************************************
@@ -383,7 +436,7 @@ Hm2WwanDataConnectionEntry ::= SEQUENCE {
         hm2WwanDataConnectionDnsSecondaryCurrent        InetAddress, 
         hm2WwanDataConnectionMtu                        Integer32, 
         hm2WwanDataConnectionFailedRetry                Integer32, 
-        hm2WwanDataConnectionFailedRetryCurrent         Integer32, 
+        hm2WwanDataConnectionFailedRetryCurrent         Unsigned32, 
         hm2WwanDataConnectionStatus                     Hm2ConnectionStatus, 
         hm2WwanDataConnectionStatusErrorReason          HmLargeDisplayString, 
         hm2WwanDataConnectionActivatedCount             Unsigned32, 
@@ -394,7 +447,7 @@ Hm2WwanDataConnectionEntry ::= SEQUENCE {
 
  
 hm2WwanDataConnectionSimId OBJECT-TYPE
-        SYNTAX              Integer32 (1..10)
+        SYNTAX              Hm2SimCardsListIndex
         MAX-ACCESS          not-accessible
         STATUS              current
         DESCRIPTION         
@@ -418,7 +471,9 @@ hm2WwanDataConnectionApn OBJECT-TYPE
         DESCRIPTION         
                             "Access Point Name used to identify the data connection's
                             gateway name in the carriers network. If empty then the
-                            default APN configured on the SIM card will be used."
+                            default APN configured on the SIM card will be used. APN
+                            value change while the connection is active, will take effect
+                            after toggling hm2WwanDataConnectionAdminStatus."
         DEFVAL              { ''H }
         ::= { hm2WwanDataConnectionEntry 3 }
 
@@ -552,6 +607,7 @@ hm2WwanDataConnectionIpAddressCurrent OBJECT-TYPE
         DESCRIPTION         
                             "The IP Address that the WWAN data interface is currently
                             using."
+        DEFVAL              { '00000000'H }
         ::= { hm2WwanDataConnectionEntry 16 }
 
 hm2WwanDataConnectionDnsPrimaryCurrentType OBJECT-TYPE
@@ -570,6 +626,7 @@ hm2WwanDataConnectionDnsPrimaryCurrent OBJECT-TYPE
         DESCRIPTION         
                             "The Primary DNS Address that the WWAN data interface 
                             is currently using."
+        DEFVAL              { '00000000'H }
         ::= { hm2WwanDataConnectionEntry 18 }
 
 hm2WwanDataConnectionDnsSecondaryCurrentType OBJECT-TYPE
@@ -588,16 +645,17 @@ hm2WwanDataConnectionDnsSecondaryCurrent OBJECT-TYPE
         DESCRIPTION         
                             "The Secondary DNS Address that the WWAN data interface 
                             is currently using."
+        DEFVAL              { '00000000'H }
         ::= { hm2WwanDataConnectionEntry 20 }
 
 hm2WwanDataConnectionMtu OBJECT-TYPE
-        SYNTAX              Integer32 (552..1500)
-        MAX-ACCESS          read-write
+        SYNTAX              Integer32 (0..1500)
+        MAX-ACCESS          read-only
         STATUS              current
         DESCRIPTION         
                             "Maximum Transmision Unit used when sending IP packets
-                            over the WWAN data interface."
-        DEFVAL              { 1500 }
+                            over the WWAN data interface. The MTU value is reported
+                            by the wwan modem."
         ::= { hm2WwanDataConnectionEntry 21 }
 
 hm2WwanDataConnectionFailedRetry OBJECT-TYPE
@@ -614,14 +672,12 @@ hm2WwanDataConnectionFailedRetry OBJECT-TYPE
         ::= { hm2WwanDataConnectionEntry 22 }
 
 hm2WwanDataConnectionFailedRetryCurrent OBJECT-TYPE
-        SYNTAX              Integer32 (0..32)
+        SYNTAX              Unsigned32
         MAX-ACCESS          read-only
         STATUS              current
         DESCRIPTION         
                             "The current number o data reconnect attempts made.
-                            Can only be lower or equal to
-                            hm2WwanDataConnectionFailedRetry. Value 0 means no
-                            retries have been made."
+                            Value 0 means no retries have been made."
         ::= { hm2WwanDataConnectionEntry 23 }
 
 hm2WwanDataConnectionStatus OBJECT-TYPE
@@ -716,7 +772,7 @@ Hm2WwanDataPlanEntry ::= SEQUENCE {
 
  
 hm2WwanDataPlanSimId OBJECT-TYPE
-        SYNTAX              Integer32 (1..10)
+        SYNTAX              Hm2SimCardsListIndex
         MAX-ACCESS          not-accessible
         STATUS              current
         DESCRIPTION         
@@ -857,7 +913,7 @@ Hm2WwanDataPacketStatsEntry ::= SEQUENCE {
         }
  
 hm2WwanDataPacketStatsSimId OBJECT-TYPE
-        SYNTAX              Integer32 (1..10)
+        SYNTAX              Hm2SimCardsListIndex
         MAX-ACCESS          not-accessible
         STATUS              current
         DESCRIPTION         
@@ -995,7 +1051,7 @@ Hm2WwanSimCardEntry ::= SEQUENCE {
         }
  
 hm2WwanSimCardSimId OBJECT-TYPE
-        SYNTAX              Integer32 (1..10)
+        SYNTAX              Hm2SimCardsListIndex
         MAX-ACCESS          not-accessible
         STATUS              current
         DESCRIPTION         
@@ -1063,7 +1119,7 @@ hm2WwanSimCardSetActive OBJECT-TYPE
         ::= { hm2WwanSimCardEntry 6 }
 
 hm2WwanSimCardPin1 OBJECT-TYPE
-        SYNTAX              SnmpAdminString (SIZE(4..8))
+        SYNTAX              SnmpAdminString (SIZE(0|4..8))
         MAX-ACCESS          read-write
         STATUS              current
         DESCRIPTION         
@@ -1181,11 +1237,14 @@ hm2WwanModemInformationGroup        OBJECT IDENTIFIER ::= { hm2WwanInformationGr
 -- *************************************************************
 --
 hm2WwanCellularActiveSimId OBJECT-TYPE
-        SYNTAX          Integer32 (1..10)
+        SYNTAX          Hm2SimCardsListActive
         MAX-ACCESS      read-only
         STATUS          current
         DESCRIPTION
-                        "The Sim Card id for the current active SIM."
+                        "The Sim Card id for the current active SIM:
+                           * '0' value means no SIM Card is active.
+                           * '1' value means Primary SIM Card is active.
+                           * '2' value means Backup SIM Card is active."
         ::= { hm2WwanCellularInformationGroup 1 }
 
 hm2WwanCellularRegistration OBJECT-TYPE
@@ -1274,7 +1333,9 @@ hm2WwanCellularChannel OBJECT-TYPE
         STATUS          current
         DESCRIPTION
                         "The current channel number within the Cellular Band
-                        used for radio transmissions."
+                        used for radio transmissions. A value of 0 means the
+                        channel is not relevant to the network technology
+                        currently in use."
         ::= { hm2WwanCellularInformationGroup 11 }
 
 hm2WwanCellularSignalStrength OBJECT-TYPE
@@ -1285,7 +1346,8 @@ hm2WwanCellularSignalStrength OBJECT-TYPE
                         "In GSM/UMTS mobile networks signal strength is based 
                         on RSSI (Received Signal Strength Indication) value 
                         measuring the power level being received by the antena.
-                        The higher the RSSI the stronger the signal."
+                        The higher the RSSI the stronger the signal. A value 
+                        of -125 means 'no signal'."
         ::= { hm2WwanCellularInformationGroup 12 }
 
 hm2WwanCellularSignalStrengthLte OBJECT-TYPE
@@ -1315,16 +1377,6 @@ hm2WwanCellularSignalQualityLte OBJECT-TYPE
                         (Reference Signal Received Quality)."
         ::= { hm2WwanCellularInformationGroup 15 }
 
-hm2WwanCellularRscp OBJECT-TYPE
-        SYNTAX          Integer32
-        MAX-ACCESS      read-only
-        STATUS          current
-        DESCRIPTION
-                        "UMTS Received Signal Code Power is used as an indication
-                        of signal strength, as a handover criterion, in downlink
-                        power control and to calculate path loss."
-        ::= { hm2WwanCellularInformationGroup 16 }
-
 hm2WwanCellularRoamingStatus OBJECT-TYPE
         SYNTAX          Hm2RoamingStatus
         MAX-ACCESS      read-only
@@ -1336,15 +1388,16 @@ hm2WwanCellularRoamingStatus OBJECT-TYPE
                                        roaming mode. Roaming has to be admin enabled.
                             * RoamingDisabled: no home network detected and
                                                Roaming is admin disabled."
-        ::= { hm2WwanCellularInformationGroup 17 }
+        ::= { hm2WwanCellularInformationGroup 16 }
 
 hm2WwanCellularBitErrorRate OBJECT-TYPE
         SYNTAX          Integer32
         MAX-ACCESS      read-only
         STATUS          current
         DESCRIPTION
-                        "Cellular transmission error rate displayed in percentage."
-        ::= { hm2WwanCellularInformationGroup 18 }
+                        "Cellular transmission error rate displayed in hundredths 
+                        of percentage units. A value of 1000 means 10% bit error ratio."
+        ::= { hm2WwanCellularInformationGroup 17 }
 
 hm2WwanCellularCurrentTxRate OBJECT-TYPE
         SYNTAX          Unsigned32
@@ -1352,7 +1405,7 @@ hm2WwanCellularCurrentTxRate OBJECT-TYPE
         STATUS          current
         DESCRIPTION
                         "Current channel TX rate displayed in kbps."
-        ::= { hm2WwanCellularInformationGroup 19 }
+        ::= { hm2WwanCellularInformationGroup 18 }
 
 hm2WwanCellularCurrentRxRate OBJECT-TYPE
         SYNTAX          Unsigned32
@@ -1360,7 +1413,7 @@ hm2WwanCellularCurrentRxRate OBJECT-TYPE
         STATUS          current
         DESCRIPTION
                         "Current channel RX rate displayed in kbps."
-        ::= { hm2WwanCellularInformationGroup 20 }
+        ::= { hm2WwanCellularInformationGroup 19 }
 
 hm2WwanCellularMaxTxRate OBJECT-TYPE
         SYNTAX          Unsigned32
@@ -1369,7 +1422,7 @@ hm2WwanCellularMaxTxRate OBJECT-TYPE
         DESCRIPTION
                         "Maximum channel TX rate that can be achieved, 
                         displayed in kbps."
-        ::= { hm2WwanCellularInformationGroup 21 }
+        ::= { hm2WwanCellularInformationGroup 20 }
 
 hm2WwanCellularMaxRxRate OBJECT-TYPE
         SYNTAX          Unsigned32
@@ -1378,6 +1431,15 @@ hm2WwanCellularMaxRxRate OBJECT-TYPE
         DESCRIPTION
                         "Maximum channel RX rate that can be achieved, 
                         displayed in kbps."
+        ::= { hm2WwanCellularInformationGroup 21 }
+
+hm2WwanCellularDataTech OBJECT-TYPE
+        SYNTAX          Hm2CellularDataTech
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                        "Data technology in use for the active
+                        data connection."
         ::= { hm2WwanCellularInformationGroup 22 }
 
 --
@@ -1417,6 +1479,21 @@ hm2WwanModemImei OBJECT-TYPE
                         "Internation Mobile Equipment Identity is a unique number
                         given to mobile capable devices."
         ::= { hm2WwanModemInformationGroup 4 }
+
+hm2WwanModemOperationalState OBJECT-TYPE
+        SYNTAX          Hm2ModemOperationalState
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                        "ONLINE: Modem is fully operational
+                        LOW_POWER: Modem has temporarily disabled RF
+                        OFFLINE: Modem has deactivated RF and is partially shutdown
+                        RESET: Modem is in the process of power cycling
+                        SHUTTING_DOWN: Modem is in the process of shutting down
+                        PERSISTENT_LOW_POWER: Modem has disabled RF and state persists after reset
+                        UNKNOWN: Unknown state."
+        ::= { hm2WwanModemInformationGroup 5 }
+
 
 
 --

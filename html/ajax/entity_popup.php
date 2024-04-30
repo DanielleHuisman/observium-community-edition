@@ -76,11 +76,8 @@ switch ($vars['entity_type']) {
 
     case "mac":
         if (preg_match('/^' . OBS_PATTERN_MAC . '$/i', $vars['entity_id'])) {
-            $mac = format_mac($vars['entity_id']);
             // Other way by using Pear::Net_MAC, see here: http://pear.php.net/manual/en/package.networking.net-mac.importvendors.php
-            $url      = 'https://api.macvendors.com/' . urlencode($mac);
-            $response = get_http_request($url);
-            if ($response) {
+            if ($response = get_http_def('macvendors_mac', [ 'mac' => format_mac($vars['entity_id']) ])) {
                 echo 'MAC vendor: ' . escape_html($response);
             } else {
                 echo 'Not Found';
@@ -104,97 +101,15 @@ switch ($vars['entity_type']) {
             }
 
             $response    = '';
-            $reverse_dns = gethostbyaddr6($ip);
-            if ($reverse_dns) {
-                $response .= '<h4>' . $reverse_dns . '</h4><hr />' . PHP_EOL;
+            if ($reverse_dns = gethostbyaddr6($ip)) {
+                $response .= '<h4>' . escape_html($reverse_dns) . '</h4><hr />' . PHP_EOL;
             }
 
             // WHOIS
-            if (!isset($config['http_proxy']) && is_executable($config['whois'])) {
-                // Use direct whois cmd query (preferred)
-                // NOTE, for now not tested and not supported for KRNIC, ie: 202.30.50.0, 2001:02B8:00A2::
-                $cmd   = $config['whois'] . ' ' . $ip;
-                $whois = external_exec($cmd);
-
-                $multi_whois = explode('# start', $whois); // Some time whois return multiple (ie: whois 8.8.8.8), than use last
-                if (safe_count($multi_whois) > 1) {
-                    $whois = array_pop($multi_whois);
-                }
-
-                $org = 0;
-                foreach (explode("\n", $whois) as $line) {
-                    if (preg_match('/^(\w[\w\s\-\/]+):.*$/', $line, $matches)) {
-                        if (in_array($matches[1], ['Ref', 'source', 'nic-hdl-br'])) {
-                            if ($org === 1) {
-                                $response .= PHP_EOL;
-                                $org++;
-                                continue;
-                            }
-                            break;
-                        }
-                        if (in_array($matches[1], ['Organization', 'org', 'mnt-irt'])) {
-                            $org++; // has org info
-                        } elseif ($matches[1] === 'Comment') {
-                            continue; // skip comments
-                        }
-                        $response .= $line . PHP_EOL;
-                    }
-                }
-            } else {
-                // Use RIPE whois API query
-                $whois_url = 'https://stat.ripe.net/data/whois/data.json?';
-                $whois_url .= 'sourceapp=' . urlencode(OBSERVIUM_PRODUCT . '-' . get_unique_id());
-                $whois_url .= '&resource=' . urlencode($ip);
-
-                if ($request = get_http_request($whois_url)) {
-                    $request = safe_json_decode($request); // Convert to array
-                    if ($request['status'] === 'ok' && safe_count($request['data']['records'])) {
-                        $whois_parts = [];
-                        foreach ($request['data']['records'] as $i => $parts) {
-                            $key = $parts[0]['key'];
-
-                            if (in_array($key, ['NetRange', 'inetnum', 'inet6num'])) {
-                                $org = 0;
-
-                                $whois_parts[0] = '';
-                                foreach ($parts as $part) {
-                                    if (in_array($part['key'], ['Ref', 'source', 'nic-hdl-br'])) {
-                                        break;
-                                    }
-                                    if (in_array($part['key'], ['Organization', 'org', 'mnt-irt'])) {
-                                        $org      = 1; // has org info
-                                        $org_name = $part['value'];
-                                    } elseif ($part['key'] === 'Comment') {
-                                        continue; // skip comments
-                                    }
-                                    $whois_parts[0] .= sprintf('%-16s %s' . PHP_EOL, $part['key'] . ':', $part['value']);
-                                }
-
-                            } elseif ($org === 1 && $key === 'OrgName' && strpos($org_name, $parts[0]['value']) === 0) {
-
-                                $whois_parts[1] = '';
-                                foreach ($parts as $part) {
-                                    if (in_array($part['key'], ['Ref', 'source', 'nic-hdl-br'])) {
-                                        break;
-                                    }
-                                    if ($part['key'] === 'Comment') {
-                                        continue; // skip comments
-                                    }
-                                    $whois_parts[1] .= sprintf('%-16s %s' . PHP_EOL, $part['key'] . ':', $part['value']);
-                                }
-
-                                break;
-                            }
-                        }
-                        $response .= implode(PHP_EOL, $whois_parts);
-
-                        //print_vars($request['data']['records']);
-                    }
-                }
-            }
+            $response .= escape_html(ip_whois($ip));
 
             if ($response) {
-                $cache_entry = '<pre class="small">' . escape_html($response) . '</pre>';
+                $cache_entry = '<pre class="small">' . $response . '</pre>';
                 // @session_start();
                 // $_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip] = '<pre class="small">' . $response . '</pre>';
                 // session_commit();

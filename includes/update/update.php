@@ -4,14 +4,14 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage db
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 if (!defined('OBS_DEBUG')) {
-    // Direct call not allowed.
+    // Direct call isn't allowed.
     echo("WARNING. Direct call to this script is no longer supported, please use './discovery.php -u' from main observium directory.\n");
     exit(2);
 }
@@ -301,6 +301,9 @@ foreach ($filelist as $file) {
     }
 }
 
+// Clean
+del_process_info(-1); // Remove process info
+
 if ($updating) {
 //  $GLOBALS['cache']['db_version'] = $db_rev; // Cache new db version
 //  if ($schema_insert)
@@ -314,7 +317,6 @@ if ($updating) {
     echo('-- Database is up to date.' . PHP_EOL);
 }
 
-// Clean
-del_process_info(-1); // Remove process info
+return $updating;
 
 // EOF

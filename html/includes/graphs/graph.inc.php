@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
+ * @package    observium
+ * @subpackage graphs
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -77,10 +77,10 @@ if (isset($vars['timestamp_to']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['tim
 // Validate rrdtool compatible time string and set to now/day if it's not valid
 if (preg_match(OBS_PATTERN_RRDTIME, $vars['to'])) {
     $to = $vars['to'];
-}              // else { $to     = $config['time']['now']; }
+}              // else { $to     = get_time(); }
 if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) {
     $from = $vars['from'];
-}              // else { $from   = $config['time']['day']; }
+}              // else { $from   = get_time('day'); }
 
 if (isset($vars['period']) && is_numeric($vars['period'])) {
     $to     = get_time();
@@ -244,7 +244,7 @@ if ($error_msg) {
 }
 
 // Total runtime and clean graph file
-$graph_return['total'] = utime() - $total_start;
+$graph_return['total'] = elapsed_time($total_start);
 if (strlen($graph_return['filename']) && is_file($graph_return['filename'])) {
     unlink($graph_return['filename']);
 }

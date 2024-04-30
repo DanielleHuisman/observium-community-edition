@@ -1,0 +1,862 @@
+-- Copyright (C) 2007-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsote.mib,v 1.2 2012/09/07 09:52:05 siva Exp $
+
+ARICENT-OSPF-TE-MIB DEFINITIONS ::= BEGIN
+
+
+   IMPORTS
+      MODULE-IDENTITY, OBJECT-TYPE, Counter32, Counter64,
+      Integer32, Unsigned32, IpAddress, enterprises    FROM SNMPv2-SMI
+      TEXTUAL-CONVENTION                               FROM SNMPv2-TC;
+
+--    org         OBJECT IDENTIFIER ::=  { iso(1) 3 }
+--    dod         OBJECT IDENTIFIER ::=  { org 6 }
+--    internet    OBJECT IDENTIFIER ::=  { dod 1 }
+--    mgmt        OBJECT IDENTIFIER ::=  { internet 2 }
+--    private     OBJECT IDENTIFIER ::=  { internet 4 }
+--    enterprises OBJECT IDENTIFIER ::=  { iso(1) org(3) dod(6) internet(1)  private(4) 1 }
+--    mib-2       OBJECT IDENTIFIER ::=  { mgmt 1 }
+
+
+futOspfTe  MODULE-IDENTITY
+          LAST-UPDATED "201209050000Z"
+          ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+          CONTACT-INFO "support@aricent.com"
+
+          DESCRIPTION  "All rights reserved"
+          REVISION     "201209050000Z"
+          DESCRIPTION  "The Proprietary MIB 
+                        to configure OSPF-TE module" 
+
+       ::= {enterprises futuresoftware (2076) 72 }
+
+
+--future              OBJECT IDENTIFIER ::= { enterprises 2076 }
+--futOspfTe           OBJECT IDENTIFIER ::= { futOspfTe 72 }
+--::=  { 1 3 6 1 4 1 2076 72 }
+
+
+--  The Area ID, in OSPF-TE, has the same format as an IP Address,
+--  but has the function of defining a summarization point for
+--  Link State Advertisements
+AreaID ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "An OSPF Area Identifier."
+    SYNTAX      IpAddress
+
+--  The Router ID, in OSPF-TE, has the same format as an IP Address,
+--  but identifies the router independent of its IP Address.
+RouterID ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "A OSPF Router Identifier."
+    SYNTAX      IpAddress
+
+--  The range of Interface Index
+InterfaceIndex ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+       "The range of ifIndex."
+    SYNTAX      Integer32
+
+BandWidth ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS     current
+    DESCRIPTION
+       "Bandwidth in thousand bps"
+    SYNTAX     Counter64 
+
+TeLinkPriority ::= TEXTUAL-CONVENTION
+   DISPLAY-HINT "d"
+   STATUS       current
+   DESCRIPTION
+       "This type is used to represent a priority. Each connection is
+        assigned a priority. This priority is used when accounting for
+        bandwidth on TE links or component links, for resource
+        allocation and for rerouting purposes. Value 0 is the highest
+        priority. Value 7 is the lowest priority."
+   SYNTAX       Integer32 (0..7)
+
+TeLinkEncodingType ::= TEXTUAL-CONVENTION
+   STATUS       current
+   DESCRIPTION
+       "Link encoding type as specified in 'GMPLS Signaling Functional
+        Description' document. The values specified in this document are
+        not contiguous."
+   SYNTAX       INTEGER {
+                    packet(1),
+                    ethernet(2),
+                    ansiEtsiPdh(3),
+                    sdhItuSonetAnsi(5),
+                    digitalWrapper(7),
+                    lambda(8),
+                    fiber(9),
+                    fiberChannel(11)
+                    }
+    
+futOspfTeGeneralGroup OBJECT IDENTIFIER ::= { futOspfTe 1 }
+
+
+--  SCALAR TABLE BEGIN  futOspfTeGeneralGroup
+
+   futOspfTeAdminStatus OBJECT-TYPE
+       SYNTAX       INTEGER {
+                       enabled  (1),
+                       disabled (2) 
+                       }
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+           "Indicates whether the router supports OSPF-TE
+             or not. It has a pre-requisite condition 
+             .i.e Only an Opaque Capable Router can 
+             set this object as enabled."
+       DEFVAL { disabled }
+       ::= { futOspfTeGeneralGroup 1 }
+
+
+   futOspfTeTraceLevel OBJECT-TYPE
+       SYNTAX       Integer32 
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+           "This object is used to define level of trace 
+		    required for OSPF-TE.Levels are defined as Follows.
+			0x00000001 -- Critical Trace
+			0x00000002 -- Function Entry Trace
+			0x00000004 -- Function Exit Trace
+			0x00000008 -- CSPF Trace
+			0x00000010 -- Search Failure Trace
+			0x00000020 -- Memory allocation failure Trace
+			0x00000040 -- Contraol Plane Trace."
+			DEFVAL { '00000001'H }
+       ::= { futOspfTeGeneralGroup 2 }
+
+
+   futOspfTeCspfRunCnt OBJECT-TYPE
+       SYNTAX       Counter32
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "This gives the total number of times CSPF 
+            computation was performed"
+       ::= { futOspfTeGeneralGroup 3 }
+
+--  SCALAR TABLE END futOspfTeGeneralGroup
+
+
+-- OSPF TE Link State Database
+--      The Link State Database contains the Router Address TLVs 
+--      and Link TLVs both self originated and the TLVs received from the 
+--      neighbouring routers. It contains the Network LSAs both
+--      self originated and the Network LSAs received from the
+--      neighbouring routers. It contains the self originated Router LSA.
+--      READ-ONLY Table  
+
+futOspfTeLsdbTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF FutOspfTeLsdbEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "The OSPF-TE Process's Link State Database containing Router LSA,
+		    Network LSA , Type 10 Opaque LSA which holds Router Adrress TLVs and 
+			Link TLVs. This TE database contains only self originated Router
+			LSA."
+        ::= { futOspfTe 2 }
+
+
+   futOspfTeLsdbEntry OBJECT-TYPE
+       SYNTAX       FutOspfTeLsdbEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "A single Link State Advertisement."
+       INDEX { futOspfTeLsdbAreaId, futOspfTeLsdbType, futOspfTeLsdbLsid, futOspfTeLsdbRouterId }
+       ::= { futOspfTeLsdbTable 1 }
+
+   FutOspfTeLsdbEntry ::= SEQUENCE {
+       futOspfTeLsdbAreaId         AreaID,
+       futOspfTeLsdbType           INTEGER,
+       futOspfTeLsdbLsid           IpAddress,
+       futOspfTeLsdbRouterId       RouterID,
+       futOspfTeLsdbChecksum       Integer32,
+       futOspfTeLsdbAdvertisement  OCTET STRING
+       }
+
+   futOspfTeLsdbAreaId OBJECT-TYPE
+       SYNTAX       AreaID
+       MAX-ACCESS   not-accessible 
+       STATUS       current
+       DESCRIPTION
+          "The 32 bit identifier of the Area  from  which
+           the LSA was received or originated."
+       ::= { futOspfTeLsdbEntry 1 }
+
+   futOspfTeLsdbType OBJECT-TYPE
+       SYNTAX      INTEGER    
+                   {
+                       routerLSA  (1),
+                       networkLSA (2),
+                       type10OpaqueLSA  (10)
+                   }
+       MAX-ACCESS   not-accessible 
+       STATUS       current
+       DESCRIPTION
+          "The type  of  the  link  state  advertisement.
+           Each  link state type has a separate advertise-
+           ment format."
+       ::= { futOspfTeLsdbEntry 2 }
+
+   futOspfTeLsdbLsid OBJECT-TYPE
+       SYNTAX       IpAddress
+       MAX-ACCESS   not-accessible 
+       STATUS       current
+       DESCRIPTION
+          "The Link State ID is an LS Type Specific field
+           that identifies the piece of the  routing  domain
+           that is being described by the advertisement for Router
+		   and Network LSAs. For Type 10 LSA the format is 
+		   0x01 0x00 and next 2 bytes is interface index of the
+		   interface for which Type 10 LSA is generated."
+       ::= { futOspfTeLsdbEntry 3 }
+
+   futOspfTeLsdbRouterId OBJECT-TYPE
+       SYNTAX        RouterID
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+          "The 32 bit number that uniquely identifies the
+           originating router in the Autonomous System."
+       ::= { futOspfTeLsdbEntry 4 }
+
+   futOspfTeLsdbChecksum OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This field is the  checksum  of  the  complete
+           contents  of  the  advertisement, excepting the
+           age field.  The age field is excepted  so  that
+           an   advertisement's  age  can  be  incremented
+           without updating the  checksum.   The  checksum
+           used  is  the same that is used for ISO connec-
+           tionless datagrams; it is commonly referred  to
+           as the Fletcher checksum."
+       ::= { futOspfTeLsdbEntry 5 }
+
+   futOspfTeLsdbAdvertisement OBJECT-TYPE
+       SYNTAX       OCTET STRING (SIZE (1..65535))
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "The entire Link State Advertisement, including
+           its header."
+       ::= { futOspfTeLsdbEntry 6 }
+
+
+-- OSPF TE Type 9 LSA Link State Database
+--      The Link State Database contains Type 9 Opaque Lsa 
+--      READ-ONLY Table  
+
+futOspfTeType9LsdbTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FutOspfTeType9LsdbEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "The OSPF-TE database Type 9 LSAs."
+        ::= { futOspfTe 3 }
+
+   futOspfTeType9LsdbEntry OBJECT-TYPE
+       SYNTAX   FutOspfTeType9LsdbEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "A single Type 9 TE LSA."
+       INDEX { futOspfTeType9LsdbIfIpAddress,
+	           futOspfTeType9LsdbIfIndex,
+               futOspfTeType9LsdbLsid,
+               futOspfTeType9LsdbRouterId }
+      ::= { futOspfTeType9LsdbTable 1 }
+
+   FutOspfTeType9LsdbEntry ::= SEQUENCE {
+       futOspfTeType9LsdbIfIpAddress    IpAddress,
+       futOspfTeType9LsdbIfIndex        InterfaceIndex,
+       futOspfTeType9LsdbLsid           IpAddress,
+       futOspfTeType9LsdbRouterId       RouterID,
+       futOspfTeType9LsdbChecksum       Integer32,
+       futOspfTeType9LsdbAdvertisement  OCTET STRING
+       }
+
+   futOspfTeType9LsdbIfIpAddress OBJECT-TYPE
+       SYNTAX      IpAddress
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Interface Index associated with the Interface"
+       ::=  { futOspfTeType9LsdbEntry 1 }
+
+   futOspfTeType9LsdbIfIndex  OBJECT-TYPE
+       SYNTAX      InterfaceIndex (1..65535) 
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Interface Index associated with the Interface"
+       ::=  { futOspfTeType9LsdbEntry 2 }
+
+   futOspfTeType9LsdbLsid OBJECT-TYPE
+       SYNTAX       IpAddress
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The Link State ID is an LS Type Specific field
+           containing the Opaque Type and Opaque ID."
+       REFERENCE
+          "The OpaqueLSA Option ,Appendix A.2 The Opaque LSA"
+       ::= { futOspfTeType9LsdbEntry 3 }
+
+   futOspfTeType9LsdbRouterId OBJECT-TYPE
+       SYNTAX       RouterID
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The 32 bit number that uniquely identifies the
+           originating router in the Autonomous System."
+       REFERENCE
+          "The Opaque LSA Option ,Section 5.0 Management Considerations"
+       ::= { futOspfTeType9LsdbEntry 4 }
+
+   futOspfTeType9LsdbChecksum OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This field is the  checksum  of  the  complete
+           contents  of  the  advertisement, excepting the
+           age field.  The age field is excepted  so  that
+           an   advertisement's  age  can  be  incremented
+           without updating the  checksum.   The  checksum
+           used  is  the same that is used for ISO connec-
+           tionless datagrams; it is commonly referred  to
+           as the Fletcher checksum."
+       REFERENCE
+          "The Opaque LSA Option ,Section 5.0 Management Considerations"
+       ::= { futOspfTeType9LsdbEntry 5 }
+
+   futOspfTeType9LsdbAdvertisement OBJECT-TYPE
+       SYNTAX       OCTET STRING (SIZE (1..65535))
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "The entire TYPE9 Opaque Link State Advertisement,
+           including its header."
+       REFERENCE
+          "The Opaque LSA Option,Appendix A.2 The Opaque LSA"
+       ::= { futOspfTeType9LsdbEntry 6 }
+
+
+--  OSPF-TE Area Table
+--      The OSPF Area Table contains the information  
+--      Router LSA, Network LSA and TE LSAs specific 
+--      to this Area
+
+
+futOspfTeAreaTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF FutOspfTeAreaEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "Information describing the configured  parame-
+           ters  and cumulative statistics of the router's
+           attached areas."
+       ::= { futOspfTe 4 }
+
+   futOspfTeAreaEntry OBJECT-TYPE
+       SYNTAX       FutOspfTeAreaEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "Information describing the configured  parame-
+          ters  and  cumulative  statistics of one of the
+          router's attached areas."
+       INDEX { futOspfTeAreaId }
+       ::= { futOspfTeAreaTable 1 }
+
+   FutOspfTeAreaEntry ::=
+       SEQUENCE {
+                 futOspfTeAreaId             AreaID,
+                 futOspfTeAreaLsaCount       Integer32,
+                 futOspfTeType10AreaCksumSum Integer32,
+                 futOspfTeType2AreaCksumSum  Integer32
+                }
+
+   futOspfTeAreaId OBJECT-TYPE
+       SYNTAX       AreaID
+       MAX-ACCESS   not-accessible 
+       STATUS       current
+       DESCRIPTION
+          "A 32-bit integer uniquely identifying an area.
+           Area ID 0.0.0.0 is used for the OSPF backbone."
+       ::= { futOspfTeAreaEntry 1 }
+
+   futOspfTeAreaLsaCount OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This gives the count of how many LSAs attached to
+           this area only type 10 and type 2."
+       ::= { futOspfTeAreaEntry 2 }
+
+   futOspfTeType10AreaCksumSum OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This gives the sum of TE LSA check sum installed in the
+           TE Data base associated with this area."
+       ::= { futOspfTeAreaEntry 3 }
+
+   futOspfTeType2AreaCksumSum OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This gives the sum of Network LSA check sum installed in the
+           TE Data base associated with this area."
+       ::= { futOspfTeAreaEntry 4 }
+
+
+--  OSPF-TE Interface Table
+--  The OSPF-TE Interface Table holds the Traffic Engineering 
+--  information related to interface 
+--  READ ONLY Table
+
+futOspfTeIfTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF FutOspfTeIfEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "The OSPF-TE Interface Table describes the TE information 
+            associated with the interfaces."
+        ::= { futOspfTe 5 }
+
+futOspfTeIfEntry OBJECT-TYPE
+        SYNTAX       FutOspfTeIfEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "The OSPF-TE Interface Entry describes TE information
+            associated with the interface "
+        INDEX { futOspfTeIfIpAddress, futOspfTeAddressLessIf }
+        ::= { futOspfTeIfTable 1 }
+
+FutOspfTeIfEntry ::=
+    SEQUENCE {
+        futOspfTeIfIpAddress      IpAddress,
+        futOspfTeAddressLessIf    InterfaceIndex,
+        futOspfTeIfAreaId         AreaID,
+        futOspfTeIfType           INTEGER,
+        futOspfTeIfMetric         Integer32,
+        futOspfTeIfMaxBw          BandWidth,
+        futOspfTeIfMaxReservBw    BandWidth,
+        futOspfTeIfRsrcClassColor Integer32,
+        futOspfTeIfOperStat       INTEGER,
+        futOspfTeIfLinkId         IpAddress,
+        futOspfTeIfRemoteIpAddr   IpAddress,
+        futOspfTeIfProtectionType INTEGER,
+		futOspfTeIfSrlg           OCTET STRING
+    }
+
+futOspfTeIfIpAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible 
+        STATUS       current
+        DESCRIPTION
+           "The IP address of this OSPF interface."
+        ::= { futOspfTeIfEntry 1 }
+
+futOspfTeAddressLessIf OBJECT-TYPE
+        SYNTAX       InterfaceIndex (1..65535)
+        MAX-ACCESS   not-accessible 
+        STATUS       current
+        DESCRIPTION
+           "For the purpose of easing  the  instancing  of
+            addressed   and  addressless  interfaces;  This
+            variable takes the value 0 on  interfaces  with
+            IP  Addresses,  and  the corresponding value of
+            ifIndex for interfaces having no IP Address."
+        ::= { futOspfTeIfEntry 2 }
+
+futOspfTeIfAreaId OBJECT-TYPE
+        SYNTAX       AreaID
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "A 32-bit integer uniquely identifying the area
+            to  which  the  interface  connects. Area  ID
+            0.0.0.0 is used for the OSPF backbone."
+        ::= { futOspfTeIfEntry 3 }
+
+futOspfTeIfType OBJECT-TYPE
+        SYNTAX       INTEGER
+                     {
+                        pointToPoint (1),
+                        multiaccess (2)
+                     }  
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "The OSPF/OSPF-TE interface type."
+        ::= { futOspfTeIfEntry 4 }
+
+futOspfTeIfMetric OBJECT-TYPE
+        SYNTAX       Integer32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "TE Metric associated with the link "
+        ::= { futOspfTeIfEntry 5 }
+
+futOspfTeIfMaxBw OBJECT-TYPE
+        SYNTAX       BandWidth 
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "The Maximum Bandwidth specifies the maximum
+            bandwidth that can be used on this link in this
+            direction (From the router originating the LSA 
+            to its neighbor) "
+        ::= { futOspfTeIfEntry 6 }
+
+futOspfTeIfMaxReservBw OBJECT-TYPE
+        SYNTAX       BandWidth 
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "The Maximum Reservable Bandwidth specifies the 
+            maximum bandwidth that may be reserved on this 
+            link in this direction "
+        ::= { futOspfTeIfEntry 7 }
+
+futOspfTeIfRsrcClassColor OBJECT-TYPE
+        SYNTAX       Integer32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "The Resource Class/Color specifies 
+            administrative group membership for
+            this link, in terms of a bit mask (0-31)"
+        ::= { futOspfTeIfEntry 8 }
+
+futOspfTeIfOperStat OBJECT-TYPE
+        SYNTAX       INTEGER
+                     {
+                        invalid      (1),
+                        notInService (2),
+                        active       (3)
+                     } 
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "This gives the status of the interface.
+            It would be in 'invalid' state if TE information not present.  
+            It would be in 'notInService' state if TE information is present,
+            but at OSPF level interface is not created.
+            It would be in 'active' state if both TE information and at OSPF
+            level interface is operational."  
+        ::= { futOspfTeIfEntry 9 }
+
+futOspfTeIfLinkId OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "A 32-bit integer (represented as a type  IpAd-
+            dress)  If Interface Type is PtoP this is neighbour
+            router Id and if Interface type is multi-access than 
+		    this is interface address of designated router."
+        ::= { futOspfTeIfEntry 10 }
+
+futOspfTeIfRemoteIpAddr OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The remote IP address associated with the TE link (
+             numbered links). For an unnumbered link, the remote
+             address is of type unknown and this object should be the
+             zero length string."
+        ::= { futOspfTeIfEntry 11 }
+
+futOspfTeIfProtectionType OBJECT-TYPE
+        SYNTAX        INTEGER {
+                          extraTraffic(1),
+                          unprotected(2),
+                          shared(3),
+                          dedicated1For1(4),
+                          dedicated1Plus1(5),
+                          enhanced(6)
+                      }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This attribute specifies link protection type of the
+             TE link. Description of the different protection types can be
+             found in the 'Routing Extensions in Support of Generalized
+             MPLS' document."
+        ::= { futOspfTeIfEntry 12 }
+        
+futOspfTeIfSrlg OBJECT-TYPE
+        SYNTAX       OCTET STRING
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+           "This gives list of SRLG values associated with  
+            this interface."
+        ::= { futOspfTeIfEntry 13 }
+
+-- End of futOspfTeIfTable
+
+
+-- Interface Switching Capability Descriptor Table
+--  READ ONLY Table
+
+futOspfTeIfDescriptorTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FutOspfTeIfDescriptorEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This table specifies the Interface descriptors associated with the
+        Interface"
+   ::= { futOspfTe 6 }
+
+futOspfTeIfDescriptorEntry OBJECT-TYPE
+   SYNTAX        FutOspfTeIfDescriptorEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "An entry in this table is for Interface descriptor."
+
+   INDEX { futOspfTeIfDescrIpAddress, futOspfTeIfDescrAddressLessIf, futOspfTeIfDescrId }
+   ::= { futOspfTeIfDescriptorTable 1 }
+
+FutOspfTeIfDescriptorEntry ::= 
+    SEQUENCE	{
+  futOspfTeIfDescrIpAddress         IpAddress,
+  futOspfTeIfDescrAddressLessIf     InterfaceIndex,
+  futOspfTeIfDescrId                Unsigned32,
+  futOspfTeIfDescrSwithingCap       INTEGER,
+  futOspfTeIfDescrEncodingType      TeLinkEncodingType,
+  futOspfTeIfDescrMinLSPBandwidth   BandWidth,
+  futOspfTeIfDescrMTU               Integer32,
+  futOspfTeIfDescrIndication        Integer32
+}
+
+futOspfTeIfDescrIpAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible 
+        STATUS       current
+        DESCRIPTION
+           "The IP address of this OSPF interface."
+        ::= { futOspfTeIfDescriptorEntry 1 }
+
+futOspfTeIfDescrAddressLessIf OBJECT-TYPE
+        SYNTAX       InterfaceIndex (1..65535)
+        MAX-ACCESS   not-accessible 
+        STATUS       current
+        DESCRIPTION
+        "For the purpose of easing  the  instancing  of
+         addressed   and  addressless  interfaces;  This
+         variable takes the value 0 on  interfaces  with
+         IP  Addresses,  and  the corresponding value of
+         ifIndex for interfaces having no IP Address."
+        ::= { futOspfTeIfDescriptorEntry 2 }
+
+futOspfTeIfDescrId OBJECT-TYPE
+   SYNTAX        Unsigned32 (1..4294967295)
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This object specifies the link descriptor identifier."
+   ::= { futOspfTeIfDescriptorEntry 3 }
+
+futOspfTeIfDescrSwithingCap OBJECT-TYPE
+   SYNTAX        INTEGER {
+                  psc1 (1),
+                  psc2 (2),
+                  psc3 (3),
+                  psc4 (4),
+                  l2sc (51),
+                  tdm  (100),
+                  lsc  (150),
+                  fsc  (200)
+                 }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies the Switching Capability."
+   REFERENCE
+       "Generalized MPLS Signaling Functional Description, RFC 3471"
+   ::= { futOspfTeIfDescriptorEntry 4 }
+
+futOspfTeIfDescrEncodingType OBJECT-TYPE
+   SYNTAX        TeLinkEncodingType
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies the TE link encoding type."
+   REFERENCE
+       "Generalized MPLS Signaling Functional Description, RFC 3471"
+   ::= { futOspfTeIfDescriptorEntry 5 }
+
+futOspfTeIfDescrMinLSPBandwidth OBJECT-TYPE
+   SYNTAX        BandWidth 
+   UNITS         "thousand bps"
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies the minimum reservable bandwidth on
+        the TE link. This is derived from the union of the
+        minimum reservable bandwidth of all the component links
+        associated with the TE link that can be used to carry
+        live traffic. This value is an estimate in units of 1,000 bytes
+        per second."
+   ::= { futOspfTeIfDescriptorEntry 6 }
+
+futOspfTeIfDescrMTU OBJECT-TYPE
+   SYNTAX        Integer32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies Interface MTU size"
+   ::= { futOspfTeIfDescriptorEntry 7 }
+
+futOspfTeIfDescrIndication OBJECT-TYPE
+   SYNTAX        Integer32 
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies whether the interface support 
+        standard or Arbitray SONET/SDH"
+   ::= { futOspfTeIfDescriptorEntry 8 }
+
+-- End of futOspfTeIfDescriptorTable
+
+
+-- TE Link Descriptor Max Bandwidth Table
+-- READ ONLY Table
+
+futOspfTeIfSwDescrMaxBwTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FutOspfTeIfSwDescrMaxBwEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This table specifies the link descriptors associated with the
+        TE links."
+   ::= { futOspfTe 7 }
+
+futOspfTeIfSwDescrMaxBwEntry OBJECT-TYPE
+   SYNTAX        FutOspfTeIfSwDescrMaxBwEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "An entry in this table is created for every TE link descriptor.
+        An ifEntry in the ifTable must exist before a
+        futOspfTeIfDescriptorEntry using the same ifIndex is created.
+        ifType of ifEntry must be futOspfTeIf(200).
+        If a TE link entry in the ifTable is destroyed, then so are all
+        entries in the futOspfTeIfSwDescriptorTable that use the ifIndex of
+        this TE link."
+   INDEX         { futOspfTeIfDescrIpAddress, futOspfTeIfDescrAddressLessIf, futOspfTeIfDescrId, futOspfTeIfSwDescrMaxBwPriority }
+   ::= { futOspfTeIfSwDescrMaxBwTable 1 }
+
+FutOspfTeIfSwDescrMaxBwEntry ::= SEQUENCE {
+  futOspfTeIfSwDescrMaxBwPriority     TeLinkPriority,
+  futOspfTeIfSwDescrMaxLSPBandwidth   BandWidth 
+}
+
+futOspfTeIfSwDescrMaxBwPriority OBJECT-TYPE
+   SYNTAX        TeLinkPriority 
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This value indiates the priority of the band width"
+   ::= { futOspfTeIfSwDescrMaxBwEntry 1 }
+
+futOspfTeIfSwDescrMaxLSPBandwidth OBJECT-TYPE
+   SYNTAX        BandWidth 
+   UNITS         "thousand bps"
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies the minimum reservable bandwidth on
+        the TE link. This is derived from the union of the
+        minimum reservable bandwidth of all the component links
+        associated with the TE link that can be used to carry
+        live traffic. This value is an estimate in units of 1,000 bytes
+        per second."
+   ::= { futOspfTeIfSwDescrMaxBwEntry 2 }
+
+
+
+-- TE Link Bandwidth Table
+-- READ-ONLY Table 
+futOspfTeIfBandwidthTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FutOspfTeIfBandwidthEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This table specifies the priority-based bandwidth table
+        for TE links."
+   ::= { futOspfTe 8 }
+
+futOspfTeIfBandwidthEntry OBJECT-TYPE
+   SYNTAX        FutOspfTeIfBandwidthEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "An entry in this table contains information about
+        the priority-based bandwidth of TE links. An ifEntry in the
+        ifTable must exist before a futOspfTeIfBandwidthEntry using the
+        same ifIndex is created. ifType of ifEntry must be futOspfTeIf(200).
+        If a TE link entry in the ifTable is destroyed, then so are
+        all entries in the futOspfTeIfBandwidthTable that use the ifIndex of
+        this TE link."
+   INDEX         {futOspfTeIfIpAddress, futOspfTeAddressLessIf, futOspfTeIfBandwidthPriority }
+   ::= { futOspfTeIfBandwidthTable 1 }
+
+FutOspfTeIfBandwidthEntry ::= SEQUENCE {
+  futOspfTeIfBandwidthPriority    TeLinkPriority,
+  futOspfTeIfUnreservedBandwidth  BandWidth 
+}
+
+futOspfTeIfBandwidthPriority OBJECT-TYPE
+   SYNTAX        TeLinkPriority
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies the priority. A value of 0 is valid
+        as specified in the 'Traffic Engineering Extensions to OSPF
+        Version 2' document."
+   ::= { futOspfTeIfBandwidthEntry 1 }
+
+futOspfTeIfUnreservedBandwidth OBJECT-TYPE
+   SYNTAX        BandWidth 
+   UNITS         "thousand bps"
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This attribute specifies the TE link unreserved
+        bandwidth at priority p. It is the sum of the unreserved
+        bandwidths at priority p of all component links associated
+        with the TE link (excludes all links that are strictly
+        used as protecting links). This value is an estimate in units
+        of 1,000 bytes per second."
+   ::= { futOspfTeIfBandwidthEntry 2 }
+
+-- End of TE Link Bandwidth Table
+
+END

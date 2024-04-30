@@ -5,8 +5,8 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage common
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -217,8 +217,7 @@ function get_db_size()
  *
  * @return string
  */
-function get_local_id()
-{
+function get_local_id() {
     // http://0pointer.de/blog/projects/ids.html
     switch (PHP_OS) {
         case 'Linux':
@@ -230,11 +229,11 @@ function get_local_id()
             if (is_file('/var/lib/dbus/machine-id')) {
                 return trim(file_get_contents('/var/lib/dbus/machine-id'));
             }
+            print_debug("DEBUG: Machine-ID not found on Linux host.");
             break;
         case 'FreeBSD':
             // kern.hostuuid: fe38be37-5d64-11eb-b896-6470021048e6
-            [, $id] = explode(': ', external_exec('sysctl kern.hostuuid'));
-            if ($id) {
+            if ($id = explode(': ', external_exec('sysctl kern.hostuuid'))[1]) {
                 return str_replace('-', '', trim($id));
             }
             break;
@@ -257,11 +256,9 @@ function get_local_id()
             //       Activation Lock Status: Disabled
 
             foreach (explode("\n", external_exec('system_profiler SPHardwareDataType')) as $line) {
-                if (str_contains($line, 'UUID:')) {
-                    [, $id] = explode(': ', $line);
-                    if ($id) {
+                if (str_contains($line, 'UUID:') &&
+                    $id = explode(': ', $line)[1]) {
                         return str_replace('-', '', strtolower(trim($id)));
-                    }
                 }
             }
             break;
@@ -274,12 +271,12 @@ function get_local_id()
     }
 
     try {
-        $uuid4 = Ramsey\Uuid\Uuid ::uuid4();
+        $uuid4 = Ramsey\Uuid\Uuid::uuid4();
     } catch (Exception $e) {
         return '';
     }
 
-    $unique_id = $uuid4 -> getHex();   // i.e. c39b2386c4e8487fad4a87cd367b279d
+    $unique_id = $uuid4->getHex();   // i.e. c39b2386c4e8487fad4a87cd367b279d
     if (file_put_contents($id_file, $unique_id)) {
         // return generated id, only when lock file is writable, for prevent logs spamming
         return $unique_id;
@@ -293,8 +290,7 @@ function get_local_id()
  *
  * @return string FQDN local hostname
  */
-function get_localhost()
-{
+function get_localhost() {
     global $cache;
 
     if (!isset($cache['localhost'])) {
@@ -592,9 +588,8 @@ function list_to_range($str, $separator = ',', $sort = TRUE)
  *
  * @return false|void
  */
-function logfile($filename, $string = NULL)
-{
-    global $config, $argv;
+function logfile($filename, $string = NULL) {
+    global $config;
 
     if (defined('__PHPUNIT_PHAR__')) {
         print_debug("Skip logging to '$filename' when run phpunit tests.");
@@ -614,7 +609,7 @@ function logfile($filename, $string = NULL)
     // Create logfile if not exist
     if (is_file($filename)) {
         if (!is_writable($filename)) {
-            print_debug("Log file '$filename' is not writable, check file permissions.");
+            print_debug("Log file '$filename' is not writeable, check file permissions.");
             return FALSE;
         }
         $fd = fopen($filename, 'ab');
@@ -622,13 +617,13 @@ function logfile($filename, $string = NULL)
         $fd = fopen($filename, 'wb');
         // Check writable file (only after creation for speedup)
         if (!is_writable($filename)) {
-            print_debug("Log file '$filename' is not writable or not created.");
-            fclose($fd);
+            print_debug("Log file '$filename' is not writeable or not created.");
+            if ($fd !== FALSE) { fclose($fd); }
             return FALSE;
         }
     }
 
-    //$string = '[' . date('Y/m/d H:i:s O') . '] ' . basename($argv[0]) . '(' . getmypid() . '): ' . trim($string) . PHP_EOL;
+
     $string = '[' . date('Y/m/d H:i:s O') . '] ' . OBS_SCRIPT_NAME . '(' . getmypid() . '): ' . trim($string) . PHP_EOL;
     fwrite($fd, $string);
     fclose($fd);
@@ -730,7 +725,7 @@ function get_versions($program = NULL)
                  * python_text    = 2.7.5
                  */
                 $python_version = str_replace('Python ', '', external_exec('/usr/bin/env python --version 2>&1'));
-                $python_default = TRUE;
+                $python3_default = TRUE;
                 if (str_contains($python_version, 'No such file or directory')) {
                     // /usr/bin/env: 'python': No such file or directory
                     $python_version = str_replace('Python ', '', external_exec('/usr/bin/env python3 --version 2>&1'));
@@ -739,20 +734,29 @@ function get_versions($program = NULL)
                         $python_version = 'Not found';
                     } else {
                         // Append info about no default python executable
-                        $python_default = FALSE;
+                        $python3_default = FALSE;
+                    }
+                } elseif (str_starts_with($python_version, '2.')) {
+                    // python3 not symlynk to python
+                    $python3 = str_replace('Python ', '', external_exec('/usr/bin/env python3 --version 2>&1'));
+                    if (!str_contains($python3, 'No such file or directory')) {
+                        // /usr/bin/env: 'python': No such file or directory
+                        $python_version = $python3;
+                        // Append info about no default python executable
+                        $python3_default = FALSE;
                     }
                 }
                 $versions['python_version'] = $python_version;
                 if ($return_version) {
                     return $versions['python_version'];
                 }
-                if (str_starts($python_version, '2.')) {
+                if (str_starts_with($python_version, '2.')) {
                     $versions['python_old'] = version_compare($versions['python_version'], OBS_MIN_PYTHON2_VERSION, '<');
                 } else {
                     $versions['python_old'] = version_compare($versions['python_version'], OBS_MIN_PYTHON3_VERSION, '<');
                 }
                 $versions['python_text'] = $python_version;
-                if (!$python_default) {
+                if (!$python3_default) {
                     $versions['python_text'] .= ' (python3 not used as default python)';
                 }
                 break;
@@ -777,11 +781,18 @@ function get_versions($program = NULL)
                 $versions['mysql_client'] = $mysql_client;
                 $mysql_version            = dbFetchCell("SELECT version();");
                 $versions['mysql_full']   = $mysql_version;
-                [$versions['mysql_version']] = explode('-', $mysql_version);
+                $versions['mysql_version'] = explode('-', $mysql_version)[0];
+
+                // Define DB NAME for later use
+                $versions['mysql_name'] = str_contains(strtolower($mysql_version), 'maria') ? 'MariaDB' : 'MySQL';
+                if (!defined('OBS_DB_NAME')) {
+                    define('OBS_DB_NAME', $versions['mysql_name']);
+                }
+
                 if ($return_version) {
                     return $versions['mysql_version'];
                 }
-                $versions['mysql_name'] = str_icontains_array($mysql_version, 'Maria') ? 'MariaDB' : 'MySQL';
+
                 if ($versions['mysql_name'] === 'MariaDB') {
                     $versions['mysql_old'] = version_compare($versions['mysql_version'], OBS_MIN_MARIADB_VERSION, '<');
                 } else {
@@ -790,10 +801,6 @@ function get_versions($program = NULL)
                 $mysql_version          .= ' (extension: ' . OBS_DB_EXTENSION . ' ' . $mysql_client . ')';
                 $versions['mysql_text'] = $mysql_version;
 
-                // Define DB NAME for later use
-                if (!defined('OBS_DB_NAME')) {
-                    define('OBS_DB_NAME', $versions['mysql_name']);
-                }
                 break;
 
             case 'snmp':
@@ -1077,7 +1084,7 @@ function print_versions()
         }
         if ($GLOBALS['cache']['versions']['python_old']) {
             $python_class = 'warning';
-            if (str_starts($python_version, '2.')) {
+            if (str_starts_with($python_version, '2.')) {
                 $python_version = generate_tooltip_link(NULL, $python_version, 'Recommended version is greater than or equal to: ' . OBS_MIN_PYTHON2_VERSION . ' or ' . OBS_MIN_PYTHON3_VERSION);
             } else {
                 $python_version = generate_tooltip_link(NULL, $python_version, 'Recommended version is greater than or equal to: ' . OBS_MIN_PYTHON3_VERSION);
@@ -1134,123 +1141,6 @@ function print_versions()
           </tbody>
         </table>' . PHP_EOL;
         echo generate_box_close();
-    }
-}
-
-/**
- * Observium's SQL debugging. Chooses nice output depending upon web or cli.
- * Use format param:
- *  'compress' (default) print compressed and highlight query;
- *  'full', 'html' print fully formatted query (multiline);
- *  'log' for a return compressed query.
- *
- * @param string $query
- * @param string $format
- */
-function print_sql($query, $format = 'compress')
-{
-    switch ($format) {
-        case 'full':
-        case 'format':
-        case 'html':
-            // Fully formatted
-            $output = (new Doctrine\SqlFormatter\SqlFormatter()) -> format($query);
-            break;
-
-        case 'log':
-            // Only compress and return for log
-            return (new Doctrine\SqlFormatter\SqlFormatter()) -> compress($query);
-
-        default:
-            // Only compress and highlight in single line (default)
-            $compressed = (new Doctrine\SqlFormatter\SqlFormatter()) -> compress($query);
-            $output     = (new Doctrine\SqlFormatter\SqlFormatter()) -> highlight($compressed);
-    }
-
-    if (!is_cli()) {
-        $output = '<p>' . $output . '</p>';
-    } else {
-        $output = rtrim($output);
-    }
-
-    echo $output;
-}
-
-// DOCME needs phpdoc block
-// Observium's variable debugging. Chooses nice output depending upon web or cli
-// TESTME needs unit testing
-function print_vars($vars, $trace = NULL)
-{
-
-    if (PHP_SAPI === 'cli' || (isset($GLOBALS['cli']) && $GLOBALS['cli'])) {
-        // In cli, still prefer ref
-        if (class_exists('ref', FALSE)) {
-            ref ::config('shortcutFunc', ['print_vars', 'print_debug_vars']);
-            ref ::config('showUrls', FALSE);
-            if (OBS_DEBUG > 0) {
-                if (is_null($trace)) {
-                    $backtrace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-                } else {
-                    $backtrace = $trace;
-                }
-                ref ::config('Backtrace', $backtrace); // pass original backtrace
-                ref ::config('showStringMatches', FALSE);
-            } else {
-                ref ::config('showBacktrace', FALSE);
-                ref ::config('showResourceInfo', FALSE);
-                ref ::config('showStringMatches', FALSE);
-                ref ::config('showMethods', FALSE);
-            }
-            rt($vars);
-        } else {
-            print_r($vars);
-            echo PHP_EOL;
-        }
-    } elseif (class_exists('ref')) {
-        // in Web use old ref class, when Tracy not possible to use
-        ref ::config('shortcutFunc', ['print_vars', 'print_debug_vars']);
-        ref ::config('showUrls', FALSE);
-        if (OBS_DEBUG > 0) {
-            if (is_null($trace)) {
-                $backtrace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-            } else {
-                $backtrace = $trace;
-            }
-            ref ::config('Backtrace', $backtrace); // pass original backtrace
-        } else {
-            ref ::config('showBacktrace', FALSE);
-            ref ::config('showResourceInfo', FALSE);
-            ref ::config('showStringMatches', FALSE);
-            ref ::config('showMethods', FALSE);
-        }
-        //ref::config('stylePath',  $GLOBALS['config']['html_dir'] . '/css/ref.css');
-        //ref::config('scriptPath', $GLOBALS['config']['html_dir'] . '/js/ref.js');
-        r($vars);
-    } else {
-        // Just fallback to php var dump
-        echo '<div class="code">';
-        print_r($vars);
-        echo '</div>';
-    }
-}
-
-/**
- * Call to print_vars in debug mode only
- * By default var displayed only for debug level 2
- *
- * @param mixed   $vars        Variable to print
- * @param integer $debug_level Minimum debug level, default 2
- */
-function print_debug_vars($vars, $debug_level = 2)
-{
-    // For level 2 display always (also empty), for level 1 only non empty vars
-    if (defined('OBS_DEBUG') && OBS_DEBUG &&
-        OBS_DEBUG >= $debug_level && (OBS_DEBUG > 1 || !safe_empty($vars))) {
-        $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-        print_vars($vars, $trace);
-    } elseif (defined('OBS_CACHE_DEBUG') && OBS_CACHE_DEBUG) {
-        $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-        print_vars($vars, $trace);
     }
 }
 
@@ -1391,13 +1281,14 @@ function datetime_to_unixtime($datetime, $use_gmt = FALSE)
  *   shorter => *same as short-2 above
  *   (else)  => '1y 1d 1h 1m 1s'
  *
- * @param int|string $uptime Time is seconds
- * @param string     $format Optional format
+ * @param mixed  $uptime Time is seconds
+ * @param string $format Optional format
  *
  * @return string
  */
-function format_uptime($uptime, $format = "long")
-{
+function format_uptime($uptime, $format = "long") {
+
+    $uptime = clean_number($uptime);
     if (!is_numeric($uptime)) {
         print_debug("Passed incorrect value to " . __FUNCTION__ . "()");
         print_debug_vars($uptime);
@@ -1418,7 +1309,7 @@ function format_uptime($uptime, $format = "long")
 
     $result = '';
 
-    if (str_starts($format, 'long')) {
+    if (str_starts_with($format, 'long')) {
         if ($up['y'] > 0) {
             $result .= $up['y'] . ' year' . ($up['y'] != 1 ? 's' : '');
             if ($up['d'] > 0 || $up['h'] > 0 || $up['m'] > 0 || $up['s'] > 0) {
@@ -1456,10 +1347,10 @@ function format_uptime($uptime, $format = "long")
         }
     } else {
         $count = $format === 'shorter' ? 2 : 6;
-        if (str_starts($format, 'short-')) {
+        if (str_starts_with($format, 'short-')) {
             // short-2 => 2, short-3 => 3 and up to 6
-            [, $tmp] = explode('-', $format, 2);
-            if (is_numeric($count) && $count >= 1 && $count <= 6) {
+            $tmp = explode('-', $format, 2)[1];
+            if (is_numeric($tmp) && $tmp >= 1 && $tmp <= 6) {
                 $count = (int)$tmp;
             }
         }
@@ -1546,6 +1437,54 @@ function get_timezone($refresh = FALSE)
     return $cache['timezone'];
 }
 
+function generate_timezone_list($refresh = FALSE) {
+  global $cache;
+
+  if ($refresh || !isset($cache['timezone_list'])) {
+    /*
+    $regions = [
+      DateTimeZone::AFRICA,
+      DateTimeZone::AMERICA,
+      DateTimeZone::ANTARCTICA,
+      DateTimeZone::ASIA,
+      DateTimeZone::ATLANTIC,
+      DateTimeZone::AUSTRALIA,
+      DateTimeZone::EUROPE,
+      DateTimeZone::INDIAN,
+      DateTimeZone::PACIFIC,
+    ];
+
+    $t = [];
+    foreach($regions as $region) {
+      $t[] = DateTimeZone::listIdentifiers($region);
+    }
+    $timezones = array_merge([], ...$t);
+    */
+
+    $timezones        = DateTimeZone::listIdentifiers(DateTimeZone::ALL);
+    $timezone_offsets = [];
+    foreach ($timezones as $timezone) {
+      $tz                          = new DateTimeZone($timezone);
+      $timezone_offsets[$timezone] = $tz->getOffset(new DateTime);
+    }
+
+    // sort timezone by offset
+    asort($timezone_offsets);
+
+    $timezone_list = [];
+    foreach ($timezone_offsets as $timezone => $offset) {
+      $offset_prefix    = $offset < 0 ? '-' : '+';
+      $offset_formatted = gmdate('H:i', abs($offset));
+
+      $pretty_offset = "UTC{$offset_prefix}{$offset_formatted}";
+
+      $timezone_list[$timezone] = [ 'descr' => "({$pretty_offset}) $timezone", 'offset' => $offset ];
+    }
+    $cache['timezone_list'] = $timezone_list;
+  }
+
+  return $cache['timezone_list'];
+}
 
 /**
  * Convert common MAC strings to fixed 12 char string
@@ -1595,6 +1534,10 @@ function format_mac($mac, $split_char = ':')
 {
     // Clean MAC string
     $mac = mac_zeropad($mac);
+
+    if (empty($mac)) {
+        return '';
+    }
 
     // Add colons
     $mac = preg_replace('/([[:xdigit:]]{2})(?!$)/', '$1:', $mac);
@@ -1823,7 +1766,7 @@ function external_exec($command, &$exec_status = [], $timeout = NULL, $debug = F
             }
         }
 
-        $runtime = microtime(TRUE) - $start;
+        $runtime = elapsed_time($start);
         $status  = proc_get_status($process);
 
         // Break from this loop if the process exited before timeout
@@ -2216,8 +2159,7 @@ function check_process_run($device, $pid = NULL)
  *
  * @return boolean
  */
-function is_array_assoc($array)
-{
+function is_array_assoc($array) {
     return is_array($array) && !array_is_list($array);
 }
 
@@ -2228,9 +2170,24 @@ function is_array_assoc($array)
  *
  * @return boolean
  */
-function is_array_list($array)
-{
+function is_array_list($array) {
     return is_array($array) && array_is_list($array);
+}
+
+function is_array_numeric($array) {
+    if (!is_array($array) || empty($array)) {
+        return FALSE;
+    }
+    foreach ($array as $value) {
+        // Check if the value is not numeric
+        if (!is_numeric($value)) {
+            // Return false immediately if a non-numeric value is found
+            return FALSE;
+        }
+    }
+
+    // If the loop completes, all values are numeric
+    return TRUE;
 }
 
 /**
@@ -2258,7 +2215,7 @@ function array_key_iexists($key, array $array)
 function array_value_recursive($key, array $arr)
 {
     $val = [];
-    array_walk_recursive($arr, function ($v, $k) use ($key, &$val) {
+    array_walk_recursive($arr, static function ($v, $k) use ($key, &$val) {
         if ($k == $key) {
             array_push($val, $v);
         }
@@ -2310,6 +2267,15 @@ function array_push_after(array $array, $key, $new)
 }
 
 function array_filter_key($array, $keys = [], $condition = TRUE) {
+
+    if ($condition === 'starts' || $condition === 'starts_with') {
+        return array_filter($array, static function($key) use ($keys) { return str_starts_with($key, (string)$keys); }, ARRAY_FILTER_USE_KEY);
+    }
+    if ($condition === 'contains') {
+        return array_filter($array, static function($key) use ($keys) { return str_contains($key, (string)$keys); }, ARRAY_FILTER_USE_KEY);
+    }
+
+    // keys is array
     if (!is_array($array) || ($condition === TRUE && empty($keys)) || !array_is_list($keys)) {
         return [];
     }
@@ -3058,41 +3024,6 @@ function truncate_ng($substring, $max = 50, $rep = '...')
     return mb_strimwidth($substring, 0, $max, $rep, 'UTF-8');
 }
 
-/**
- * Wrapper to htmlspecialchars()
- *
- * @param string $string
- * @param int    $flags
- *
- * @return string
- */
-// TESTME needs unit testing
-function escape_html($string, $flags = ENT_QUOTES)
-{
-
-    if ($string === NULL) {
-        return NULL;
-    }
-
-    $string = htmlspecialchars($string, $flags, 'UTF-8');
-
-    // Un-escape allowed tags
-    if (str_contains($string, '&lt;') && str_contains_array($string, $GLOBALS['config']['escape_html']['tags'])) {
-        foreach ($GLOBALS['config']['escape_html']['tags'] as $tag) {
-            $string = str_replace(['&lt;' . $tag . '&gt;', '&lt;/' . $tag . '&gt;', '&lt;' . $tag . ' /&gt;', '&lt;' . $tag . '/&gt;'],
-                                  ['<' . $tag . '>', '</' . $tag . '>', '<' . $tag . ' />', '<' . $tag . '/>'],
-                                  $string);
-        }
-    }
-    // Un-escape allowed entities
-    if (str_contains($string, '&amp;') && str_contains_array($string, $GLOBALS['config']['escape_html']['entities'])) {
-        foreach ($GLOBALS['config']['escape_html']['entities'] as $tag) {
-            $string = str_replace('&amp;' . $tag . ';', '&' . $tag . ';', $string);
-        }
-    }
-
-    return $string;
-}
 
 /**
  * Escape HTML characters in a string using htmlspecialchars() while allowing specific tags and entities.
@@ -3102,31 +3033,41 @@ function escape_html($string, $flags = ENT_QUOTES)
  *
  * @return string|null The escaped string, or null if the input is null.
  */
-function escape_html_ng($string, $flags = ENT_QUOTES)
+function escape_html($string, $flags = ENT_QUOTES)
 {
-    if ($string === NULL) {
-        return NULL;
+    if (empty($string)) {
+        return $string;
     }
 
     $string = htmlspecialchars($string, $flags, 'UTF-8');
 
-    $allowedTags     = $GLOBALS['config']['escape_html']['tags'];
-    $allowedEntities = $GLOBALS['config']['escape_html']['entities'];
+    // Un-escape allowed tags using a callback
+    if (str_contains($string, '&lt;')) {
+        $allowed_tags = $GLOBALS['config']['escape_html']['tags'];
+        $string = preg_replace_callback('/&lt;(\/?(.+?)(?: *\/)?)&gt;/', static function ($matches) use ($allowed_tags) {
+            $tag = $matches[2];
 
-    // Un-escape allowed tags and entities using a callback
-    $string = preg_replace_callback('/&(?:lt|amp);([^;]+);/', function ($matches) use ($allowedTags, $allowedEntities) {
-        $tagOrEntity = $matches[1];
+            if (in_array($tag, $allowed_tags, TRUE)) {
+                return '<' . $matches[1] . '>';
+            }
 
-        if (in_array($tagOrEntity, $allowedTags)) {
-            return $tagOrEntity === '/' ? '</' : '<' . $tagOrEntity;
-        }
+            return $matches[0];
+        }, $string);
+    }
 
-        if (in_array($tagOrEntity, $allowedEntities)) {
-            return '&' . $tagOrEntity . ';';
-        }
+    // Un-escape allowed entities using a callback
+    if (str_contains($string, '&amp;')) {
+        $allowed_entities = $GLOBALS['config']['escape_html']['entities'];
+        $string = preg_replace_callback('/&amp;([^;]+);/', static function ($matches) use ($allowed_entities) {
+            $entity = $matches[1];
 
-        return $matches[0];
-    },                              $string);
+            if (in_array($entity, $allowed_entities, TRUE)) {
+                return '&' . $entity . ';';
+            }
+
+            return $matches[0];
+        }, $string);
+    }
 
     return $string;
 }
@@ -3229,14 +3170,14 @@ function format_bytes($value, $round = 2, $sf = 3)
 /**
  * Format a numeric value using the SI prefix system, and round the value to a specified number of decimal places.
  *
- * @param float $value The input value to be formatted.
+ * @param mixed $value The input value to be formatted.
  * @param int   $round The number of decimal places to round the value to. Default is 2.
  * @param int   $sf    The number of significant figures to use in the formatted value. Default is 3.
  *
  * @return string The formatted value with the appropriate SI prefix.
  */
-function format_si($value, $round = 2, $sf = 3)
-{
+function format_si($value, $round = 2, $sf = 3) {
+    $value = clean_number($value);
     if (!is_numeric($value)) {
         print_debug("Passed incorrect value to " . __FUNCTION__ . "()");
         print_debug_vars($value);
@@ -3253,14 +3194,14 @@ function format_si($value, $round = 2, $sf = 3)
 
     // https://physics.nist.gov/cuu/Units/prefixes.html
     if ($value >= 0.1) {
-        $sizes = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
+        $sizes = [ '', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' ];
         $ext   = $sizes[0];
         for ($i = 1; (($i < count($sizes)) && ($value >= 1000)); $i++) {
             $value /= 1000;
             $ext   = $sizes[$i];
         }
     } else {
-        $sizes = ['', 'm', 'µ', 'n', 'p', 'f', 'a', 'z', 'y'];
+        $sizes = [ '', 'm', 'µ', 'n', 'p', 'f', 'a', 'z', 'y' ];
         $ext   = $sizes[0];
         for ($i = 1; (($i < count($sizes)) && ($value != 0) && ($value <= 0.1)); $i++) {
             $value *= 1000;
@@ -3280,14 +3221,14 @@ function format_si($value, $round = 2, $sf = 3)
  * Format a value using binary prefixes (k, M, G, T, P, E) and round the value
  * to a specified number of decimal places.
  *
- * @param float $value The input value to be formatted.
+ * @param mixed $value The input value to be formatted.
  * @param int   $round The number of decimal places to round the value to. Default is 2.
  * @param int   $sf    The number of significant figures to use in the formatted value. Default is 3.
  *
  * @return string The formatted value with the appropriate binary prefix.
  */
-function format_bi($value, $round = 2, $sf = 3)
-{
+function format_bi($value, $round = 2, $sf = 3) {
+    $value = clean_number($value);
     if (!is_numeric($value)) {
         print_debug("Passed incorrect value to " . __FUNCTION__ . "()");
         print_debug_vars($value);
@@ -3301,7 +3242,7 @@ function format_bi($value, $round = 2, $sf = 3)
     } else {
         $neg = FALSE;
     }
-    $sizes = ['', 'k', 'M', 'G', 'T', 'P', 'E'];
+    $sizes = [ '', 'k', 'M', 'G', 'T', 'P', 'E' ];
     $ext   = $sizes[0];
     for ($i = 1; (($i < count($sizes)) && ($value >= 1024)); $i++) {
         $value /= 1024;
@@ -3317,19 +3258,16 @@ function format_bi($value, $round = 2, $sf = 3)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function format_number($value, $base = '1000', $round = 2, $sf = 3)
-{
+function format_number($value, $base = '1000', $round = 2, $sf = 3) {
     if ($base == '1000') {
         return format_si($value, $round, $sf);
-    } else {
-        return format_bi($value, $round, $sf);
     }
+    return format_bi($value, $round, $sf);
 }
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function format_value($value, $format = '', $round = 2, $sf = 3)
-{
+function format_value($value, $format = '', $round = 2, $sf = 3) {
 
     switch (strtolower((string)$format)) {
         case 'si':
@@ -3351,9 +3289,22 @@ function format_value($value, $format = '', $round = 2, $sf = 3)
             break;
 
         default:
-            if (is_numeric($value)) {
-                $orig  = $value;
-                $value = sprintf("%01.{$round}f", $value);
+            if ($value === TRUE) {
+                return 'TRUE';
+            }
+            if ($value === FALSE) {
+                return 'FALSE';
+            }
+            if (is_null($value)) {
+                return 'NULL';
+            }
+            if (safe_empty($value)) {
+                return '""';
+            }
+            $num = clean_number($value);
+            if (is_numeric($num)) {
+                $orig  = $num;
+                $value = sprintf("%01.{$round}f", $num);
                 if (abs($orig) > 0 && preg_match('/^\-?0\.0+$/', $value)) {
                     // prevent show small values as zero
                     // ie 0.000627 as 0.00
@@ -3364,14 +3315,6 @@ function format_value($value, $format = '', $round = 2, $sf = 3)
                 } else {
                     $value = preg_replace(['/\.0+$/', '/(\.\d)0+$/'], '\1', $value);
                 }
-            } elseif ($value === TRUE) {
-                $value = 'TRUE';
-            } elseif ($value === FALSE) {
-                $value = 'FALSE';
-            } elseif (is_null($value)) {
-                $value = 'NULL';
-            } elseif ($value === '') {
-                $value = '""';
             }
     }
 
@@ -3388,19 +3331,17 @@ function format_value($value, $format = '', $round = 2, $sf = 3)
  * - 2.23 (sf=3) -> 2.23
  * - 0.00001 (sf=3) -> 0.000
  *
- * @param float|int|string $number The input number to format.
+ * @param float|int|string $num The input number to format.
  * @param int              $sf     The number of significant figures to keep.
  *
  * @return string The formatted number as a string.
  */
-function format_number_short($number, $sf)
-{
-    if (is_string($number)) {
-        // remove non-numeric chars from end of string
-        $number = trim_number(preg_replace('/\D+$/', '', $number));
-    }
+function format_number_short($num, $sf) {
+    // remove non-numeric chars from end of string
+    $number = clean_number($num);
     if (!is_numeric($number)) {
-        return $number;
+        // passed not numeric, return original
+        return $num;
     }
     if (is_intnum($number)) {
         return (int)$number ? (string)$number : '0';
@@ -3423,6 +3364,29 @@ function format_number_short($number, $sf)
 }
 
 /**
+ * Clean commas and non-numeric chars
+ *
+ * @param mixed $num Numeric value
+ * @return float|int|string
+ */
+function clean_number($num) {
+    if (!is_string($num) || is_numeric($num)) {
+        return $num;
+    }
+
+    // remove non-numeric chars from end of string
+    $num = preg_replace('/\D+$/', '', $num);
+
+    // number_format() by default return numbers with comma
+    // number_format('7619627.0010', 4) -> 7,619,627.0010
+    if (str_contains($num, ',')) {
+        //var_dump($a);
+        return str_replace(',', '', $num);
+    }
+    return $num;
+}
+
+/**
  * Trim unimportant zeroes from string float number,
  * examples:
  *  1.0 -> 1
@@ -3433,7 +3397,11 @@ function format_number_short($number, $sf)
  * @return float|int|string
  */
 function trim_number($number) {
-    return (is_string($number) && str_contains($number, '.')) ? rtrim(rtrim($number, '0'), '.') : $number;
+    if (!is_string($number)) {
+        return $number;
+    }
+    $number = clean_number($number);
+    return str_contains($number, '.') ? rtrim(rtrim($number, '0'), '.') : $number;
 }
 
 /**
@@ -3520,8 +3488,8 @@ function is_valid_param($string, $type = '')
                      !(str_istarts($string, [ 'Not Avail', 'Not Specified', 'To be filled by O.E.M.' ]) ||
                        str_contains_array($string, [ 'denied', 'No Such' ]) ||
                        preg_match($poor_default_pattern, $string) ||
-                       in_array($string, [ '<EMPTY>', 'empty', 'n/a', 'N/A', 'na', 'NA', '1234567890',
-                                           '0123456789', 'No Asset Tag', 'Tag 12345', 'sim', 'Unknown'], TRUE));
+                       in_array($string, [ '<EMPTY>', 'empty', 'n/a', 'N/A', 'na', 'NA', '1234567890', 'Default string',
+                                           '0123456789', 'No Asset Tag', 'Tag 12345', 'sim', 'Unknown' ], TRUE));
             break;
 
         case 'mac':
@@ -3557,6 +3525,15 @@ function is_valid_param($string, $type = '')
         case 'snmp_port':
             // port 0 also valid, but we exclude because it reserved
             $valid = is_intnum($string) && $string > 0 && $string <= 65353;
+            break;
+
+        case 'filename':
+            $len = strlen($string);
+            if ($len > 255 || !$len) {
+                $valid = FALSE;
+            } else {
+                $valid = strpbrk($string, '|\'\\?*&<";:>+[]=/') === FALSE;
+            }
             break;
 
         case 'path':
@@ -3829,954 +3806,61 @@ function gethostbyaddr6($ip)
     return $ptr;
 }
 
-/**
- * Request an http(s) url.
- * Note. If first runtime request exit with timeout,
- *       than will be set constant OBS_HTTP_REQUEST as FALSE
- *       and all other requests will skipped with FALSE response!
- *
- * @param string      $request                  Requested URL
- * @param array       $context                  Set additional HTTP context options, see http://php.net/manual/en/context.http.php
- * @param int|boolean $rate_limit               Rate limit per day for specified domain (in url). If FALSE no limits
- *
- * @return string|boolean Return response content or FALSE
- * @global array      $GLOBALS                  ['response_headers'] Response headers with keys:
- *                                              code (HTTP code status), status (HTTP status description) and all other
- * @global boolean    $GLOBALS                  ['request_status'] TRUE if response code is 2xx or 3xx
- *
- * @global array      $config
- */
-function get_http_request($request, $context = [], $rate_limit = FALSE)
-{
-    global $config;
+function elapsed_time($microtime_start, $precision = NULL) {
+    $time_elapsed = microtime(TRUE) - $microtime_start;
 
-    $ok = TRUE;
-    if (defined('OBS_HTTP_REQUEST') && OBS_HTTP_REQUEST === FALSE) {
-        print_debug("HTTP requests skipped since previous request exit with timeout");
-        $ok                          = FALSE;
-        $GLOBALS['response_headers'] = ['code' => 408, 'descr' => 'Previous Request Timeout'];
-    }
-
-    // Detect available curl module
-    if (!defined('OBS_HTTP')) {
-        $tmp = get_versions(); // cached versions
-        if ($tmp['curl_old']) {
-            define('OBS_HTTP', 'php');
-        } else {
-            define('OBS_HTTP', 'curl');
-        }
-        print_debug("HTTP '" . OBS_HTTP . "' library used.");
-    }
-
-    if ($ok && OBS_HTTP === 'php') {
-        if (!ini_get('allow_url_fopen')) {
-            print_debug('HTTP requests disabled, since PHP config option "allow_url_fopen" set to off. Please enable this option in your PHP config.');
-            $ok                          = FALSE;
-            $GLOBALS['response_headers'] = ['code' => 400, 'descr' => 'HTTP Method Disabled'];
-        } elseif (str_istarts($request, 'https') && !check_extension_exists('openssl')) {
-            // Check if Secure requests allowed, but ssl extension not exist
-            print_debug(__FUNCTION__ . '() wants to connect with https but https is not enabled on this server. Please check your PHP settings, the openssl extension must exist and be enabled.');
-            logfile(__FUNCTION__ . '() wants to connect with https but https is not enabled on this server. Please check your PHP settings, the openssl extension must exist and be enabled.');
-            $ok                          = FALSE;
-            $GLOBALS['response_headers'] = ['code' => 400, 'descr' => 'HTTPS Method Disabled'];
-        }
-    }
-
-    if ($ok && process_http_ratelimit($request, $rate_limit)) {
-        // request exceeded rate limit
-        $GLOBALS['response_headers'] = ['code' => 429, 'descr' => 'Too Many Requests'];
-        $ok                          = FALSE;
-    }
-
-    if (OBS_DEBUG > 0) {
-        $debug_request = $request;
-        if (OBS_DEBUG < 2 && strpos($request, 'update.observium.org')) {
-            $debug_request = preg_replace('/&stats=.+/', '&stats=***', $debug_request);
-        }
-        $debug_msg = PHP_EOL . 'REQUEST[%y' . $debug_request . '%n]';
-    }
-
-    if (!$ok) {
-        if (OBS_DEBUG > 0) {
-            print_message($debug_msg . PHP_EOL .
-                          'REQUEST STATUS[%rFALSE%n]' . PHP_EOL .
-                          'RESPONSE CODE[' . $GLOBALS['response_headers']['code'] . ' ' . $GLOBALS['response_headers']['descr'] . ']', 'console');
-        }
-
-        // Set GLOBAL var $request_status for use as validate status of last response
-        $GLOBALS['request_status'] = FALSE;
-        return FALSE;
-    }
-
-    if (OBS_HTTP === 'curl') {
-        $response_array = process_http_curl($request, $context);
-    } else {
-        $response_array = process_http_php($request, $context);
-    }
-
-    // Request response
-    $response = $response_array['response'];
-    $runtime  = $response_array['request_runtime'];
-
-    // Request end unixtime and runtime
-    $GLOBALS['request_unixtime'] = $response_array['request_unixtime'];
-    $GLOBALS['request_runtime']  = $response_array['request_runtime'];
-
-    // Headers
-    $head                        = $response_array['response_headers'];
-    $GLOBALS['response_headers'] = $response_array['response_headers'];
-
-    // Set GLOBAL var $request_status for use as validate status of last response
-    if (isset($head['code']) && ($head['code'] < 200 || $head['code'] >= 400)) {
-        $GLOBALS['request_status'] = FALSE;
-    } elseif ($response === FALSE) {
-        // An error in get response
-        $GLOBALS['response_headers'] = ['code' => 408, 'descr' => 'Request Timeout'];
-        $GLOBALS['request_status']   = FALSE;
-    } else {
-        // Valid statuses: 2xx Success, 3xx Redirection or head code not set (ie response not correctly parsed)
-        $GLOBALS['request_status'] = TRUE;
-    }
-
-    // if (str_contains($request, 'somewrong')) {
-    //   print_vars($head);
-    //   var_dump($response);
-    // }
-    // Set OBS_HTTP_REQUEST for skip all other requests (FALSE for skip all other requests)
-    if (!defined('OBS_HTTP_REQUEST')) {
-        if ($response === FALSE && empty($head)) {
-            // Derp, no way for get proxy headers
-            if ($runtime < 1 &&
-                isset($config['http_proxy']) && $config['http_proxy'] &&
-                !(isset($config['proxy_user']) || isset($config['proxy_password']))) {
-                $GLOBALS['response_headers'] = ['code' => 407, 'descr' => 'Proxy Authentication Required'];
-            } else {
-                $GLOBALS['response_headers'] = ['code' => 408, 'descr' => 'Request Timeout'];
-            }
-            $GLOBALS['request_status'] = FALSE;
-
-            // Validate host from request and check if it timeout request
-            if (OBS_PROCESS_NAME === 'poller' && gethostbyname6(parse_url($request, PHP_URL_HOST))) {
-                // Timeout error, only if not received response headers
-                define('OBS_HTTP_REQUEST', FALSE);
-                print_debug(__FUNCTION__ . '() exit with timeout. Access to outside localnet is blocked by firewall or network problems. Check proxy settings.');
-                logfile(__FUNCTION__ . '() exit with timeout. Access to outside localnet is blocked by firewall or network problems. Check proxy settings.');
-            }
-        } else {
-            define('OBS_HTTP_REQUEST', TRUE);
-        }
-    }
-    // FIXME. what if first request fine, but second broken?
-    //else if ($response === FALSE)
-    //{
-    //  if (function_exists('runkit_constant_redefine')) { runkit_constant_redefine('OBS_HTTP_REQUEST', FALSE); }
-    //}
-
-    if (defined('OBS_DEBUG') && OBS_DEBUG) {
-        // Hide extended stats in normal debug level = 1
-        if (OBS_DEBUG < 2 && strpos($request, 'update.observium.org')) {
-            $request = preg_replace('/&stats=.+/', '&stats=***', $request);
-        }
-        // Show debug info
-        print_message($debug_msg . PHP_EOL .
-                      'REQUEST STATUS[' . ($GLOBALS['request_status'] ? '%gTRUE' : '%rFALSE') . '%n]' . PHP_EOL .
-                      'REQUEST RUNTIME[' . ($runtime > 3 ? '%r' : '%g') . round($runtime, 4) . 's%n]' . PHP_EOL .
-                      'RESPONSE CODE[' . $GLOBALS['response_headers']['code'] . ' ' . $GLOBALS['response_headers']['descr'] . ']', 'console');
-        if (OBS_DEBUG > 1) {
-            echo "RESPONSE[\n" . $response . "\n]";
-            print_vars($http_response_header);
-            print_vars($opts);
-        }
-    }
-
-    return $response;
-}
-
-function process_http_ratelimit($request, $rate_limit = FALSE)
-{
-    if ($rate_limit && is_numeric($rate_limit) && $rate_limit >= 0) {
-        // Check limit rates to this domain (per/day)
-        if (preg_match('/^https?:\/\/([\w\.]+[\w\-\.]*(:\d+)?)/i', $request, $matches)) {
-            $date    = format_unixtime(get_time(), 'Y-m-d');
-            $domain  = $matches[0]; // base domain (with http(s)): https://test-me.com/ -> https://test-me.com
-            $rate_db = safe_json_decode(get_obs_attrib('http_rate_' . $domain));
-            //print_vars($date); print_vars($rate_db);
-            if (is_array($rate_db) && isset($rate_db[$date])) {
-                $rate_count = $rate_db[$date];
-            } else {
-                $rate_count = 0;
-            }
-            $rate_count++;
-            set_obs_attrib('http_rate_' . $domain, safe_json_encode([$date => $rate_count]));
-            if ($rate_count > $rate_limit) {
-                print_debug("HTTP requests skipped because the rate limit $rate_limit/day for domain '$domain' is exceeded (count: $rate_count)");
-                //$GLOBALS['response_headers'] = [ 'code' => 429, 'descr' => 'Too Many Requests' ];
-                //$ok = FALSE;
-                return TRUE;
-            } elseif (OBS_DEBUG > 1) {
-                print_debug("HTTP rate count for domain '$domain': $rate_count ($rate_limit/day)");
-            }
-        }
-    }
-
-    return FALSE;
-}
-
-function process_http_php($request, $context = [])
-{
-    global $config;
-
-    // Add common http context
-    $opts = ['http' => generate_http_context_defaults($context)];
-
-    // Force IPv4 or IPv6
-    if (isset($config['http_ip_version'])) {
-        // Bind to IPv4 -> 0:0
-        // Bind to IPv6 -> [::]:0
-        $bindto         = str_contains($config['http_ip_version'], '6') ? '[::]:0' : '0:0';
-        $opts['socket'] = ['bindto' => $bindto];
-    }
-
-    // HTTPS
-    // if ($parse_url = parse_url($request))
-    // {
-    //   if ($parse_url['scheme'] == 'https')
-    //   {
-    //     $opts['ssl'] = [ 'SNI_enabled' => TRUE, 'SNI_server_name' => $parse_url['host'] ];
-    //   }
-    // }
-
-    // DEBUG, generate curl cmd for testing:
-    if (defined('OBS_DEBUG') && OBS_DEBUG) {
-        $curl_cmd = 'curl';
-        if (OBS_DEBUG > 1) {
-            // Show response headers
-            $curl_cmd .= ' -i';
-        }
-        if (isset($config['http_ip_version'])) {
-            $curl_cmd .= str_contains($config['http_ip_version'], '6') ? ' -6' : ' -4';
-        }
-        if (isset($opts['http']['timeout'])) {
-            $curl_cmd .= ' --connect-timeout ' . $opts['http']['timeout'];
-        }
-        if (isset($opts['http']['method'])) {
-            $curl_cmd .= ' -X ' . $opts['http']['method'];
-        }
-        if (isset($opts['http']['header'])) {
-            foreach (explode("\r\n", $opts['http']['header']) as $curl_header) {
-                if (safe_empty($curl_header)) {
-                    continue;
-                }
-                $curl_cmd .= ' -H \'' . $curl_header . '\'';
-            }
-        }
-        if (isset($opts['http']['content'])) {
-            $curl_cmd .= ' -d \'' . $opts['http']['content'] . '\'';
-        }
-        // Proxy
-        // -x, --proxy <[protocol://][user:password@]proxyhost[:port]>
-        // -U, --proxy-user <user:password>
-        if (isset($config['http_proxy']) && $config['http_proxy']) {
-            $http_proxy = $config['http_proxy'];
-
-            // Basic proxy auth
-            if (isset($config['proxy_user'], $config['proxy_password']) && $config['proxy_user']) {
-                $http_proxy = $config['proxy_user'] . ':' . $config['proxy_password'] . '@' . $http_proxy;
-            }
-            $curl_cmd .= ' -x ' . $http_proxy;
-        }
-        print_debug("HTTP CURL cmd:\n$curl_cmd $request");
-    }
-
-    // Process http request and calculate runtime
-    $start    = utime();
-    $context  = stream_context_create($opts);
-    $response = file_get_contents($request, FALSE, $context);
-    $end      = utime();
-    $runtime  = $end - $start;
-
-    // Request end unixtime and runtime
-    $GLOBALS['request_unixtime'] = $end;
-    $GLOBALS['request_runtime']  = $runtime;
-
-    // Parse response headers
-    // Note: $http_response_header - see: http://php.net/manual/en/reserved.variables.httpresponseheader.php
-    $head = [];
-    foreach ($http_response_header as $k => $v) {
-        $t = explode(':', $v, 2);
-        if (isset($t[1])) {
-            // Date: Sat, 12 Apr 2008 17:30:38 GMT
-            $head[trim($t[0])] = trim($t[1]);
-        } elseif (preg_match("!HTTP/([\d\.]+)\s+(\d+)(.*)!", $v, $matches)) {
-            // HTTP/1.1 200 OK
-            $head['http']  = $matches[1];
-            $head['code']  = (int)$matches[2];
-            $head['descr'] = trim($matches[3]);
-        } else {
-            $head[] = $v;
-        }
-    }
-
-    return [
-      'response'         => $response,
-      'request_unixtime' => $end,
-      'request_runtime'  => $runtime,
-      'response_headers' => $head
-    ];
-}
-
-function process_http_curl($request, $context = [])
-{
-    global $config;
-
-    $c = curl_init($request);
-
-    $options = [
-      CURLOPT_RETURNTRANSFER        => TRUE,        // return response instead print
-      CURLOPT_HTTP_CONTENT_DECODING => FALSE, // return raw response
-      //CURLOPT_HEADER => TRUE,
-      CURLINFO_HEADER_OUT           => TRUE,           // request headers
-      CURLOPT_USERAGENT             => OBSERVIUM_PRODUCT . '/' . OBSERVIUM_VERSION,
-      //CURLOPT_CONNECTTIMEOUT => 0,
-      //CURLOPT_TIMEOUT => 5,
-      //CURLOPT_HTTPHEADER => $header,
-      //CURLOPT_CUSTOMREQUEST => 'POST',
-      //CURLOPT_POSTFIELDS => $fields,
-      //CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-      //CURLOPT_ENCODING => '',
-      //CURLOPT_DNS_USE_GLOBAL_CACHE => false,
-      CURLOPT_SSL_VERIFYHOST        => (bool)$config['http_ssl_verify'], // Disabled SSL Host check
-      CURLOPT_SSL_VERIFYPEER        => (bool)$config['http_ssl_verify'], // Disabled SSL Cert check
-    ];
-    // Append options based on defaults from generate_http_context_defaults($context)
-    $options[CURLOPT_TIMEOUT] = isset($context['timeout']) ? (int)$context['timeout'] : 15;
-
-    // Proxy
-    if (isset($config['http_proxy']) && $config['http_proxy']) {
-        $options[CURLOPT_PROXY] = $config['http_proxy'];
-        //$options[CURLOPT_PROXYTYPE] = CURLPROXY_HTTP; // CURLPROXY_SOCKS4, CURLPROXY_SOCKS5, CURLPROXY_SOCKS4A, CURLPROXY_SOCKS5_HOSTNAME
-    }
-
-    // Basic proxy auth
-    if (isset($config['proxy_user']) && $config['proxy_user'] && isset($config['proxy_password'])) {
-        $options[CURLOPT_PROXYAUTH]    = CURLAUTH_BASIC; // CURLAUTH_NTLM
-        $options[CURLOPT_PROXYUSERPWD] = $config['proxy_user'] . ':' . $config['proxy_password'];
-    }
-
-    // Headers
-    if (isset($context['header'])) {
-        $options[CURLOPT_HTTPHEADER] = explode("\r\n", trim($context['header']));
-    }
-
-    if ($context['method']) {
-        switch ($context['method']) {
-            case 'GET':
-                break;
-            case 'POST':
-                $options[CURLOPT_POST] = TRUE;
-                break;
-            case 'PUT':
-                $options[CURLOPT_PUT] = TRUE;
-                break;
-            default:
-                $options[CURLOPT_CUSTOMREQUEST] = $context['method'];
-        }
-    }
-    if (($context['method'] === 'POST' || $context['method'] === 'PUT')) {
-        if (!safe_empty($context['content'])) {
-            $options[CURLOPT_POSTFIELDS] = $context['content'];
-            print_debug_vars($context['content']);
-        }
-
-        $options[CURLOPT_POSTREDIR] = 1; // follow 301 redir
-    }
-    // Follow up to 3 redirects
-    $options[CURLOPT_MAXREDIRS]      = 3;
-    $options[CURLOPT_FOLLOWLOCATION] = TRUE;
-
-    // Force IPv4 or IPv6
-    if (isset($config['http_ip_version'])) {
-        $options[CURLOPT_IPRESOLVE] = str_contains($config['http_ip_version'], '6') ? CURL_IPRESOLVE_V6 : CURL_IPRESOLVE_V4;
-    }
-
-    if (OBS_DEBUG) {
-        $options[CURLOPT_VERBOSE] = TRUE;
-    }
-
-    curl_setopt_array($c, $options);
-    $response = curl_exec($c);
-    $end      = utime();
-    //r($response);
-
-    if (!curl_errno($c)) {
-        // Normal response
-
-        $http_info = curl_getinfo($c);
-        print_debug_vars($http_info);
-        //r($http_info);
-
-        $head = [
-          'http' => $http_info['http_version'],
-          'code' => $http_info['http_code'],
-          //'descr' => curl_error($c)
-        ];
-        if (preg_match("!HTTP/([\d\.]+)!", $http_info['request_header'], $matches)) {
-            $head['http'] = $matches[1];
-        }
-        // HTTP code descriptions
-        switch ($http_info['http_code']) {
-            case 100:
-                $head['descr'] = 'Continue';
-                break;
-            case 101:
-                $head['descr'] = 'Switching Protocols';
-                break;
-            case 200:
-                $head['descr'] = 'OK';
-                break;
-            case 201:
-                $head['descr'] = 'Created';
-                break;
-            case 202:
-                $head['descr'] = 'Accepted';
-                break;
-            case 203:
-                $head['descr'] = 'Non-Authoritative Information';
-                break;
-            case 204:
-                $head['descr'] = 'No Content';
-                break;
-            case 205:
-                $head['descr'] = 'Reset Content';
-                break;
-            case 206:
-                $head['descr'] = 'Partial Content';
-                break;
-            case 300:
-                $head['descr'] = 'Multiple Choices';
-                break;
-            case 301:
-                $head['descr'] = 'Moved Permanently';
-                break;
-            case 302:
-                $head['descr'] = 'Moved Temporarily';
-                break;
-            case 303:
-                $head['descr'] = 'See Other';
-                break;
-            case 304:
-                $head['descr'] = 'Not Modified';
-                break;
-            case 305:
-                $head['descr'] = 'Use Proxy';
-                break;
-            case 400:
-                $head['descr'] = 'Bad Request';
-                break;
-            case 401:
-                $head['descr'] = 'Unauthorized';
-                break;
-            case 402:
-                $head['descr'] = 'Payment Required';
-                break;
-            case 403:
-                $head['descr'] = 'Forbidden';
-                break;
-            case 404:
-                $head['descr'] = 'Not Found';
-                break;
-            case 405:
-                $head['descr'] = 'Method Not Allowed';
-                break;
-            case 406:
-                $head['descr'] = 'Not Acceptable';
-                break;
-            case 407:
-                $head['descr'] = 'Proxy Authentication Required';
-                break;
-            case 408:
-                $head['descr'] = 'Request Time-out';
-                break;
-            case 409:
-                $head['descr'] = 'Conflict';
-                break;
-            case 410:
-                $head['descr'] = 'Gone';
-                break;
-            case 411:
-                $head['descr'] = 'Length Required';
-                break;
-            case 412:
-                $head['descr'] = 'Precondition Failed';
-                break;
-            case 413:
-                $head['descr'] = 'Request Entity Too Large';
-                break;
-            case 414:
-                $head['descr'] = 'Request-URI Too Large';
-                break;
-            case 415:
-                $head['descr'] = 'Unsupported Media Type';
-                break;
-            case 500:
-                $head['descr'] = 'Internal Server Error';
-                break;
-            case 501:
-                $head['descr'] = 'Not Implemented';
-                break;
-            case 502:
-                $head['descr'] = 'Bad Gateway';
-                break;
-            case 503:
-                $head['descr'] = 'Service Unavailable';
-                break;
-            case 504:
-                $head['descr'] = 'Gateway Time-out';
-                break;
-            case 505:
-                $head['descr'] = 'HTTP Version not supported';
-                break;
-            default:
-                $head['descr'] = 'Unknown HTTP status';
-        }
-        $runtime = $http_info['total_time'];
-    } else {
-        $head    = [
-            //'http' => $http_info['http_version'],
-            'code'  => curl_errno($c),
-            'descr' => curl_error($c)
-        ];
-        $runtime = curl_getinfo($c, CURLINFO_TOTAL_TIME);
-        print_debug_vars(curl_getinfo($c));
-    }
-
-    curl_close($c);
-
-    return [
-      'response'         => $response,
-      'request_unixtime' => $end,
-      'request_runtime'  => $runtime,
-      'response_headers' => $head
-    ];
+    return is_numeric($precision) ? round($time_elapsed, $precision) : $time_elapsed;
 }
 
 /**
- * Process HTTP request by definition array and process it for valid status.
- * Used definition params in response key.
+ * Return named unix times from now.
+ * Note, 'now' static unixtime over process run.
+ * For undate run get_time('new')
  *
- * @param string|array $def      Definition array or alert transport key (see transports definitions)
- * @param string       $response Response from get_http_request()
- *
- * @return boolean          Return TRUE if request processed with valid HTTP code (2xx, 3xx) and API response return valid param
- */
-function test_http_request($def, $response)
-{
-    $response = trim($response);
-
-    if (is_string($def)) {
-        // Get transport definition for responses
-        $def = $GLOBALS['config']['transports'][$def]['notification'];
-    }
-
-    // Response is array (or xml)?
-    $is_response_array = strtolower($def['response_format']) === 'json';
-
-    // Set status by response status
-    $success = get_http_last_status();
-
-    // If response return valid code and content, additional parse for specific defined tests
-    if ($success) {
-        // Decode if request OK
-        if ($is_response_array) {
-            $response = safe_json_decode($response);
-        }
-        // else additional formats?
-
-        // Check if call succeeded
-        if (isset($def['response_test'])) {
-            // Convert single test condition to multi-level condition
-            if (isset($def['response_test']['operator'])) {
-                $def['response_test'] = [$def['response_test']];
-            }
-
-            // Compare all definition fields with response,
-            // if response param not equals to expected, set not success
-            // multilevel keys should written with '->' separator, ie: $a[key][some][0] - key->some->0
-            foreach ($def['response_test'] as $test) {
-                if ($is_response_array) {
-                    $field = array_get_nested($response, $test['field']);
-                } else {
-                    // RAW response
-                    $field = $response;
-                }
-                if (test_condition($field, $test['operator'], $test['value']) === FALSE) {
-                    print_debug("Response [" . $field . "] not valid: [" . $test['field'] . "] " . $test['operator'] . " [" . implode(', ', (array)$test['value']) . "]");
-
-                    $success = FALSE;
-                    break;
-                } else {
-                    print_debug("Response [" . $field . "] valid: [" . $test['field'] . "] " . $test['operator'] . " [" . implode(', ', (array)$test['value']) . "]");
-                }
-            }
-        }
-    } elseif ($is_response_array && isset($def['response_fields']['message'], $def['response_fields']['status'])) {
-        // Decode response for useful error reports also for bad statuses
-        $response = safe_json_decode($response);
-    }
-
-    if (!$success) {
-        if (isset($def['response_fields']['message'], $def['response_fields']['status']) && is_array($response)) {
-            echo PHP_EOL;
-            if (isset($def['response_fields']['status'])) {
-                if ($def['response_fields']['status'] === 'raw') {
-                    $status = get_http_last_code();
-                } else {
-                    $status = array_get_nested($response, $def['response_fields']['status']);
-                }
-                if (OBS_DEBUG) {
-                    print_message("%WRESPONSE STATUS%n[%r" . $status . "%n]", 'console');
-                }
-            }
-            $msg = array_get_nested($response, $def['response_fields']['message']);
-            if (isset($def['response_fields']['info']) &&
-                $info = array_get_nested($response, $def['response_fields']['info'])) {
-                $msg .= " ($info)";
-            }
-            if (OBS_DEBUG) {
-                print_message("%WRESPONSE ERROR%n[%y" . $msg . "%n]\n", 'console');
-            }
-            $GLOBALS['last_message'] = $msg;
-        } elseif (is_string($response) && $response && !get_http_last_status()) {
-            if (OBS_DEBUG) {
-                echo PHP_EOL;
-                print_message("%WRESPONSE STATUS%n[%r" . get_http_last_code() . "%n]", 'console');
-                print_message("%WRESPONSE ERROR%n[%y" . $response . "%n]\n", 'console');
-            }
-            $GLOBALS['last_message'] = $response;
-        }
-    }
-    print_debug_vars($response, 1);
-
-    return $success;
-}
-
-/**
- * Return HTTP return code for last request by get_http_request()
- *
- * @return integer HTTP code
- */
-function get_http_last_code()
-{
-    return $GLOBALS['response_headers']['code'];
-}
-
-/**
- * Return HTTP return code for last request by get_http_request()
- *
- * @return boolean HTTP status TRUE if response code 2xx or 3xx
- */
-function get_http_last_status()
-{
-    return $GLOBALS['request_status'];
-}
-
-/**
- * Generate HTTP specific context with some defaults for proxy, timeout, user-agent.
- * Used in get_http_request().
- *
- * @param array $context HTTP specified context, see http://php.net/manual/ru/function.stream-context-create.php
- *
- * @return array HTTP context array
- */
-function generate_http_context_defaults($context = [])
-{
-    global $config;
-
-    if (!is_array($context)) {
-        $context = [];
-    } // Fix context if not array passed
-
-    // Defaults
-    if (!isset($context['timeout'])) {
-        $context['timeout'] = '15';
-    }
-    // HTTP/1.1
-    $context['protocol_version'] = 1.1;
-    // get the entire body of the response in case of error (HTTP/1.1 400, for example)
-    if (OBS_DEBUG) {
-        $context['ignore_errors'] = TRUE;
-    }
-
-    // User agent (required for some type of queries, ie geocoding)
-    if (!isset($context['header'])) {
-        $context['header'] = ''; // Avoid 'undefined index' when concatting below
-    }
-    $context['header'] .= 'User-Agent: ' . OBSERVIUM_PRODUCT . '/' . OBSERVIUM_VERSION . "\r\n";
-
-    if (isset($config['http_proxy']) && $config['http_proxy']) {
-        $context['proxy']           = 'tcp://' . $config['http_proxy'];
-        $context['request_fulluri'] = isset($config['proxy_fulluri']) ? (bool)$config['proxy_fulluri'] : TRUE;
-    }
-
-    // Basic proxy auth
-    if (isset($config['proxy_user']) && $config['proxy_user'] && isset($config['proxy_password'])) {
-        $auth              = base64_encode($config['proxy_user'] . ':' . $config['proxy_password']);
-        $context['header'] .= 'Proxy-Authorization: Basic ' . $auth . "\r\n";
-    }
-
-    print_debug_vars($context);
-
-    return $context;
-}
-
-
-/**
- * Generate HTTP context based on passed params, tags and definition.
- * This context will used in get_http_request_test() (or get_http_request())
- *
- * @param string|array $def    Definition array or alert transport key (see transports definitions)
- * @param array        $tags   (optional) Contact array and other tags
- * @param array        $params (optional) Array of requested params with key => value entries (used with request method POST)
- *
- * @return array           HTTP Context which can used in get_http_request_test() or get_http_request()
- * @global array       $config
- */
-function generate_http_context($def, $tags = [], $params = [])
-{
-    global $config;
-
-    if (is_string($def)) {
-        // Get transport definition for requests
-        $def = $config['transports'][$def]['notification'];
-    }
-
-    $context = []; // Init
-
-    // Request method POST/GET
-    if ($def['method']) {
-        $context['method'] = strtoupper($def['method']);
-    }
-    // Request timeout
-    if (is_intnum($def['timeout']) || $def['timeout'] >= 1 || $def['timeout'] <= 300) {
-        $context['timeout'] = $def['timeout'];
-    }
-
-    // Content and headers
-    $header = "Connection: close\r\n";
-
-    // Add encode $params for POST request inside http headers
-    if ($context['method'] === 'POST' || $context['method'] === 'PUT') {
-        if (isset($def['request_params_key'])) {
-            // Key based link to request params, see google-chat notification
-            $key = 'request_params_' . strtolower(array_tag_replace($tags, $def['request_params_key']));
-            if (isset($def[$key])) {
-                $request_params = &$def[$key];
-            } else {
-                $request_params = &$def['request_params'];
-            }
-        } else {
-            // Common default request_params
-            $request_params = &$def['request_params'];
-        }
-
-        // Generate request params
-        foreach ((array)$request_params as $param => $entry) {
-            // Param based on expression (only true/false)
-            // See: pushover notification def
-            if (str_contains($param, '?')) {
-                [$param, $param_if] = explode('?', $param, 2);
-                //print_vars($tags);
-                //print_vars($params);
-                if (!isset($tags[$param_if]) || !get_var_true($tags[$param_if])) {
-                    print_debug("Request param '$param' skipped, because other param '$param_if' false or unset.");
-                    continue;
-                }
-            }
-
-            // Try to find all keys in header like %bot_hash% matched with same key in $endpoint array
-            if (is_array($entry)) {
-                // ie teams and pagerduty
-                $params[$param] = array_merge((array)$params[$param], array_tag_replace($tags, $entry));
-            } elseif (!isset($params[$param]) || $params[$param] === '') {
-                $params[$param] = array_tag_replace($tags, $entry);
-            }
-            // Clean empty params
-            if (safe_empty($params[$param])) {
-                unset($params[$param]);
-            }
-        }
-
-        if (strtolower($def['request_format']) === 'json') {
-            // Encode params as json string
-            $data   = safe_json_encode($params);
-            $header .= "Content-Type: application/json; charset=utf-8\r\n";
-        } else {
-            // Encode params as url encoded string
-            $data = http_build_query($params);
-            // https://stackoverflow.com/questions/4007969/application-x-www-form-urlencoded-or-multipart-form-data
-            //$header .= "Content-Type: multipart/form-data\r\n";
-            $header .= "Content-Type: application/x-www-form-urlencoded; charset=utf-8\r\n";
-        }
-        $header .= "Content-Length: " . strlen($data) . "\r\n";
-
-        // Encoded content data
-        $context['content'] = $data;
-    }
-
-    // Basic auth
-    if (isset($def['request_user'])) {
-        $basic_auth = $def['request_user'];
-        if (isset($def['request_password'])) {
-            $basic_auth .= ':' . $def['request_password'];
-        }
-        $basic_auth = array_tag_replace($tags, $basic_auth);
-
-        $header .= 'Authorization: Basic ' . base64_encode($basic_auth) . "\r\n";
-    }
-
-    // Additional headers with contact params
-    foreach ($def['request_header'] as $entry) {
-        // Try to find all keys in header like %bot_hash% matched with same key in $endpoint array
-        $header .= array_tag_replace($tags, $entry) . "\r\n";
-    }
-
-    $context['header'] = $header;
-
-    return $context;
-}
-
-/**
- * Generate URL based on passed params, tags and definition.
- * This context will used in get_http_request_test() (or get_http_request())
- *
- * @param string|array $def    Definition array or alert transport key (see transports definitions)
- * @param array        $tags   (optional) Contact array, used only if transport required additional headers (ie hipchat)
- * @param array        $params (optional) Array of requested params with key => value entries (used with request method GET)
- *
- * @return string           URL which can used in get_http_request_test() or get_http_request()
- * @global array       $config
- */
-function generate_http_url($def, $tags = [], $params = [])
-{
-    global $config;
-
-    if (is_string($def)) {
-        // Get definition for transport API
-        $def = $config['transports'][$def]['notification'];
-    }
-
-    $url = ''; // Init
-
-    // Append (if set $def['url_param']) or set hardcoded url for transport
-    if (isset($def['url'])) {
-        // Try to find all keys in URL like %bot_hash% and %%url_encoded%% matched with the same key in $endpoint array
-        $url .= array_tag_replace_encode($tags, $def['url']);
-    }
-
-    // Add GET params to url
-    if ($def['method'] === 'GET' || $def['method'] === 'DELETE') {
-        if (isset($def['request_params_key'])) {
-            // Key based link to request params, see google-chat notification
-            $key = 'request_params_' . strtolower(array_tag_replace($tags, $def['request_params_key']));
-            if (isset($def[$key])) {
-                $request_params = &$def[$key];
-            } else {
-                $request_params = &$def['request_params'];
-            }
-        } else {
-            // Common default request_params
-            $request_params = &$def['request_params'];
-        }
-
-        // Generate request params
-        foreach ((array)$request_params as $param => $entry) {
-            // Param based on expression (only true/false)
-            // See: pushover notification def
-            if (str_contains($param, '?')) {
-                [$param, $param_if] = explode('?', $param, 2);
-                //print_vars($tags);
-                //print_vars($params);
-                if (!isset($tags[$param_if]) || !get_var_true($tags[$param_if])) {
-                    print_debug("Request param '$param' skipped, because other param '$param_if' false or unset.");
-                    continue;
-                }
-            }
-
-            // Try to find all keys in header like %bot_hash% matched with same key in $endpoint array
-            if (is_array($entry)) {
-                // ie teams and pagerduty
-                $params[$param] = array_merge((array)$params[$param], array_tag_replace($tags, $entry));
-            } elseif (!isset($params[$param]) || $params[$param] === '') {
-                $params[$param] = array_tag_replace($tags, $entry);
-            }
-            // Clean empty params
-            if (safe_empty($params[$param])) {
-                unset($params[$param]);
-            }
-        }
-
-        // Append params to url
-        if (safe_count($params)) {
-            $data = http_build_query($params);
-            if (str_contains($url, '?')) {
-                // Append additional params to url string
-                $url .= '&' . $data;
-            } else {
-                // Add get params as first time
-                $url .= '?' . $data;
-            }
-        }
-    }
-
-    return $url;
-}
-
-/**
- * Return named unix times from now
- *
- * @param string $str    Named time from now, ie: fiveminute, twelvehour, year
- * @param bool   $future If TRUE, return unix time in future.
+ * @param string $period Named time from now, ie: fiveminute, twelvehour, year
+ * @param bool   $future If TRUE, return unix time in the future.
  *
  * @return int
  */
-function get_time($str = 'now', $future = FALSE)
-{
+function get_time($period = 'now', $future = FALSE) {
     global $config;
 
-    // Set some times needed by loads of scripts (it's dynamic, so we do it here!)
-    $config['time']['now'] = time();
     /*
-  $config['time']['fiveminute'] = $config['time']['now'] - 300;      //time() - (5 * 60);
-  $config['time']['fourhour']   = $config['time']['now'] - 14400;    //time() - (4 * 60 * 60);
-  $config['time']['sixhour']    = $config['time']['now'] - 21600;    //time() - (6 * 60 * 60);
-  $config['time']['twelvehour'] = $config['time']['now'] - 43200;    //time() - (12 * 60 * 60);
-  $config['time']['day']        = $config['time']['now'] - 86400;    //time() - (24 * 60 * 60);
-  $config['time']['twoday']     = $config['time']['now'] - 172800;   //time() - (2 * 24 * 60 * 60);
-  $config['time']['week']       = $config['time']['now'] - 604800;   //time() - (7 * 24 * 60 * 60);
-  $config['time']['twoweek']    = $config['time']['now'] - 1209600;  //time() - (2 * 7 * 24 * 60 * 60);
-  $config['time']['month']      = $config['time']['now'] - 2678400;  //time() - (31 * 24 * 60 * 60);
-  $config['time']['twomonth']   = $config['time']['now'] - 5356800;  //time() - (2 * 31 * 24 * 60 * 60);
-  $config['time']['threemonth'] = $config['time']['now'] - 8035200;  //time() - (3 * 31 * 24 * 60 * 60);
-  $config['time']['sixmonth']   = $config['time']['now'] - 16070400; //time() - (6 * 31 * 24 * 60 * 60);
-  $config['time']['year']       = $config['time']['now'] - 31536000; //time() - (365 * 24 * 60 * 60);
-  $config['time']['twoyear']    = $config['time']['now'] - 63072000; //time() - (2 * 365 * 24 * 60 * 60);
-  $config['time']['threeyear']  = $config['time']['now'] - 94608000; //time() - (3 * 365 * 24 * 60 * 60);
-  */
+    $config['time']['fiveminute'] = $config['time']['now'] - 300;      //time() - (5 * 60);
+    $config['time']['fourhour']   = $config['time']['now'] - 14400;    //time() - (4 * 60 * 60);
+    $config['time']['sixhour']    = $config['time']['now'] - 21600;    //time() - (6 * 60 * 60);
+    $config['time']['twelvehour'] = $config['time']['now'] - 43200;    //time() - (12 * 60 * 60);
+    $config['time']['day']        = $config['time']['now'] - 86400;    //time() - (24 * 60 * 60);
+    $config['time']['twoday']     = $config['time']['now'] - 172800;   //time() - (2 * 24 * 60 * 60);
+    $config['time']['week']       = $config['time']['now'] - 604800;   //time() - (7 * 24 * 60 * 60);
+    $config['time']['twoweek']    = $config['time']['now'] - 1209600;  //time() - (2 * 7 * 24 * 60 * 60);
+    $config['time']['month']      = $config['time']['now'] - 2678400;  //time() - (31 * 24 * 60 * 60);
+    $config['time']['twomonth']   = $config['time']['now'] - 5356800;  //time() - (2 * 31 * 24 * 60 * 60);
+    $config['time']['threemonth'] = $config['time']['now'] - 8035200;  //time() - (3 * 31 * 24 * 60 * 60);
+    $config['time']['sixmonth']   = $config['time']['now'] - 16070400; //time() - (6 * 31 * 24 * 60 * 60);
+    $config['time']['year']       = $config['time']['now'] - 31536000; //time() - (365 * 24 * 60 * 60);
+    $config['time']['twoyear']    = $config['time']['now'] - 63072000; //time() - (2 * 365 * 24 * 60 * 60);
+    $config['time']['threeyear']  = $config['time']['now'] - 94608000; //time() - (3 * 365 * 24 * 60 * 60);
+    */
 
-    $str = strtolower(trim($str));
+    // Set times needed by loads of scripts
+    $config['time']['now'] = $config['time']['now'] ?? time();
 
-    if ($str === 'now' || empty($str)) {
+    $period = empty($period) ? 'now' : strtolower(trim($period));
+
+    if ($period === 'now') {
         return $config['time']['now'];
+    }
+    if ($period === 'new') {
+        return $config['time']['now'] = time();
     }
     $time = $config['time']['now'];
 
-    $multipliers  = [
-      'two'    => 2, 'three' => 3, 'four' => 4,
-      'five'   => 5, 'six' => 6, 'seven' => 7,
-      'eight'  => 8, 'nine' => 9, 'ten' => 10,
-      'eleven' => 11, 'twelve' => 12
+    $multipliers = [
+        'one'   => 1, 'two'   => 2, 'three' => 3, 'four' => 4,  'five'   => 5,  'six'    => 6,
+        'seven' => 7, 'eight' => 8, 'nine'  => 9, 'ten'  => 10, 'eleven' => 11, 'twelve' => 12
     ];
-    $times        = [
+    $times = [
       'year'   => 31536000,
       'month'  => 2678400,
       'week'   => 604800,
@@ -4784,10 +3868,10 @@ function get_time($str = 'now', $future = FALSE)
       'hour'   => 3600,
       'minute' => 60
     ];
-    $time_pattern = '/^(?<multiplier>' . implode('|', array_keys($multipliers)) . ')?(?<time>' . implode('|', array_keys($times)) . ')$/';
-    //$time_pattern = '/^(?<multiplier>two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)?(?<time>year|month|week|day|hour|minute)$/';
-    if (preg_match($time_pattern, $str, $matches)) {
-        $multiplier = isset($multipliers[$matches['multiplier']]) ? $multipliers[$matches['multiplier']] : 1;
+    $time_pattern = '/^(?<multiplier>' . implode('|', array_keys($multipliers)) . '|\d+)?(?<time>' . implode('|', array_keys($times)) . ')s?$/';
+    //r($time_pattern);
+    if (preg_match($time_pattern, $period, $matches)) {
+        $multiplier = $multipliers[$matches['multiplier']] ?? (is_numeric($matches['multiplier']) ? $matches['multiplier'] : 1);
 
         $diff = $multiplier * $times[$matches['time']];
 
@@ -4817,8 +3901,7 @@ function get_time($str = 'now', $future = FALSE)
  * @return string
  */
 // TESTME needs unit testing
-function format_timestamp($str)
-{
+function format_timestamp($str = 'now') {
     global $config;
 
     if ($str === 'now') {
@@ -4844,15 +3927,13 @@ function format_timestamp($str)
  * @return string
  */
 // TESTME needs unit testing
-function format_unixtime($time, $format = NULL)
-{
+function format_unixtime($time, $format = NULL) {
 
-    [$sec, $usec] = explode('.', (string)$time);
+    [ $sec, $usec ] = explode('.', (string)$time);
     if (!safe_empty($usec)) {
         $date = date_create_from_format('U.u', number_format($time, 6, '.', ''));
     } else {
         $date = date_create_from_format('U', $sec);
-        $usec = 0;
     }
 
     // If something wrong with create data object, just return empty string (and yes, we never use zero unixtime)
@@ -4866,26 +3947,17 @@ function format_unixtime($time, $format = NULL)
     try {
         $date_timezone = new DateTimeZone(str_replace(':', '', $tz['php']));
         //$date_timezone = new DateTimeZone($tz['php_name']);
-        $date -> setTimeZone($date_timezone);
+        $date->setTimeZone($date_timezone);
     } catch (Throwable $throwable) {
         print_debug($throwable -> getMessage());
-    } catch (Exception $exception) {
-        print_debug($exception -> getMessage());
     }
     //r($date);
 
     if (safe_empty($format)) {
         $format = $GLOBALS['config']['timestamp_format'];
     }
-    $return = date_format($date, (string)$format);
-    if (PHP_VERSION_ID < 70300 && str_contains($return, 'v')) {
-        // The 'v' format specifier has been added in php 7.3
-        $msec = $usec ? substr(str_pad((string)$usec, 6, '0'), 0, 3) : '000';
-        //echo sprintf("%s -> %s\n", $usec, $msec);
-        return str_replace('v', $msec, $return);
-    }
 
-    return $return;
+    return date_format($date, (string)$format);
 }
 
 /**
@@ -5328,7 +4400,7 @@ function unit_string_to_numeric($str, $unit_base = NULL)
             return $str;
     }
 
-    $multiplier = pow($base, $power);
+    $multiplier = $base ** $power;
 
     return (float)($matches[1] * $multiplier);
 }
@@ -5346,7 +4418,7 @@ function string_to_id($string)
 }
 
 /**
- * Convert value of sensor from known unit to defined SI unit (used in poller/discovery)
+ * Convert the value of sensor from known unit to defined SI unit (used in poller/discovery)
  *
  * @param float|string $value Value in non standard unit
  * @param string       $unit  Unit name/symbol
@@ -5354,30 +4426,26 @@ function string_to_id($string)
  *
  * @return float|string Value converted to standard (SI) unit
  */
-function value_to_si($value, $unit, $type = NULL)
-{
+function value_to_si($value, $unit, $type = NULL) {
     if (!is_numeric($value)) {
+        // Just return the original value if not numeric
         return $value;
-    } // Just return original value if not numeric
+    }
 
     $unit_lower = strtolower($unit);
     $case_units = [
-      'c'          => 'C',
-      'celsius'    => 'C',
-      'f'          => 'F',
-      'fahrenheit' => 'F',
-      'k'          => 'K',
-      'kelvin'     => 'K',
+        'c'    => 'C', 'celsius'    => 'C',
+        'f'    => 'F', 'fahrenheit' => 'F',
+        'k'    => 'K', 'kelvin'     => 'K',
 
-      'w'     => 'W',
-      'watts' => 'W',
-      'dbm'   => 'dBm',
+        'w'    => 'W', 'watts'      => 'W',
+        'dbm'  => 'dBm',
 
-      'mpsi' => 'Mpsi',
-      'mmhg' => 'mmHg',
-      'inhg' => 'inHg',
+        'mpsi' => 'Mpsi',
+        'mmhg' => 'mmHg',
+        'inhg' => 'inHg',
     ];
-    // set correct unit case (required for external lib)
+    // set a correct unit case (required for external lib)
     if (isset($case_units[$unit_lower])) {
         $unit = $case_units[$unit_lower];
     }
@@ -5389,7 +4457,6 @@ function value_to_si($value, $unit, $type = NULL)
             try {
                 $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Temperature::getUnit($unit);
             } catch (Throwable $e) {
-                //PHP 7+
                 $unit = $unit_lower;
             }
             $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Temperature($value, $unit);
@@ -5418,7 +4485,7 @@ function value_to_si($value, $unit, $type = NULL)
                 // https://www.everythingrf.com/rf-calculators/watt-to-dbm
                 if ($value > 0) {
                     $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, 'W');
-                    $si_value   = $value_from -> toUnit('dBm');
+                    $si_value   = $value_from->toUnit('dBm');
 
                     $from = $value . " $unit";
                     $to   = $si_value . ' dBm';
@@ -5444,7 +4511,7 @@ function value_to_si($value, $unit, $type = NULL)
                 // https://en.wikipedia.org/wiki/DBm
                 // https://www.everythingrf.com/rf-calculators/dbm-to-watts
                 $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, $unit);
-                $si_value   = $value_from -> toUnit('W');
+                $si_value   = $value_from->toUnit('W');
 
                 $from = $value . " $unit";
                 $to   = $si_value . ' W';
@@ -5464,13 +4531,12 @@ function value_to_si($value, $unit, $type = NULL)
         case 'atm':
             // https://en.wikipedia.org/wiki/Pounds_per_square_inch
             try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Pressure ::getUnit($unit);
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Pressure::getUnit($unit);
             } catch (Throwable $e) {
-                //PHP 7+
                 $unit = $unit_lower;
             }
             $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit);
-            $si_value   = $value_from -> toUnit('Pa');
+            $si_value   = $value_from->toUnit('Pa');
 
             $type = 'pressure';
             $from = $value . " $unit";
@@ -5487,14 +4553,14 @@ function value_to_si($value, $unit, $type = NULL)
         case 'm/min': // Meter per minute
         case 'km/h':  // Kilometer per hour
             try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Velocity ::getUnit($unit);
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Velocity::getUnit($unit);
             } catch (Throwable $e) {
                 //PHP 7+
                 $unit = $unit_lower;
             }
             // Any velocity units:
             $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Velocity($value, $unit);
-            $si_value   = $value_from -> toUnit('m/s');
+            $si_value   = $value_from->toUnit('m/s');
 
             $type = 'velocity';
             $from = $value . " $unit";
@@ -5514,23 +4580,22 @@ function value_to_si($value, $unit, $type = NULL)
         case 'cmm':
         case 'm3/min':
             try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow ::getUnit($unit);
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow::getUnit($unit);
             } catch (Throwable $e) {
-                //PHP 7+
                 $unit = $unit_lower;
             }
             if ($type === 'waterflow') {
                 // Waterflow default unit is L/s
                 $si_unit = 'L/s';
             } elseif ($type === 'airflow') {
-                // Use for Airflow imperial unit CFM (Cubic foot per minute) as more common industry standard
+                // Use for Airflow imperial unit CFM (Cubic foot per minute) as a more common industry standard
                 $si_unit = 'CFM';
             } else {
-                // For future
+                // For the future
                 $si_unit = 'm^3/s';
             }
             $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow($value, $unit);
-            $si_value   = $value_from -> toUnit($si_unit);
+            $si_value   = $value_from->toUnit($si_unit);
 
             $from = $value . " $unit";
             $to   = $si_value . " $si_unit";
@@ -5538,17 +4603,17 @@ function value_to_si($value, $unit, $type = NULL)
 
         default:
             // Ability to use any custom function to convert value based on unit name
-            $function_name = 'value_unit_' . $unit_lower; // ie: value_unit_ekinops_dbm1($value) or value_unit_accuenergy($value)
+            $function_name = 'value_unit_' . $unit_lower; // ie: value_unit_ekinops_dbm1($value) or value_unit_ieee32float($value)
             if (function_exists($function_name)) {
-                $si_value = call_user_func_array($function_name, [$value]);
+                $si_value = $function_name($value);
 
                 //$type  = $unit;
-                $from = $value . " $unit";
+                $from = "$function_name($value)";
                 $to   = $si_value;
-            } elseif ($type === 'pressure' && str_ends($unit_lower, ['pa', 'si'])) {
+            } elseif ($type === 'pressure' && str_ends($unit_lower, [ 'pa', 'si' ])) {
                 // Any of pressure unit, like hPa
                 $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit);
-                $si_value   = $value_from -> toUnit('Pa');
+                $si_value   = $value_from->toUnit('Pa');
 
                 $from = $value . " $unit";
                 $to   = $si_value . ' Pa';
@@ -5573,8 +4638,7 @@ function value_to_si($value, $unit, $type = NULL)
  *
  * @return array       Array with values converted to unit_from
  */
-function value_to_units($value, $unit_from, $class, $unit_to = [])
-{
+function value_to_units($value, $unit_from, $class, $unit_to = []) {
     global $config;
 
     // Convert symbols to supported by lib units
@@ -5635,7 +4699,7 @@ function value_to_units($value, $unit_from, $class, $unit_to = [])
         $tou = str_replace(['<sup>', '</sup>'], ['^', ''], $to); // I.e. mg/m<sup>3</sup> => mg/m^3
         $tou = html_entity_decode($tou);                         // I.e. &deg;C => °C
 
-        $units[$to] = $value_from -> toUnit($tou);
+        $units[$to] = $value_from->toUnit($tou);
     }
 
     return $units;
@@ -5717,6 +4781,31 @@ function is_flag_set($flag, $param, $all = FALSE)
 }
 
 /**
+ * Return file extension when it exists on a system, limited extensions (default is svg and png).
+ *
+ * @param string $file
+ * @param array|string $ext_list
+ * @return false|string
+ */
+function is_file_ext($file, $ext_list = [ 'svg', 'png' ]) {
+    global $cache;
+
+    if (isset($cache['is_file_ext'][$file]) &&
+        in_array($cache['is_file_ext'][$file], (array)$ext_list, TRUE)) {
+        // reduce is_file() calls
+        return $cache['is_file_ext'][$file];
+    }
+    foreach ((array)$ext_list as $ext) {
+        if (is_file($file . ".$ext")) {
+            //if ($ext === 'svg') { r($file . ".$ext"); }
+            $cache['is_file_ext'][$file] = $ext;
+            return $ext;
+        }
+    }
+    return FALSE;
+}
+
+/**
  * Checks if a string is composed solely of lower case letters.
  * Primarily used to sanitise strings used for file inclusion
  *
@@ -5737,8 +4826,7 @@ function is_alpha($string)
  *
  * @return string
  */
-function smart_quotes($string)
-{
+function smart_quotes($string) {
     if (!is_string($string)) {
         return $string;
     }
@@ -5768,20 +4856,15 @@ function smart_quotes($string)
 
 // JSON escaping for JS see:
 // https://stackoverflow.com/questions/7462394/php-json-string-escape-double-quotes-for-js-output
-function json_escape($str)
-{
+function json_escape($str) {
     if (!is_string($str)) {
         return $str;
     }
 
-    $str = str_replace(['\"', '"'], ['"', '\"'], smart_quotes($str));
-    //$str = str_replace("\u0022", "\\\"", $str );
-    //$str = str_replace("\u0027", "\\'",  $str );
-    return $str;
+    return substr(safe_json_encode(smart_quotes($str)), 1, -1);
 }
 
-function safe_json_encode($var, $options = 0)
-{
+function safe_json_encode($var, $options = 0) {
     $options |= OBS_JSON_ENCODE; // JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
 
     $str = @json_encode($var, $options);

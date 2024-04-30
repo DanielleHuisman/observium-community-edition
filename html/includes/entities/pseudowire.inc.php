@@ -24,42 +24,42 @@ function generate_pseudowire_query($vars)
             case "group":
             case "group_id":
                 $values  = get_group_entities($value);
-                $where[] = generate_query_values_ng($values, 'pseudowire_id');
+                $where[] = generate_query_values($values, 'pseudowire_id');
                 break;
             case 'device_group_id':
             case 'device_group':
                 $values  = get_group_entities($value, 'device');
-                $where[] = generate_query_values_ng($values, 'device_id');
+                $where[] = generate_query_values($values, 'device_id');
                 break;
             case "device":
             case "device_id":
-                $where[] = generate_query_values_ng($value, 'device_id');
+                $where[] = generate_query_values($value, 'device_id');
                 break;
             case "port":
             case "port_id":
-                $where[] = generate_query_values_ng($value, 'port_id');
+                $where[] = generate_query_values($value, 'port_id');
                 break;
             case "id":
-                $where[] = generate_query_values_ng($value, 'pseudowire_id');
+                $where[] = generate_query_values($value, 'pseudowire_id');
                 break;
             case "pwid":
             case "pwID":
-                $where[] = generate_query_values_ng($value, 'pwID');
+                $where[] = generate_query_values($value, 'pwID');
                 break;
             case "pwtype":
-                $where[] = generate_query_values_ng($value, 'pwType');
+                $where[] = generate_query_values($value, 'pwType');
                 break;
             case "psntype":
-                $where[] = generate_query_values_ng($value, 'pwPsnType');
+                $where[] = generate_query_values($value, 'pwPsnType');
                 break;
             case "peer_id":
-                $where[] = generate_query_values_ng($value, 'peer_device_id');
+                $where[] = generate_query_values($value, 'peer_device_id');
                 break;
             case "peer_addr":
-                $where[] = generate_query_values_ng($value, 'peer_addr');
+                $where[] = generate_query_values($value, 'peer_addr');
                 break;
             case "event":
-                $where[] = generate_query_values_ng($value, 'event');
+                $where[] = generate_query_values($value, 'event');
                 break;
         }
     }
@@ -279,14 +279,14 @@ function generate_pseudowire_row($pw, $vars)
     $table_cols = 11;
 
     $graph_array           = [];
-    $graph_array['to']     = $config['time']['now'];
+    $graph_array['to']     = get_time();
     $graph_array['id']     = $pw['pseudowire_id'];
     $graph_array['type']   = $pw['graph'];
     $graph_array['legend'] = "no";
     $graph_array['width']  = 80;
     $graph_array['height'] = 20;
     $graph_array['bg']     = 'ffffff00';
-    $graph_array['from']   = $config['time']['day'];
+    $graph_array['from']   = get_time('day');
 
     if ($pw['event'] && $pw['pwOperStatus']) {
         $mini_graph = generate_graph_tag($graph_array);
@@ -312,7 +312,7 @@ function generate_pseudowire_row($pw, $vars)
         $out .= '<td>' . $pw['pwRemoteIfString'] . '</td>';
     }
     $out .= '<td>' . generate_entity_link('pseudowire', $pw, $mini_graph, NULL, FALSE) . '</td>';
-    $out .= '<td style="white-space: nowrap">' . generate_tooltip_link(NULL, format_uptime(($config['time']['now'] - $pw['last_change']), 'short-2') . ' ago', format_unixtime($pw['last_change'])) . '</td>';
+    $out .= '<td style="white-space: nowrap">' . generate_tooltip_link(NULL, format_uptime((get_time('now') - $pw['last_change']), 'short-2') . ' ago', format_unixtime($pw['last_change'])) . '</td>';
     $out .= '<td style="text-align: right;"><strong>' . generate_tooltip_link('', $pw['event'], $pw['event_descr'], $pw['event_class']) . '</strong></td>';
     $out .= '<td style="text-align: right;"><strong>' . generate_tooltip_link('', $pw['pwOperStatus'], $pw['event_descr'], $pw['event_class']) . '</strong></td>';
     $out .= '<td>' . format_uptime($pw['pwUptime'], 'short-2') . '</td>';
@@ -334,5 +334,116 @@ function generate_pseudowire_row($pw, $vars)
 
     return $out;
 }
+
+function print_pseudowire_form($vars, $single_device = FALSE)
+{
+    //global $config;
+
+    $form = ['type'          => 'rows',
+             'space'         => '10px',
+             'submit_by_key' => TRUE,
+             'url'           => generate_url($vars)];
+
+    $form_items = [];
+
+    if ($single_device) {
+        // Single device, just hidden field
+        $form['row'][0]['device_id'] = [
+          'type'  => 'hidden',
+          'name'  => 'Device',
+          'value' => $vars['device_id'],
+          'grid'  => 2,
+          'width' => '100%'];
+    } else {
+        $form_items['devices'] = generate_form_values('device', dbFetchColumn('SELECT DISTINCT `device_id` FROM `pseudowires`'));
+
+        $form['row'][0]['device_id'] = [
+          'type'   => 'multiselect',
+          'name'   => 'Device',
+          'value'  => $vars['device_id'],
+          'grid'   => 2,
+          'width'  => '100%', //'180px',
+          'values' => $form_items['devices']];
+    }
+
+    // Ports
+    $form_items['ports'] = generate_form_values('ports', dbFetchColumn('SELECT DISTINCT `port_id` FROM `pseudowires`'));
+
+    $form['row'][0]['port_id'] = [
+      'type'   => 'multiselect',
+      'name'   => 'Local Port',
+      'value'  => $vars['port_id'],
+      'grid'   => 2,
+      'width'  => '100%', //'180px',
+      'values' => $form_items['ports']];
+
+    // Peer Address
+    $form_items['ports'] = generate_form_values('port', dbFetchColumn('SELECT DISTINCT `peer_addr` FROM `pseudowires`'));
+
+    $form['row'][0]['port_id'] = [
+      'type'   => 'multiselect',
+      'name'   => 'Local Port',
+      'value'  => $vars['port_id'],
+      'grid'   => 2,
+      'width'  => '100%', //'180px',
+      'values' => $form_items['ports']];
+
+
+    // Groups
+    foreach (get_type_groups('pseudowire') as $entry) {
+        $form_items['group'][$entry['group_id']] = $entry['group_name'];
+    }
+    $form['row'][0]['group'] = [
+      'community' => FALSE,
+      'type'      => 'multiselect',
+      'name'      => 'Select Groups',
+      'width'     => '100%', //'180px',
+      'grid'      => 2,
+      'value'     => $vars['group'],
+      'values'    => $form_items['group']];
+
+    $form['row'][0]['search'] = [
+      'type'  => 'submit',
+      'grid'  => 2,
+      //'name'        => 'Search',
+      //'icon'        => 'icon-search',
+      'right' => TRUE,
+    ];
+
+    // Show search form
+    echo '<div class="hidden-xl">';
+    print_form($form);
+    echo '</div>';
+
+    // Custom panel form
+    $panel_form = ['type'          => 'rows',
+                   'title'         => 'Search Processors',
+                   'space'         => '10px',
+                   //'brand' => NULL,
+                   //'class' => '',
+                   'submit_by_key' => TRUE,
+                   'url'           => generate_url($vars)];
+
+    // Clean grids
+    foreach ($form['row'] as $row => $rows) {
+        foreach (array_keys($rows) as $param) {
+            if (isset($form['row'][$row][$param]['grid'])) {
+                unset($form['row'][$row][$param]['grid']);
+            }
+        }
+    }
+
+    // Copy forms
+    $panel_form['row'][0]['device_id'] = $form['row'][0]['device_id'];
+    $panel_form['row'][0]['group']     = $form['row'][0]['group'];
+
+    $panel_form['row'][3]['processor_descr'] = $form['row'][0]['processor_descr'];
+
+    $panel_form['row'][5]['search'] = $form['row'][0]['search'];
+
+    // Register custom panel
+    register_html_panel(generate_form($panel_form));
+}
+
 
 // EOF

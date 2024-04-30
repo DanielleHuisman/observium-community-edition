@@ -42,7 +42,7 @@ foreach (dbFetchRows("SELECT * FROM `eigrp_ports` WHERE `device_id` = ? AND `eig
           <td class="state-marker"></td>
           <td colspan=6>';
 
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $eigrp_port['eigrp_port_id'];
         $graph_array['type'] = 'eigrpport_packets';
 

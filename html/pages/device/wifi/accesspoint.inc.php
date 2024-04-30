@@ -34,7 +34,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - User sessions</h4>');
             $graph_array['type'] = "wifi_usersessions";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');
@@ -42,7 +42,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - Retransmit octets</h4>');
             $graph_array['type'] = "wifi_retransmitoctet";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');
@@ -50,7 +50,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - Noise Floor</h4>');
             $graph_array['type'] = "wifi_noisefloor";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');
@@ -58,7 +58,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - Reset</h4>');
             $graph_array['type'] = "wifi_resetcount";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');
@@ -66,7 +66,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - Transmit retries</h4>');
             $graph_array['type'] = "wifi_txretriescount";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');
@@ -74,7 +74,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - Failed client associations</h4>');
             $graph_array['type'] = "wifi_clientfailedassociations";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');
@@ -82,7 +82,7 @@ if ($device['type'] == 'wireless') {
             echo('<tr><td>');
             echo('<h3> Radio' . $radio['radio_number'] . ' - Refused connections</h4>');
             $graph_array['type'] = "wifi_refusedconnectioncount";
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $radio['wifi_radio_id'];
             print_graph_row($graph_array);
             echo('</td></tr>');

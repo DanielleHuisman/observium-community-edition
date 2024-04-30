@@ -1,0 +1,703 @@
+ELTEX-MES-ISS-ACL-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Integer32
+                FROM SNMPv2-SMI
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        RowStatus, TEXTUAL-CONVENTION, MacAddress, TruthValue, DisplayString
+                FROM SNMPv2-TC
+        eltMesIss
+                FROM ELTEX-MES-ISS-MIB
+        issL2FilterEntry, issL3FilterEntry
+                FROM ARICENT-ISS-MIB
+        issAclRateCtrlEntry
+                FROM ARICENT-ISS-ACL-MIB
+        ifIndex
+                FROM IF-MIB;
+
+eltMesIssAclMIB MODULE-IDENTITY
+        LAST-UPDATED "202302070000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "Access Control Lists MIB definitions."
+        REVISION "202209010000Z"
+        DESCRIPTION "Added eltMesIssAclNotifications object."
+        REVISION "201811130000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 1 }
+
+-- ------------------------------------------------------------------------- --
+-- groups in the MIB
+-- ------------------------------------------------------------------------- --
+
+    eltMesIssAclL2Filter            OBJECT IDENTIFIER ::= { eltMesIssAclMIB 1 }
+    eltMesIssAclL3Filter            OBJECT IDENTIFIER ::= { eltMesIssAclMIB 2 }
+    eltMesIssAclUserDefinedFilter   OBJECT IDENTIFIER ::= { eltMesIssAclMIB 3 }
+    eltMesIssAclRateControl         OBJECT IDENTIFIER ::= { eltMesIssAclMIB 4 }
+    eltMesIssAclGenFilter           OBJECT IDENTIFIER ::= { eltMesIssAclMIB 5 }
+
+    eltMesIssAclNotifications       OBJECT IDENTIFIER ::= { eltMesIssAclMIB 6 }
+
+-- ------------------------------------------------------------------------- --
+-- Textual Conventions
+-- ------------------------------------------------------------------------- --
+
+EltMesIssAclRateCtrlActionType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Action type."
+    SYNTAX  INTEGER {
+        none(1),
+        trap(2),
+        shutdown(3),
+        trapAndShutdown(4)
+    }
+
+EltMesIssAclStormCauseType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Storm cause type."
+    SYNTAX  INTEGER {
+        unicast(1),
+        broadcast(2),
+        multicast(3)
+    }
+
+EltMesIssAclInterfaceType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+         "Interface type."
+    SYNTAX  INTEGER {
+          vlan (1)
+    }
+
+EltMesIssAclFilterType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+         "ACL Filter type."
+    SYNTAX  INTEGER {
+          aclL2Filter (1),
+          aclL3Filter (2)
+    }
+
+EltMesIssAclFilterDirection ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "ACL direction."
+    SYNTAX  INTEGER {
+          input (1)
+    }
+
+-- ------------------------------------------------------------------------- --
+-- L2 ACL Filters
+-- ------------------------------------------------------------------------- --
+
+eltMesIssAclL2FilterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAclL2FilterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the issL2FilterTable table."
+    ::= { eltMesIssAclL2Filter 1 }
+
+eltMesIssAclL2FilterEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAclL2FilterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table is a L2 filter rule.
+         Index to the table is the L2 filter number. An entry in this
+         table will be created when the L2 Filter entry (issL2FilterStatus)
+         in the fsissext.mib is created."
+    AUGMENTS { issL2FilterEntry }
+    ::= { eltMesIssAclL2FilterTable 1 }
+
+EltMesIssAclL2FilterEntry ::=
+    SEQUENCE {
+        eltMesIssAclL2FilterDstMacAddrMask
+            MacAddress,
+        eltMesIssAclL2FilterSrcMacAddrMask
+            MacAddress,
+        eltMesIssAclL2FilterUserDefinedBytesValue
+            OCTET STRING,
+        eltMesIssAclL2FilterUserDefinedBytesMask
+            OCTET STRING,
+        eltMesIssAclL2FilterDesc
+            DisplayString
+    }
+
+eltMesIssAclL2FilterDstMacAddrMask OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the mask for the packet's destination MAC address.
+         Only masked bits will be used to filter a packet by the destination
+         MAC address. By default, all bits are masked, i.e. the whole address
+         will be compared with a filter."
+    DEFVAL  { 'FFFFFFFFFFFF'H }
+    ::= { eltMesIssAclL2FilterEntry 1 }
+
+eltMesIssAclL2FilterSrcMacAddrMask OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the mask for the packet's source MAC address.
+         Only masked bits will be used to filter a packet by the source
+         MAC address. By default, all bits are masked, i.e. the whole address
+         will be compared with a filter."
+    DEFVAL  { 'FFFFFFFFFFFF'H }
+    ::= { eltMesIssAclL2FilterEntry 2 }
+
+eltMesIssAclL2FilterUserDefinedBytesValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..8))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the values of bytes in a filtered packet which are located
+         by UDB offsets configured in ltMesIssAclUdbOffsetConfigTable.
+         Each two bytes in this field refers to a single
+         eltMesIssAclUdbOffsetConfigEntry."
+    ::= { eltMesIssAclL2FilterEntry 3 }
+
+eltMesIssAclL2FilterUserDefinedBytesMask OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..8))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the mask for bytes in a filtered packet which are located
+         by UDB offsets configured in ltMesIssAclUdbOffsetConfigTable.
+         Each two bytes in this field refers to a single
+         eltMesIssAclUdbOffsetConfigEntry."
+    ::= { eltMesIssAclL2FilterEntry 4 }
+    
+eltMesIssAclL2FilterDesc OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..127))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A user defined textual string which contains ACL description."
+    DEFVAL  { "" }
+    ::= { eltMesIssAclL2FilterEntry 5 }
+
+-- ------------------------------------------------------------------------- --
+-- L3 ACL Filters
+-- ------------------------------------------------------------------------- --
+
+eltMesIssAclL3FilterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAclL3FilterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the issL3FilterTable table."
+    ::= { eltMesIssAclL3Filter 1 }
+
+eltMesIssAclL3FilterEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAclL3FilterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table is a L3 filter rule.
+         Index to the table is the L3 filter number. An entry in this
+         table will be created when the L3 Filter entry (issL3FilterStatus)
+         in the fsissext.mib is created."
+    AUGMENTS { issL3FilterEntry }
+    ::= { eltMesIssAclL3FilterTable 1 }
+
+EltMesIssAclL3FilterEntry ::=
+    SEQUENCE {
+        eltMesIssAclL3FilterUserDefinedBytesValue
+            OCTET STRING,
+        eltMesIssAclL3FilterUserDefinedBytesMask
+            OCTET STRING,
+        eltMesIssAclL3FilterTrafficClass
+            Integer32,
+        eltMesIssAclL3FilterDesc
+            DisplayString
+    }
+
+eltMesIssAclL3FilterUserDefinedBytesValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..8))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the values of bytes in a filtered packet which are located
+         by UDB offsets configured in ltMesIssAclUdbOffsetConfigTable.
+         Each two bytes in this field refers to a single
+         eltMesIssAclUdbOffsetConfigEntry."
+    ::= { eltMesIssAclL3FilterEntry 1 }
+
+eltMesIssAclL3FilterUserDefinedBytesMask OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..8))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the mask for bytes in a filtered packet which are located
+         by UDB offsets configured in ltMesIssAclUdbOffsetConfigTable.
+         Each two bytes in this field refers to a single
+         eltMesIssAclUdbOffsetConfigEntry."
+    ::= { eltMesIssAclL3FilterEntry 2 }
+
+eltMesIssAclL3FilterTrafficClass OBJECT-TYPE
+    SYNTAX      Integer32 (-1..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP Traffic Class value to be checked against the packet.
+         This value covers both DSCP and ECN fields.
+         A value of '-1' means the Traffic Class field becomes dont care."
+    DEFVAL  { -1 }
+    ::= { eltMesIssAclL3FilterEntry 3 }
+    
+eltMesIssAclL3FilterDesc OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..127))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A user defined textual string which contains ACL description."
+    DEFVAL  { "" }
+    ::= { eltMesIssAclL3FilterEntry 4 }
+
+-- ------------------------------------------------------------------------- --
+-- User defined ACL Filters
+-- ------------------------------------------------------------------------- --
+
+eltMesIssAclUdbOffsetConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAclUdbOffsetConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table allows to configure user-defined bytes for ACL."
+    ::= { eltMesIssAclUserDefinedFilter 1 }
+
+eltMesIssAclUdbOffsetConfigEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAclUdbOffsetConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in eltMesIssAclUdbOffsetConfigTable."
+    INDEX { eltMesIssAclUdbOffsetIndex }
+    ::= { eltMesIssAclUdbOffsetConfigTable 1 }
+
+EltMesIssAclUdbOffsetConfigEntry ::=
+    SEQUENCE {
+        eltMesIssAclUdbOffsetIndex
+            Integer32,
+        eltMesIssAclUdbOffsetType
+            INTEGER,
+        eltMesIssAclUdbOffsetByte
+            Integer32
+    }
+
+eltMesIssAclUdbOffsetIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The numerical index of offset value."
+    ::= { eltMesIssAclUdbOffsetConfigEntry 1 }
+
+eltMesIssAclUdbOffsetType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    destMacAddress (1),
+                    layer2FramePayload (2),
+                    layer3HeaderOrArp (3),
+                    layer4Header (4)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The starting position in a packet the offset will be counted from."
+    DEFVAL  { destMacAddress }
+    ::= { eltMesIssAclUdbOffsetConfigEntry 2 }
+
+eltMesIssAclUdbOffsetByte OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The offset value in bytes."
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclUdbOffsetConfigEntry 3 }
+
+-- ------------------------------------------------------------------------- --
+-- Rate Control Group
+-- ------------------------------------------------------------------------- --
+
+eltMesIssAclRateCtrlTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAclRateCtrlEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the issAclRateCtrlTable table."
+    ::= { eltMesIssAclRateControl 1 }
+
+eltMesIssAclRateCtrlEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAclRateCtrlEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry appears in this table for each physical and port-channel
+         interface in the switch."
+    AUGMENTS { issAclRateCtrlEntry }
+    ::= { eltMesIssAclRateCtrlTable 1 }
+
+EltMesIssAclRateCtrlEntry ::=
+    SEQUENCE {
+        eltMesIssAclRateCtrlDlfLimitKbpsValue   Integer32,
+        eltMesIssAclRateCtrlBcastLimitKbpsValue Integer32,
+        eltMesIssAclRateCtrlMcastLimitKbpsValue Integer32,
+        eltMesIssAclRateCtrlDlfLimitPpsValue    Integer32,
+        eltMesIssAclRateCtrlBcastLimitPpsValue  Integer32,
+        eltMesIssAclRateCtrlMcastLimitPpsValue  Integer32,
+        eltMesIssAclRateCtrlIgrBandwidth        Integer32,
+        eltMesIssAclRateCtrlDlfLimitAction      EltMesIssAclRateCtrlActionType,
+        eltMesIssAclRateCtrlBcastLimitAction    EltMesIssAclRateCtrlActionType,
+        eltMesIssAclRateCtrlMcastLimitAction    EltMesIssAclRateCtrlActionType
+    }
+
+eltMesIssAclRateCtrlDlfLimitKbpsValue OBJECT-TYPE
+    SYNTAX      Integer32 (0..2147483647)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows to configure the limiting value for the maximum number
+         of dlf kilobits that can be transmitted per second over this interface.
+         Setting this object to the value zero disables rate limiting for
+         Destination lookup failure kilobits on this interface. The value that
+         can be set for this object is limited by the underlying hardware"
+    
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 1 }
+
+eltMesIssAclRateCtrlBcastLimitKbpsValue OBJECT-TYPE
+    SYNTAX       Integer32 (0..2147483647)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Allows to configure the limiting value for the maximum number
+         of broadcast kilobits that can be transmitted per second over this
+         interface. Setting this object to the value zero disables rate
+         limiting for Broadcast kilobits on this interface. The value that
+         can be set for this object is limited by the underlying hardware"
+    
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 2 }
+
+eltMesIssAclRateCtrlMcastLimitKbpsValue OBJECT-TYPE
+    SYNTAX       Integer32 (0..2147483647)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Allows to configure the limiting value for the maximum number
+         of multicast kilobits that can be transmitted per second over this
+         interface. Setting this object to the value zero disables rate
+         limiting for Multicast kilobits on this interface. The value that
+         can be set for this object is limited by the underlying hardware"
+    
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 3 }
+
+eltMesIssAclRateCtrlDlfLimitPpsValue OBJECT-TYPE
+    SYNTAX       Integer32 (0..2147483647)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Allows to configure the limiting value for the maximum number
+         of dlf packets that can be transmitted per second over this interface.
+         Setting this object to the value zero disables rate limiting for
+         Destination lookup failure packets on this interface. The value that
+         can be set for this object is limited by the underlying hardware"
+    
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 4 }
+
+eltMesIssAclRateCtrlBcastLimitPpsValue OBJECT-TYPE
+    SYNTAX       Integer32 (0..2147483647)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Allows to configure the limiting value for the maximum number
+         of broadcast packets that can be transmitted per second over this
+         interface. Setting this object to the value zero disables rate
+         limiting for Broadcast packets on this interface. The value that
+         can be set for this object is limited by the underlying hardware"
+    
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 5 }
+
+eltMesIssAclRateCtrlMcastLimitPpsValue OBJECT-TYPE
+    SYNTAX       Integer32 (0..2147483647)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Allows to configure the limiting value for the maximum number
+         of multicast packets that can be transmitted per second over this
+         interface. Setting this object to the value zero disables rate
+         limiting for Multicast packets on this interface. The value that
+         can be set for this object is limited by the underlying hardware"
+    
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 6 }
+
+eltMesIssAclRateCtrlIgrBandwidth OBJECT-TYPE
+    SYNTAX      Integer32 (0..2147483647)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures the interface ingress bandwidth measured in Kbit per
+         second. All ingress traffic that exceeds the configured rate
+         will be dropped.
+
+         Rate limiting will be performed with granularity of 16 Kbps.
+         A value of 0 disables rate limiting i.e. sets the port
+         to the full speed."
+    DEFVAL  { 0 }
+    ::= { eltMesIssAclRateCtrlEntry 7 }
+
+eltMesIssAclRateCtrlDlfLimitAction OBJECT-TYPE
+    SYNTAX      EltMesIssAclRateCtrlActionType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the action to be taken if configured limiting
+         value (in pps or kbps) is exceeded for dlf packets."
+    DEFVAL  { none }
+    ::= { eltMesIssAclRateCtrlEntry 8 }
+
+eltMesIssAclRateCtrlBcastLimitAction OBJECT-TYPE
+    SYNTAX      EltMesIssAclRateCtrlActionType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the action to be taken if configured limiting
+         value (in pps or kbps) is exceeded for broadcast packets."
+    DEFVAL  { none }
+    ::= { eltMesIssAclRateCtrlEntry 9 }
+
+eltMesIssAclRateCtrlMcastLimitAction OBJECT-TYPE
+    SYNTAX      EltMesIssAclRateCtrlActionType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the action to be taken if configured limiting
+         value (in pps or kbps) is exceeded for multicast packets."
+    DEFVAL  { none }
+    ::= { eltMesIssAclRateCtrlEntry 10 }
+
+eltMesIssAclRateCtrlConfiguredUnits OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            pps(1),
+                            kbps(2)
+                         }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        ""
+    DEFVAL  { pps }
+    ::= { eltMesIssAclRateControl 2 }
+
+eltMesIssStormCtrlTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssStormCtrlEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of the rate limiting parameters and the storm type
+         for each physical and port-channel interface in the switch."
+    ::= { eltMesIssAclRateControl 3 }
+
+eltMesIssStormCtrlEntry OBJECT-TYPE
+    SYNTAX      EltMesIssStormCtrlEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in eltMesIssStormCtrlTable."
+    INDEX { ifIndex, eltMesIssAclStormCtrlType }
+    ::= { eltMesIssStormCtrlTable 1 }
+
+EltMesIssStormCtrlEntry ::=
+    SEQUENCE {
+        eltMesIssAclStormCtrlType              EltMesIssAclStormCauseType,
+        eltMesIssAclStormDetected              TruthValue,
+        eltMesIssAclStormPortAction            EltMesIssAclRateCtrlActionType,
+        eltMesIssAclStormPortLimitKbpsValue    Integer32,
+        eltMesIssAclStormPortLimitPpsValue     Integer32
+    }
+
+eltMesIssAclStormCtrlType OBJECT-TYPE
+    SYNTAX      EltMesIssAclStormCauseType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The storm type."
+    ::= { eltMesIssStormCtrlEntry 1 }
+
+eltMesIssAclStormDetected OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Detected/Cleared storm on the interface."
+    ::= { eltMesIssStormCtrlEntry 2 }
+
+eltMesIssAclStormPortAction OBJECT-TYPE
+    SYNTAX      EltMesIssAclRateCtrlActionType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the action to be taken if configured limiting
+         value (in pps or kbps) is exceeded for packets.
+         
+         This field is functionally the same as
+         eltMesIssAclRateCtrlDlfLimitAction,
+         eltMesIssAclRateCtrlBcastLimitAction or
+         eltMesIssAclRateCtrlMcastLimitAction
+         from eltMesIssAclRateCtrlTableTable."
+    DEFVAL  { none }
+    ::= { eltMesIssStormCtrlEntry 3 }
+
+eltMesIssAclStormPortLimitKbpsValue OBJECT-TYPE
+    SYNTAX      Integer32 (0..2147483647)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The limiting value for the maximum number of kilobits
+         that can be transmitted per second over this interface.
+         The zero value of this object means disable rate limiting
+         on this interface.
+         
+         This field is functionally the same as
+         eltMesIssAclRateCtrlDlfLimitKbpsValue,
+         eltMesIssAclRateCtrlBcastLimitKbpsValue or
+         eltMesIssAclRateCtrlMcastLimitKbpsValue
+         from eltMesIssAclRateCtrlTableTable."
+    DEFVAL  { 0 }
+    ::= { eltMesIssStormCtrlEntry 4 }
+
+eltMesIssAclStormPortLimitPpsValue OBJECT-TYPE
+    SYNTAX      Integer32 (0..2147483647)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The limiting value for the maximum number of packets
+         that can be transmitted per second over this interface.
+         The zero value of this object means disable rate limiting
+         on this interface.
+         
+         This field is functionally the same as
+         eltMesIssAclRateCtrlDlfLimitPpsValue,
+         eltMesIssAclRateCtrlBcastLimitPpsValue or
+         eltMesIssAclRateCtrlMcastLimitPpsValue
+         from eltMesIssAclRateCtrlTableTable."
+    DEFVAL  { 0 }
+    ::= { eltMesIssStormCtrlEntry 5 }
+
+-- ------------------------------------------------------------------------- --
+-- Generic ACL Filter Group
+-- ------------------------------------------------------------------------- --
+
+eltMesIssAclIfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAclIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains bindings of ACL filters to interfaces."
+    ::= { eltMesIssAclGenFilter 1 }
+
+eltMesIssAclIfEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAclIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table describes the binding of ACL filter
+         to a specific interface."
+    INDEX { eltMesIssAclIfType,
+            eltMesIssAclIfIndex,
+            eltMesIssAclFilterDirection,
+            eltMesIssAclFilterType,
+            eltMesIssAclFilterIndex }
+    ::= { eltMesIssAclIfTable 1 }
+
+EltMesIssAclIfEntry ::=
+    SEQUENCE {
+        eltMesIssAclIfType              EltMesIssAclInterfaceType,
+        eltMesIssAclIfIndex             Integer32,
+        eltMesIssAclFilterDirection     EltMesIssAclFilterDirection,
+        eltMesIssAclFilterType          EltMesIssAclFilterType,
+        eltMesIssAclFilterIndex         Integer32,
+        eltMesIssAclIfRowStatus         RowStatus
+    }
+
+eltMesIssAclIfType OBJECT-TYPE
+    SYNTAX      EltMesIssAclInterfaceType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Interface type."
+    ::= { eltMesIssAclIfEntry 1 }
+
+eltMesIssAclIfIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Interface index."
+    ::= { eltMesIssAclIfEntry 2 }
+
+eltMesIssAclFilterDirection OBJECT-TYPE
+    SYNTAX      EltMesIssAclFilterDirection
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Filter direction."
+    ::= { eltMesIssAclIfEntry 3 }
+
+eltMesIssAclFilterType OBJECT-TYPE
+    SYNTAX      EltMesIssAclFilterType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Filter type."
+    ::= { eltMesIssAclIfEntry 4 }
+
+eltMesIssAclFilterIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Filter index."
+    ::= { eltMesIssAclIfEntry 5 }
+
+eltMesIssAclIfRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Row status."
+    ::= { eltMesIssAclIfEntry 6 }
+
+-- ------------------------------------------------------------------------- --
+-- Generic ACL notifications
+-- ------------------------------------------------------------------------- --
+
+eltMesIssAclNotificationsPrefix OBJECT IDENTIFIER
+    ::=  { eltMesIssAclNotifications 0 }
+
+eltMesIssAclStormControlTrap NOTIFICATION-TYPE
+    OBJECTS     {
+        eltMesIssAclStormDetected,
+        eltMesIssAclStormPortAction,
+        eltMesIssAclStormPortLimitKbpsValue,
+        eltMesIssAclStormPortLimitPpsValue
+    }
+    STATUS      current
+    DESCRIPTION
+        "An eltMesIssAclStormControlTrap is generated when
+         the storm is occurred on the interface."
+    ::= { eltMesIssAclNotificationsPrefix 1 }
+
+END

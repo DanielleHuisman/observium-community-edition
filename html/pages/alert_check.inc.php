@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -220,7 +220,7 @@ echo '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">';
 foreach ($conditions as $condition) {
     // Detect incorrect metric used
     if (!in_array($condition['metric'], $allowed_metrics, TRUE)) {
-        print_error("Unknown condition metric '" . $condition['metric'] . "' for Entity type '" . $check['entity_type'] . "'");
+        print_error("Unknown condition metric '" . escape_html($condition['metric']) . "' for Entity type '" . escape_html($check['entity_type']) . "'");
 
         foreach (array_keys($config['entities']) as $suggest_entity) {
             if (isset($config['entities'][$suggest_entity]['metrics'][$condition['metric']])) {
@@ -231,7 +231,8 @@ foreach ($conditions as $condition) {
         }
     }
 
-    echo '<tr><td>' . $condition['metric'] . '</td><td>' . $condition['condition'] . '</td><td>' . str_replace(",", ", ", $condition['value']) . '</td></tr>';
+    echo '<tr><td>' . escape_html($condition['metric']) . '</td><td>' . escape_html($condition['condition']) .
+        '</td><td>' . escape_html(str_replace(",", ", ", $condition['value'])) . '</td></tr>';
 
     $condition_text_block[] = $condition['metric'] . ' ' . $condition['condition'] . ' ' . $condition['value'];
     //str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
@@ -254,19 +255,19 @@ if ($check['suppress_recovery']) {
 }
 
 if ($check['delay'] > 0) {
-    echo '<span class="label label-delayed">Delay ' . $check['delay'] . '</span><br />';
+    echo '<span class="label label-delayed">Delay ' . escape_html($check['delay']) . '</span><br />';
 }
 
 echo '
             </td>
             <td><i>' . $check['status_numbers'] . '</i><br />';
 
-if (safe_count($contacts)) {
+if ($count = safe_count($contacts)) {
     $content = "";
     foreach ($contacts as $contact) {
-        $content .= '<span class="label">' . $contact['contact_method'] . '</span> ' . escape_html($contact['contact_descr']) . '<br />';
+        $content .= '<span class="label">' . escape_html($contact['contact_method']) . '</span> ' . escape_html($contact['contact_descr']) . '<br />';
     }
-    echo generate_tooltip_link('', '<span class="label label-success">' . count($contacts) . ' Notifiers</span>', $content);
+    echo generate_tooltip_link('', '<span class="label label-success">' . $count . ' Notifiers</span>', $content);
 } else {
     echo '<span class="label label-primary">Default Notifier</span>';
 }
@@ -356,53 +357,6 @@ if (!$readonly) {
     $form_params['alert_and'][0] = ['name' => 'Require any condition', 'icon' => $config['icon']['or-gate']];
     $form_params['alert_and'][1] = ['name' => 'Require all conditions', 'icon' => $config['icon']['and-gate']];
 
-    $metrics_list = [];
-    foreach ($config['entities'][$check['entity_type']]['metrics'] as $metric => $entry) {
-        $metric_list           = [
-          'metric'      => $metric,
-          'description' => $entry['label'],
-        ];
-        $metric_list['values'] = '';
-        if (is_array($entry['values'])) {
-            if (is_array_list($entry['values'])) {
-                $values = $entry['values'];
-            } else {
-                $values = [];
-                foreach ($entry['values'] as $value => $descr) {
-                    $values[] = "$value ($descr)";
-                }
-            }
-            $metric_list['values'] = '<span class="label">' . implode('</span>  <span class="label">', $values) . '</span>';
-        } elseif ($entry['type'] === 'integer') {
-            $metric_list['values'] = escape_html('<numeric>');
-            if (str_contains($metric, 'value')) {
-                $metric_list['values'] .= '<br />';
-                // some table fields
-                foreach (['limit_high', 'limit_high_warn', 'limit_low', 'limit_low_warn'] as $field) {
-                    if (isset($config['entities'][$check['entity_type']]['table_fields'][$field])) {
-                        $metric_list['values'] .= '<span class="label">@' . $config['entities'][$check['entity_type']]['table_fields'][$field] . '</span>  ';
-                    }
-                }
-            }
-        } else {
-            $metric_list['values'] = escape_html('<' . $entry['type'] . '>');
-        }
-        $metrics_list[] = $metric_list;
-        //$metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
-    }
-    //$form_params['metrics'] = implode(',<br/>', $metrics_list);
-    $metrics_opts           = [
-      'columns'     => [
-        ['Metrics', 'style="width: 5%;"'],
-        'Description',
-        'Values'
-      ],
-      'metric'      => ['class' => 'label'],
-      'description' => ['class' => 'text-nowrap'],
-      'values'      => ['escape' => FALSE]
-    ];
-    $form_params['metrics'] = build_table($metrics_list, $metrics_opts);
-
     //r($condition_text_block);
 
     $form['row'][5]['alert_and']        = [
@@ -430,8 +384,9 @@ if (!$readonly) {
       'type'     => 'html',
       'fieldset' => 'body',
       'class'    => 'col-md-5',
-      'name'     => 'List of known metrics:',
-      'html'     => '<div class="col-md-12">' . $form_params['metrics'] . '</div>'];
+      //'name'     => 'List of known metrics:',
+      'html'     => generate_alert_metrics_table($check['entity_type'])
+    ];
 
     $form['row'][99]['close']  = [
       'type'      => 'submit',
@@ -1056,30 +1011,35 @@ if ($vars['view'] === "assoc") {
     <div class="col-md-4">
     <?php
 
-    $box_args = ['title'         => 'Contacts',
-                 'header-border' => TRUE,
+    $box_args = [
+        'title'         => 'Contacts',
+        'header-border' => TRUE,
     ];
 
     if ($_SESSION['userlevel'] >= 9) {
-        $box_args['header-controls'] = ['controls' => ['all'   => ['text' => 'Add All',
-                                                                   'icon' => $config['icon']['plus'],
-                                                                   'url'  => '#modal-contacts_add_all',
-                                                                   'data' => 'data-toggle="modal"'],
-                                                       'clear' => ['text' => 'Remove All',
-                                                                   'icon' => $config['icon']['cancel'],
-                                                                   'url'  => '#modal-contacts_delete_all',
-                                                                   'data' => 'data-toggle="modal"']]];
+        $box_args['header-controls'] = [ 'controls' => [
+                'all'   => [ 'text' => 'Add All',
+                             'icon' => $config['icon']['plus'],
+                             'url'  => '#modal-contacts_add_all',
+                             'data' => 'data-toggle="modal"'
+                ],
+                'clear' => [ 'text' => 'Remove All',
+                             'icon' => $config['icon']['cancel'],
+                             'url'  => '#modal-contacts_delete_all',
+                             'data' => 'data-toggle="modal"' ] ]
+        ];
 
-        /* Begin add all contacts */
+        /* Begin to add all contacts */
 
-        $form = ['type'      => 'horizontal',
-                 'userlevel' => 9,          // Minimum user level for display form
-                 'id'        => 'modal-contacts_add_all',
-                 'title'     => 'Add All unassociated contacts to Checker',
-                 //'modal_args' => $modal_args,
-                 //'help'     => 'This will delete the selected association rule.',
-                 //'class'      => '', // Clean default box class!
-                 //'url'       => ''
+        $form = [
+            'type'      => 'horizontal',
+            'userlevel' => 9,          // Minimum user level for display form
+            'id'        => 'modal-contacts_add_all',
+            'title'     => 'Add All unassociated contacts to Checker',
+            //'modal_args' => $modal_args,
+            //'help'     => 'This will delete the selected association rule.',
+            //'class'      => '', // Clean default box class!
+            //'url'       => ''
         ];
         //$form['fieldset']['body']   = array('class' => 'modal-body');   // Required this class for modal body!
         //$form['fieldset']['footer'] = array('class' => 'modal-footer'); // Required this class for modal footer!
@@ -1095,7 +1055,8 @@ if ($vars['view'] === "assoc") {
         $form['row'][0]['action']        = [
           'type'     => 'hidden',
           'fieldset' => 'body',
-          'value'    => 'add_alert_checker_contactall'];
+          'value'    => 'contact_alert_checker_addall'
+        ];
 
         $form['row'][6]['confirm_add_all'] = [
           'type'        => 'checkbox',
@@ -1103,7 +1064,7 @@ if ($vars['view'] === "assoc") {
           'name'        => 'Confirm',
           //'offset'      => FALSE,
           'placeholder' => 'Yes, please add all contacts to this checker!',
-          'onchange'    => "javascript: toggleAttrib('disabled', 'add_alert_checker_contactall');",
+          'onchange'    => "javascript: toggleAttrib('disabled', 'contact_alert_checker_addall');",
           'value'       => 'confirm'];
 
         $form['row'][99]['close']                        = [
@@ -1113,8 +1074,9 @@ if ($vars['view'] === "assoc") {
           'name'      => 'Close',
           'icon'      => '',
           'attribs'   => ['data-dismiss' => 'modal',  // dismiss modal
-                          'aria-hidden'  => 'true']]; // do not sent any value
-        $form['row'][99]['add_alert_checker_contactall'] = [
+                          'aria-hidden'  => 'true']
+        ]; // do not sent any value
+        $form['row'][99]['contact_alert_checker_addall'] = [
           'type'      => 'submit',
           'fieldset'  => 'footer',
           'div_class' => '', // Clean default form-action class!
@@ -1123,7 +1085,8 @@ if ($vars['view'] === "assoc") {
           //'right'       => TRUE,
           'class'     => 'btn-primary',
           'disabled'  => TRUE,
-          'value'     => 'add_alert_checker_contactall'];
+          'value'     => 'contact_alert_checker_addall'
+        ];
 
         $modals .= generate_form_modal($form);
         unset($form);
@@ -1154,7 +1117,8 @@ if ($vars['view'] === "assoc") {
         $form['row'][0]['action']        = [
           'type'     => 'hidden',
           'fieldset' => 'body',
-          'value'    => 'delete_alert_checker_contactall'];
+          'value'    => 'contact_alert_checker_deleteall'
+        ];
 
         $form['row'][6]['confirm_delete_all'] = [
           'type'        => 'checkbox',
@@ -1162,8 +1126,9 @@ if ($vars['view'] === "assoc") {
           'name'        => 'Confirm',
           //'offset'      => FALSE,
           'placeholder' => 'Yes, please delete all contacts from this checker!',
-          'onchange'    => "javascript: toggleAttrib('disabled', 'delete_alert_checker_contactall');",
-          'value'       => 'confirm'];
+          'onchange'    => "javascript: toggleAttrib('disabled', 'contact_alert_checker_deleteall');",
+          'value'       => 'confirm'
+        ];
 
         $form['row'][99]['close']                           = [
           'type'      => 'submit',
@@ -1172,8 +1137,9 @@ if ($vars['view'] === "assoc") {
           'name'      => 'Close',
           'icon'      => '',
           'attribs'   => ['data-dismiss' => 'modal',  // dismiss modal
-                          'aria-hidden'  => 'true']]; // do not sent any value
-        $form['row'][99]['delete_alert_checker_contactall'] = [
+                          'aria-hidden'  => 'true']
+        ]; // do not sent any value
+        $form['row'][99]['contact_alert_checker_deleteall'] = [
           'type'      => 'submit',
           'fieldset'  => 'footer',
           'div_class' => '', // Clean default form-action class!
@@ -1182,7 +1148,8 @@ if ($vars['view'] === "assoc") {
           //'right'       => TRUE,
           'class'     => 'btn-danger',
           'disabled'  => TRUE,
-          'value'     => 'delete_alert_checker_contactall'];
+          'value'     => 'contact_alert_checker_deleteall'
+        ];
 
         $modals .= generate_form_modal($form);
         unset($form);
@@ -1210,30 +1177,33 @@ if ($vars['view'] === "assoc") {
             $form = [
                 'type'      => 'simple',
                 'userlevel' => 9,          // Minimum user level for display form
-                'id'        => 'delete_alert_checker_contact',
+                'id'        => 'contact_alert_checker_delete',
                 //'title'      => 'Delete Alert Contact Association',
             ];
-            $form['row'][0]['contact_id']                        = [
-              'type'  => 'hidden',
-              'value' => $contact['contact_id']];
+            $form['row'][0]['contact_id'] = [
+                'type'  => 'hidden',
+                'value' => $contact['contact_id']
+            ];
             $form['row'][0]['confirm_' . $contact['contact_id']] = [
               'type'  => 'hidden',
-              'value' => 1];
-            $form['row'][99]['action']                           = [
+              'value' => 1
+            ];
+            $form['row'][99]['action'] = [
                 //$form['row'][99]['submit'] = array(
                 'type'      => 'submit',
-                'icon_only' => TRUE, // hide button styles
+                //'icon_only' => TRUE, // hide button styles
                 //'fieldset'    => 'footer',
                 //'div_class'   => '', // Clean default form-action class!
                 'name'      => '',
-                'icon'      => $config['icon']['cancel'],
+                'icon'      => 'icon-trash',
                 //'right'       => TRUE,
-                //'class'       => 'btn-small',
+                'class'     => 'btn-xs btn-danger',
                 // confirmation dialog
-                'attribs'   => ['data-toggle'            => 'confirmation', // Enable confirmation dialog
-                                'data-confirm-placement' => 'left',
-                                'data-confirm-content'   => 'Delete contact \'' . escape_html($contact['contact_descr']) . '\'?'],
-                'value'     => 'delete_alert_checker_contact'];
+                'attribs'   => [ 'data-toggle'            => 'confirmation', // Enable confirmation dialog
+                                 'data-confirm-placement' => 'left',
+                                 'data-confirm-content'   => 'Delete contact \'' . escape_html($contact['contact_descr']) . '\' association?' ],
+                'value'     => 'contact_alert_checker_delete'
+            ];
 
             echo '
     <tr>
@@ -1290,11 +1260,12 @@ if ($vars['view'] === "assoc") {
             'type'     => 'submit',
             //'icon_only'   => TRUE, // hide button styles
             'name'     => 'Associate',
-            'icon'     => 'icon-plus',
+            'icon'     => 'icon-plus-sign',
             'readonly' => $readonly,
             //'right'       => TRUE,
             'class'    => 'btn-primary',
-            'value'    => 'add_alert_checker_contact'];
+            'value'    => 'contact_alert_checker_add'
+        ];
 
         $box_close['footer_content']   = generate_form($form);
         $box_close['footer_nopadding'] = TRUE;

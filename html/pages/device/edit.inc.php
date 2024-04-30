@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -34,12 +34,15 @@ $panes['mibs']   = 'MIBs';
 $panes['graphs'] = 'Graphs';
 $panes['alerts'] = 'Alerts';
 $panes['ports']  = 'Ports';
-if ($health_exist['sensors']) {
+if ($cache['health_exist'][$device['device_id']]['sensors']) {
     $panes['sensors'] = 'Sensors';
 }
-if ($health_exist['status']) {
+if ($cache['health_exist'][$device['device_id']]['status']) {
     $panes['status'] = 'Statuses';
 }
+// if ($cache['health_exist'][$device['device_id']]['counter']) {
+//     $panes['counter'] = 'Counters';
+// }
 if (safe_count($config['os'][$device['os']]['icons'])) {
     $panes['icon'] = 'Icon';
 }
@@ -103,7 +106,7 @@ foreach ($panes as $type => $text) {
 }
 $navbar['options_right']['delete']['url']  = generate_url($link_array, ['section' => 'delete']);
 $navbar['options_right']['delete']['text'] = 'Delete';
-$navbar['options_right']['delete']['icon'] = $config['icon']['device-delete'];
+$navbar['options_right']['delete']['icon'] = ':wastebasket:';//$config['icon']['device-delete'];
 if ($vars['section'] === 'delete') {
     $navbar['options_right']['delete']['class'] = 'active';
 }
@@ -115,7 +118,7 @@ if (is_file($filename)) {
     $attribs = get_dev_attribs($device['device_id']);
     $model   = get_model_array($device);
 
-    register_html_resource('js', 'js/jquery.serializejson.js');
+    register_html_resource('js', 'js/jquery.serializejson.min.js');
     include($filename);
 } else {
     print_error('<h3>Page does not exist</h4>

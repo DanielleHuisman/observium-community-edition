@@ -1,0 +1,357 @@
+-- Copyright (C) 2015 Aricent. All Rights Reserved
+
+-- $Id: fspbt.mib,v 1.5 2016/02/18 09:47:31 siva Exp $
+
+--    PBB-TE Proprietary MIB Definition
+
+--    This document explains the proprietary MIB implemented
+--    for PBB-TE  product.
+
+--    This proprietary MIB definition, supplements the standard IEEE802.1Qay
+--    MIB and also provides management of certain proprietary features of
+--    PBB-TE.
+
+--    The proprietary MIB definitions follows:
+
+ARICENT-PBB-TE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+    OBJECT-TYPE,MODULE-IDENTITY, Integer32, Unsigned32,
+    enterprises, Counter32
+         FROM SNMPv2-SMI
+    RowStatus, MacAddress
+         FROM SNMPv2-TC
+    VlanId                  FROM ARICENTQ-BRIDGE-MIB
+    ieee8021PbbTeTeSidEntry, IfIndexList
+    FROM IEEE8021-PBBTE-MIB; 
+
+fspbbte   MODULE-IDENTITY
+        LAST-UPDATED "201209050000Z"
+        ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+        CONTACT-INFO "support@aricent.com"
+        DESCRIPTION
+         "The proprietary MIB module for PBB-TE module."
+	REVISION "201209050000Z"
+        DESCRIPTION
+         "The proprietary MIB module for PBB-TE module."
+    ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 11}
+
+-- ****************************************************************************
+--                           Groups in the MIB
+-- ****************************************************************************
+
+     fsPbbTeScalars          OBJECT IDENTIFIER ::= { fspbbte 1 }
+     fsPbbTeContext          OBJECT IDENTIFIER ::= { fspbbte 2 }
+     fsPbbTeEspVidMapping    OBJECT IDENTIFIER ::= { fspbbte 3 }
+     fsPbbTeTeSidExtension   OBJECT IDENTIFIER ::= { fspbbte 4 }
+     fsPbbTeTest             OBJECT IDENTIFIER ::= { fspbbte 5 }
+
+-- ****************************************************************************
+--                           Scalars in the MIB
+-- ****************************************************************************
+
+fsPbbTeGlobalTraceOption OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This object is used to enable trace statements in
+          PBB-TE module for global events that are not specific to
+          any virtual context.
+          A four byte integer is used for enabling the trace level.
+          Each bit in the four byte integer represents a particular
+          trace level.
+          Trace Levels
+                 BIT
+                  0  - Init and Shutdown traces
+                  1  - Management traces
+                  2  - Data Path traces
+                  3  - Control Plane traces
+                  4  - Packet Dump traces
+                  5  - Traces related to all resources except buffers
+                  6  - All Failure traces
+                  7  - Buffer allocation/release traces
+
+          The remaining bits are reserved to be used for module specific
+          trace options."
+    ::= { fsPbbTeScalars 1 }
+
+-- ****************************************************************************
+--                          Context Based table
+-- ****************************************************************************
+
+fsPbbTeContextTable OBJECT-TYPE
+     SYNTAX      SEQUENCE OF FsPbbTeContextEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+       "This table contains Provider Backbone Bridge - Traffic engineering 
+        configuration for each context running in the switch."
+     ::= { fsPbbTeContext 1 }
+
+fsPbbTeContextEntry OBJECT-TYPE
+     SYNTAX      FsPbbTeContextEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+       "This table contains context number and the PBB-TE 
+        configuration for the particular context."
+        INDEX { fsPbbTeContextId }
+     ::= { fsPbbTeContextTable 1 }
+
+FsPbbTeContextEntry ::= SEQUENCE {
+     fsPbbTeContextId              Integer32,
+     fsPbbTeContextSystemControl       INTEGER,
+     fsPbbTeContextTraceOption         Unsigned32,
+     fsPbbTeContextNoOfActiveEsps      Counter32,
+     fsPbbTeContextNoOfCreatedEsps     Counter32,
+     fsPbbTeContextNoOfDeletedEsps     Counter32
+}
+
+fsPbbTeContextId OBJECT-TYPE
+     SYNTAX      Integer32 (0..255)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "Identifies Virtual Context in the system."
+     ::= { fsPbbTeContextEntry 1 }
+
+fsPbbTeContextSystemControl OBJECT-TYPE
+    SYNTAX      INTEGER { start(1), shutdown(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Start or shutdown Provider Backbone Brige-Traffic Engg 
+         in the system. When set as 'start', resources required by 
+         PBB-TE module are allocated & PBB-TE module starts running.
+         When shutdown, all resources used by PBB-TE module
+         will be released to the mempool."
+    ::= { fsPbbTeContextEntry 2 }
+
+fsPbbTeContextTraceOption OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This object is used to enable trace statements in
+          PBB-TE module for events specific to a context.
+          A four byte integer is used for enabling the trace level.
+          Each bit in the four byte integer represents a particular
+          trace level.
+          Trace Levels
+                 BIT
+                  0  - Init and Shutdown traces
+                  1  - Management traces
+                  2  - Data Path traces
+                  3  - Control Plane traces
+                  4  - Packet Dump traces
+                  5  - Traces related to all resources except buffers
+                  6  - All Failure traces
+                  7  - Buffer allocation/release traces
+
+          The remaining bits are reserved to be used for module specific
+          trace options."
+    ::= { fsPbbTeContextEntry 3 }
+
+fsPbbTeContextNoOfActiveEsps OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the number of current active ESPs existing in
+        the given virtual context."
+    ::= { fsPbbTeContextEntry 4 }
+
+fsPbbTeContextNoOfCreatedEsps OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of ESPs that has been created in the given virtual context, 
+        since creation of the context."
+    ::= { fsPbbTeContextEntry 5 }
+
+fsPbbTeContextNoOfDeletedEsps OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of ESPs that has been deleted in the given virtual context, 
+        since creation of the context."
+    ::= { fsPbbTeContextEntry 6 }
+
+-- ****************************************************************************
+--                               ESP-VIDs Table
+-- ****************************************************************************
+
+fsPbbTeEspVidTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbTeEspVidEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+          "This table contains ESP Vlans in this bridge."
+     ::= { fsPbbTeEspVidMapping 1 }
+
+fsPbbTeEspVidEntry OBJECT-TYPE
+    SYNTAX      FsPbbTeEspVidEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of ESP Vlans configured in this bridge."    
+    INDEX  { fsPbbTeContextId, fsPbbTeEspVid }
+    ::= { fsPbbTeEspVidTable 1 }
+
+FsPbbTeEspVidEntry ::=
+    SEQUENCE {
+       fsPbbTeEspVid          VlanId,
+       fsPbbTeEspVidRowStatus RowStatus
+     }
+
+fsPbbTeEspVid  OBJECT-TYPE
+    SYNTAX        VlanId
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+     "This object specifies the Vlan identifier allocated for provisioning TE
+      Ethernet switched paths."
+    ::= { fsPbbTeEspVidEntry 1 }
+
+fsPbbTeEspVidRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus {
+                             createAndGo(4),
+                             destroy(6)
+                           }
+
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the status of this entry. A Vlan ID can be 
+          marked as an ESP-VID by creating and activating an entry in this 
+          table i.e. by assigning a value of 'createAndGo' for the status.
+          Every Vlan index which has a status of 'active' is an ESP-VID.
+          A Vlan that is marked as an ESP VLAN in this manner should not be 
+          deleted without reverting it back to a non-ESP VID first. This is 
+          done by setting the status as 'destroy'."
+    ::= { fsPbbTeEspVidEntry 2 }
+
+-- ****************************************************************************
+--                               TE-SID Extension Table
+-- ****************************************************************************
+
+fsPbbTeTeSidExtTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPbbTeTeSidExtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+          "This table is extension of standard ieee8021PbbTeTeSidTable."
+     ::= { fsPbbTeTeSidExtension 1 }
+
+fsPbbTeTeSidExtEntry OBJECT-TYPE
+    SYNTAX      FsPbbTeTeSidExtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Entries in this table are the extension entries of 
+        ieee8021PbbTeTeSidTable."    
+    AUGMENTS  { ieee8021PbbTeTeSidEntry }
+    ::= { fsPbbTeTeSidExtTable 1 }
+
+FsPbbTeTeSidExtEntry ::= SEQUENCE {
+       fsPbbTeTeSidExtContextId      Integer32
+     }
+
+fsPbbTeTeSidExtContextId OBJECT-TYPE
+     SYNTAX      Integer32 (-1|0..255)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Identifies Virtual Context in the system. If the TESID entry is not 
+         assigned to any virtual context then it will have a value of -1."
+     DEFVAL      {-1}
+     ::= { fsPbbTeTeSidExtEntry 1 }
+
+
+-- ****************************************************************************
+--                               Test Mib objects
+--
+--       The following MIB objects are used only for test purposes
+-- ****************************************************************************
+
+-- The following Mib objects are used to test the API provided by PBB-TE 
+-- for dynamic provisioning from external modules
+
+fsPbbTeTestApiContextId OBJECT-TYPE
+     SYNTAX      Integer32 (0..255)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Identifies Virtual Context in the system." 
+     ::= { fsPbbTeTest 1 }
+
+fsPbbTeTestApiTeSid  OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+     "Traffic-engineering Service-instance identifier. Specifying TE-SID 
+      is optional when creating an ESP. If TE-SID is not provided, 
+      a Vlan Static Filtering entry alone will be created for the ESP."
+    ::= { fsPbbTeTest 2 }
+
+fsPbbTeTestApiDestMacAddr  OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+     "Destination Mac Address of the ESP."
+    ::= { fsPbbTeTest 3 }
+
+fsPbbTeTestApiSourceMacAddr  OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+     "Source Mac Address of the ESP. Specifying Source MAC address
+      is optional when creating an ESP. It is mandatory only when 
+      the TESID is specified. Otherwise it is not used."
+    ::= { fsPbbTeTest 4 }
+    
+fsPbbTeTestApiEspVlanId  OBJECT-TYPE
+    SYNTAX        VlanId
+    MAX-ACCESS    read-write 
+    STATUS        current
+    DESCRIPTION
+     "Vlan Id that has been allocated as an ESP vlan."
+    ::= { fsPbbTeTest 5 }
+
+fsPbbTeTestApiEgressPort  OBJECT-TYPE
+    SYNTAX        Integer32 (0..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+     "Egress port for point to point ESPs. If the Egress port is
+      configured as zero, then the EgressPortList will be referred."
+    ::= { fsPbbTeTest 6 }
+
+fsPbbTeTestApiEgressPortList  OBJECT-TYPE
+    SYNTAX        IfIndexList
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+     "EgreePortList in case of port to multipoint ESPs. This object 
+      will be referred only when the EgressPort is configured as zero."
+    ::= { fsPbbTeTest 7 }
+
+fsPbbTeTestApiAction OBJECT-TYPE
+    SYNTAX      INTEGER { create(1), destroy(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry. When this object is 
+	 configured, the PBB-TE API for ESP creation will be invoked with the 
+         last configured values for the test API MIB objects. 
+	 Also all test API MIB objects will be reset to have a value of zero
+         ready for the next invocation."
+    ::= { fsPbbTeTest 8 }
+END

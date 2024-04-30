@@ -1,0 +1,2164 @@
+--  =======================================================================
+--  File        : osPort.mib
+--  Description : Private MIB support the configuration & states of ports
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-PORT-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE,
+                Integer32, Unsigned32, Gauge32,
+                Counter64                                       FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION, MacAddress,
+                DisplayString, TruthValue                       FROM SNMPv2-TC
+                oaOptiSwitch, PortIndex, PortList,
+                PortIndexOrNone                                 FROM OS-COMMON-TC-MIB
+                NOTIFICATION-GROUP,
+                MODULE-COMPLIANCE, OBJECT-GROUP                 FROM SNMPv2-CONF
+                VlanIdOrNone                                    FROM IEEE8021-CFM-MIB;
+
+osPort          MODULE-IDENTITY
+                LAST-UPDATED "202008270000Z" -- 27 Aug. 2020
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Matan Unger
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "Supports information about configuration & states of ports."
+
+                -- Revision history
+                -- ================
+
+                REVISION     "202008270000Z" -- 27 Aug. 2020
+                DESCRIPTION
+                  "Object osPortMflgMac for notification"
+
+                REVISION     "201912260000Z" -- 26 Dec. 2019
+                DESCRIPTION
+                "MAC Flapping loop guard:
+                 1. New isolatedByMacFlapLoopGuard option in osPortOperState.
+                 2. Notifications: osPortIsolation and osPortRecovery."
+
+                REVISION "201907230000Z"  -- July 23 2019
+                DESCRIPTION
+                 "osPortFloodLimitTable"
+
+                REVISION "201812090000Z"  -- December 9, 2018
+                DESCRIPTION
+                 "1. Added feature sfp-auto-detect on media select object.
+                  2. Added new traps in case the media is not compatible with port capabilities."
+				  
+                REVISION "201504300000Z"  -- April 30, 2015
+                DESCRIPTION
+                  "The new table osPortTrunkExtTable."
+
+                REVISION "201406090000Z"  -- June 9, 2014
+                DESCRIPTION
+                  "The value s2500(7) of osPortAdminSpeed"
+
+                REVISION "201402110000Z"  -- Feb 11, 2014
+                DESCRIPTION
+                   "1. New table: osPortEthTypeTable.
+                   2. new object: osPortEthType1, osPortEthType2"
+                REVISION "201309170000Z"  -- Sep 17, 2013
+                DESCRIPTION
+                  "1. New objects: osPortBuffersProfileIndex,
+                      osPortRemarkingDei in osPortEntry.
+                   2. New table: osPortBuffersProfileTable.
+                   3. New objects: osPortBuffersCfg, osPortBuffersShared,
+                      osPortBuffersWRED.
+                   4. New textual conversion: BuffersProfileIndex."
+                REVISION "201209230000Z"  -- September 23, 2012
+                DESCRIPTION
+                  "New object osPortShapeLocked"
+
+                REVISION "201206240000Z"  -- June 24, 2012
+                DESCRIPTION
+                  "1. Object osPortIfType:  added new enumeration 'foSFPplus (37)'
+                   2. Object osPortLanType: added new enumeration 'eth1000or10000 (18)'"
+
+                REVISION "201205290000Z"  -- May 29, 2012
+                DESCRIPTION
+                  "1. Support for SGMII and sfp+ for media-select.
+                   2. Imports VlanIdOrNone from IEEE8021-CFM-MIB."
+
+                REVISION "201011020000Z"  -- Nov 02, 2010
+                DESCRIPTION
+                "Revision 1.4:
+                    Changes:
+                       1. Object name osPortShapeLastError is added.
+                       2. Object name osPortTrunkLastError is added.
+                       3. LastError textual convention is added.
+                "
+
+                REVISION "201010200000Z"  -- Oct 20, 2010
+                DESCRIPTION
+                "Revision 1.3:
+                    Changes:
+                       1. Object name osPortLastError is added.
+                       2. Objects   osPortCntRecvBytes,
+                                    osPortCntRecvPacks,
+                                    osPortCntRecvUniPacks,
+                                    osPortCntRecvBroadPacks,
+                                    osPortCntRecvMultiPacks,
+                                    osPortCntSentBytes,
+                                    osPortCntSentPacks,
+                                    osPortCntSentUniPacks,
+                                    osPortCntSentBroadPacks,
+                                    osPortCntSentMultiPacks,
+                                    osPortCntRecvCRCorAlignmentErrs,
+                                    osPortCntRecvShortPacks,
+                                    osPortCntRecvLongPacks,
+                                    osPortCntRecvFragmentPacks,
+                                    osPortCntRecvJabberPacks,
+                                    osPortCntRecvAndSentCollisions,
+                                    osPortCntRecvUpTo64octsPacks,
+                                    osPortCntRecv65to127octsPacks,
+                                    osPortCntRecv128to255octsPacks,
+                                    osPortCntRecv256to511octsPacks,
+                                    osPortCntRecv512to1023octsPacks,
+                                    osPortCntRecvAbove1023octsPacks,
+                                    osPortCntLateCollisions,
+                                    osPortCntRecvBadBytes
+                     are added.
+                     
+                     3. Objects     osPortShapeCapability,
+                                    osPortShapeMinRate,
+                                    osPortShapeMaxRate,
+                                    osPortShapeMinBurstSize,
+                                    osPortShapeMaxBurstSize
+                       (osPortShapeParametersTable) are added.
+                "
+
+                REVISION "201008050000Z"  -- Aug 05, 2010
+                DESCRIPTION
+                "Revision 1.2:
+                    Changes:
+                       1. Object name osPortShapeBirstSize is replaced to osPortShapeBurstSize
+                "
+
+                REVISION "201004180000Z"  -- Apr 18, 2010
+                DESCRIPTION
+                "Revision 1.1:
+                    Changes:
+                       1. New objects osPortL2CtrlDTP and osPortL2CtrlPAGP are added to the osPortEntry
+                       2. TEXTUAL-CONVENTIONs PortIndex and PortIndexOrNone: syntax is changed to Unsigned32
+                       3. TEXTUAL-CONVENTION L2CtrlProcess: enumeration 'notSupported' is changed to 'none'
+                       4. Object osPortBlockReason: added new enumeration 'blockedByErp (7)'
+                       5. Object osPortIfType: added new enumeration 'portTrunk (35)'
+                       6. Entry 'osPortCntEntry' is defined as AUGMENTS of the entry 'osPortEntry'
+                "
+
+                REVISION "200801080000Z"   -- Jan 08, 2008
+                DESCRIPTION
+                    "Revision 1.0: Initial edition."
+                ::= { oaOptiSwitch 1 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osPortNotifications  OBJECT IDENTIFIER ::= { osPort 0 }
+osPortCfg            OBJECT IDENTIFIER ::= { osPort 1 }
+osPortBuffersCfg     OBJECT IDENTIFIER ::= { osPort 8 }
+osPortGen            OBJECT IDENTIFIER ::= { osPort 70 }
+osPortConformance    OBJECT IDENTIFIER ::= { osPort 101 }
+osPortCoreEgressEth  OBJECT IDENTIFIER ::= { osPort 102 }
+osPortMIBCompliances OBJECT IDENTIFIER ::= { osPortConformance 1 }
+osPortMIBGroups      OBJECT IDENTIFIER ::= { osPortConformance 2 }
+
+-- ************************************************************
+-- Textual Converions
+-- ************************************************************
+
+SupportValue      ::= TEXTUAL-CONVENTION
+   STATUS       current
+   DESCRIPTION
+      "Represents a value, that reflects support of the feature on the Device." 
+   SYNTAX       INTEGER { notSupported(1), supported(2) }
+
+BuffersProfileIndex ::= TEXTUAL-CONVENTION
+   DISPLAY-HINT "d"
+   STATUS       current
+   DESCRIPTION
+      "A value in the range 1-7 that indicates buffers profile."
+   SYNTAX       Unsigned32 (1..7)
+
+L2CtrlProcess     ::= TEXTUAL-CONVENTION
+   STATUS       current
+   DESCRIPTION
+      "Port L2 protocol control mode:
+          none         - Control mode is not configurated
+          drop         - Drop incoming L2 protocol control packets
+          peer         - Support L2 protocol
+          tunnel       - Tunnelize L2 protocol control packets"
+   SYNTAX       INTEGER {
+      none         (1),
+      drop         (2),
+      peer         (3),
+      tunnel       (4)
+   }
+
+PortEntryValidator  ::= TEXTUAL-CONVENTION
+   STATUS       current
+   DESCRIPTION
+      "Status for controlling of the entry."
+   SYNTAX       INTEGER { valid(1), invalid(2) }
+
+LastError ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "255a"
+    STATUS       current
+    DESCRIPTION
+            "Last SNMPSET error"
+    SYNTAX  OCTET STRING (SIZE (2..160)) 
+
+-- *******************************************************************
+--  osPortCfg: global configurPortIndexOrNoneation, status & capatibilities
+-- ******************************************************************* 
+ 
+osPortCfgSupport OBJECT-TYPE
+   SYNTAX     SupportValue
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Indicates that this MIB is supported."
+   ::= { osPortCfg 1 }
+
+osPortCfgMaxNumberOfPort OBJECT-TYPE
+   SYNTAX     PortIndex
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Number of ports in the box."
+   ::= { osPortCfg 2 }
+
+osPortCfgBaseTrunkPortIndex OBJECT-TYPE
+   SYNTAX     PortIndex
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Offset used for an index in a trunk port."
+   ::= { osPortCfg 3 }
+
+osPortCfgMaxNumberOfSl OBJECT-TYPE
+   SYNTAX     Unsigned32 (1..8190)
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Maximum number of SL (service level ID)."
+   DEFVAL { 8 }
+   ::= { osPortCfg 4 }
+
+osPortCfgMaxTrunkId OBJECT-TYPE
+   SYNTAX     Integer32 (1..128)
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Max ID number of trunk port."
+   ::= { osPortCfg 5 }
+
+osPortTrunkLastError   OBJECT-TYPE
+    SYNTAX           LastError
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Last trunk configuration error description."
+    ::= { osPortCfg 12 }
+   
+   
+   osPortCntEgressClearAll OBJECT-TYPE
+        SYNTAX  INTEGER {
+            none        (1),
+            clear       (2)
+        }
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                "Clear all port egress counters, see osPortEgressCntTable" 
+        ::= { osPortCfg 13 }
+
+-- *******************************************************************
+--  osPortTable: per port configurations & states
+-- ******************************************************************* 
+
+
+
+osPortTable     OBJECT-TYPE
+   SYNTAX      SEQUENCE OF OsPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Ports configuration & state table."
+   REFERENCE
+      "."
+   ::= { osPort 2 }
+
+osPortEntry     OBJECT-TYPE
+   SYNTAX      OsPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortIndex }
+   ::= { osPortTable 1 }
+
+OsPortEntry ::= SEQUENCE {
+   osPortIndex                PortIndex, 
+   osPortDescription          DisplayString,
+   osPortLink                 TruthValue,
+   osPortAdminSpeed           INTEGER,
+   osPortOperSpeed            Gauge32,
+   osPortDuplex               INTEGER,
+   osPortAdminState           INTEGER,
+   osPortOperState            INTEGER,
+   osPortBlockReason          BITS,
+
+-- BUFFERS PROFILE
+-- ===========
+   osPortBuffersProfileIndex  BuffersProfileIndex,
+
+-- TRUNK GROUP
+-- ===========
+   osPortTrunkIndex           PortIndexOrNone,
+   osPortLacpAdminMode        INTEGER,
+   osPortLacpOperState        INTEGER,
+
+   osPortMtuSize              Unsigned32,
+
+   osPortQosMarkingVpt        INTEGER,
+   osPortQosTrust             INTEGER,
+   osPortRemarkingDei         INTEGER,
+   osPortSl                   Unsigned32,
+
+-- TAG-OUTBOUND GROUP
+-- ==================
+   osPortTagType              INTEGER,
+   osPortTagDefaultTag        VlanIdOrNone,
+
+-- L2CONTROL GROUP
+-- ================
+   osPortL2CtrlDot1x          L2CtrlProcess,  
+   osPortL2CtrlLACP           L2CtrlProcess, 
+   osPortL2CtrlSTP            L2CtrlProcess,
+   osPortL2CtrlGVRP           L2CtrlProcess,
+   osPortL2CtrlPause          L2CtrlProcess,
+   osPortL2CtrlLinkOAM        L2CtrlProcess,
+   osPortL2CtrlELMI           L2CtrlProcess,
+   osPortL2CtrlLLDP           L2CtrlProcess,
+   osPortL2CtrlDTP            L2CtrlProcess,
+   osPortL2CtrlPAGP           L2CtrlProcess,
+   osPortL2CtrlVTP            L2CtrlProcess,      
+   osPortL2CtrlCDP            L2CtrlProcess,   
+   osPortL2CtrlPVST           L2CtrlProcess,
+
+   osPortAdminMediaSelect     INTEGER,
+   osPortOperMediaSelect      INTEGER,
+   osPortLanType              INTEGER,
+   osPortIfType               INTEGER,
+   
+   osPortLastError            LastError
+}
+
+osPortIndex             OBJECT-TYPE
+   SYNTAX              PortIndex
+   MAX-ACCESS          not-accessible
+   STATUS              current
+   DESCRIPTION
+      "Port index."
+   REFERENCE
+      "."
+   ::= { osPortEntry 1 }
+   
+
+   
+osPortDescription       OBJECT-TYPE
+   SYNTAX              DisplayString (SIZE(0..80))
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port description.
+       Default description for physical port: 'Port <port index> - <port type'
+                           for trunk:         'TRUNK <trunk id>'"
+   ::= { osPortEntry 3 }
+
+osPortLink              OBJECT-TYPE
+   SYNTAX              TruthValue
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port link status."
+   ::= { osPortEntry 5 }
+
+osPortAdminSpeed        OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other   (1),
+      auto    (2),
+      s10     (3),
+      s100    (4),
+      s1000   (5),
+      s10000  (6),
+      s2500   (7)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port speed: 10/100/1000/2500/10000/auto"
+   DEFVAL { auto }
+   ::= { osPortEntry 6 }
+
+osPortOperSpeed         OBJECT-TYPE
+   SYNTAX              Gauge32    
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port real speed in MBps"
+   ::= { osPortEntry 7 }
+
+osPortDuplex            OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other  (1),
+    --auto   (2),
+      full   (3),
+      half   (4)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port duplex mode: full/half"
+    DEFVAL { full }
+    ::= { osPortEntry 9 }
+
+osPortAdminState        OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other          (1),
+      enable         (2),
+      disableByMgmt  (3)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port admin state: enabled/disabledByMgmt"
+   DEFVAL { enable }
+   ::= { osPortEntry 10 }
+
+osPortOperState         OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other                           (1),
+      enabled                         (2),
+      disabledByMgmt                  (3),
+      disabledByReboot                (4),
+      isolatedByLinkFlapGuard         (5),
+      isolatedByLinkReflection        (6),
+      isolatedByLinkProtection        (7),
+      isolatedByStpLinkReflection     (8),
+      isolatedByHotSwap               (9),
+      isolatedByHa                    (10),
+      isolatedByStpPortLoop           (11),
+      isolatedByStpOverRate           (12),
+      isolatedByEthoamOverRate        (13),
+      isolatedByEfmOverRate           (14),
+      isolatedByDot1xOverRate         (15),
+      isolatedByDot1agOverRate        (16),
+      isolatedByLacpOverRate          (17),
+      isolatedByAhOverRate            (18),
+      isolatedByUdld                  (19),
+      isolatedByShdslLinkDown         (20),
+      isolatedByL2TpOverRate          (21),
+      isolatedByTdmLinkProtection     (22),
+      isolatedByMplsLinkProtection    (23),
+      isolatedByMacFlapLoopGuard      (24)
+   }
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port oper status"
+   ::= { osPortEntry 11 }
+
+osPortBlockReason       OBJECT-TYPE
+   SYNTAX              BITS {
+      other               (0),
+      reserve             (1),
+      enabled             (2),
+      blockedByStp        (3),
+      blockedByDot1X      (4),
+      blockedByLacp       (5),
+      blockedByAh         (6),
+      blockedByErp        (7)
+   }
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port block reason (why port doesn't forward packets while link is up).
+       See also Bridge.MIB for STP state per VlanId."
+   ::= { osPortEntry 12 }
+
+osPortBuffersProfileIndex  OBJECT-TYPE
+   SYNTAX              BuffersProfileIndex
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Buffers profile assigned to the port."
+   DEFVAL { 1 }
+   ::= { osPortEntry 50 }
+
+osPortTrunkIndex        OBJECT-TYPE
+   SYNTAX              PortIndexOrNone
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port index of trunk if port is a member of trunk.
+       Otherwise, it is 0 (zero)."
+   ::= { osPortEntry 60 }
+
+osPortLacpAdminMode          OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other      (1),
+      disabled   (2),
+      active     (3),
+      passive    (4),
+      rapid      (5)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port LACP admin mode:
+          disabled - LACP is not active
+          rapid   - MRV's optimization for LACP 
+          passive - LACP passive mode
+          active  - LACP is active"
+   ::= { osPortEntry 61 }
+
+osPortLacpOperState     OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other   (1),
+      nonLacp (2),
+      blocked (3),
+      enabled (4)
+   }
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port LACP oper mode:
+          nonLacp - LACP is not active
+          blocked - port is LACP blocked
+          enabled - LACP is active"
+   ::= { osPortEntry 62 }
+
+osPortMtuSize           OBJECT-TYPE
+   SYNTAX              Unsigned32 (64..16000)
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port MTU size"
+   ::= { osPortEntry 66 }
+
+osPortQosMarkingVpt     OBJECT-TYPE
+   SYNTAX              INTEGER  {
+      other   (1),
+      vpt     (2),
+      dscp    (3),
+      vptdscp (4),
+      none        (5)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port QoS marking mode: vpt/dscp/vptdscp"
+   ::= { osPortEntry 70 }
+
+osPortQosTrust          OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other   (1),
+      l2      (2),
+      l3      (3),
+      l2l3    (4),
+      port    (5)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "port QoS trust mode:
+          l2   - L2 VPT trust mode
+          l3   - L3 DSCP trust mode
+          l2l3 - L3 DSCP mode for IP packets, L2 VPT mode for non IP packets
+          port - Port service level (see osPortSl)"
+   ::= { osPortEntry 71 }
+
+osPortRemarkingDei     OBJECT-TYPE
+   SYNTAX              INTEGER {
+      preserveDei (1),
+      remarkDei   (2)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "DEI bit remarking on egress:
+          preserveDei - Packet egress with same DEI it ingressed
+          remarkDei   - Packet DEI bit is set according to DP"
+   DEFVAL { preserveDei }
+   ::= { osPortEntry 72 }
+
+osPortSl                OBJECT-TYPE
+   SYNTAX              Unsigned32  (1..8190)
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port service level (useable if osPortQosTrust is in port mode)
+       Actual maximum value may be obtained in osPortCfgMaxNumberOfSl"
+   ::= { osPortEntry 78 }
+
+-- TAG-OUTBOUND GROUP
+-- ==================
+osPortTagType           OBJECT-TYPE
+   SYNTAX              INTEGER {
+      other              (1),
+      tagged             (2),
+      untaggedSingleVlan (3),
+      untaggedMultiVlans (4),
+      hybrid             (5),
+      qInQ               (6)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port tag-outbound mode:
+          tagged             - Tagged port
+          untaggedSingleVlan - Adds default tag for incoming untagged packets
+          untaggedMultiVlans - Adds a certain tag for incoming untagged packets according to ACL
+          hybrid             - Adds default tag if incoming packet has no tag. Removes tag if outgoing packet has default tag
+          qInQ               - Adds default tag for incoming both untagged & tagged packets"
+   DEFVAL { untaggedSingleVlan }
+   ::= { osPortEntry 80 }
+   
+
+
+osPortTagDefaultTag     OBJECT-TYPE
+   SYNTAX              VlanIdOrNone
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port default tag. Has sence only for untaggedSingleVlan(3), hybrid(5) and qInQ(6)."
+   ::= { osPortEntry 81 }
+
+osPortL2CtrlDot1x       OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      ".1x L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 83 }
+
+osPortL2CtrlLACP        OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "LACP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 84 }
+
+osPortL2CtrlSTP         OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "STP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 85 }
+
+osPortL2CtrlGVRP        OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "GVRP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 86 }
+
+osPortL2CtrlPause       OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+     "Pause L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 87 }
+
+osPortL2CtrlLinkOAM     OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "LinkOam L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 88 }
+
+osPortL2CtrlELMI        OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      ".ELMI L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 89 }
+
+osPortL2CtrlLLDP        OBJECT-TYPE                
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "LLDP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 90 }
+
+-- ADDITIONAL L2CONTROL GROUP (TBD or per VLAN)
+-- ============================================
+osPortL2CtrlDTP        OBJECT-TYPE
+   SYNTAX              L2CtrlProcess         
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "DTP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 91 }
+
+osPortL2CtrlPAGP        OBJECT-TYPE
+   SYNTAX              L2CtrlProcess         
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "PAGP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 92 }
+
+osPortL2CtrlVTP         OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "VTP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 95 }
+
+osPortL2CtrlCDP         OBJECT-TYPE
+   SYNTAX              L2CtrlProcess        
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "CDP L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 96 }
+
+osPortL2CtrlPVST        OBJECT-TYPE
+   SYNTAX              L2CtrlProcess         
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "PVST L2 protocol (see L2CtrlProcess description)"
+   ::= { osPortEntry 97 }
+
+osPortAdminMediaSelect        OBJECT-TYPE
+   SYNTAX              INTEGER {
+      notApplicable    (1),
+      sfp              (2),
+      sfp100           (3),
+      copper           (4),
+      auto             (5),
+      sgmii            (6),
+      sfpPlus          (7),
+      sfpAutoDetect    (8)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port Media-Select admin mode: notApplicable/sfp/sfp100/copper/auto/sfpAutoDetect"
+   ::= { osPortEntry 98 }
+
+osPortOperMediaSelect         OBJECT-TYPE
+   SYNTAX              INTEGER {
+      notApplicable    (1),
+      sfp              (2),
+      sfp100           (3),
+      copper           (4),
+      sgmii            (6),
+      sfpPlus          (7),
+      sfpAutoDetect    (8)
+   }
+   MAX-ACCESS          read-only
+   STATUS              current
+   DESCRIPTION
+      "Port Media-Select oper mode: notApplicable/sfp/sfp100/copper/sfpAutoDetect"
+   ::= { osPortEntry 99 }
+
+osPortLanType      OBJECT-TYPE
+   SYNTAX  INTEGER {
+      none               (1),  -- no LAN interface installed
+      eth10              (2),  -- Ethernet  10Mbps
+      eth100             (3),  -- Ethernet 100Mbps
+      eth10or100         (4),  -- Ethernet 10/100Mbps 
+      eth100B            (5),  -- Ethernet 100Mbps Backbone/ISVLAN 
+      eth1000B           (6),  -- Ethernet 1000Mbps Backbone/ISVLAN 
+      atmLane            (7),  -- ATM Lan Emulation Module 
+      eth100Grp          (8),  -- Ethernet 100Mbps Group Switching 
+      eth10or100Grp      (9),  -- Ethernet 10/100Mbps Group Switching 
+      fddi               (10), -- FDDI 
+      eth100or1000       (11), -- Ethernet 100/1000Mbps 
+      eth10hpna          (12), -- Ethernet 10 HomePNA
+      eth100or1000amp    (13), -- Ethernet 100/1000Mbps 
+      eth10or100overVDSL (14), -- Ethernet 10/100Mbps over VDSL
+      eth1000            (15), -- Ethernet 1000Mbps 
+      eth10or100or1000   (16), -- Ethernet 10/100/1000Mbps
+      eth10000           (17), -- Ethernet 10000Mbps 
+      ethLAG             (18), -- Ethernet Link Agregation (port trunk)
+      eth1000or10000     (19)  -- Ethernet 1000/10000 Mbps (SFP+)
+   }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "Port installed LAN type (if exists): none/eth10/eth100/eth10or100/..."
+   ::= { osPortEntry 100 }
+
+osPortIfType         OBJECT-TYPE
+   SYNTAX  INTEGER {
+      aui   (1),  -- AUI interface - Ethernet 10 Mbps only
+      tp    (2),  -- TP  interface - 10 or 100 Mbps
+      auiTp (3),  -- AUI & TP interface - Ethernet 10 Mbps only
+      tpfd  (4),  -- TP Full Duplex capable - 10 or 100 Mbps
+      coax  (5),  -- COAX interface- Ethernet 10 Mbps only
+      foMm  (6),  -- Fiber Optic MultiMode  - 10 or 100 Mbps
+      foSm  (7),  -- Fiber Optic SingleMode - 10 or 100 Mbps
+      none  (8),  -- no interface installed - no LAN installed
+      foSxM (9),  -- Fiber Optic MultiMode   - GigaBit          - (WaveLength=850nm)
+      foLxM (10), -- Fiber Optic MultiMode   - GigaBit          - (WaveLength=1310nm)
+      foLxS1(11), -- Fiber Optic SingleMode1 - GigaBit          - (WaveLength=1310nm)
+      foLxS2(12), -- Fiber Optic SingleMode2 - GigaBit          - (WaveLength=1550nm)
+      foLxS3(13), -- Fiber Optic SingleMode3 - GigaBit          - (WaveLength=1550nm)
+      foM   (14), -- Fiber Optic MultiMode   - FastEthernet,ATM,FDDI - (WaveLength=1310nm)
+      foMX  (15), -- Fiber Optic MultiMode   - FastEthernet          - (WaveLength=1310nm)
+      foS1  (16), -- Fiber Optic SingleMode1 - FastEthernet,ATM,FDDI - (WaveLength=1310nm)
+      foS2  (17), -- Fiber Optic SingleMode2 - FastEthernet,ATM,FDDI - (WaveLength=1310nm)
+      foS3  (18), -- Fiber Optic SingleMode3 - FastEthernet,ATM      - (WaveLength=1550nm)
+      foLxS4(19), -- Fiber Optic SingleMode4 - GigaBit          - (WaveLength=1550nm)
+      foLxS5(20), -- Fiber Optic SingleMode5 - GigaBit          - (WaveLength=1550nm)
+      foS4  (21), -- Fiber Optic SingleMode4 - FastEthernet     - (WaveLength=1550nm)
+      foS5  (22), -- Fiber Optic SingleMode5 - FastEthernet     - (WaveLength=1550nm)
+      foM10 (23), -- Fiber Optic MultiMode   -     Ethernet     - (WaveLength=850nm)
+      foGMX (24), -- Fiber Optic MultiMode   - GigaBit          - (WaveLength=1310nm)
+      foS1A (25), -- Fiber Optic SingleMode  - GigaBit Long distance - (WaveLength=1310nm)
+      foPAL (26), -- Fiber Optic Passive AirLink
+      foXFP (27), -- Fiber Optic XFP interface - 10 GigaBit Small Form Factor Pluggable
+      foSFPtp              (28), -- Fiber Optic SFP interface & TP interface
+      foSFP                (29), -- Fiber Optic SFP interface
+      foSFPfoSFP100FXtp    (30), -- Fiber Optic SFP interface & Fiber Optic SFP100FX interface & TP interface
+      foSFP100FX           (31), -- Fiber Optic SFP100FX interface
+      foSFPfoSFP100FX      (32), -- Fiber Optic SFP interface & Fiber Optic SFP100FX interface
+      foSFPdirect          (33), -- Fiber Optic SFP direct interface
+      tpSHDSL              (34), -- TP SHDSL interface
+      portTrunk            (35), -- Port Trunk interface
+      internalPort         (36), -- Port used for internal connections
+      foSFPplus            (37)  -- Fiber Optic SFP plus interface
+   }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "Port installed physical interface (if any): aui/tp..."
+   ::= { osPortEntry 101 }
+
+osPortLastError   OBJECT-TYPE
+    SYNTAX           LastError
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Last configuration error description."
+    ::= { osPortEntry 102 }
+
+
+-- *******************************************************************
+--  Port Shaper
+-- ******************************************************************* 
+
+osPortShapeTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortShapeEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table reflects ports shaping."
+   ::= { osPort 3 }
+
+osPortShapeEntry OBJECT-TYPE
+   SYNTAX      OsPortShapeEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortIndex, osPortShapeDir, osPortShapeQId }
+   ::= { osPortShapeTable 1 }
+
+OsPortShapeEntry ::= SEQUENCE {
+   osPortShapeDir             INTEGER,
+   osPortShapeQId             Unsigned32,
+   osPortShapeRate            Gauge32,
+   osPortShapeBurstSize       Gauge32,
+   osPortShapeLastError       LastError,
+   osPortShapeLocked          TruthValue,
+   osPortShapeAdminStatus     PortEntryValidator
+}
+
+osPortShapeDir          OBJECT-TYPE
+   SYNTAX              INTEGER {
+      egressShaping (1),
+      ingressShaping(2)
+   }
+   MAX-ACCESS          not-accessible
+   STATUS              current
+   DESCRIPTION
+      "Shaper direction: egressShaping/ingressShaping."
+   ::= { osPortShapeEntry 3 }
+
+osPortShapeQId          OBJECT-TYPE
+   SYNTAX              Unsigned32 (1..8190 | 8191)
+   MAX-ACCESS          not-accessible
+   STATUS              current
+   DESCRIPTION
+      "Port shaper queue ID
+       If port shaper is per queue - ID should be between 1 & osPortCfgMaxNumberOfSl
+       If port shaper is global    - ID should be 8191."
+   ::= { osPortShapeEntry 4 }
+
+osPortShapeRate         OBJECT-TYPE
+   SYNTAX              Gauge32
+   UNITS               "kilobits per second"
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Shaper rate."
+   ::= { osPortShapeEntry 6 }
+
+osPortShapeBurstSize    OBJECT-TYPE
+   SYNTAX              Gauge32
+   UNITS               "KBytes"
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Shaper birst size."
+   ::= { osPortShapeEntry 7 }
+   
+osPortShapeLastError   OBJECT-TYPE
+    SYNTAX           LastError
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Last configuration error description."
+    ::= { osPortShapeEntry 8 }
+
+osPortShapeLocked     OBJECT-TYPE
+     SYNTAX           TruthValue
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+        "The value true(1) means, that this shaper is tied with ethernet provision service
+        (see osEthServ.mib) and cannot be changed with osPort.mib"
+     ::= { osPortShapeEntry 15 }
+
+
+osPortShapeAdminStatus  OBJECT-TYPE
+    SYNTAX             PortEntryValidator
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Shaper admin status (see PortEntryValidator)."
+--  DEFVAL { nothing }
+    ::= { osPortShapeEntry 17 }
+
+-- *******************************************************************
+--  Port Trunk
+-- ******************************************************************* 
+
+osPortTrunkTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortTrunkEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table handles port trunk."
+   REFERENCE
+      "CLI commands 'port trunk NAME PORT'"
+   ::= { osPort 4 }
+
+osPortTrunkEntry OBJECT-TYPE
+   SYNTAX      OsPortTrunkEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortTrunkId } 
+   ::= { osPortTrunkTable 1 }
+
+OsPortTrunkEntry ::= SEQUENCE {
+   osPortTrunkId                Integer32,
+   osPortTrunkIndexId           Integer32,
+   osPortTrunkMembers           PortList,
+   osPortTrunkAdminStatus       PortEntryValidator,
+   osPortTrunkNumOfMembers      Integer32
+}
+
+osPortTrunkId                 OBJECT-TYPE
+   SYNTAX                     Integer32 (1..128)
+   MAX-ACCESS                 not-accessible
+   STATUS                     current
+   DESCRIPTION
+      "The trunk's id (1, 2, ..., osPortCfgMaxTrunkId)."
+   ::= { osPortTrunkEntry 3 }
+
+osPortTrunkIndexId      OBJECT-TYPE
+   SYNTAX               Integer32 
+   MAX-ACCESS           read-only
+   STATUS               current
+   DESCRIPTION
+      "The trunk's port index (osPortCfgBaseTrunkPortIndex + osPortTrunkId)."
+   ::= { osPortTrunkEntry 4 }
+
+osPortTrunkMembers      OBJECT-TYPE
+   SYNTAX               PortList
+   MAX-ACCESS           read-write
+   STATUS               current
+   DESCRIPTION
+      "Determine which ports are members at this trunk."
+   ::= { osPortTrunkEntry 5 }
+
+osPortTrunkAdminStatus  OBJECT-TYPE
+   SYNTAX               PortEntryValidator
+   MAX-ACCESS           read-write
+   STATUS               current
+   DESCRIPTION
+      "Trunk admin status (see PortEntryValidator)."
+   ::= { osPortTrunkEntry 6 }
+
+osPortTrunkNumOfMembers OBJECT-TYPE
+   SYNTAX               Integer32
+   MAX-ACCESS           read-only
+   STATUS               current
+   DESCRIPTION
+      "Determine how many ports are members at this trunk."
+   ::= { osPortTrunkEntry 7 }
+   
+-- *******************************************************************
+--  Port Counters
+-- ******************************************************************* 
+
+osPortCntTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortCntEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table handles port (statistics) counters."
+   REFERENCE
+      "CLI commands:
+       'show port statistics table'
+       'show port statistics [PORTS-GROUP]'"
+   ::= { osPort 5 }
+
+osPortCntEntry OBJECT-TYPE
+   SYNTAX      OsPortCntEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   AUGMENTS    { osPortEntry }
+   ::= { osPortCntTable 1 }
+
+OsPortCntEntry ::= SEQUENCE {
+        osPortCntClearAll                    INTEGER,
+          osPortCntRecvBytes                 Counter64,
+          osPortCntRecvPacks                 Counter64,
+          osPortCntRecvUniPacks              Counter64,
+          osPortCntRecvBroadPacks            Counter64,
+          osPortCntRecvMultiPacks            Counter64,
+          osPortCntSentBytes                 Counter64,
+          osPortCntSentPacks                 Counter64,
+          osPortCntSentUniPacks              Counter64,
+          osPortCntSentBroadPacks            Counter64,
+          osPortCntSentMultiPacks            Counter64,
+          osPortCntRecvCRCorAlignmentErrs    Counter64,
+          osPortCntRecvShortPacks            Counter64,
+          osPortCntRecvLongPacks             Counter64,
+          osPortCntRecvFragmentPacks         Counter64,
+          osPortCntRecvJabberPacks           Counter64,
+          osPortCntRecvAndSentCollisions     Counter64,
+          osPortCntRecvUpTo64octsPacks       Counter64,
+          osPortCntRecv65to127octsPacks      Counter64,
+          osPortCntRecv128to255octsPacks     Counter64,
+          osPortCntRecv256to511octsPacks     Counter64,
+          osPortCntRecv512to1023octsPacks    Counter64,
+          osPortCntRecvAbove1023octsPacks    Counter64,
+        -- UP 2 HERE IT IS THE SAME AS IN CLI...
+          osPortCntLateCollisions            Counter64,
+          osPortCntRecvBadBytes              Counter64,
+          osPortCntEgressClear               INTEGER
+}
+
+osPortCntClearAll                   OBJECT-TYPE
+        SYNTAX  INTEGER {
+            none        (1),
+            clear       (2)
+        }
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                "Clear all port counters"
+        ::= { osPortCntEntry 2 }
+
+  osPortCntRecvBytes                  OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Good bytes received"
+          ::= { osPortCntEntry 3 }
+  
+  
+  osPortCntRecvPacks                  OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Good packets received"
+          ::= { osPortCntEntry 4 }
+  
+  
+  osPortCntRecvUniPacks               OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Good unicast packets received"
+          ::= { osPortCntEntry 5 }
+  
+  
+  osPortCntRecvBroadPacks             OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Good broadcast packets received"
+          ::= { osPortCntEntry 6 }
+  
+  
+  osPortCntRecvMultiPacks             OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Good multicast packets received"
+          ::= { osPortCntEntry 7 }
+  
+  
+  osPortCntSentBytes                  OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Bytes transmitted"
+          ::= { osPortCntEntry 8 }
+  
+  
+  osPortCntSentPacks                  OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Packets transmitted"
+          ::= { osPortCntEntry 9 }
+  
+  
+  osPortCntSentUniPacks               OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Unicast packets transmitted"
+          ::= { osPortCntEntry 10 }
+  
+  
+  osPortCntSentBroadPacks             OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Broadcast packets transmitted"
+          ::= { osPortCntEntry 11 }
+  
+  
+  osPortCntSentMultiPacks             OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Multicast packets transmitted"
+          ::= { osPortCntEntry 12 }
+  
+  
+  osPortCntRecvCRCorAlignmentErrs     OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "CRC or Alignment error received"
+          ::= { osPortCntEntry 13 }
+  
+  
+  osPortCntRecvShortPacks             OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Undersize received"
+          ::= { osPortCntEntry 14 }
+  
+  
+  osPortCntRecvLongPacks              OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Oversize received"
+          ::= { osPortCntEntry 15 }
+  
+  
+  osPortCntRecvFragmentPacks          OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Fragments received"
+          ::= { osPortCntEntry 16 }
+  
+  
+  osPortCntRecvJabberPacks            OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Jabber received"
+          ::= { osPortCntEntry 17 }
+  
+  
+  osPortCntRecvAndSentCollisions      OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Collisions received and transmitted"
+          ::= { osPortCntEntry 18 }
+  
+  
+  osPortCntRecvUpTo64octsPacks        OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "     -   64 Octets"
+          ::= { osPortCntEntry 19 }
+  
+  
+  osPortCntRecv65to127octsPacks       OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "   65 - 127 Octets"
+          ::= { osPortCntEntry 20 }
+  
+  
+  osPortCntRecv128to255octsPacks      OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  " 128 -  255 Octets"
+          ::= { osPortCntEntry 22 }
+  
+  
+  osPortCntRecv256to511octsPacks      OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  " 256 -  511 Octets"
+          ::= { osPortCntEntry 23 }
+  
+  
+  osPortCntRecv512to1023octsPacks     OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  " 512 - 1023 Octets"
+          ::= { osPortCntEntry 24 }
+  
+  
+  osPortCntRecvAbove1023octsPacks     OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "1024 - XXXX Octets"
+          ::= { osPortCntEntry 25 }
+  
+  
+  osPortCntLateCollisions            OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Late collisions received and transmitted"
+          ::= { osPortCntEntry 41 }
+  
+  
+  osPortCntRecvBadBytes              OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "Bad bytes received"
+          ::= { osPortCntEntry 42 }
+          
+  osPortCntEgressClear OBJECT-TYPE
+        SYNTAX  INTEGER {
+            none        (1),
+            clear       (2)
+        }
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                "Clear all port egress counters, see osPortEgressCntTable" 
+        ::= { osPortCntEntry 43 }
+ 
+
+-- *******************************************************************
+--  Port Shaper Patameters
+-- ******************************************************************* 
+
+osPortShapeParametersTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortShapeParametersEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table reflects ports shaping parameters"
+   ::= { osPort 6 }
+
+osPortShapeParametersEntry OBJECT-TYPE
+   SYNTAX      OsPortShapeParametersEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortIndex, osPortShapeDir }
+   ::= { osPortShapeParametersTable 1 }
+
+OsPortShapeParametersEntry ::= SEQUENCE {
+   osPortShapeCapability     INTEGER,
+   osPortShapeMinRate         Gauge32,
+   osPortShapeMaxRate         Gauge32,
+   osPortShapeMinBurstSize    Gauge32,
+   osPortShapeMaxBurstSize    Gauge32
+}
+
+osPortShapeCapability        OBJECT-TYPE
+   SYNTAX                     INTEGER {
+      notAvailable  (1),
+      available     (2)
+   }
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "Describes if shaper available or not available for specified direction of the port."
+   ::= { osPortShapeParametersEntry 1 }
+
+osPortShapeMinRate            OBJECT-TYPE
+   SYNTAX                     Gauge32
+   UNITS                      "kilobits per second"
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "Returns minimal valid rate for a port shaper"
+   ::= { osPortShapeParametersEntry 2 }
+
+osPortShapeMaxRate            OBJECT-TYPE
+   SYNTAX                     Gauge32
+   UNITS                      "kilobits per second"
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "Returns maximal valid rate for a port shaper"
+   ::= { osPortShapeParametersEntry 3 }
+
+osPortShapeMinBurstSize       OBJECT-TYPE
+   SYNTAX                     Gauge32
+   UNITS                      "KBytes"
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "Returns minimal valid burst size for a port shaper"
+   ::= { osPortShapeParametersEntry 4 }
+
+osPortShapeMaxBurstSize       OBJECT-TYPE
+   SYNTAX                     Gauge32
+   UNITS                      "KBytes"
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "Returns maximal valid burst size for a port shaper"
+   ::= { osPortShapeParametersEntry 5 }
+
+
+-- *******************************************************************
+--  Buffers profile
+-- *******************************************************************
+
+osPortBuffersProfileTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortBuffersProfileEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table reflects buffers profiles"
+   ::= { osPort 7 }
+
+osPortBuffersProfileEntry OBJECT-TYPE
+   SYNTAX      OsPortBuffersProfileEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osBufferProfileIndex, osBufferProfileServiceLevel }
+   ::= { osPortBuffersProfileTable 1 }
+
+OsPortBuffersProfileEntry ::= SEQUENCE {
+   osBufferProfileIndex               BuffersProfileIndex,
+   osBufferProfileServiceLevel         Unsigned32,
+   osBuffersProfileDescriptorsGreen    Unsigned32,
+   osBuffersProfileDescriptorsYellow   Unsigned32,
+   osBuffersProfileDescriptorsRed      Unsigned32,
+   osBuffersProfileBuffersGreen        Unsigned32,
+   osBuffersProfileBuffersYellow       Unsigned32,
+   osBuffersProfileBuffersRed          Unsigned32,
+   osBuffersProfileWredThresholdGreen  Unsigned32,
+   osBuffersProfileWredThresholdYellow Unsigned32,
+   osBuffersProfileWredThresholdRed    Unsigned32
+}
+
+osBufferProfileIndex  OBJECT-TYPE
+   SYNTAX         BuffersProfileIndex
+   MAX-ACCESS     not-accessible
+   STATUS         current
+   DESCRIPTION
+      "Buffers profile index."
+   ::= { osPortBuffersProfileEntry 1 }
+
+osBufferProfileServiceLevel  OBJECT-TYPE
+   SYNTAX         Unsigned32 (1..8)
+   MAX-ACCESS     not-accessible
+   STATUS         current
+   DESCRIPTION
+      "Service Level within buffers profile"
+   ::= { osPortBuffersProfileEntry 2 }
+
+osBuffersProfileDescriptorsGreen  OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..1000000)
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Threshold for descriptors of packets with green drop precedence"
+   ::= { osPortBuffersProfileEntry 3 }
+
+osBuffersProfileDescriptorsYellow  OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..1000000)
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Threshold for descriptors of packets with yellow drop precedence"
+   ::= { osPortBuffersProfileEntry 4 }
+
+osBuffersProfileDescriptorsRed  OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..1000000)
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Threshold for descriptors of packets with red drop precedence"
+   ::= { osPortBuffersProfileEntry 5 }
+
+osBuffersProfileBuffersGreen  OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..1000000)
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Threshold for buffers of packets with green drop precedence"
+   ::= { osPortBuffersProfileEntry 6 }
+
+osBuffersProfileBuffersYellow  OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..1000000)
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Threshold for buffers of packets with yellow drop precedence"
+   ::= { osPortBuffersProfileEntry 7 }
+
+osBuffersProfileBuffersRed  OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..1000000)
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Threshold for buffers of packets with red drop precedence"
+   ::= { osPortBuffersProfileEntry 8 }
+
+osBuffersProfileWredThresholdGreen OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..99)
+   UNITS          "Percentage"
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "WRED threshold for green packets"
+   ::= { osPortBuffersProfileEntry 9 }
+
+osBuffersProfileWredThresholdYellow OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..99)
+   UNITS          "Percentage"
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "WRED threshold for green packets"
+   ::= { osPortBuffersProfileEntry 10 }
+
+osBuffersProfileWredThresholdRed OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..99)
+   UNITS          "Percentage"
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "WRED threshold for green packets"
+   ::= { osPortBuffersProfileEntry 11 }
+
+-- *******************************************************************
+--  osPortGen
+-- *******************************************************************
+
+osPortMflgMac     OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+       "MAC address, that was reason of MFLG isolation.
+       Is sent inside osPortIsolation only if isolation was
+       because MFLG."
+    ::= { osPortGen 3 }
+
+
+-- *******************************************************************
+--  osPortBuffersCfg
+-- *******************************************************************
+
+osPortBuffersShared OBJECT-TYPE
+   SYNTAX       INTEGER {
+      disabled     (1),
+      enabled      (2)
+  }
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+      "Globbaly enable use of shared buffers."
+   DEFVAL { enabled }
+   ::= { osPortBuffersCfg 1 }
+
+osPortBuffersWRED OBJECT-TYPE
+   SYNTAX       INTEGER {
+      disabled     (1),
+      enabled      (2)
+  }
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+      "Globally enable Weighted Random Early Detection."
+   DEFVAL { disabled }
+   ::= { osPortBuffersCfg 2 }
+
+   
+-- *******************************************************************
+--  osPortCoreEgressEth
+-- *******************************************************************
+
+osPortEthType1 OBJECT-TYPE
+   SYNTAX     OCTET STRING (SIZE (2))
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+      "define the first eth type 0x1-0xFFFF."
+   DEFVAL { '8100'h }
+   ::= { osPortCoreEgressEth 1 }
+
+osPortEthType2 OBJECT-TYPE
+   SYNTAX     OCTET STRING (SIZE (2))
+   MAX-ACCESS read-write
+   STATUS     current
+   DESCRIPTION
+      "define the second eth type 0x1-0xFFFF."
+   DEFVAL { '8100'h }
+   ::= { osPortCoreEgressEth 2 }
+   
+   
+   
+-- ******************************************************************
+-- osPortEthTypeTable
+-- ******************************************************************
+
+osPortEthTypeTable     OBJECT-TYPE
+   SYNTAX      SEQUENCE OF OsPortEthTypeEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Ports eth_type configuration."
+   REFERENCE
+      "."
+   ::= { osPort 9 }
+
+osPortEthTypeEntry     OBJECT-TYPE
+   SYNTAX      OsPortEthTypeEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortIndex }
+   ::= { osPortEthTypeTable 1 }
+
+OsPortEthTypeEntry ::= SEQUENCE {
+   osPortEthType                INTEGER
+   }
+
+osPortEthType             OBJECT-TYPE
+   SYNTAX              INTEGER {
+      coreEth1   (1),
+      coreEth2   (2)
+   }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+      "Port eth_type."
+   REFERENCE
+      "."
+   ::= { osPortEthTypeEntry 1 }
+   
+-- *******************************************************************
+--  Port Egress Counters
+-- ******************************************************************* 
+
+osPortEgressCntTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortEgressCntEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table handles port egress counters."
+   REFERENCE
+      "CLI commands:
+       'show port egress-counter'
+       'show port egress-counter packets [PORTS-GROUP]'
+       'show port egress-counter bytes [PORTS-GROUP]'"
+		::= { osPort 10 }
+
+osPortEgressCntEntry OBJECT-TYPE
+   SYNTAX      OsPortEgressCntEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   
+   INDEX { osPortIndex, osBufferProfileServiceLevel, osPortEgressUnits, osPortEgressValueType }
+   ::= { osPortEgressCntTable 1 }
+
+OsPortEgressCntEntry ::= SEQUENCE {
+		  osPortEgressUnits           	 INTEGER,
+		  osPortEgressValueType          INTEGER,
+   		  osPortEgressCounter	         Counter64
+	}
+	        
+osPortEgressUnits   OBJECT-TYPE
+   SYNTAX              INTEGER {
+                         bytes   (1),
+                         packets (2)
+                       }
+   MAX-ACCESS          not-accessible
+   STATUS              current
+   DESCRIPTION
+      "."
+   REFERENCE
+      "."
+   ::= { osPortEgressCntEntry 3 }
+   
+osPortEgressValueType  OBJECT-TYPE
+   SYNTAX         INTEGER {
+   					pass 	  (1), 
+   					passOther (2),
+   					passGreen (3),
+   					drop 	  (4),
+   					dropOther (5),
+   					dropGreen (6)
+   				  }
+   MAX-ACCESS     not-accessible
+   STATUS         current
+   DESCRIPTION
+      "Service Level within buffers profile"
+   ::= { osPortEgressCntEntry 4 }
+   
+
+osPortEgressCounter OBJECT-TYPE
+          SYNTAX  Counter64
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                  "units value."
+          ::= { osPortEgressCntEntry 5 }  
+
+
+-- *******************************************************************
+--  Port Trunk Extensions
+-- ******************************************************************* 
+
+osPortTrunkExtTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortTrunkExtEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This extends the capabilities of the osPortTrunkExtTable"
+   REFERENCE
+      "CLI commands 'port trunk NAME PORT'"
+   ::= { osPort 14 }
+
+osPortTrunkExtEntry OBJECT-TYPE
+   SYNTAX      OsPortTrunkExtEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortTrunkId } 
+-- AUGMENTS { osPortTrunkEntry }
+   
+   ::= { osPortTrunkExtTable 1 }
+
+OsPortTrunkExtEntry ::= SEQUENCE {
+   osPortTrunkMaxPortBundle    Integer32,
+   osPortTrunkRevertive        TruthValue,
+   osPortTrunkFastSwitchover   TruthValue,
+   osPortTrunkLowerThreshold   Integer32,
+   osPortTrunkHigherThreshold  Integer32,
+
+   osPortTrunkTearDown         TruthValue
+}
+
+osPortTrunkMaxPortBundle      OBJECT-TYPE
+   SYNTAX                     Integer32 (1..8)
+   MAX-ACCESS                 read-write
+   STATUS                     current
+   DESCRIPTION
+      "The Max Port value.
+      CLI: '[no ]port trunk NAME lacp max-bundle <1-8> (revertive| non-revertive| )' '"
+-- DEFVAL { 0 }
+   ::= { osPortTrunkExtEntry 3 }
+
+osPortTrunkRevertive          OBJECT-TYPE
+   SYNTAX                     TruthValue
+   MAX-ACCESS                 read-write
+   STATUS                     current
+   DESCRIPTION
+      "Revertive or non-....
+      CLI: '[no ]port trunk NAME lacp max-bundle <1-8> (revertive| non-revertive| )' '"
+    DEFVAL { false }       
+   ::= { osPortTrunkExtEntry 4 }
+   
+osPortTrunkFastSwitchover     OBJECT-TYPE
+   SYNTAX                     TruthValue
+   MAX-ACCESS                 read-write
+   STATUS                     current
+   DESCRIPTION
+      "Fast switchover or no-....
+      CLI: '[no ]port trunk NAME fast-switchover' '"
+    DEFVAL { false }       
+   ::= { osPortTrunkExtEntry 5 }
+
+osPortTrunkLowerThreshold     OBJECT-TYPE
+   SYNTAX                     Integer32 (1..8)
+   MAX-ACCESS                 read-write
+   STATUS                     current
+   DESCRIPTION
+      "Tear down lower-threshold.
+      CLI: '[no ]port trunk NAME (lower-threshold <1-8> (higher-threshold <1-8>|)|)'."
+   DEFVAL { 8 }
+   ::= { osPortTrunkExtEntry 6 }
+
+osPortTrunkHigherThreshold    OBJECT-TYPE
+   SYNTAX                     Integer32 (1..8)
+   MAX-ACCESS                 read-write
+   STATUS                     current
+   DESCRIPTION
+      "Tear down lower-threshold.
+      CLI: '[no ]port trunk NAME (lower-threshold <1-8> (higher-threshold <1-8>|)|)'."
+   DEFVAL { 8 }
+   ::= { osPortTrunkExtEntry 7 }
+
+osPortTrunkTearDown           OBJECT-TYPE
+   SYNTAX                     TruthValue
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "Tear down state of the trunk."
+   ::= { osPortTrunkExtEntry 17 }
+
+-- *******************************************************************
+--  Port Flood Limit Table
+-- ******************************************************************* 
+
+osPortFloodLimitTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF OsPortFloodLimitEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "This table handles port flood limit management."
+   REFERENCE
+      "CLI commands:
+      [no ]port flood-limiting (unknown-unicast|multicast|broadcast|tcp-syn) (PORTS-GROUP|all)
+      [no ]port flood-limiting rate VALUE (PORTS-GROUP|all)
+      "
+		::= { osPort 15 }
+
+osPortFloodLimitEntry OBJECT-TYPE
+   SYNTAX      OsPortFloodLimitEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Contains entry of the table."
+   INDEX { osPortIndex }
+   ::= { osPortFloodLimitTable 1 }
+
+OsPortFloodLimitEntry ::= SEQUENCE {
+		  osPortFloodLimitTypes          BITS,
+		  osPortFloodLimitRate           Gauge32
+	}
+	        
+osPortFloodLimitTypes  OBJECT-TYPE
+   SYNTAX              BITS{
+                         unknownUnicast (0),
+                         multicast      (1),
+                         broadcast      (2),
+                         tcpSyn         (3),
+                         reserved       (4),
+                         deleteAll      (5)
+                       }
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+       "Types of traffic to be limited.
+       Bit deleteAll(5) is dedicated to reset all bits by debug utility snmpset"
+   DEFVAL { {} }
+   ::= { osPortFloodLimitEntry 5 }
+
+osPortFloodLimitRate   OBJECT-TYPE
+   SYNTAX              Gauge32 ( 0..100000000 )
+   UNITS               "Kbits/sec"
+   MAX-ACCESS          read-write
+   STATUS              current
+   DESCRIPTION
+       "Permitted rate in kbps. A value of 0 indicates no rate limiting on port."
+   DEFVAL { 0 }
+   ::= { osPortFloodLimitEntry 6 }
+
+
+-- ******************************************************************
+-- NOTIFICATIONS (TRAPS)
+-- ******************************************************************
+
+osPortMgmtEnabled NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortDescription
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when the port is enabled by managemet (CLI or SNMP).
+       This notification is dedicated exactly to reflect port enabling by the management
+       commands, unlike the physical connection."
+    ::= { osPortNotifications 1 }
+
+osPortMgmtDisabled NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortDescription
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when the port is disabled by managemet (CLI or SNMP).
+       This notification is dedicated exactly to reflect port disabling by the management
+       commands, unlike the physical disconnection."
+    ::= { osPortNotifications 2 }
+
+osPortSfpInserted NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortDescription
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when an SFP is inserted in a port."
+    ::= { osPortNotifications 3 }
+
+osPortSfpRemoved NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortDescription
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when an SFP is removed from a port."
+    ::= { osPortNotifications 4 }
+
+osPortSfpI2cFailure NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortOperState
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when an SFP I2C fails."
+    ::= { osPortNotifications 5 }
+ 
+osPortSfpI2cRecovery NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortOperState
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when an SFP I2C recovers."
+    ::= { osPortNotifications 6 }
+
+osPortSfpAutoDetectErr NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortLastError                  
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when an SFP media
+        is not compatible with port capabilities."
+    ::= { osPortNotifications 7 }
+ 
+osPortIsolation NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortOperState,
+                  osPortMflgMac
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when the port is isolated by one of 'guards'."
+    ::= { osPortNotifications 8 }
+
+osPortRecovery NOTIFICATION-TYPE
+    OBJECTS     {
+                  osPortOperState
+                }
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when the port is recovered after isolation."
+    ::= { osPortNotifications 9 }
+
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osPortMIBCompliance MODULE-COMPLIANCE
+   STATUS current
+   DESCRIPTION
+      "The core compliance statement for all the implementations." 
+
+   MODULE -- this module 
+      MANDATORY-GROUPS { 
+         osPortMandatoryGroup,
+         osPortNotificationsGroup
+      }
+   ::= { osPortMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osPortMandatoryGroup  OBJECT-GROUP
+   OBJECTS { 
+      osPortCfgSupport,
+      osPortCfgMaxNumberOfPort,
+      osPortCfgBaseTrunkPortIndex,
+      osPortCfgMaxNumberOfSl,
+      osPortCfgMaxTrunkId,
+      osPortDescription,
+      osPortLink,
+      osPortAdminSpeed,
+      osPortOperSpeed,
+      osPortDuplex,
+      osPortAdminState,
+      osPortOperState,
+      osPortBlockReason,
+
+      osPortBuffersProfileIndex,
+      osPortTrunkIndex,
+      osPortLacpAdminMode,
+      osPortLacpOperState,
+      osPortMtuSize,
+      osPortQosMarkingVpt,
+      osPortQosTrust,
+      osPortRemarkingDei,
+      osPortSl,
+      osPortTagType,
+      osPortTagDefaultTag,
+      osPortL2CtrlDot1x,
+      osPortL2CtrlLACP,
+      osPortL2CtrlSTP,
+      osPortL2CtrlGVRP,
+      osPortL2CtrlPause,
+      osPortL2CtrlLinkOAM,
+      osPortL2CtrlELMI,
+      osPortL2CtrlLLDP,
+      osPortL2CtrlDTP,
+      osPortL2CtrlPAGP,
+      osPortL2CtrlVTP,
+      osPortL2CtrlCDP,
+      osPortL2CtrlPVST,
+      osPortAdminMediaSelect,
+      osPortOperMediaSelect,   
+      osPortLanType,             
+      osPortIfType,
+      osPortLastError, 
+      osPortEthType1,
+	  osPortEthType2,
+      osPortShapeRate,
+      osPortShapeBurstSize,
+      osPortShapeLastError,
+      osPortShapeLocked,
+      osPortShapeAdminStatus,
+
+      osPortShapeCapability,
+      osPortShapeMinRate,
+      osPortShapeMaxRate,
+      osPortShapeMinBurstSize,
+      osPortShapeMaxBurstSize,
+
+      osBuffersProfileDescriptorsGreen,
+      osBuffersProfileDescriptorsYellow,
+      osBuffersProfileDescriptorsRed,
+      osBuffersProfileBuffersGreen,
+      osBuffersProfileBuffersYellow,
+      osBuffersProfileBuffersRed,
+      osBuffersProfileWredThresholdGreen,
+      osBuffersProfileWredThresholdYellow,
+      osBuffersProfileWredThresholdRed,
+      osPortBuffersShared,
+      osPortBuffersWRED,
+
+      osPortMflgMac,
+
+      osPortTrunkIndexId,
+      osPortTrunkMembers,
+      osPortTrunkAdminStatus,
+      osPortTrunkNumOfMembers,
+      osPortTrunkLastError,
+      osPortCntEgressClearAll,
+      
+      osPortTrunkMaxPortBundle, osPortTrunkRevertive, osPortTrunkFastSwitchover,
+      osPortTrunkLowerThreshold, osPortTrunkHigherThreshold,
+      osPortTrunkTearDown,
+
+      osPortCntClearAll,
+      osPortCntRecvBytes,
+      osPortCntRecvPacks,
+      osPortCntRecvUniPacks,
+      osPortCntRecvBroadPacks,
+      osPortCntRecvMultiPacks,
+      osPortCntSentBytes,
+      osPortCntSentPacks,
+      osPortCntSentUniPacks,
+      osPortCntSentBroadPacks,
+      osPortCntSentMultiPacks,
+      osPortCntRecvCRCorAlignmentErrs,
+      osPortCntRecvShortPacks,
+      osPortCntRecvLongPacks,
+      osPortCntRecvFragmentPacks,
+      osPortCntRecvJabberPacks,
+      osPortCntRecvAndSentCollisions,
+      osPortCntRecvUpTo64octsPacks,
+      osPortCntRecv65to127octsPacks,
+      osPortCntRecv128to255octsPacks,
+      osPortCntRecv256to511octsPacks,
+      osPortCntRecv512to1023octsPacks,
+      osPortCntRecvAbove1023octsPacks,
+      osPortCntLateCollisions,
+      osPortCntRecvBadBytes,
+      osPortEthType,
+      osPortEgressCounter,
+      osPortCntEgressClear,
+
+		  osPortFloodLimitTypes, osPortFloodLimitRate
+   }
+   STATUS current 
+   DESCRIPTION 
+      "."
+   ::= { osPortMIBGroups 1 }
+
+osPortNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+             osPortMgmtEnabled, osPortMgmtDisabled,
+             osPortSfpInserted, osPortSfpRemoved,
+             osPortSfpI2cFailure, osPortSfpI2cRecovery, osPortSfpAutoDetectErr,
+             osPortIsolation, osPortRecovery
+          }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osPortMIBGroups 2 }
+
+
+-- another MIBs
+-- OAPORTS.MIB
+--    protection/reflection      see OAPROTEC.MIB  OAPRTLIN.MIB
+--
+--    missed (tbd, out of frame of MEF?):
+--    port core-ethertype-X
+--    port advertise
+--    port errdisable
+--    port redundancy
+--    port udld
+ --   port untagged-multi-vlans
+--    osPortIngressPriority      Unsigned32,    ++ (1..7) : port priority-queuing profile <1-7> ingress [PORTS-GROUP]
+--    osPortLtLearning           TruthValue, 
+--    osPortAclName              DisplayString, ++ "port access-group WORD PORTS-GROUP"
+--    osPortAclEgressName        DisplayString, ++ "port access-group egress WORD PORTS-GROUP"
+--    osPortAclExtraName         DisplayString, ++ "port access-group extra WORD PORTS-GROUP"
+--    osPortAclBindMode          INTEGER,       ++ byPort/byVlan: "port acl-binding-mode (by-port|by-vlan) [PORTS-GROUP]
+--    osPortBuffProfile          Unsigned32,    ++ (1..7) : "port buffers profile <1-7> [PORTS-GROUP]"
+--    osPortBuffIngressProfile   Unsigned32,    ++ (1..7) : "port buffers profile <1-7> ingress [PORTS-GROUP]"
+--    osPortShaperMtuSize        INTEGER,       ++ {10240/1536/2048} : "port shaper mtu (1536|2048|10240)
+--    osPortSlAccVpt             OCTET STRING,  ++     PortList: "port sl-account dscp PORTS-GROUP vpt PORTS-GROUP
+--    osPortSlAccDscp            OCTET STRING,  ++     PortList: "port sl-account dscp PORTS-GROUP vpt PORTS-GROUP
+--    osPortSlAccDPermitVpt      OCTET STRING,  ++     PortList: "port sl-account default policy permit dscp PORTS-GROUP vpt PORTS-GROUP
+--    osPortSlAccDPermitDscp     OCTET STRING,  ++     PortList: "port sl-account default policy permit dscp PORTS-GROUP vpt PORTS-GROUP
+--    osPortPriority             Unsigned32, ++ (1..7) : port priority-queuing profile <1-7> [PORTS-GROUP]
+
+
+END
+

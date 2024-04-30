@@ -5,8 +5,8 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage snmp
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -160,14 +160,13 @@ function snmp_size64_high_low($high, $low)
  *
  * @return mixed $numeric
  */
-function snmp_fix_numeric($value, $unit = NULL)
-{
+function snmp_fix_numeric($value, $unit = NULL) {
     if (is_numeric($value)) {
-        return $value + 0;
-    } // If already numeric just return value
+        return $value + 0; // If already numeric just return value
+    }
     if (!is_string($value)) {
-        return $value;
-    } // Non string values just return as is
+        return $value;     // Non string values just return as is
+    }
 
     $value = trim($value, " \t\n\r\0\x0B\"");
 
@@ -178,7 +177,7 @@ function snmp_fix_numeric($value, $unit = NULL)
 
         case 'bytes':
         case 'bits':
-            // Additionally try to convert bytes/bits
+            // Additionally, try to convert bytes/bits
             return unit_string_to_numeric($value);
 
         case 'hex':
@@ -189,6 +188,12 @@ function snmp_fix_numeric($value, $unit = NULL)
 
         case 'oct':
             return octdec($value);
+    }
+
+    // Case for numeric and split:
+    // 20% (cpu1: 28%   cpu2: 13%)
+    if ($brackets = preg_match('/^(?<value>[+\-]?\d+[^\(\)]*)\((?<bracket>[^\(\)]+)\)$/', $value, $brackets_matches)) {
+        $value = $brackets_matches['value'];
     }
 
     if ($unit && str_starts_with($unit, 'split')) {
@@ -206,17 +211,31 @@ function snmp_fix_numeric($value, $unit = NULL)
         } else {
             if (str_contains($value, ':')) {
                 // Ie: CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%
-                [, $value] = explode(':', $value);
-                $value = trim($value);
+                $value = trim(explode(':', $value)[1]);
             }
-            // Another hack for FIBERSTORE-MIB/FS-SWITCH-MIB multi lane DOM sensors
-            // Also see NETAPP-MIB sensors
-            foreach (explode(',', $value) as $i => $v) {
-                $key          = 'split' . ($i + 1);
+            if ($brackets && preg_match_all('/\w+\:\s*([\+\-]*\d\S+)/', $brackets_matches['bracket'], $matches)) {
+                // 20% (cpu1: 28%   cpu2: 13%)
+                $split = $matches[1];
+            } elseif (str_contains($value, '(') &&
+                preg_match_all('/(\d+\s*(?:sec|min))s? \(\s*([\d\.\+\-]+).*?\),?/i', $value, $matches)) {
+                // 5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)
+                //echo PHP_EOL; print_vars($matches);
+                $split = $matches[2];
+            } else {
+                // Another hack for FIBERSTORE-MIB/FS-SWITCH-MIB multi lane DOM sensors
+                // Also see NETAPP-MIB sensors
+                $split = explode(',', $value);
+            }
+            foreach ($split as $i => $v) {
+                $key = 'split' . ($i + 1);
                 $values[$key] = trim($v);
             }
         }
         print_debug_vars($values);
+        if (is_numeric($values[$unit])) {
+            // no need extra fixates
+            return $values[$unit] + 0;
+        }
         $value = $values[$unit];
     }
 
@@ -225,9 +244,9 @@ function snmp_fix_numeric($value, $unit = NULL)
     foreach (array_reverse(explode(': ', $value)) as $numeric) {
         // Clean prepend texts, ie: Spinning at 5160 RPM
         $numeric = preg_replace('/^([a-z]+ )+/i', '', $numeric);
-        [$numeric] = explode(' ', $numeric);
+        $numeric = explode(' ', $numeric)[0];
         // 3.09(W-)
-        [$numeric] = explode('(', $numeric);
+        $numeric = explode('(', $numeric)[0];
         $numeric = preg_replace('/[^0-9a-z\-,\.]/i', '', $numeric);
         // Some retarded devices report data with spaces and commas: STRING: "  20,4"
         $numeric = str_replace(',', '.', $numeric);
@@ -640,18 +659,15 @@ function snmp_translate($oid, $mib = NULL, $mibdir = NULL)
  * @global array $cache
  */
 // TESTME needs unit testing
-function snmp_command($command, $device, $oids, $options, $mib = NULL, &$mibdir = NULL, $flags = OBS_SNMP_ALL)
-{
+function snmp_command($command, $device, $oids, $options, $mib = NULL, &$mibdir = NULL, $flags = OBS_SNMP_ALL) {
     global $config, $cache;
 
     get_model_array($device); // Pre-cache model options (if required)
 
-    $nobulk = snmp_nobulk($device, $mib);
-
     // Get the full command path from the config. Choice between bulkwalk and walk. Add max-reps if needed.
     switch ($command) {
         case 'snmpwalk':
-            if ($nobulk) {
+            if ($nobulk = snmp_nobulk($device, $mib)) {
                 $cmd = $config['snmpwalk'];
                 // Append end oid (can speedup snmpwalk in some cases)
                 if (isset($GLOBALS['snmp_oid_end'])) {
@@ -673,12 +689,12 @@ function snmp_command($command, $device, $oids, $options, $mib = NULL, &$mibdir 
             break;
         case 'snmpget':
         case 'snmpgetnext':
-            $cmd    = $config[$command];
             $nobulk = TRUE; // reset bulk here
+            $cmd    = $config[$command];
             break;
         case 'snmpbulkget':
             // NOTE. Currently, not used by us
-            if ($nobulk) {
+            if ($nobulk = snmp_nobulk($device, $mib)) {
                 $cmd = $config['snmpget'];
             } else {
                 $cmd = $config['snmpbulkget'] . snmp_gen_maxrep($device, $mib);
@@ -743,11 +759,14 @@ function snmp_command($command, $device, $oids, $options, $mib = NULL, &$mibdir 
 
     // Set correct MIB directories based on passed dirs and OS definition
     // If $mibdir variable is passed, we use it directly
-    if (empty($mibdir)) {
-        // Change to correct mibdir, required for store in snmp_errors
-        $mibdir = snmp_mib2mibdirs($mib);
+    if ($mibdir !== FALSE) {
+        // Do not pass mibdirs when false (for snmp_dump())
+        if (empty($mibdir)) {
+            // Change to correct mibdir, required for store in snmp_errors
+            $mibdir = snmp_mib2mibdirs($mib);
+        }
+        $cmd .= " -M $mibdir";
     }
-    $cmd .= " -M $mibdir";
 
     // Add the device URI to the string
     $cmd .= ' ' . escapeshellarg($device['snmp_transport']) . ':' . escapeshellarg(device_host($device, TRUE)) . ':' . escapeshellarg($device['snmp_port']);
@@ -784,9 +803,10 @@ function snmp_nobulk($device, $mib = NULL) {
         print_debug("Device-specific no-bulk option.");
         return TRUE;
     }
-    if (is_numeric($device['snmp_maxrep']) && $device['snmp_maxrep'] <= 0) {
-        print_debug("Device-specific maxrep 0 or less.");
-        return TRUE;
+    if (is_numeric($device['snmp_maxrep'])) {
+        $nobulk = $device['snmp_maxrep'] <= 0;
+        print_debug("Device-specific maxrep ".($nobulk ? "0 or less" : $device['snmp_maxrep']) . ".");
+        return $nobulk;
     }
     if (isset($cache['devices']['model'][$device['device_id']]['snmp']['nobulk']) &&
               $cache['devices']['model'][$device['device_id']]['snmp']['nobulk']) {
@@ -952,6 +972,8 @@ function snmp_gen_options($command = 'snmpwalk', $flags = 0)
             // get need only varbind values (without Oid)
             $output = 'QUv';
             break;
+        case 'snmpdump':
+            return '--hexOutputLength=0 -Ih -ObentxU';
         case 'snmpwalk':
         default:
             // walk require output with Oid.index = value
@@ -1126,9 +1148,15 @@ function snmp_log_errors($command, $device, $oid, $options, $mib, $mibdir, $exec
                 // }
             }
         } elseif ($exec_status['exitcode'] === 2) {
-            // Reason: (noSuchName) There is no such variable name in this MIB.
-            // This is incorrect snmp version used for MIB/oid (mostly snmp v1)
-            $error_code = OBS_SNMP_ERROR_FAILED_RESPONSE; // 1000;
+            if (str_contains($exec_status['stderr'], 'authorizationError')) {
+                // Error in packet
+                // Reason: authorizationError (access denied to that object)
+                $error_code = OBS_SNMP_ERROR_AUTHORIZATION_ERROR; // 990;
+            } else {
+                // Reason: (noSuchName) There is no such variable name in this MIB.
+                // This is an incorrect snmp version used for MIB/oid (mostly snmp v1)
+                $error_code = OBS_SNMP_ERROR_FAILED_RESPONSE; // 1000;
+            }
         }
     } elseif ($error_code === OBS_SNMP_ERROR_UNKNOWN) {
         if ($exec_status['exitcode'] === 2 &&
@@ -2106,6 +2134,17 @@ function snmp_virtual_exist($device, $virtual, $oid = 'dot1dBasePortIfIndex', $m
         // snmpgetnext -v2c -cpublic@4093 -M ../rfc:../net-snmp:. 177.99.234.206 BRIDGE-MIB::dot1dBasePortIfIndex
         // BRIDGE-MIB::dot1dStpProtocolSpecification.0 = INTEGER: unknown(1)
         $context_data = snmp_getnext_oid($device, $oid, $mib);
+        if (snmp_error_code() === 5) {
+            // Getnext returned non empty output, but different Oid, return NULL instead FALSE
+            print_debug("SNMP in virtual routing '$virtual' empty on device for $mib::$oid.");
+
+            return NULL;
+        }
+        // if (snmp_error_code() === 1 && str_starts_with($virtual, 'vlan-')) {
+        //     // empty response for vlan context
+        //     print_debug("SNMP in virtual routing '$virtual' empty on device for $mib::$oid.");
+        //     return NULL;
+        // }
     }
     print_debug_vars($context_data);
 
@@ -2426,6 +2465,98 @@ function snmp_cache_oid($device, $oid, $mib = NULL, $mibdir = NULL, $flags = OBS
     }
 
     return $value;
+}
+
+// snmpwalk -v2c -c <community> -t 3 -Cc --hexOutputLength=0 -Ih -ObentxU <hostname> . > myagent.snmpwalk
+// snmpwalk -v2c -c <community> -t 3 -Cc --hexOutputLength=0 -Ih -ObentxU <hostname> .1.3.6.1.4.1 >> myagent.snmpwalk
+function snmp_dump($device, $filename = NULL, $oid_start = NULL) {
+    if (empty($filename) || in_array(strtolower($filename), [ 'stdout', 'cmd' ])) {
+        $stdout = TRUE;
+    } elseif (is_valid_param('path', $filename)) {
+        if (is_file($filename) && filesize($filename)) {
+            print_error('File "' . $filename . '" already exist.'.PHP_EOL);
+            return FALSE;
+        }
+        if (!is_writable(dirname($filename))) {
+            //print_vars(dirname($filename));
+            print_error('File "' . $filename . '" is not writable.'.PHP_EOL);
+            return FALSE;
+        }
+        $stdout = FALSE;
+    } else {
+        print_error('Incorrect the filename "' . $filename . '"' .PHP_EOL);
+        return FALSE;
+    }
+    if (!empty($oid_start) && !preg_match(OBS_PATTERN_SNMP_OID_NUM, $oid_start)) {
+        print_error('Incorrect starting Oid ' . $oid_start.PHP_EOL);
+        return FALSE;
+    }
+
+    if (empty($oid_start)) {
+        $oid_start = '.';
+    }
+
+    // Generate snmp options
+    if (empty($device['snmp_timeout'])) {
+        $device['snmp_timeout'] = 3;
+        $device['snmp_retries'] = 2;
+    }
+    //print_vars($device);
+    $flags = OBS_SNMP_NOINCREASE;
+    $options = snmp_gen_options('snmpdump', $flags);
+    $mib_dir = FALSE;
+
+    $cmd = snmp_command('snmpwalk', $device, $oid_start, $options, NULL, $mib_dir, $flags);
+    if (!$stdout) {
+        $cmd = str_replace('2>/dev/null', '> '.$filename, $cmd);
+    }
+    if (!$stdout) {
+        print_cli("Started dump '$filename' for device {$device['hostname']} from Oid: $oid_start".PHP_EOL);
+        print_cli("WARNING. THIS MAY TAKE A WHILE, PLEASE BE PATIENT WHILE IT RUNNING...".PHP_EOL);
+        print_cli("Check snmpdump running by cmd: wc -l $filename".PHP_EOL);
+    }
+    if ($filename === 'cmd') {
+        $filename = $device['hostname'] . '.snmpwalk';
+        if (!is_writable(dirname($filename))) {
+            $filename = $GLOBALS['config']['temp_dir'] . '/' . $filename;
+        }
+        echo(str_replace('2>/dev/null', '> '.$filename, $cmd) . PHP_EOL);
+        if ($oid_start === '.') {
+            $cmd = snmp_command('snmpwalk', $device, '.1.3.6.1.4.1', $options, NULL, $mib_dir, $flags);
+            echo(str_replace('2>/dev/null', '>> '.$filename, $cmd) . PHP_EOL);
+        }
+
+        return $filename;
+    }
+
+    print_debug_vars($cmd);
+    // FIXME. Add shell progress: https://stackoverflow.com/questions/12498304/using-bash-to-display-a-progress-indicator-spinner
+    //external_exec($cmd, $exec_status);
+    system($cmd, $result_code);
+    //print_vars($result_code);
+
+    if ($oid_start === '.' && $result_code === 0) {
+        // Append ent oids
+        $cmd = snmp_command('snmpwalk', $device, '.1.3.6.1.4.1', $options, NULL, $mib_dir, $flags);
+        if (!$stdout) {
+            $cmd = str_replace('2>/dev/null', '>> '.$filename, $cmd);
+        }
+        print_debug_vars($cmd);
+        if (!$stdout) {
+            print_cli("Append ent oids (.1.3.6.1.4.1) for device {$device['hostname']}".PHP_EOL);
+        }
+        //external_exec($cmd, $exec_status);
+        system($cmd, $result_code_ent);
+        if (!$stdout && $result_code_ent !== 0) {
+            print_warning("Snmpdump for ent oids not exist.");
+        }
+    }
+    if (!$stdout && $result_code !== 0) {
+        print_warning("Snmpdump not completed or exit by timeout.");
+        return FALSE;
+    }
+
+    return $stdout ?: $filename;
 }
 
 // EOF

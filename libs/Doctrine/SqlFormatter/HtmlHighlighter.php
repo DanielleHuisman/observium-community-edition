@@ -7,13 +7,14 @@ namespace Doctrine\SqlFormatter;
 use function htmlentities;
 use function sprintf;
 use function trim;
+
 use const ENT_COMPAT;
 use const ENT_IGNORE;
 use const PHP_EOL;
 
 final class HtmlHighlighter implements Highlighter
 {
-    const HIGHLIGHT_PRE = 'pre';
+    public const HIGHLIGHT_PRE = 'pre';
 
     /**
      * This flag tells us if queries need to be enclosed in <pre> tags
@@ -36,20 +37,20 @@ final class HtmlHighlighter implements Highlighter
             self::HIGHLIGHT_RESERVED => 'style="font-weight:bold;"',
             self::HIGHLIGHT_BOUNDARY => '',
             self::HIGHLIGHT_NUMBER => 'style="color: green;"',
-            self::HIGHLIGHT_WORD => 'class="grey"',
+            self::HIGHLIGHT_WORD => 'style="color: #333;"',
             self::HIGHLIGHT_ERROR => 'style="background-color: red;"',
             self::HIGHLIGHT_COMMENT => 'style="color: #aaa;"',
             self::HIGHLIGHT_VARIABLE => 'style="color: orange;"',
-            self::HIGHLIGHT_PRE => 'style=""',
+            self::HIGHLIGHT_PRE => 'style="color: black; background-color: white;"',
         ];
         $this->usePre         = $usePre;
     }
 
-    public function highlightToken(int $type, string $value) : string
+    public function highlightToken(int $type, string $value): string
     {
         $value = htmlentities($value, ENT_COMPAT | ENT_IGNORE, 'UTF-8');
 
-        if ($type === Token::TOKEN_TYPE_BOUNDARY && ($value==='(' || $value===')')) {
+        if ($type === Token::TOKEN_TYPE_BOUNDARY && ($value === '(' || $value === ')')) {
             return $value;
         }
 
@@ -61,7 +62,7 @@ final class HtmlHighlighter implements Highlighter
         return '<span ' . $attributes . '>' . $value . '</span>';
     }
 
-    public function attributes(int $type)
+    public function attributes(int $type): ?string
     {
         if (! isset(self::TOKEN_TYPE_TO_HIGHLIGHT[$type])) {
             return null;
@@ -70,7 +71,7 @@ final class HtmlHighlighter implements Highlighter
         return $this->htmlAttributes[self::TOKEN_TYPE_TO_HIGHLIGHT[$type]];
     }
 
-    public function highlightError(string $value) : string
+    public function highlightError(string $value): string
     {
         return sprintf(
             '%s<span %s>%s</span>',
@@ -80,16 +81,16 @@ final class HtmlHighlighter implements Highlighter
         );
     }
 
-    public function highlightErrorMessage(string $value) : string
+    public function highlightErrorMessage(string $value): string
     {
         return $this->highlightError($value);
     }
 
-    public function output(string $string) : string
+    public function output(string $string): string
     {
-        $string =trim($string);
+        $string = trim($string);
 
-        // This is derp truncate for long list
+        // Added by Observium Developers. IN list truncated for a long list
         $string = preg_replace('!(IN</span>\s*)(\()([^\)]+)(\))!', '$1$2<div class="text-truncate" onclick="revealHiddenOverflow(this)">$3</div>$4', $string);
 
         if (! $this->usePre) {

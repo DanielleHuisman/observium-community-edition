@@ -1,29 +1,28 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
+ * @package    observium
+ * @subpackage discovery
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (count($valid['sensor']['temperature']['DNOS-BOXSERVICES-PRIVATE-MIB']) ||
-    count($valid['sensor']['power']['DNOS-BOXSERVICES-PRIVATE-MIB'])) {
+if (!safe_empty($valid['sensor']['temperature']['DNOS-BOXSERVICES-PRIVATE-MIB']) ||
+    !safe_empty($valid['sensor']['power']['DNOS-BOXSERVICES-PRIVATE-MIB'])) {
     // Exit from discovery, since already added valid sensors by DNOS-BOXSERVICES-PRIVATE-MIB
     // Note, DNOS-BOXSERVICES-PRIVATE-MIB and OLD-DNOS-BOXSERVICES-PRIVATE-MIB are crossed
-    echo 'Skipped by DNOS-BOXSERVICES-PRIVATE-MIB';
+    print_debug('Skipped by DNOS-BOXSERVICES-PRIVATE-MIB');
     return;
 }
 
 // Retrieve temperature limits
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesNormalTempRangeMin.0 = INTEGER: 0
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesNormalTempRangeMax.0 = INTEGER: 57
-$boxServicesNormalTempRangeMin = snmp_get($device, 'boxServicesNormalTempRangeMin.0', '-Ovq', 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
-$boxServicesNormalTempRangeMax = snmp_get($device, 'boxServicesNormalTempRangeMax.0', '-Ovq', 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
+$boxServicesNormalTempRangeMin = snmp_get_oid($device, 'boxServicesNormalTempRangeMin.0', 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
+$boxServicesNormalTempRangeMax = snmp_get_oid($device, 'boxServicesNormalTempRangeMax.0', 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
 
 // Initialize check variable to false
 $boxServicesStackTempSensorsTable = FALSE;
@@ -53,7 +52,7 @@ foreach ($oids as $index => $entry) {
 
     $boxServicesStackTempSensorsTable = TRUE;
 
-    $descr = (count($oids) > 1 ? 'Stack Unit ' . $entry['boxServicesUnitIndex'] . ' ' : '') . 'Internal Temperature';
+    $descr = (safe_count($oids) > 1 ? 'Stack Unit ' . $entry['boxServicesUnitIndex'] . ' ' : '') . 'Internal';
     $oid   = ".1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.9.1.5.$index";
     $value = $entry['boxServicesStackTempSensorTemperature'];
 
@@ -125,7 +124,7 @@ $oids = snmpwalk_cache_oid($device, 'boxServicesFansTable', [], 'OLD-DNOS-BOXSER
 
 foreach ($oids as $index => $entry) {
     $descr = 'Fan';
-    if (count($oids) > 1) {
+    if (safe_count($oids) > 1) {
         $descr .= ' ' . ($index + 1);
     }
     $oid   = ".1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.6.1.3.$index";

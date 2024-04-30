@@ -1,0 +1,324 @@
+--  =======================================================================
+--  File        : osDevice.mib
+--  Description : Private MIB support the configuration & states of OptiSwitch
+--  By          : Olga
+
+-- Copyright (c) 2016 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-DEVICE-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE, 
+                Integer32, Unsigned32                           FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION                              FROM SNMPv2-TC
+                oaOptiSwitch                                    FROM OS-COMMON-TC-MIB
+                NOTIFICATION-GROUP,
+                MODULE-COMPLIANCE, OBJECT-GROUP                 FROM SNMPv2-CONF;
+
+osDevice        MODULE-IDENTITY
+                LAST-UPDATED "201904040000Z"  -- April 4, 2019
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "Supports information about configuration & states of ports."
+
+                -- Revision history
+                -- ================
+                REVISION "201904040000Z"  -- April 4, 2019
+                DESCRIPTION
+                  "The new subtree osDevSerial."
+
+                REVISION "201609140000Z"  -- September 14, 2016
+                DESCRIPTION
+                  "The new Optiswitch MIB for modules information."
+
+                ::= { oaOptiSwitch 40 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osDevNotifications   OBJECT IDENTIFIER ::= { osDevice 0 }
+osDevModule          OBJECT IDENTIFIER ::= { osDevice 1 }
+osDevParams          OBJECT IDENTIFIER ::= { osDevice 2 }
+osDevSerial          OBJECT IDENTIFIER ::= { osDevParams 1 }
+osDevConformance     OBJECT IDENTIFIER ::= { osDevice 101 }
+osDevMIBCompliances  OBJECT IDENTIFIER ::= { osDevConformance 1 }
+osDevMIBGroups       OBJECT IDENTIFIER ::= { osDevConformance 2 }
+
+-- ************************************************************
+-- Textual Converions
+-- ************************************************************
+
+DevModuleType  ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+      "List of modules supported by device."
+    SYNTAX       INTEGER {
+                   none     (1),
+                   lte0     (2),
+                   vdsl0    (3)
+                 }
+
+SerialBaudRate  ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+      "Baud rate of a serial port."
+    SYNTAX       Integer32 (9600|115200)
+
+-- ************************************************************
+-- Modules definfitions
+-- ************************************************************
+
+osDevModuleType    OBJECT-TYPE
+    SYNTAX      DevModuleType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Module type."
+    ::= { osDevModule 1 }
+
+osDevModuleSlotNumber OBJECT-TYPE
+   SYNTAX     Integer32  (1..1024) 
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Number of slot where OS module is inserted."
+   ::= { osDevModule 2 }
+
+-- ************************************************************
+-- General defice parameters definfitions
+-- ************************************************************
+
+-- ************************************************************
+-- Serial ports definfitions
+-- ************************************************************
+
+osDevSerialNumber OBJECT-TYPE
+        SYNTAX     Integer32 
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+        "Number od serial ports."
+        ::= { osDevSerial 1 }
+
+-- ************************************************************
+-- Serial ports table
+-- ************************************************************
+
+osDevSerialTable  OBJECT-TYPE
+        SYNTAX     SEQUENCE OF OsDevSerialEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+        "This table shows all the serail port parameters."
+        ::= { osDevSerial 2 }
+
+osDevSerialEntry  OBJECT-TYPE
+        SYNTAX     OsDevSerialEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+        "The entries of the table."
+        INDEX { osDevSerialIndex }
+        ::= { osDevSerialTable 1 }
+
+OsDevSerialEntry ::= SEQUENCE
+        {
+         osDevSerialIndex         Unsigned32,
+         osDevSerialOperBaudrate  SerialBaudRate,
+         osDevSerialAdminBaudrate SerialBaudRate
+        }
+
+osDevSerialIndex  OBJECT-TYPE
+        SYNTAX     Unsigned32
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+        "The index of the serial port."
+        ::= { osDevSerialEntry 1 }
+
+osDevSerialOperBaudrate OBJECT-TYPE
+        SYNTAX     SerialBaudRate
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+        "Current baud rate of the serial port"
+        ::= { osDevSerialEntry 2 }
+
+osDevSerialAdminBaudrate OBJECT-TYPE
+        SYNTAX     SerialBaudRate
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+        "Configured baud rate of the serial port, that will act after reboot.
+        CLI command: <baudrate <9600|115200>."
+        ::= { osDevSerialEntry 3 }
+
+-- notifications
+
+-- *******************************************************************
+--  Module specific traps
+-- ******************************************************************* 
+osDevModuleInserted NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module is plugged"
+    ::= { osDevNotifications 1 }
+
+osDevModuleRemoved NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module is unplugged"
+    ::= { osDevNotifications 2 }
+
+osDevModuleLedPowerOn NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module is powered on"
+    ::= { osDevNotifications 3 }
+
+osDevModuleLedPowerOff NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module is powered off"
+    ::= { osDevNotifications 4 }
+
+osDevModuleLedWanOn NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module SYNC (WAN) LED is on"
+    ::= { osDevNotifications 5 }
+
+osDevModuleLedWanOff NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module SYNC (WAN) LED is off"
+    ::= { osDevNotifications 6 }
+
+osDevModuleLedConnOn NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module CONNECTION LED is on"
+    ::= { osDevNotifications 7 }
+
+osDevModuleLedConnOff NOTIFICATION-TYPE
+    OBJECTS         {
+                      osDevModuleSlotNumber,
+                      osDevModuleType
+                    }
+    STATUS  current
+    DESCRIPTION
+            "The SNMP trap that is generated when module CONNECTION LED is off"
+    ::= { osDevNotifications 8 }
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osDevMIBCompliance MODULE-COMPLIANCE
+   STATUS current
+   DESCRIPTION
+      "The core compliance statement for all the implementations." 
+
+   MODULE -- this module 
+      MANDATORY-GROUPS { 
+         osDevMandatoryGroup,
+         osDevNotificationsGroup
+      }
+   ::= { osDevMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osDevMandatoryGroup  OBJECT-GROUP
+   OBJECTS { 
+            osDevModuleSlotNumber,
+            osDevModuleType,
+            osDevSerialNumber,
+            osDevSerialOperBaudrate, osDevSerialAdminBaudrate
+   }
+   STATUS current 
+   DESCRIPTION 
+      "."
+   ::= { osDevMIBGroups 1 }
+
+osDevNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+                  osDevModuleInserted,
+                  osDevModuleRemoved,
+                  osDevModuleLedPowerOn,
+                  osDevModuleLedPowerOff,
+                  osDevModuleLedWanOn,
+                  osDevModuleLedWanOff,
+                  osDevModuleLedConnOn,
+                  osDevModuleLedConnOff
+                 }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osDevMIBGroups 2 }
+
+
+END
+

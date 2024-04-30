@@ -56,7 +56,7 @@ foreach (dbFetchRows("SELECT * FROM `eigrp_peers` WHERE `device_id` = ? AND `eig
           <td class="state-marker"></td>
           <td colspan=8>';
 
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $peer['eigrp_peer_id'];
         $graph_array['type'] = 'eigrppeer_graph';
 

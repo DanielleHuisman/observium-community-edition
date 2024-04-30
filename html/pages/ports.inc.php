@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -18,9 +18,7 @@ if (!isset($vars['format']) || !is_alpha($vars['format']) || !is_file($config['h
     $vars['format'] = 'list';
 }
 
-if (OBS_DEBUG) {
-    print_vars($vars);
-}
+print_debug_vars($vars, 1);
 
 $param = [];
 
@@ -39,10 +37,12 @@ $select = "`ports`.`port_id` AS `port_id`, `devices`.`device_id` AS `device_id`"
 
 $where_array = build_ports_where_array_ng($vars);
 
+/*
 if (!$config['web_show_disabled'] && safe_count($cache['devices']['disabled']) > 0) {
-    $where_array[] = generate_query_values_ng($cache['devices']['disabled'], 'ports.device_id', '!=');
+    $where_array[] = generate_query_values($cache['devices']['disabled'], 'ports.device_id', '!=');
 }
 $where .= implode('', $where_array);
+*/
 //r($where_array);
 
 $form_items = [];
@@ -62,22 +62,20 @@ foreach (['ifType', 'ifSpeed', 'port_descr_type'] as $entry) {
     $query = "SELECT `$entry` FROM `ports`";
     $query .= " LEFT JOIN `devices` USING (`device_id`)";
 
+    $form_where = [];
     foreach ($where_array as $where_entry) {
         if (!str_contains($where_entry, "`$entry`")) {
-            $temp_where[] .= $where_entry;
+            $form_where[] .= $where_entry;
         }
     }
+    $form_where[] = "`$entry` != ''";
 
-    $temp_where[] = "`$entry` != ''";
-    $temp_where[] = $cache['where']['ports_permitted'];
+    //r($form_where);
+    $query .= generate_where_clause($form_where, $cache['where']['ports_permitted']);
+    $query .= " GROUP BY `$entry`";
 
-    $query .= generate_where_clause($temp_where);
-
-    $query .= " GROUP BY `$entry` ORDER BY `$entry`";
-
-    if ($entry === 'ifSpeed') {
-        $query .= ' DESC';
-    }
+    $sort_order = $entry === 'ifSpeed' ? 'DESC' : '';
+    $query .= generate_query_sort($entry, $sort_order);
 
     $form_items[$entry] = [];
     foreach (dbFetchRows($query) as $data) {
@@ -163,7 +161,7 @@ $form['row'][0]['state'] = [
   'name'   => 'Port State',
   'width'  => '100%', //'180px',
   'value'  => $vars['state'],
-  'values' => ['up' => 'Up', 'down' => ' Down', 'admindown' => 'Admin Down']
+  'values' => [ 'up' => 'Up', 'down' => ' Down', 'admindown' => 'Shutdown']
 ];
 
 $form['row'][0]['ifType'] = [
@@ -200,7 +198,7 @@ $form['row'][1]['label'] = [
 
 $form['row'][1]['ifAlias'] = [
   'type'        => 'text',
-  'name'        => 'Port Description (alias)',
+  'name'        => 'Port Description (ifAlias)',
   'value'       => $vars['ifAlias'],
   'width'       => '100%', //'180px',
   'placeholder' => TRUE
@@ -216,7 +214,7 @@ $form['row'][1]['ifSpeed'] = [
 
 $form['row'][1]['port_descr_type'] = [
   'type'   => 'multiselect',
-  'name'   => 'Port Type',
+  'name'   => 'Port Parsed Type',
   'width'  => '100%', //'180px',
   'value'  => $vars['port_descr_type'],
   'values' => $form_items['port_descr_type']
@@ -345,14 +343,13 @@ $navbar['options_right']['reset'] = ['text' => 'Reset', 'url' => generate_url(['
 print_navbar($navbar);
 unset($navbar);
 
+/* not required array, because permissions array already in select query
 include($config['html_dir'] . '/includes/port-sort-select.inc.php');
 
 $sql = "SELECT " . $select;
 $sql .= " FROM `ports`";
 $sql .= " INNER JOIN `devices` USING (`device_id`)";
 $sql .= generate_where_clause($where_array);
-
-$row = 1;
 
 //r($sql);
 
@@ -361,13 +358,22 @@ port_permitted_array($ports);
 $ports_count = count($ports);
 
 $port_ids = array_value_recursive('port_id', $ports);
+*/
 
+$sql = "SELECT `port_id`";
+$sql .= " FROM `ports`";
+$sql .= " INNER JOIN `devices` USING (`device_id`)";
+$sql .= generate_where_clause($where_array, $cache['where']['ports_permitted']);
+
+$ports_ids = dbFetchColumn($sql, $param);
+$ports_count = safe_count($ports_ids);
+//r($port_ids);
 if ($vars['agg_graph']) {
 
     $graph_vars = [
       'type'   => 'multi-port_' . $vars['agg_graph'],
       'legend' => 'no',
-      'id'     => implode(',', $port_ids)
+      'id'     => implode(',', $ports_ids)
     ];
 
     if ($ports_count < 350) {
@@ -379,7 +385,9 @@ if ($vars['agg_graph']) {
     }
 }
 
-include($config['html_dir'] . '/includes/port-sort.inc.php');
+$row = 1; // FIXME. not know for what..
+
+//include($config['html_dir'] . '/includes/port-sort.inc.php');
 include($config['html_dir'] . '/pages/ports/' . $vars['format'] . '.inc.php');
 
 // EOF

@@ -1,0 +1,1020 @@
+DC-VPWS-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    enterprises, Unsigned32,
+    Gauge32
+      FROM SNMPv2-SMI
+
+    TruthValue,
+    RowStatus
+      FROM SNMPv2-TC
+
+    SnmpAdminString
+      FROM SNMP-FRAMEWORK-MIB
+
+    InetAddressType,
+    InetAddress
+      FROM INET-ADDRESS-MIB
+
+    InterfaceIndex,
+    InterfaceIndexOrZero,
+    ifIndex
+      FROM IF-MIB
+
+    L2vpnPwBindType,
+    L2vpnADType,
+    L2vpnSigType,
+    L2vpnVeIdOrZero,
+    BgpRouteDistinguisher,
+    BgpExtendedCommunity,
+    l2vmEntityIndex
+      FROM DC-L2VPN-MIB
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP
+      FROM SNMPv2-CONF
+
+    IANAPwTypeTC
+      FROM IANA-PWE3-MIB            -- RFC5601
+
+    AdminStatus,
+    NpgOperStatus,
+    NumericIndex,
+    NumericIndexOrZero
+      FROM DC-MASTER-TC;
+
+  vpwsMib MODULE-IDENTITY
+    LAST-UPDATED "201503080000Z" -- March 8, 2015
+    ORGANIZATION "MRV Communications."
+    CONTACT-INFO
+                 "For technical support, please contact your service channel"
+    DESCRIPTION  "VPWS MIB."
+    ::= { opx 19 }
+
+nbase                OBJECT IDENTIFIER ::= { enterprises 629 }
+opx                OBJECT IDENTIFIER ::= { nbase 10 }
+
+  vpwsObjects      OBJECT IDENTIFIER ::= { vpwsMib 1 } -- VPWS tables
+  vpwsConformance  OBJECT IDENTIFIER ::= { vpwsMib 2 } -- Module conformance
+
+-------------------------------------------------------------------------------
+--
+-- VPWS Config Table.
+--
+
+  vpwsConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF VpwsConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "VPWS Configuration Table.
+
+                 This table specifies information for configuring and
+                 monitoring Virtual Private Wire Services (VPWS).
+
+                 Note that any changes made to this table when
+                 vpwsStatusOperStatus is 'up' may cause the VPWS to be
+                 deactivated (vpwsStatusOperStatus 'down') before the change
+                 is made.  The VPWS will then attempt to re-activate.  The
+                 VPWS may or may not re-activate depending on the validity of
+                 the new configuration."
+    ::= { vpwsObjects 1 }
+
+  vpwsConfigEntry OBJECT-TYPE
+    SYNTAX      VpwsConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a configured VPWS."
+    INDEX       { l2vmEntityIndex, vpwsIndex }
+    ::= { vpwsConfigTable 1 }
+
+  VpwsConfigEntry ::=
+    SEQUENCE {
+      vpwsIndex                         NumericIndex,
+      vpwsConfigRowStatus               RowStatus,
+      vpwsConfigAdminStatus             AdminStatus,
+      vpwsConfigOperStatus              NpgOperStatus,
+      vpwsConfigName                    SnmpAdminString,
+      vpwsConfigDescr                   SnmpAdminString,
+      vpwsConfigADType                  L2vpnADType,
+      vpwsConfigSigType                 L2vpnSigType,
+      vpwsConfigPwEncapType             IANAPwTypeTC,
+      vpwsConfigMtu                     Unsigned32,
+      vpwsConfigControlWord             TruthValue,
+      vpwsConfigSeqDelivery             TruthValue,
+      vpwsConfigRouteDistinguisher      BgpRouteDistinguisher,
+      vpwsConfigVpnId                   BgpExtendedCommunity,
+      vpwsConfigLocalSiteID             L2vpnVeIdOrZero,
+      vpwsConfigLocalPreference         Unsigned32,
+      vpwsConfigLabelBlockSize          Unsigned32,
+      vpwsConfigIncludeCSV              TruthValue,
+      vpwsConfigIgnoreMtuMismatch       TruthValue,
+      vpwsConfigIgnoreEncapsMismatch    TruthValue
+    }
+
+  vpwsIndex OBJECT-TYPE
+    SYNTAX      NumericIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Index identifying the VPWS instance."
+    ::= { vpwsConfigEntry 2 }
+
+  vpwsConfigRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this VPWS Configuration Table entry,
+                 used to create and destroy table entries."
+    ::= { vpwsConfigEntry 3 }
+
+  vpwsConfigAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this VPWS instance, used to
+                 activate and deactivate the VPWS instance."
+    DEFVAL      { adminStatusUp }
+    ::= { vpwsConfigEntry 4 }
+
+  vpwsConfigOperStatus OBJECT-TYPE
+    SYNTAX      NpgOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational state of this VPWS instance.
+
+                 If the operational status is 'up' then the VPWS is
+                 programmed in the data plane."
+    ::= { vpwsConfigEntry 5 }
+
+  vpwsConfigName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "A textual name of the VPWS instance.  If there is no local
+                 name, or this field is otherwise not applicable, then this
+                 field MUST contain a zero-length octet string."
+    ::= { vpwsConfigEntry 6 }
+
+  vpwsConfigDescr OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "A textual string containing information about the VPWS
+                 instance.  If there is no information for this VPWS
+                 instance, then this field MUST contain a zero-length octet
+                 string."
+    ::= { vpwsConfigEntry 7 }
+
+  vpwsConfigADType OBJECT-TYPE
+    SYNTAX      L2vpnADType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The auto-discovery protocol used by this VPWS.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { none }
+    ::= { vpwsConfigEntry 8 }
+
+  vpwsConfigSigType OBJECT-TYPE
+    SYNTAX      L2vpnSigType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The pseudowire signaling protocol used for auto-created
+                 PWs on this VPWS.
+
+                 If vpwsConfigADType is set to 'none' this field is
+                 ignored.
+
+                 If vpwsConfigADType is set to 'bgp' this field must be set
+                 to 'ldp' or 'bgp'.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { none }
+    ::= { vpwsConfigEntry 9 }
+
+  vpwsConfigPwEncapType OBJECT-TYPE
+    SYNTAX      IANAPwTypeTC
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The MPLS pseudowire encapsulation type used by this VPWS.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { ethernet }
+    ::= { vpwsConfigEntry 10 }
+
+  vpwsConfigMtu OBJECT-TYPE
+    SYNTAX      Unsigned32 (64..9192)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The layer 2 MTU of this VPWS.
+
+                 When using auto-discovery and signaling, this specifies
+                 the signaled layer 2 MTU.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { 1500 }
+    ::= { vpwsConfigEntry 11 }
+
+  vpwsConfigControlWord OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Whether or not the pseudowires use a PW control word.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { false }
+    ::= { vpwsConfigEntry 12 }
+
+  vpwsConfigSeqDelivery OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Whether or not the pseudowires must provide sequenced
+                 delivery of traffic.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { false }
+    ::= { vpwsConfigEntry 13 }
+
+  vpwsConfigRouteDistinguisher OBJECT-TYPE
+    SYNTAX      BgpRouteDistinguisher
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The route distinguisher for this VPWS.  See [RFC4364] for
+                 a complete definition of a route distinguisher.
+
+                 This is only used if BGP auto-discovery is enabled
+                 (vpwsConfigADType = bgp).
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { '0000000000000000'H }
+    ::= { vpwsConfigEntry 14 }
+
+  vpwsConfigVpnId OBJECT-TYPE
+    SYNTAX      BgpExtendedCommunity
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The VPN ID to advertise as a BGP extended community, or
+                 zero if none.
+
+                 If the VPWS uses BGP auto-discovery and LDP signaling
+                 (vpwsConfigADType = bgp and vpwsConfigSigType = ldp) then
+                 this must be set to a valid VPN ID, otherwise it is unused
+                 and can be set to zero.
+
+                 If the VPWS uses BGP auto-discovery and LDP signaling then
+                 the VPN ID is used as follows.
+                 -  The VPWS advertises the VPN ID as a BGP extended
+                    community attribute on all BGP L2VPN routes that it
+                    exports.
+                 -  The VPWS uses the VPN ID as an import filter on all
+                    BGP L2VPN routes that it imports (in addition to
+                    Route Target import filtering).
+                 -  The VPWS uses the VPN ID as the AGI value in LDP
+                    messages.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { '0000000000000000'H }
+    ::= { vpwsConfigEntry 15 }
+
+  vpwsConfigLocalSiteID OBJECT-TYPE
+    SYNTAX      L2vpnVeIdOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The local VPWS site ID, or zero if not specified.
+
+                 This is only used if BGP auto-discovery is enabled
+                 (vpwsConfigADType = bgp).  It can be used with BGP or LDP
+                 signaling.
+
+                 If auto-discovery is enabled then the VPWS service
+                 establishes a pseudowire (PW) between each pair of VPWS
+                 sites within a VPWS.
+
+                 The valid range for VPWS site IDs depends on whether
+                 LDP or BGP signaling is used.
+                 -  For LDP signaling (vpwsConfigSigType = ldp) the valid
+                 range is 1-4294967295 (4 bytes).
+                 -  For BGP signaling (vpwsConfigSigType = bgp) the valid
+                 range is 1-65535 (2 bytes).
+
+                 The use of the VPWS site ID in auto-discovery and
+                 signaling also depends on whether LDP or BGP signaling
+                 is used.
+                 -  For BGP auto-discovery with LDP signaling the VPWS site
+                 ID is advertised in the 4-byte 'PE_addr' field in the
+                 BGP NLRI specified in [RFC 6074].  It is also used as
+                 the local SAII/TAII value in LDP messages.
+                 -  For BGP auto-discovery with BGP signaling the VPWS site
+                 ID is advertised in the 2-byte 'VE ID' field in the
+                 BGP NLRI specified in [RFC 4761].
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { 0 }
+    ::= { vpwsConfigEntry 16 }
+
+  vpwsConfigLocalPreference OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The preference that the local PE router is the designated
+                 forwarder for this VPWS.  High values are preferred to low
+                 values.
+
+                 This is only used if BGP auto-discovery is enabled
+                 (vpwsConfigADType = bgp).  It can be used with BGP or LDP
+                 signaling.
+
+                 The local PE router sets the LOCAL_PREF attribute to the
+                 value configured in this field in the BGP routes that it
+                 sends for this VPWS.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { 100 }
+    ::= { vpwsConfigEntry 17 }
+
+  vpwsConfigLabelBlockSize OBJECT-TYPE
+    SYNTAX      Unsigned32 (2 | 4 | 8 | 16)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of the label blocks for this VPWS.
+
+                 This is only used when using BGP auto-discovery with BGP
+                 signaling (vpwsConfigADType = bgp and
+                 vpwsConfigSigType = bgp).
+
+                 The only currently-permitted sizes are 2, 4, 8 and 16.
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { 8 }
+    ::= { vpwsConfigEntry 18 }
+
+  vpwsConfigIncludeCSV OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Whether or not the BGP NLRI for this VPWS will include a
+                 Circuit Status Vector TLV.
+
+                 This is only used when using BGP auto-discovery with BGP
+                 signaling (vpwsConfigADType = bgp and
+                 vpwsConfigSigType = bgp).
+
+                 Changing this value will cause an interruption to data
+                 flow for this VPWS."
+    DEFVAL      { false }
+    ::= { vpwsConfigEntry 19 }
+
+    vpwsConfigIgnoreMtuMismatch OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION "This field specifies whether mismatches of MTU size with
+                   remote PE routers should be ignored for this VPWS.
+
+                   If this field is false, PWs will not be established to
+                   remote PE routers that signal a different MTU.  Otherwise
+                   PWs will be established.
+
+                   Changing this value will cause an interruption to data
+                   flow for this VPWS."
+      DEFVAL      { false }
+      ::= { vpwsConfigEntry 20 }
+
+    vpwsConfigIgnoreEncapsMismatch OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION "This field specifies whether mismatches of encapsulation
+                   type with remote PE routers should be ignored for this
+                   VPWS.
+
+                   If this field is false, PWs will not be established to
+                   remote PE routers that signal a different encapsulation
+                   type.  Otherwise PWs will be established.
+
+                   Changing this value will cause an interruption to data
+                   flow for this VPWS."
+      DEFVAL      { false }
+      ::= { vpwsConfigEntry 21 }
+
+-- End of VPWS Config Table.
+
+-------------------------------------------------------------------------------
+--
+-- VPWS Status Table (READ-ONLY).
+--
+
+  vpwsStatusTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF VpwsStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "VPWS Status Table (read-only).
+
+                 This table reports the status of Virtual Private Wire
+                 Services (VPWS)."
+    ::= { vpwsObjects 2 }
+
+  vpwsStatusEntry OBJECT-TYPE
+    SYNTAX      VpwsStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a VPWS."
+    INDEX       { l2vmEntityIndex, vpwsIndex }
+    ::= { vpwsStatusTable 1 }
+
+  VpwsStatusEntry ::=
+    SEQUENCE {
+      vpwsStatusOperStatus              NpgOperStatus,
+      vpwsStatusVcCount                 Gauge32,
+      vpwsStatusDesignatedForwarder     TruthValue
+    }
+
+  vpwsStatusOperStatus OBJECT-TYPE
+    SYNTAX      NpgOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational state of this VPWS instance.
+
+                 If the operational status is 'up' then the VPWS has
+                 been successfully activated."
+    ::= { vpwsStatusEntry 3 }
+
+  vpwsStatusVcCount OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of Virtual Circuits currently present in this VPWS
+                 instance.
+
+                 Specifically, this is number of local Attachment Circuits
+                 (ACs) bound to active pseudowires in this VPWS instance."
+    ::= { vpwsStatusEntry 4 }
+
+  vpwsStatusDesignatedForwarder OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether or not the PE router is currently the elected
+                 Designated Forwarder for this VPWS instance.
+
+                 This field is only used if BGP auto-discovery is enabled
+                 (vpwsConfigADType = bgp).  Otherwise, it is set to false."
+    ::= { vpwsStatusEntry 5 }
+
+-- End of VPWS Status Table.
+
+-------------------------------------------------------------------------------
+--
+-- VPWS Binding Config Table.
+--
+
+  vpwsBindCfgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF VpwsBindCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "VPWS Binding Config Table.
+
+                 This table configures bindings of Attachment Circuits (ACs)
+                 to VPWS instances, pseudowires (PWs), and layer 2 local
+                 switching rules (hairpins).
+
+                 Multiple ACs can be associated with a single VPWS.
+
+                 If the binding corresponds to two VPWS sites that are hosted
+                 by a single PE router, a hairpin can be created between the
+                 two sites' ACs.  Otherwise, a PW set is used to establish
+                 connectivity.
+
+                 The method for associating ACs with PWs depends on whether
+                 auto-discovery is enabled.
+
+                 -  If auto-discovery is disabled (vpwsConfigADType = none)
+                    then PWs are provisioned in the pwTable.  In this case,
+                    each AC is bound to a set of provisioned PWs, that are
+                    identified by a PW Set Index.  PW redundancy
+                    configuration is not yet supported by L2VM provisioned
+                    PWs, therefore the PW Set will have a single member, and
+                    this set index can be set to the pwIndex in the pwTable
+                    of that PW.  This form of binding is known as a
+                    double-sided binding since the PW(s) must be provisioned
+                    in the pwTable at each end of the virtual circuit.
+
+                 -  If auto-discovery is enabled (vpwsConfigADType = bgp)
+                    then the VPWS service establishes a PW between each pair
+                    of VPWS sites within the VPWS, using BGP auto-discovery
+                    to determine which PE router hosts each VPWS site.  In
+                    this case, each AC is bound to a PW that is identified by
+                    the local and remote site IDs.  The PE router creates
+                    these PWs automatically as a result of the BGP
+                    auto-discovery process.  This form of configuration is
+                    sometimes known as 'colored pools'.  In this approach the
+                    operator configures a pool of ACs for each local site,
+                    and each pool is identified by a site ID or 'color'.  The
+                    VPWS service establishes a PW between each pair of
+                    'colored pools' (VPWS sites), and each AC is bound to a
+                    PW associated with the same 'colored pool' (local site
+                    ID).
+
+                 -  If auto-discovery is enabled (vpwsConfigADType = bgp)
+                    then an AC can still be bound to a PW that is provisioned
+                    in the pwTable MIB, for example to incorporate a legacy
+                    PE router that does not support auto-discovery into the
+                    VPWS.
+
+                 The method for associating ACs with other ACs in a hairpin
+                 also depends on whether auto-discovery is enabled.
+
+                 -  If auto-discovery is disabled, the AC is bound to another
+                    AC directly, by configuring its interface index in this
+                    table.  In this case the PW set index can also optionally
+                    be specified to provide redundant connectivity to the
+                    other site.
+
+                 -  If auto-discovery is enabled, the BGP auto-discovery
+                    process ascertains that this PE router also hosts the
+                    remote site, and automatically binds the two ACs.
+
+                 In either case a row in this table only establishes
+                 unidirectional connectivity for a hairpin.  For full
+                 connectivity, the opposite direction will need to be
+                 configured in the same manner (though this need not be in
+                 the same VPWS instance).
+
+                 Each VPWS Binding is configured with a PW binding type,
+                 given by vpwsBindCfgPwBindType, which specifies whether the
+                 PW Set to which the AC is bound is identified by a PW Set
+                 index and/or hairpin interface index (and so is provisioned)
+                 or by a local and remote site ID (and so is auto-created as
+                 a result of BGP auto-discovery).
+
+                 This table is indexed on AC interface index to ensure that
+                 each AC is only ever bound to a single VPWS.  The read-only
+                 vpwsBindTable can be used to show the ACs bound to each
+                 VPWS.
+
+                 Note that changes to this table may cause the corresponding
+                 AC to go operationally down as it may involve re-programming
+                 the AC in the data plane."
+    ::= { vpwsObjects 3 }
+
+  vpwsBindCfgEntry OBJECT-TYPE
+    SYNTAX      VpwsBindCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a configured VPWS binding."
+    INDEX       { l2vmEntityIndex, ifIndex }
+    ::= { vpwsBindCfgTable 1 }
+
+  VpwsBindCfgEntry ::=
+    SEQUENCE {
+      vpwsBindCfgRowStatus              RowStatus,
+      vpwsBindCfgAdminStatus            AdminStatus,
+      vpwsBindCfgOperStatus             NpgOperStatus,
+      vpwsBindCfgVpwsIndex              NumericIndexOrZero,
+      vpwsBindCfgPwBindType             L2vpnPwBindType,
+      vpwsBindCfgPwSetIndex             Unsigned32,
+      vpwsBindCfgRemoteSiteID           L2vpnVeIdOrZero,
+      vpwsBindCfgLclSwitchIfIndex       InterfaceIndexOrZero
+    }
+
+  vpwsBindCfgRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this VPWS Binding Configuration Table
+                 entry, used to create and destroy table entries."
+   ::= { vpwsBindCfgEntry 3 }
+
+  vpwsBindCfgAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this VPWS binding, used to
+                 activate and deactivate the VPWS binding."
+    DEFVAL      { adminStatusUp }
+    ::= { vpwsBindCfgEntry 4 }
+
+  vpwsBindCfgOperStatus OBJECT-TYPE
+    SYNTAX      NpgOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this VPWS binding.
+
+                 If the operational status is 'up' then the cross-connect
+                 for this binding is programmed in the data plane."
+    ::= { vpwsBindCfgEntry 5 }
+
+  vpwsBindCfgVpwsIndex OBJECT-TYPE
+    SYNTAX      NumericIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Index identifying the VPWS instance.
+
+                 This field must be set to a non-zero value before the VPWS
+                 binding can go into operational status 'up'.
+
+                 Changing this value will cause an interruption to data
+                 flow from this AC onto the VPWS."
+    DEFVAL      { 0 }
+    ::= { vpwsBindCfgEntry 6 }
+
+  vpwsBindCfgPwBindType OBJECT-TYPE
+    SYNTAX      L2vpnPwBindType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The VPWS pseudowire (PW) binding type.  This field specifies
+                 the identifiers used for the PW to which the AC is bound.
+
+                 If the PW is provisioned in the pwTable, then it is identified
+                 by an index into the pwTable MIB.  In this case, this field
+                 must be set to pwMibIndex, and the pwTable MIB index must be
+                 set in vpwsBindCfgPwSetIndex.
+
+                 If the PW is created as a result of BGP auto-discovery, then
+                 it is identified by a local and remote VE ID.  For a VPWS, the
+                 VE ID is equal to the VPWS Site ID.  In this case, this field
+                 must be set to lclRmtVeId, and the remote VPWS Site ID for the
+                 PW must be set in vpwsBindCfgRemoteSiteID.  The local VPWS
+                 Site ID is the value set in vpwsConfigLocalSiteID.
+
+                 It is not valid to set this field to lclRmtVeId unless
+                 auto-discovery is enabled (vpwsConfigADType = bgp).  If this
+                 field is set to lclRmtVeId for any other value of
+                 vpwsConfigADType, then vpwsBindCfgOperStatus is set to
+                 operStatusFailedPerm.
+
+                 Changing this value will cause an interruption to data
+                 flow from this AC onto the VPWS."
+    DEFVAL      { pwMibIndex }
+    ::= { vpwsBindCfgEntry 7 }
+
+  vpwsBindCfgPwSetIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1073741823)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Index for the set of PWs to which the AC should be bound.
+                 The AC is bound to every PW in the pwTable with
+                 pwRedundancySetId set to this value.
+
+                 This is only used if the PW is provisioned in the pwTable
+                 MIB, that is if vpwsBindCfgPwBindType = pwMibIndex.
+
+                 Changing this value will cause an interruption to data
+                 flow from this AC onto the VPWS."
+    DEFVAL      { 0 }
+    ::= { vpwsBindCfgEntry 8 }
+
+  vpwsBindCfgRemoteSiteID OBJECT-TYPE
+    SYNTAX      L2vpnVeIdOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The remote VPWS site ID of the PW to bind the AC to, or zero
+                 if not specified.
+
+                 This is only used if the pseudowire (PW) is created as a
+                 result of BGP auto-discovery, that is if vpwsBindCfgPwBindType
+                 = lclRmtVeId.
+
+                 If vpwsBindCfgPwBindType = lclRmtVeId then the AC is bound to
+                 a PW that connects the local VPWS site (vpwsConfigLocalSiteID)
+                 to the remote VPWS site, using auto-discovery to determine
+                 the remote PE router that hosts the remote VPWS site.
+
+                 This remote VPWS site ID should match the local VPWS site ID
+                 configured on the remote PE router.
+
+                 The valid range for VPWS site IDs depends on whether
+                 LDP or BGP signaling is used.
+                 -  For LDP signaling (vpwsConfigSigType = ldp) the valid
+                    range is 1-4294967295 (4 bytes).
+                 -  For BGP signaling (vpwsConfigSigType = bgp) the valid
+                    range is 1-65535 (2 bytes).
+
+                 Changing this value will cause an interruption to data
+                 flow from this AC onto the VPWS."
+    DEFVAL      { 0 }
+    ::= { vpwsBindCfgEntry 9 }
+
+  vpwsBindCfgLclSwitchIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Interface index that the AC should be bound to directly,
+                 via a layer 2 local switching rule (hairpin).  Only
+                 relevant if the local PE hosts both VPWS sites concerned
+                 in this binding; otherwise, should be set to zero.
+
+                 This is only used if the PW is provisioned in the pwTable
+                 MIB, that is if vpwsBindCfgPwBindType = pwMibIndex."
+    DEFVAL      { 0 }
+    ::= { vpwsBindCfgEntry 10 }
+
+-- End VPWS Binding Config Table
+
+-------------------------------------------------------------------------------
+--
+-- VPWS Binding Table (READ-ONLY).
+--
+
+  vpwsBindTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF VpwsBindEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "VPWS Binding Table (read-only).
+
+                 This table displays the Attachment Circuit (AC) bindings
+                 in a VPWS.
+
+                 Bindings are configured in the vpwsBindCfgTable.
+
+                 This table is read-only."
+    ::= { vpwsObjects 4 }
+
+  vpwsBindEntry OBJECT-TYPE
+    SYNTAX      VpwsBindEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a VPWS binding."
+    INDEX       { l2vmEntityIndex, vpwsIndex, ifIndex }
+    ::= { vpwsBindTable 1 }
+
+  VpwsBindEntry ::=
+    SEQUENCE {
+      vpwsBindOperStatus                NpgOperStatus,
+      vpwsBindPwBindType                L2vpnPwBindType,
+      vpwsBindPwSetIndex                NumericIndex,
+      vpwsBindPwIfIndex                 InterfaceIndex,
+      vpwsBindLocalSiteID               L2vpnVeIdOrZero,
+      vpwsBindRemoteSiteID              L2vpnVeIdOrZero,
+      vpwsBindLclSwitchIfIndex          InterfaceIndex,
+      vpwsBindRemoteRD                  BgpRouteDistinguisher,
+      vpwsBindRemoteAddrType            InetAddressType,
+      vpwsBindRemoteAddr                InetAddress
+    }
+
+  vpwsBindOperStatus OBJECT-TYPE
+    SYNTAX      NpgOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this VPWS binding.
+
+                 If the operational status is 'up' then the cross-connect
+                 for this binding is programmed in the data plane."
+    ::= { vpwsBindEntry 4 }
+
+  vpwsBindPwBindType OBJECT-TYPE
+    SYNTAX      L2vpnPwBindType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If the AC is bound to a pseudowire (PW) that is provisioned in
+                 the pwTable, then this field is set to pwMibIndex.
+
+                 If the AC is bound to a pseudowire that has been created as a
+                 result of BGP auto-discovery, then this field is set to
+                 lclRmtVeId.  In this case, the PW is identified by the local
+                 and remote VPWS Site IDs.  The local VPWS Site ID is stored in
+                 vpwsBindLocalSiteID, and the remote VPWS Site ID is stored in
+                 vpwsBindRemoteSiteID."
+    ::= { vpwsBindEntry 5 }
+
+  vpwsBindPwSetIndex OBJECT-TYPE
+    SYNTAX      NumericIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The PW set index of the PWs bound to this AC.  The AC is
+                 bound to the (redundant) set of PWs corresponding to rows
+                 in the pwTable with pwRedundancySetId set to this value.
+
+                 If the vpwsBindPwBindType is pwMibIndex, then this value
+                 will match the configured vpwsBindCfgPwSetIndex.
+                 Otherwise the PW set index is determined when the
+                 pseudowire is created following auto-discovery of the
+                 remote site."
+    ::= { vpwsBindEntry 6 }
+
+  vpwsBindPwIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The interface index that has been assigned for the set of
+                 pseudowires to which this AC is bound."
+    ::= { vpwsBindEntry 7 }
+
+  vpwsBindLocalSiteID OBJECT-TYPE
+    SYNTAX      L2vpnVeIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local VPWS site ID to which this AC is bound, or zero
+                 if not applicable.
+
+                 This is only relevant if vpwsBindPwBindType = lclRmtVeId.
+
+                 If vpwsBindPwBindType = lclRmtVeId then the AC is bound to a
+                 pseudowire that connects the local VPWS site to the
+                 remote VPWS site, using auto-discovery to determine the
+                 remote PE router that hosts the remote VPWS site."
+    ::= { vpwsBindEntry 8 }
+
+  vpwsBindRemoteSiteID OBJECT-TYPE
+    SYNTAX      L2vpnVeIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote VPWS site ID to which this AC is bound, or zero
+                 if not applicable.
+
+                 This is only relevant if vpwsBindPwBindType = lclRmtVeId.
+
+                 If vpwsBindPwBindType = lclRmtVeId then the AC is bound to a
+                 pseudowire that connects the local VPWS site to the
+                 remote VPWS site, using auto-discovery to determine the
+                 remote PE router that hosts the remote VPWS site."
+    ::= { vpwsBindEntry 9 }
+
+  vpwsBindLclSwitchIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The interface index of the AC bound to this AC directly in
+                 a layer 2 local switching rule (hairpin).
+
+                 If the vpwsBindPwBindType is pwMibIndex, then this value
+                 will match the configured vpwsBindCfgLclSwitchIfIndex.
+
+                 Otherwise, the hairpin interface index is determined when
+                 the auto-discovery process learns that the remote site
+                 is hosted at the local PE router.  This field is zero if
+                 the remote site is not hosted at the local PE router."
+    ::= { vpwsBindEntry 10 }
+
+  vpwsBindRemoteRD OBJECT-TYPE
+    SYNTAX      BgpRouteDistinguisher
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote route distinguisher, or null if not known.
+
+                 This is the route distinguisher of the best BGP route
+                 advertising the remote VPWS site ID.
+
+                 This is only relevant if vpwsBindPwBindType = lclRmtVeId."
+    ::= { vpwsBindEntry 11 }
+
+  vpwsBindRemoteAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address family of the remote address.
+
+                 This is only relevant if vpwsBindPwBindType = lclRmtVeId."
+    ::= { vpwsBindEntry 12 }
+
+  vpwsBindRemoteAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote address, or null if not known.
+
+                 This is the address of the router advertising the best
+                 BGP route to the remote VPWS site ID.
+
+                 This is only relevant if vpwsBindPwBindType = lclRmtVeId."
+    ::= { vpwsBindEntry 13 }
+
+-- End of VPWS Binding Table.
+
+-------------------------------------------------------------------------------
+--
+-- Conformance statement
+--
+
+  vpwsCompliances
+    OBJECT IDENTIFIER ::= { vpwsConformance 1 }
+
+  vpwsGroups
+    OBJECT IDENTIFIER ::= { vpwsConformance 2 }
+
+--
+-- Module compliance is divided into two categories.
+--   -  Full compliance.
+--   -  Support for double-sided bindings only.
+--   -  Support for auto-discovered bindings only.
+--
+
+  vpwsFullCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for double-sided
+                 bindings and auto-created bindings using BGP
+                 auto-discovery."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         vpwsBaseGroup,
+                         vpwsDoubleSidedGroup,
+                         vpwsBgpADGroup
+                       }
+    ::= { vpwsCompliances 1 }
+
+  vpwsDoubleSidedCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for double-sided
+                 bindings only."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         vpwsBaseGroup,
+                         vpwsDoubleSidedGroup
+                       }
+    ::= { vpwsCompliances 2 }
+
+  vpwsBgpADCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for BPG auto-discovery
+                 only."
+
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         vpwsBaseGroup,
+                         vpwsBgpADGroup
+                       }
+    ::= { vpwsCompliances 3 }
+
+  vpwsBaseGroup OBJECT-GROUP
+    OBJECTS {
+      vpwsConfigRowStatus,
+      vpwsConfigAdminStatus,
+      vpwsConfigOperStatus,
+      vpwsConfigName,
+      vpwsConfigDescr,
+      vpwsConfigADType,
+      vpwsConfigSigType,
+      vpwsConfigPwEncapType,
+      vpwsConfigMtu,
+      vpwsConfigControlWord,
+      vpwsConfigSeqDelivery,
+      vpwsStatusOperStatus,
+      vpwsStatusVcCount,
+      vpwsStatusDesignatedForwarder,
+      vpwsBindCfgRowStatus,
+      vpwsBindCfgAdminStatus,
+      vpwsBindCfgOperStatus,
+      vpwsBindCfgVpwsIndex,
+      vpwsBindCfgPwBindType,
+      vpwsBindCfgPwSetIndex,
+      vpwsBindOperStatus,
+      vpwsBindPwBindType,
+      vpwsBindPwSetIndex,
+      vpwsBindPwIfIndex,
+      vpwsBindLclSwitchIfIndex,
+      vpwsBindRemoteRD,
+      vpwsBindRemoteAddrType,
+      vpwsBindRemoteAddr
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects relating to common VPWS configuration."
+    ::= { vpwsGroups 1 }
+
+  vpwsDoubleSidedGroup OBJECT-GROUP
+    OBJECTS {
+      vpwsBindCfgPwSetIndex,
+      vpwsBindCfgLclSwitchIfIndex
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects specifically relating to configuration of a VPWS with
+         double-sided bindings."
+    ::= { vpwsGroups 2 }
+
+  vpwsBgpADGroup OBJECT-GROUP
+    OBJECTS {
+      vpwsConfigRouteDistinguisher,
+      vpwsConfigVpnId,
+      vpwsConfigLocalSiteID,
+      vpwsConfigLocalPreference,
+      vpwsConfigLabelBlockSize,
+      vpwsConfigIncludeCSV,
+      vpwsConfigIgnoreMtuMismatch,
+      vpwsConfigIgnoreEncapsMismatch,
+      vpwsBindCfgRemoteSiteID,
+      vpwsBindLocalSiteID,
+      vpwsBindRemoteSiteID
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects specifically relating to configuration of a VPWS with BGP
+         auto-discovery."
+    ::= { vpwsGroups 3 }
+
+-------------------------------------------------------------------------------
+
+END

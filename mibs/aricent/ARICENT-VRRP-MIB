@@ -1,0 +1,438 @@
+-- Copyright (C) 2006-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsvrrp.mib,v 1.9 2014/03/08 13:36:21 siva Exp $
+
+--    VRRP Proprietary MIB Definition
+      
+--    This document explains the proprietary MIB implemented
+--    for VRRP product.
+      
+--    This proprietary MIB definition, supplements Rfc 2787 
+--    and also provides management of certain proprietary features of
+--    VRRP. 
+      
+--    The proprietary MIB definitions follows:
+
+
+ARICENT-VRRP-MIB DEFINITIONS ::= BEGIN
+    
+      IMPORTS
+         MODULE-IDENTITY, OBJECT-TYPE, 
+         enterprises, Integer32, Unsigned32 FROM SNMPv2-SMI
+
+         RowStatus FROM SNMPv2-TC
+
+         InterfaceIndexOrZero FROM IF-MIB
+
+         vrrpOperEntry FROM VRRP-MIB;
+    
+      fsvrrp MODULE-IDENTITY
+            LAST-UPDATED "201311180000Z" -- 18 November 2013
+            ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+            CONTACT-INFO "support@aricent.com"
+            DESCRIPTION
+               "This MIB module contains managed object definitions
+                for extensions to VRRP version 2 standard characteristics. "
+            
+            -- Revision History
+
+            REVISION "201311180000Z" -- 18 November 2013
+            DESCRIPTION
+               "Objects added for Link Tracking Feature and TxAdvertisements. "
+
+            REVISION "201109120000Z" -- 12 September 2011
+            DESCRIPTION
+               "Object added to support VRRP Advertisement in milli-seconds. "
+
+            REVISION "201108300000Z" -- 30 August 2011
+            DESCRIPTION
+               "Trace Option Object added for debug level support. "
+
+            REVISION "201103110000Z" -- 17 March 2011
+            DESCRIPTION
+               "Auth Deprecate Object added for RFC 3768 Upgrade. "
+
+            REVISION "200608030000Z" -- 3 Aug 2006
+            DESCRIPTION
+               "Admin Priority object added for proper display and restoration
+                of vrrp configured priority. "
+
+     	    REVISION "200604060000Z" -- 6 June 2006
+            DESCRIPTION
+               "Initial version of proprietary MIB module for VRRP. "
+
+         ::=  { enterprises futuresoftware (2076) 153 }
+   
+-- ------------------------------------------------------------ 
+-- groups in the MIB 
+-- ------------------------------------------------------------
+
+  fsVrrpSystem                OBJECT IDENTIFIER ::= { fsvrrp 1 }
+
+  fsVrrpStatus OBJECT-TYPE
+    SYNTAX INTEGER {
+              enabled          (1),
+              disabled         (2)
+           }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "Indicates whether the VRRP is enabled Globally."
+    ::=  { fsVrrpSystem 1 }
+
+  fsVrrpMaxOperEntries OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Gives the Maximum Number of Oper Table Entries."
+    ::=  { fsVrrpSystem 2 }
+
+-- *******************************************************************
+--  VRRP Operations Table extension starts
+-- *******************************************************************
+
+ fsVrrpOperTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF FsVrrpOperEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+         "Operations table for a VRRP router which consists of a
+          sequence of 'fsVrrpOperEntry' items. This table is a 
+          proprietary extension to the standard vrrpOperTable"
+     ::= { fsVrrpSystem 3 }
+
+ fsVrrpOperEntry OBJECT-TYPE
+     SYNTAX       FsVrrpOperEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+         "An entry in the fsVrrpOperTable contains the additional 
+          operational characteristics of a virtual router apart 
+          from vrrpOperTable."
+
+     AUGMENTS    { vrrpOperEntry }
+     ::= { fsVrrpOperTable 1 }
+
+ FsVrrpOperEntry ::=
+     SEQUENCE {
+         fsVrrpAdminPriority
+             Integer32,
+         fsVrrpOperAdvertisementIntervalInMsec
+             Integer32,
+         fsVrrpOperTrackGroupId
+             Unsigned32,
+         fsVrrpOperDecrementPriority
+             Unsigned32
+ }
+
+ fsVrrpAdminPriority OBJECT-TYPE
+     SYNTAX       Integer32 (0..254)
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+         "This object is same as that of vrrpOperPriority specified 
+          in VRRP-MIB. The only difference is, if the router owns the
+          associated IP address(es) then vrrpOperPriority will have 
+          the value 255 and fsVrrpAdminPriority will have the value 
+          configured by the administrator. Write operation requires 
+          admin down for this instance and the change will be reflected 
+          in the value of vrrpOperPriority also."
+     DEFVAL       { 100 }
+     ::= { fsVrrpOperEntry 1 }
+
+ fsVrrpOperAdvertisementIntervalInMsec OBJECT-TYPE
+     SYNTAX       Integer32 (100..255000)
+     UNITS        "milli seconds"
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+         "The time interval, in milli  seconds, between sending
+         advertisement messages. Only the master router sends
+         VRRP advertisements."
+     DEFVAL       { 1000 }
+     ::= { fsVrrpOperEntry 2 }
+
+ fsVrrpOperTrackGroupId OBJECT-TYPE
+     SYNTAX       Unsigned32 
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+        "Indicates the group index of the tracking group table 
+         fsVrrpOperTrackGroupTable.
+        
+         When the interface which is tracked by fsVrrpOperTrackGroupTable goes
+         operationally down and if this virtual router entry is the master,
+         the virtual router sends VRRP Advertisement with its actual priority
+         value decremented by the value configured in
+         fsVrrpOperDecrementPriority to enable other router to become master.
+         
+         When the interface which is tracked comes operationally up again, the
+         VRRP Advertisement is sent again with original priority value.
+         
+         This object is applicable for both VRRP Master routers owning the 
+         IPv4 address or not owning the IPv4 address.
+         
+         This object is allowed to set even if vrrpOperRowStatus is active
+         and vrrpOperAdminState is up."
+     DEFVAL       { 0 }
+     ::= { fsVrrpOperEntry 3 }
+
+ fsVrrpOperDecrementPriority OBJECT-TYPE
+     SYNTAX       Unsigned32 (0..254)
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+        "Indicates the priority value carried by the VRRP Master router 
+         in VRRP Advertisements when whose interface being tracked by by 
+         fsVrrpOperTrackGroupTable goes operationally down.
+        
+         This object is applicable for both VRRP Master routers owning the
+         IPv4 address or not owning the IPv4 address.
+         
+         This object is allowed to set even if vrrpOperRowStatus is active
+         and vrrpOperAdminState is up."
+     DEFVAL       { 0 }
+     ::= { fsVrrpOperEntry 4 }
+
+-- *******************************************************************
+--  VRRP Operations Table extension ends
+-- *******************************************************************
+
+   fsVrrpAuthDeprecate OBJECT-TYPE
+    SYNTAX INTEGER {
+              enabled          (1),
+              disabled         (2)
+           }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "If this MIB object is set to 'enabled',then authentication can be set
+         to Type 0 alone. If it is set to  disabled, then authentication type
+         can be set to any one of the values type 0-2. When set to disabled, 
+         authentication feature is compatible with RFC 2338" 
+    DEFVAL 	{ 1 }
+    ::=  { fsVrrpSystem 4 }
+
+    fsVrrpTraceOption OBJECT-TYPE
+          SYNTAX      Integer32
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+             "This object is used to enable trace statements in
+              VRRP Module.
+              A four byte integer is used for enabling the trace level.
+              Each bit in the four byte integer represents a particular
+              trace level.
+              The mapping between the bit positions & the trace level is
+              as follows:
+
+                0x00000000 - No Traces
+                0x0000ffff - All Traces
+                0x00000001 - Packet Traces
+                0x00000002 - Event Traces
+                0x00000004 - Init Traces
+                0x00000008 - Timers Traces
+                0x00000010 - All Failures Traces
+                0x00000020 - Memory traces
+                0x00000040 - Buffer traces
+                0x00000080 - Version 2 traces
+                0x00000100 - Version 3 traces
+             
+              For example if the 0x00000001 and 0x00000002 are set, then the trace
+              statement related to Packet and Event related
+              messages will be printed."
+
+    DEFVAL { 0 }
+    ::= { fsVrrpSystem 5 }
+
+-- *******************************************************************
+--  VRRP Router Stats Table extension starts
+-- *******************************************************************
+
+-- *******************************************************************
+--  VRRP Oper Track Group Table - Starts
+-- *******************************************************************
+
+   fsVrrpOperTrackGroupTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVrrpOperTrackGroupEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "Oper Track Group table for a VRRP router which consists of a
+          sequence of 'fsVrrpOperTrackGroupEntry' items. 
+          
+          This table contains the list of characteristics tracked by this 
+          virtual router."
+
+      ::= { fsVrrpSystem 6 }
+
+   fsVrrpOperTrackGroupEntry OBJECT-TYPE
+      SYNTAX       FsVrrpOperTrackGroupEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "An entry in the fsVrrpOperTrackGroupTable contains the 
+          characteristics tracked by this virtual router. "
+
+      INDEX   { fsVrrpOperTrackGroupIndex }
+      ::= { fsVrrpOperTrackGroupTable 1 }
+
+   FsVrrpOperTrackGroupEntry ::=
+      SEQUENCE {
+         fsVrrpOperTrackGroupIndex
+             Unsigned32,
+         fsVrrpOperTrackedGroupTrackedLinks
+             Unsigned32,
+         fsVrrpOperTrackRowStatus
+             RowStatus
+   }
+
+   fsVrrpOperTrackGroupIndex OBJECT-TYPE
+      SYNTAX       Unsigned32
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "Indicates the index of this track group table. "
+      ::= { fsVrrpOperTrackGroupEntry 1 }
+
+   fsVrrpOperTrackedGroupTrackedLinks OBJECT-TYPE
+      SYNTAX       Unsigned32
+      MAX-ACCESS   read-create
+      STATUS       current
+      DESCRIPTION
+         "Indicates the number of links to be tracked. The value configured
+          here indicates the number of links in fsVrrpOperTrackGroupIfTable 
+          to go down to give notification to VRRP Operations table so that
+          master to backup transition is initiated. Default value is 0 meaning
+          only if all the links configured in fsVrrpOperTrackGroupIfTable goes
+          down, indication is given to VRRP Operations table to initiate
+          master to backup transition.
+
+          The value configured here should be less than or equal to 
+          the number of entries in fsVrrpOperTrackGroupIfTable or zero at all
+          the time. If value is anything else, appropriate error is thrown.
+          "
+      DEFVAL { 0 }
+      ::= { fsVrrpOperTrackGroupEntry 2 }
+          
+   fsVrrpOperTrackRowStatus OBJECT-TYPE
+      SYNTAX       RowStatus
+      MAX-ACCESS   read-create
+      STATUS       current
+      DESCRIPTION
+         "The RowStatus variable should be used in accordance to installation
+          and removal conventions for conceptual rows.
+
+          To create a row in this table, a manager sets this object to either
+          createAndGo(4) or createAndWait(5). Until instances of all
+          corresponding columns are appropriately configured and atleast one
+          entry in fsVrrpOperTrackGroupIfTable is created, the value of the
+          corresponding instance of the 'fsVrrpOperTrackRowStatus'
+          column will be read as notReady(3).
+
+          In particular, a newly created row cannot be made active(1) until 
+          (minimally) one or more entries are created in
+          fsVrrpOperTrackGroupIfTable is created, value of the object
+          fsVrrpOperTrackedGroupTrackedLinks is set to number of entries
+          created in fsVrrpOperTrackGroupIfTable or 0.
+
+          A typical order of operation to add a row is:
+           1. Create a row in fsVrrpOperTrackGroupTable with
+           createAndWait(5).
+           2. Create one or more entries in fsVrrpOperTrackGroupIfTable
+           3. Set fsVrrpOperTrackedGroupTrackedLinks as the number of entries
+              created in fsVrrpOperTrackGroupIfTable.
+           4. Set fsVrrpOperTrackRowStatus to active(1).
+
+          An Entry in this table can be deleted, only if there are no entries
+          in fsVrrpOperTrackGroupIfTable.
+
+          Before an entry is deleted in fsVrrpOperTrackGroupIfTable is
+          deleted, the value fsVrrpOperTrackedGroupTrackedLinks should be
+          adjusted. Otherwise, error will be thrown.
+
+          Value 'fsVrrpOperTrackGroupIndex' is used as a reference in
+          fsVrrpOperTable.
+
+          Acceptable configurable values for this object are createAndGo(4),
+          createAndWait(5), active(1) and destroy(6). "
+      ::= { fsVrrpOperTrackGroupEntry 3 }
+
+-- *******************************************************************
+--  VRRP Oper Track Group Table extension - Ends
+-- *******************************************************************
+
+-- *******************************************************************
+--  VRRP Oper Track Group If Table - Starts
+-- *******************************************************************
+
+   fsVrrpOperTrackGroupIfTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVrrpOperTrackGroupIfEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "Oper Track Group If table for a VRRP router which consists of a
+          sequence of 'fsVrrpOperTrackGroupIfEntry' items. 
+          
+          This table contains the interfaces to be tracked by this 
+          virtual router."
+
+      ::= { fsVrrpSystem 7 }
+
+   fsVrrpOperTrackGroupIfEntry OBJECT-TYPE
+      SYNTAX       FsVrrpOperTrackGroupIfEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "An entry in the fsVrrpOperTrackGroupIfTable contains the 
+          interfaces tracked by this virtual router. "
+
+      INDEX   { fsVrrpOperTrackGroupIndex, fsVrrpOperTrackGroupIfIndex }
+      ::= { fsVrrpOperTrackGroupIfTable 1 }
+
+   FsVrrpOperTrackGroupIfEntry ::=
+      SEQUENCE {
+         fsVrrpOperTrackGroupIfIndex
+             InterfaceIndexOrZero,
+         fsVrrpOperTrackGroupIfRowStatus
+             RowStatus
+   }
+
+   fsVrrpOperTrackGroupIfIndex OBJECT-TYPE
+      SYNTAX       InterfaceIndexOrZero
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "Indicates the ifIndex of the interface being tracked for link
+          operational status. "
+      ::= { fsVrrpOperTrackGroupIfEntry 1 }
+
+   fsVrrpOperTrackGroupIfRowStatus OBJECT-TYPE
+      SYNTAX       RowStatus
+      MAX-ACCESS   read-create
+      STATUS       current
+      DESCRIPTION
+         "The RowStatus variable should be used in accordance to installation
+          and removal conventions for conceptual rows.
+
+          To create a row in this table, a manager sets this object to either
+          createAndGo(4) and entry automatically transitions to active(1).
+
+          Before an entry is deleted in fsVrrpOperTrackGroupIfTable is
+          deleted, the value fsVrrpOperTrackedGroupTrackedLinks should be
+          adjusted. Otherwise, error will be thrown.
+
+          Value of fsVrrpOperTrackedGroupTrackedLinks should always be less than
+          or equal to  the number of entries created here or zero.
+          If value is anything else, appropriate error is thrown.
+
+          Acceptable configurable values for this object are createAndGo(4)
+          and destroy(6). "
+      ::= { fsVrrpOperTrackGroupIfEntry 2 }
+
+-- *******************************************************************
+--  VRRP Oper Track Group If Table extension - Ends
+-- *******************************************************************
+
+END

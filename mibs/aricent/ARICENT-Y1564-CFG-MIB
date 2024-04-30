@@ -1,0 +1,1485 @@
+-- Copyright (C) 2014 Aricent Group . All Rights Reserved
+
+-- $Id: fsy1564.mib,v 1.5 2016/01/29 13:08:15 siva Exp $
+
+-- ARICENT Y1564 proprietary MIB Definition
+
+ARICENT-Y1564-CFG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    enterprises,
+    Unsigned32,
+    Integer32         FROM SNMPv2-SMI
+    DisplayString,
+    TruthValue,
+    TimeStamp,
+    RowStatus          FROM SNMPv2-TC
+    MODULE-IDENTITY    FROM SNMPv2-SMI
+    IEEE8021PriorityCodePoint FROM IEEE8021-TC-MIB
+    VlanId             FROM Q-BRIDGE-MIB;
+
+    fsY1564 MODULE-IDENTITY
+    LAST-UPDATED "201406180000Z" 
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE" 
+    CONTACT-INFO 
+
+    "The Aricent Group, One Tower Center Boulevard, 
+    18th Floor, East Brunswick, NJ 08816, USA
+    E-mail:support@aricent.com"
+
+    DESCRIPTION 
+    "The enterprise ID 29601 is originally assigned to Aricent Communications Pvt. Limited.
+    Aricent Communications is a part of Aricent Group."
+
+    REVISION "201406180000Z"
+
+    DESCRIPTION 
+    "The proprietary MIB for Aricent Y1564 Configurations." 
+
+    ::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 88 }
+
+
+    -- *****************************************************************************
+    --              Groups in Y1564 MIB
+    -- *****************************************************************************
+    fsY1564Context              OBJECT IDENTIFIER ::= { fsY1564 1 }
+    fsY1564Sla                  OBJECT IDENTIFIER ::= { fsY1564 2 } 
+    fsY1564TrafProf             OBJECT IDENTIFIER ::= { fsY1564 3 }
+    fsY1564Sac                  OBJECT IDENTIFIER ::= { fsY1564 4 }
+    fsY1564ServiceConf          OBJECT IDENTIFIER ::= { fsY1564 5 }
+    fsY1564ConfigTest           OBJECT IDENTIFIER ::= { fsY1564 6 }
+    fsY1564PerformanceTest      OBJECT IDENTIFIER ::= { fsY1564 7 }
+    fsY1564PerfTestReport       OBJECT IDENTIFIER ::= { fsY1564 8 }
+    fsY1564Notification         OBJECT IDENTIFIER ::= { fsY1564 9 }
+
+
+    --- ***********************************************************************
+    --                      Context Table 
+    --- ***********************************************************************
+
+    fsY1564ContextTable OBJECT-TYPE
+      SYNTAX        SEQUENCE OF FsY1564ContextEntry
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+        "Table of Y1564 module parameters per Y1564 Virtual Context."
+      ::= { fsY1564Context 1 }
+
+    fsY1564ContextEntry OBJECT-TYPE
+      SYNTAX       FsY1564ContextEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+        "This entry contains virtual context specific Y1564 module parameters."
+        INDEX { fsY1564ContextId }
+      ::= { fsY1564ContextTable 1 }
+
+    FsY1564ContextEntry ::=
+      SEQUENCE {
+             fsY1564ContextId                      Unsigned32,
+             fsY1564ContextName                    DisplayString,
+             fsY1564ContextSystemControl           INTEGER,
+             fsY1564ContextModuleStatus            INTEGER,
+             fsY1564ContextTraceOption             Unsigned32,
+             fsY1564ContextTrapStatus   	   INTEGER,
+             fsY1564ContextNumOfConfTestRunning   Unsigned32,
+             fsY1564ContextNumOfPerfTestRunning    Unsigned32
+           }
+             
+    fsY1564ContextId OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+         "Identifies the virtual context in the system "
+       ::= { fsY1564ContextEntry 1 }
+
+    fsY1564ContextName OBJECT-TYPE
+       SYNTAX      DisplayString (SIZE (1..32))
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+         "This object gives the context-name for this virtual context."
+       ::= { fsY1564ContextEntry 2 }
+
+    fsY1564ContextSystemControl OBJECT-TYPE
+       SYNTAX      INTEGER { start(1), shutdown(2)}
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+         "The administrative system control status of Y1564 module.
+
+          The value 'start' (1) indicates that all resources required 
+          by Y1564 should be allocated and Y1564 should be supported 
+          in the virtual context.
+
+          The value 'shutdown(2)' indicates that Y1564 module should be 
+          shutdown in the virtual context and all allocated memory 
+          should be released.
+          
+          By default this object is set to 'shutdown (2)' for all
+          virtual contexts."
+ 
+      DEFVAL  { shutdown }
+      ::= { fsY1564ContextEntry 3 }
+   
+    fsY1564ContextModuleStatus OBJECT-TYPE
+      SYNTAX      INTEGER { enable(1), disable(2)}
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "The administrative module status of Y1564 module. 
+   
+         The value 'enable (1)' indicates that Y1564 should
+         be enabled in the virtual context 
+        
+         The value 'disable (2)' indicates that Y1564 should
+         be disabled in the virtual context.
+    
+         In the disabled state, all the running tests will be
+         stopped, though configuration can still be done.
+
+         By default this object is set to disable(2) for all 
+         virtual contexts."
+
+      DEFVAL  { disable }
+      ::= { fsY1564ContextEntry 4 }
+    
+    fsY1564ContextTraceOption OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..4294967295) 
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object is used to enable the trace statements in
+         Y1564 Module.
+
+         A FOUR BYTE integer is specified for enabling the level of tracing.
+         Each BIT in the four byte integer, represents a 
+         level of Trace.
+
+         The mapping between the bit positions & the level of trace is
+         as follows:
+         0 - Init and Shutdown Traces
+         1 - Management Traces
+         2 - Control Plane Traces
+         3 - Traces related to All Resources except Buffers
+         4 - Timer start, stop and expiry related Traces
+         5 - Critical Traces
+         6 - Y1731 interface related Traces
+         7 - Configuration/Performance test traces
+         8 - Session record traces
+
+         The remaining bits are unused. Combination of levels are
+         also allowed.
+
+         For example if the bits 0 and 1 are set, then the Trace
+         statements related to Init-Shutdown and Management
+         are generated.
+
+         The user has to enter the corresponding INTEGER VALUE for the
+         bits set. For example if bits 0 and 1 are to be set, the user 
+         has to enter the value 3.
+         By default, critical trace(bit 5) is set."
+
+      DEFVAL  { '00000020'H } 
+      ::= { fsY1564ContextEntry 5 }
+
+    fsY1564ContextTrapStatus OBJECT-TYPE
+      SYNTAX      INTEGER  { enable(1), disable (2)} 
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object is used to enable or disable the transmission of 
+         TRAP notification messages. 
+
+         By default this object is set to enable(1) for all virtual 
+         contexts."
+      DEFVAL { enable }
+      ::= { fsY1564ContextEntry 6 }
+
+    fsY1564ContextNumOfConfTestRunning OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the number of configuration tests are 
+         currently running in the virtual context."
+      ::= { fsY1564ContextEntry 7 }
+
+    fsY1564ContextNumOfPerfTestRunning OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the number of performance test are
+         currently running in the virtual context."
+      ::= { fsY1564ContextEntry 8 }
+
+    --- ***********************************************************************
+    --                      Service Level Agreement Table 
+    --- ***********************************************************************
+
+    fsY1564SlaTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564SlaEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This table contains Y1564 Service Level Agreement configurations.
+         SLA is an Agreement between service provider and subscribers"
+      ::= { fsY1564Sla 1 }
+
+    fsY1564SlaEntry OBJECT-TYPE
+      SYNTAX      FsY1564SlaEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This entry contains information about a particular Y1564 SLA 
+         Configuration."
+      INDEX   { fsY1564ContextId,
+                fsY1564SlaId }
+      ::= { fsY1564SlaTable 1 }
+
+    FsY1564SlaEntry ::=
+    SEQUENCE {
+        fsY1564SlaId           		    Unsigned32,
+        fsY1564SlaEvcIndex     		    VlanId,
+        fsY1564SlaMEG          		    Unsigned32,
+        fsY1564SlaME           		    Unsigned32,
+        fsY1564SlaMEP          		    Unsigned32,
+        fsY1564SlaSacId                     Unsigned32,
+        fsY1564SlaTrafProfileId             Unsigned32,
+        fsY1564SlaStepLoadRate 		    Integer32, 
+        fsY1564SlaConfTestDuration          Integer32,
+        fsY1564SlaTestStatus	            INTEGER,
+        fsY1564SlaServiceConfId             Unsigned32,
+        fsY1564SlaColorMode    		    INTEGER,
+        fsY1564SlaCoupFlag     		    TruthValue,
+        fsY1564SlaCIR          		    Unsigned32,
+        fsY1564SlaCBS          		    Unsigned32,
+        fsY1564SlaEIR          		    Unsigned32,
+        fsY1564SlaEBS          		    Unsigned32,
+        fsY1564SlaTrafPolicing 		    INTEGER, 
+        fsY1564SlaTestSelector	            Integer32,
+        fsY1564SlaCurrentTestMode           Integer32,
+        fsY1564SlaCurrentTestState          INTEGER,
+        fsY1564SlaRowStatus    		    RowStatus
+    }
+
+    fsY1564SlaId OBJECT-TYPE
+      SYNTAX      Unsigned32 ( 1..10 )
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Service Level Agreement Identifier 
+         (An Agreement between service provider and subscribers).
+         This is a free running index used to identify the SLA. "
+      ::= { fsY1564SlaEntry 1 }
+
+    fsY1564SlaEvcIndex OBJECT-TYPE
+      SYNTAX      VlanId
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the service provider VLAN (S-VLAN) 
+         on which service is created. The EVC is configured using MEF MIB. 
+         Internally this object refers to fsEvcIndex in MEF MIB."
+      ::= { fsY1564SlaEntry 2 }
+
+    fsY1564SlaMEG OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..4294967295)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Maintenance Entity Group (MEG) of the
+         fsY1564SlaEntry. Internally this object refers to MIB object 
+         dot1agCfmMdIndex of ECFM 802.1ag standard. The value Zero is
+         used for unmapping MEG from Sla."
+      ::= { fsY1564SlaEntry 3 }
+
+    fsY1564SlaME OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..4294967295)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies  the Maintenance Entity (ME) of the 
+         fsY1564SlaEntry.Internally this object refers to MIB object 
+         dot1agCfmMaIndex of ECFM 802.1ag standard. The value Zero is
+         used for unmapping ME from Sla"
+      ::= { fsY1564SlaEntry 4 }
+
+    fsY1564SlaMEP OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..8191)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Maintenance Association End Point (MEP) 
+         of the fsY1564SlaEntry. Internally this object refers to MIB object 
+         dot1agCfmMepIdentifier of ECFM 802.1ag standard. The value Zero is
+         used for unmapping MEP from Sla"
+      ::= { fsY1564SlaEntry 5 }
+
+    fsY1564SlaSacId OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Service Acceptance Criteria to which 
+         the SLA is currently mapped.Multiple SACs can be created and 
+         each can be associated to a given SLA.Each SAC refers to the 
+         minimum Information rate, frame loss ratio, frame transmit delay, 
+         frame delay variation and availability for the service under test.
+         The value Zero is used for unmapping Sac from Sla"
+      ::= { fsY1564SlaEntry 6 }
+
+    fsY1564SlaTrafProfileId OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..10)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Traffic Profile to which the SLA is currently 
+         mapped. Multiple packet profiles can be created and each can be associated 
+         to a given SLA. Each packet profile contains packet information such as 
+         Packet Size, Payload , and EMIX pattern. The value Zero is used for 
+         unmapping Traffic Profile from Sla"
+      ::= { fsY1564SlaEntry 7 }
+
+    fsY1564SlaStepLoadRate OBJECT-TYPE
+      SYNTAX      Integer32 ( 10..100 )
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the step load rate of the step load CIR 
+         (Committed Information Rate) configuration test. If no 
+         value is provided, 25% of CIR is sent first,followed by 
+         50% of CIR and so on; the complete CIR is generated  in 4
+         steps. For eg, If step load rate is configured as 10, CIR test will 
+         be done with traffic rate incremented as 10% for each and
+         every step."
+      DEFVAL  { 25 }
+      ::= { fsY1564SlaEntry 8 }
+
+    fsY1564SlaConfTestDuration OBJECT-TYPE
+      SYNTAX      Integer32 ( 10..60 ) 
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the duration of each individual test in
+         seconds. If Configuration test is started with CIR, EIR,
+         Traffic Policing and fsY1564SlaConfTestDurationis specified as
+         10 then all the three tests should be completed within 30 seconds."
+      DEFVAL  { 30 }
+      
+      ::= { fsY1564SlaEntry 9 }
+ 
+    fsY1564SlaTestStatus OBJECT-TYPE
+      SYNTAX      INTEGER { start(1), stop(2)}
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Service Configuration  
+         test initiation status.
+         An enumerated value set to 'start' initiates service
+         configuration test based on bits selected in
+         object fsY1564SlaTestSelector.
+         
+         If Bits 0 and 1 are set in object fsY1564SlaTestSelector and 
+         fsY1564SlaTestStatus is set as start then Service configuration 
+         test will be started.
+         
+         An enumerated value set to 'stop' stops service configuration
+         test.
+
+         In Y1564, either Service Configuration Test or Service Performance 
+         Test can be initiated for the same SLA but both cannot be allowed 
+         at the same time."
+      DEFVAL  { 2 }
+      ::= { fsY1564SlaEntry 10 }
+
+   fsY1564SlaServiceConfId OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..10)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Service Configuration to which the SLA is currently
+         mapped. Multiple services can be created and each can be associated
+         to a given SLA. Each service contains the service configuration information
+         such as CIR, CEB, EIR, EBS, ColorMode and CoupFlag. This configuration is 
+         allowed only when MEF module is not defined."
+      ::= { fsY1564SlaEntry 11 }
+ 
+    fsY1564SlaColorMode OBJECT-TYPE
+      SYNTAX      INTEGER { colorAware(1), colorBlind(2)}
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION 
+        "This object specifies whether the color-aware or color blind property is
+         employed by the bandwidth profile. The default value for this object is
+         ColorBlind."
+      DEFVAL  { 2 }
+      ::= { fsY1564SlaEntry 12 }
+
+    fsY1564SlaCoupFlag OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the modes of operation of the rate enforcement
+         algorithm. The choice of the value for CF has the effect of controlling the 
+         volume of the Service Frames that are declared Yellow. When CF is set to 0, 
+         the long term average bit rate of Service Frames that are declared Yellow 
+         is bounded by EIR. When CF is set to 1, the long term average bit rate of 
+         Service Frames that are declared Yellow is bounded by CIR + EIR depending 
+         on volume of the offered Service Frames that are declared Green "
+      ::= { fsY1564SlaEntry 13 }
+
+    fsY1564SlaCIR OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION  
+        "The committed information rate Must be >= 0. CIR must be less than or 
+         equal to  EIR,if EIR > 0."
+      ::= { fsY1564SlaEntry 14 }
+
+    fsY1564SlaCBS OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      UNITS       "Bytes"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The committed burst size Must be > 0 if CIR > 0." 
+      ::= { fsY1564SlaEntry 15 }
+
+    fsY1564SlaEIR OBJECT-TYPE
+      SYNTAX       Unsigned32 (0..10485760)
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION
+        "The excess information rate Must be >= 0. EIR must be greater than or 
+         equal to CIR,if EIR > 0."
+      ::= { fsY1564SlaEntry 16 }
+
+    fsY1564SlaEBS OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      UNITS       "Bytes"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The excess burst size Must be > 0 if EIR > 0."
+      ::= { fsY1564SlaEntry 17 }
+    
+    fsY1564SlaTrafPolicing OBJECT-TYPE
+      SYNTAX      INTEGER { on(1), off(2)}
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Traffic policing status. If the Trafific policing 
+         status is set as off then Traffic polincing test is not triggered for the 
+         specified SLA Id.Default Value for this object is on."
+      DEFVAL  { 1 }
+      ::= { fsY1564SlaEntry 18 }
+    
+    fsY1564SlaTestSelector OBJECT-TYPE
+      SYNTAX      Integer32 (0..255)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Test Input to be tested for the Test.
+    
+         A FOUR BYTE integer is used to specify the Test Inputs. Each BIT in the 
+         four byte integer represents the tests are to be included in Service 
+         Configuration Test.
+        
+         The mapping between the bit positions and the test inputs are as follows:
+     
+         0 - Simple CIR Validation Test
+
+         1 - Step Load CIR Test
+
+         2 - EIR Configuration Test, Colour-Aware/Non-Colour-Aware based on the
+             value set for the object fsY1564SlaColormode or
+             fsY1564ServiceConfColorMode.
+
+         3 - Traffic Policing Test, Colour-Aware/Non-Colour-Aware based on the
+             value present in the object fsY1564SlaColormode or
+             fsY1564ServiceConfColorMode.
+
+              
+         The remaining bits are unused. Combination of test inputs are also
+         allowed.
+     
+         For example, if the bits 0 and 3 are set, then the service configuration 
+         test is selected with Simple CIR Valdation Test and EIR Configuration Test.
+         
+         The user has to enter the corresponding integer value for the bits set.
+         For Example if the bits 0 (integer value 1) and 3 (Integer value 8)
+         are set, the user has to enter the value 9 in decimal and equivalent
+         Hex value is 9. 
+
+         By default, Simple CIR, Step Load CIR, EIR - Non-Colour-Aware and Traffic
+         policing - Non-Color-Aware tests are selected."
+
+      DEFVAL { '0000000F'H } 
+      ::= { fsY1564SlaEntry 19 }
+    
+    
+    fsY1564SlaCurrentTestMode OBJECT-TYPE
+      SYNTAX       Integer32 ( 0..7 )
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION
+        "This object specifies the currently running test
+         in service configuration test.
+         The mode will be one of the following
+       
+         0 - Indicates the no test is in progress
+         1 - Simple CIR Validation Test
+         2 - Step Load CIR Test
+         3 - EIR Configuration Test, Colour-Aware
+         4 - EIR Configuration Test, Non-Colour-Aware
+         5 - Traffic Policing Test, Colour-Aware
+         6 - Traffic Policing Test, Non-Colour-Aware
+         7 - Performance Test."
+        ::= { fsY1564SlaEntry 20 }
+    
+    fsY1564SlaCurrentTestState OBJECT-TYPE
+      SYNTAX      INTEGER { 
+                            notInitiated (1),    -- test not initiated.
+                            completed (2),       -- test successfully completed.
+                            inProgress (3),      -- test in progress.
+                            aborted (4)          -- test aborted.
+                          }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION 
+        "This object specifies the current test state of the SLA."
+      DEFVAL  { 1 }
+      ::= { fsY1564SlaEntry 21 }
+        
+    fsY1564SlaRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the row status and is used to create or
+        deletea new entry by setting this object to the appropriate value as
+        mentioned in SMI-v2."
+      ::= { fsY1564SlaEntry 22 }
+    
+    --- ***********************************************************************
+    --                      Traffic Profile Table
+    --- ***********************************************************************
+
+    fsY1564TrafProfTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564TrafProfEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+       "This table contains Traffic Profile configurations."
+      ::= { fsY1564TrafProf 1 }
+
+    fsY1564TrafProfEntry OBJECT-TYPE
+      SYNTAX      FsY1564TrafProfEntry 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+       "This entry contains information about a particular Traffic Profile
+        configuration."
+      INDEX   { fsY1564ContextId,
+                fsY1564TrafProfId }
+      ::= {  fsY1564TrafProfTable 1 }
+  
+    FsY1564TrafProfEntry ::=
+    SEQUENCE {
+        fsY1564TrafProfId               Unsigned32,
+        fsY1564TrafProfDir              INTEGER,
+        fsY1564TrafProfPktSize          Integer32,
+        fsY1564TrafProfPayload          OCTET STRING,
+        fsY1564TrafProfOptEmixPktSize   DisplayString,
+        fsY1564TrafProfPCP              IEEE8021PriorityCodePoint,
+        fsY1564TrafProfRowStatus        RowStatus
+    }
+
+    fsY1564TrafProfId OBJECT-TYPE
+      SYNTAX      Unsigned32 ( 1..10 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Traffic Profile Identifier. This is a free
+         running index."
+      ::= { fsY1564TrafProfEntry 1 }
+
+    fsY1564TrafProfDir OBJECT-TYPE
+      SYNTAX      INTEGER {
+                   external (1),
+                   internal (2)
+      }
+      MAX-ACCESS  read-write 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the direction of Y1564 Traffic Profile Generation.
+         When this object is set as external, the traffic is generated at the 
+         wire-side of network-to-network interface (NNI) and is transmitted to the
+         responder through the same interface.When this object is set as internal
+         the traffic is generated at the user-to-network interface (UNI) and 
+         transmitted to the responder through NNI respectively.
+         Now the direction external(1) only supported."
+      DEFVAL  { 1 }
+      ::= { fsY1564TrafProfEntry 2 }
+
+    fsY1564TrafProfPktSize OBJECT-TYPE
+      SYNTAX      Integer32 ( 64..1518 ) 
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Traffic Profile Packet Size in bytes.
+         Allowable frame sizes are 64,128,256,512,1024,1280 and 1518"
+      DEFVAL  { 512 }
+      ::= { fsY1564TrafProfEntry 3 }
+
+    fsY1564TrafProfPayload OBJECT-TYPE
+      SYNTAX      OCTET STRING (SIZE (0..16))
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Payload in the packet profile."
+      ::= { fsY1564TrafProfEntry 4 }
+
+    fsY1564TrafProfOptEmixPktSize OBJECT-TYPE
+      SYNTAX      DisplayString
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the optional variable-size pattern 
+         (EMIX)in bytes for Y1564 Traffic Profile. 
+         Frame Sizes and corresponding size desiginations are
+         a - 64, b - 128, c - 256, d - 512,e - 1024, f - 1280 ,g - 1518.
+        
+         The pattern must be a repeating sequence of sizes.
+         For Example, a five frame repeating pattern can be specified as 
+         follows ggeaa = 1518, 1518, 1024, 64, 64.
+    
+         Either fsY1564TrafProfPktSize or fsY1564TrafProfOptEmixPktSize can be used
+         for Y1564 Traffic profile.
+        
+         The default pattern for EMIX be the sequence of sizes: abceg"
+      ::= { fsY1564TrafProfEntry 5 }
+    
+    fsY1564TrafProfPCP OBJECT-TYPE
+      SYNTAX      IEEE8021PriorityCodePoint
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the priority that is to be inserted
+         in the generated test frames. PCP value is inserted only if the Mep Type is
+         Vlan based Mep."
+      ::= { fsY1564TrafProfEntry 6 }
+        
+    fsY1564TrafProfRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the row status and is used to create or delete a new
+        entry by setting this object to the appropriate value as  mentioned in SMI-v2."
+      ::= { fsY1564TrafProfEntry 7 }
+    
+    --- ***********************************************************************
+    --                      Service Acceptance Criteria Profile Table
+    --- ***********************************************************************
+
+    fsY1564SacTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564SacEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This table contains Service Acceptance Criteria Profile configuration. 
+         Service Acceptance Criteria (SAC) is a set of criteria used to ensure that
+         a service meets its functionality and quality requirement and that the
+         service is ready to operate when it has been deployed."
+      ::= { fsY1564Sac 1 }
+
+    fsY1564SacEntry OBJECT-TYPE
+      SYNTAX      FsY1564SacEntry 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This entry contains information about a particular SAC Profile configuration."
+      INDEX   { fsY1564ContextId,
+                fsY1564SacId }
+      ::= {  fsY1564SacTable 1 }
+
+    FsY1564SacEntry ::=
+    SEQUENCE {
+        fsY1564SacId            Unsigned32,
+        fsY1564SacInfoRate      Integer32,
+        fsY1564SacFrLossRatio   Integer32,
+        fsY1564SacFrTransDelay  Integer32,
+        fsY1564SacFrDelayVar    Integer32,
+        fsY1564SacAvailability  OCTET STRING,
+        fsY1564SacRowStatus     RowStatus
+    }
+
+    fsY1564SacId OBJECT-TYPE
+      SYNTAX      Unsigned32 ( 1..10 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 SAC Identifier used to identify 
+         the particular SAC entry."
+      ::= { fsY1564SacEntry 1 }
+
+    fsY1564SacInfoRate OBJECT-TYPE
+      SYNTAX      Integer32 ( 1..100)
+      MAX-ACCESS  read-write 
+      STATUS      current
+      DESCRIPTION 
+        "This object specifies the Y1564 Information Rate configured as 
+         part of this SAC. This is the minimum Information Rate that each 
+         services are expected to be met.
+
+         Information rate is the maximum rate at which none of the offered 
+         frames are dropped by the port. It is specified in % of the link's
+         bandwidth."
+      ::= { fsY1564SacEntry 2 }
+
+    fsY1564SacFrLossRatio OBJECT-TYPE
+      SYNTAX      Integer32 ( 0..100 )
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Frame Loss Ratio (FLR) configured as 
+         part of this SAC. This is the minimum frame loss ratio that each
+         services are expected to be met.
+
+         Frame Loss Ratio measures the number of packets 
+         lost over the total number of packets sent in percentage. 
+         Frame loss can be due to a number of issues such as network 
+         congestion or errors during transmissions.
+         Example: 50%    should be given as 50"
+      ::= { fsY1564SacEntry 3 }
+
+    fsY1564SacFrTransDelay OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Frame Transfer Delay (FTD) configured 
+         as part of this SAC. This is the minimum frame transfer delay 
+         (in milliseconds) that each services are expected to be met.
+         
+         Frame Transfer delay measures the round-trip time (RTT) taken by a 
+         test frame to travel through a network device or across the network 
+         and back to the test port "
+      ::= { fsY1564SacEntry 4 }
+
+    fsY1564SacFrDelayVar OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Frame Delay Variation configured 
+         as part of this SAC. This is the minimum frame delay variation 
+         (in milliseconds) that each services are expected to be met.
+
+         Frame Delay Variation (FDV) measures the variations in the time delay 
+         between packet deliveries."
+      ::= { fsY1564SacEntry 5 }
+
+    fsY1564SacAvailability OBJECT-TYPE
+      SYNTAX      OCTET STRING (SIZE(1..6))
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Availability configured as part 
+         of this SAC. This is the maximum avaliablity that each
+         services are expected to be met.
+         Example: 50%    should be given as 50.00
+                  39.61% should be given as 39.61
+         Availability is defined as the percentage of available time 
+         (to total time) in a generic observation period."
+      ::= { fsY1564SacEntry 6 }
+
+    fsY1564SacRowStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+         "This object specifies the row status and is used to create or 
+          delete a new entry by setting this object to the appropriate 
+          value as mentioned in SMI-v2."
+       ::= { fsY1564SacEntry 7 }
+
+    --- ***********************************************************************
+    --                      Service Configuration Table
+    --- ***********************************************************************
+
+    fsY1564ServiceConfTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564ServiceConfEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This table contains Service Configuration information.
+         It includes bandwidth profile parameters, 
+         VLAN Index and Interface Index which will be used to create a 
+         service when MEF module is not defined."
+
+      ::= { fsY1564ServiceConf 1 }
+
+    fsY1564ServiceConfEntry OBJECT-TYPE
+      SYNTAX      FsY1564ServiceConfEntry 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This entry contains information about a particular Y1564 Service 
+         specific configuration."
+      INDEX   { fsY1564ContextId,
+                fsY1564ServiceConfId }
+      ::= {  fsY1564ServiceConfTable 1 }
+
+    FsY1564ServiceConfEntry ::=
+    SEQUENCE {
+        fsY1564ServiceConfId            Unsigned32,
+        fsY1564ServiceConfColorMode     INTEGER,
+        fsY1564ServiceConfCoupFlag      TruthValue,
+        fsY1564ServiceConfCIR           Unsigned32,
+        fsY1564ServiceConfCBS           Unsigned32,
+        fsY1564ServiceConfEIR           Unsigned32,
+        fsY1564ServiceConfEBS           Unsigned32,
+        fsY1564ServiceConfRowStatus     RowStatus
+    }
+
+    fsY1564ServiceConfId OBJECT-TYPE
+      SYNTAX      Unsigned32 ( 1..10 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Service Configuration Identifier.
+         This is a free running index used to identify a Service Configuration."
+      ::= { fsY1564ServiceConfEntry 1 }
+
+    fsY1564ServiceConfColorMode OBJECT-TYPE
+      SYNTAX      INTEGER { colorAware(1), colorBlind(2)}
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies whether the color-aware or color blind 
+         property is employed by the bandwidth profile. 
+         The default value for this object is ColorBlind."
+      DEFVAL  { 2 }
+      ::= { fsY1564ServiceConfEntry 2 }
+
+    fsY1564ServiceConfCoupFlag OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the modes of operation of the rate enforcement
+         algorithm. The choice of the value for CF has the effect of controlling the 
+         volume of the Service Frames that are declared Yellow. When CF is set to 0, 
+         the long term average bit rate of Service Frames that are declared Yellow 
+         is bounded by EIR. When CF is set to 1, the long term average bit rate of 
+         Service Frames that are declared Yellow is bounded by CIR + EIR depending 
+         on volume of the offered Service Frames that are declared Green "
+    ::= { fsY1564ServiceConfEntry 3 }
+
+    fsY1564ServiceConfCIR OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "The committed information rate Must be >= 0. CIR must be less than or 
+         equal to  EIR,if EIR > 0."
+      ::= { fsY1564ServiceConfEntry 4 }
+
+    fsY1564ServiceConfCBS OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "The committed burst size Must be > 0 if CIR > 0. Maximum allowable size 
+         will be jumbo frame size."
+      ::= { fsY1564ServiceConfEntry 5 }
+    
+    fsY1564ServiceConfEIR OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "The excess information rate Must be >= 0. EIR must be greater than or 
+         equal to CIR,if EIR > 0."
+    ::= { fsY1564ServiceConfEntry 6 }
+
+    fsY1564ServiceConfEBS OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..10485760)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "The excess burst size Must be > 0 if EIR > 0."
+      ::= { fsY1564ServiceConfEntry 7 }
+    
+    fsY1564ServiceConfRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the row status and is used to create or 
+         delete a new entry by setting this object to the appropriate 
+         value as mentioned in SMI-v2."
+     ::= { fsY1564ServiceConfEntry 8 }
+
+
+    --- ***********************************************************************
+    -- SLA Configuration Test Report Table
+    --- ***********************************************************************
+
+    fsY1564ConfigTestReportTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564ConfigTestReportEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This table contains the statistics of the SLA operation performed."
+      ::= { fsY1564ConfigTest 1 }
+
+    fsY1564ConfigTestReportEntry OBJECT-TYPE
+      SYNTAX      FsY1564ConfigTestReportEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This entry specifies the statistics about a particular step in the SLA
+         operation performed."
+      INDEX   { fsY1564ContextId, fsY1564ConfigTestReportSlaId,
+                fsY1564ConfigTestReportFrSize,fsY1564ConfigTestCurrentTestMode,
+                fsY1564ConfigTestReportStepId }
+      ::= {  fsY1564ConfigTestReportTable 1 }
+
+    FsY1564ConfigTestReportEntry ::=
+    SEQUENCE {
+        fsY1564ConfigTestReportSlaId              Unsigned32,
+        fsY1564ConfigTestReportFrSize             Integer32,
+        fsY1564ConfigTestCurrentTestMode          Integer32, 
+        fsY1564ConfigTestReportStepId             Integer32,
+        fsY1564ConfigTestReportResult             INTEGER,
+        fsY1564ConfigTestReportIrMin              Unsigned32,
+        fsY1564ConfigTestReportIrMean             Unsigned32,
+        fsY1564ConfigTestReportIrMax              Unsigned32,
+        fsY1564ConfigTestReportFrLossCnt          Unsigned32,
+        fsY1564ConfigTestReportFrLossRatio        Unsigned32,
+        fsY1564ConfigTestReportFrTxDelayMin       Unsigned32,
+        fsY1564ConfigTestReportFrTxDelayMean      Unsigned32,
+        fsY1564ConfigTestReportFrTxDelayMax       Unsigned32,
+        fsY1564ConfigTestReportFrDelayVarMin      Unsigned32,
+        fsY1564ConfigTestReportFrDelayVarMean     Unsigned32,
+        fsY1564ConfigTestReportFrDelayVarMax      Unsigned32,
+        fsY1564ConfigTestReportTestStartTime      TimeStamp,
+        fsY1564ConfigTestReportTestEndTime        TimeStamp
+    }
+
+    fsY1564ConfigTestReportSlaId OBJECT-TYPE
+      SYNTAX      Unsigned32 ( 1..10 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the SLA Id of service configuration test."
+      ::= { fsY1564ConfigTestReportEntry 1 }
+
+   fsY1564ConfigTestReportFrSize OBJECT-TYPE
+      SYNTAX      Integer32 ( 64..1518 )
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 frame size in SLA operation statistics."
+       ::= { fsY1564ConfigTestReportEntry 2 }
+
+
+   fsY1564ConfigTestCurrentTestMode OBJECT-TYPE
+      SYNTAX      Integer32 ( 0..7 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Currently active test running 
+        as part of service configuration test."
+      ::= { fsY1564ConfigTestReportEntry 3 }
+
+   fsY1564ConfigTestReportStepId OBJECT-TYPE
+      SYNTAX      Integer32 ( 1..10 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Step Index in SLA operation statistics.
+         Step Id for each test as follows.
+         1. For Simple CIR Validation test, step Id will be one
+         2. For Step Load CIR, step Id is based on step load rate
+         3. For EIR Color-Aware, step Id will be one and two. one for green and 
+            two for yellow frames.
+         4. For Traffic Policing Color-Aware, step Id will be one and two. one for 
+            green and two for yellow frames.
+         5. For EIR Non-Color-Aware, step Id will be one.
+         6. For Traffic Policing Non-Color-Aware, step Id will be one."
+
+      ::= { fsY1564ConfigTestReportEntry 4 }
+
+
+    fsY1564ConfigTestReportResult OBJECT-TYPE
+      SYNTAX      INTEGER {
+               pass (1),
+               fail (2)
+      }
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+         "This oject specifies the result of Service Configuration Test." 
+      ::= { fsY1564ConfigTestReportEntry 5 }
+
+    fsY1564ConfigTestReportIrMin OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the Minimum value of Information Rate in KBPS for 
+        the test."
+      ::= { fsY1564ConfigTestReportEntry 6 }
+
+    fsY1564ConfigTestReportIrMean OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the Mean value of Information Rate in KBPS for 
+        the test."
+      ::= { fsY1564ConfigTestReportEntry 7 }
+
+    fsY1564ConfigTestReportIrMax OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the Maximum value of Information Rate in KBPS 
+        for the test."
+      ::= { fsY1564ConfigTestReportEntry 8 }
+
+    fsY1564ConfigTestReportFrLossCnt OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the number of frames lost during the test."
+    ::= { fsY1564ConfigTestReportEntry  9 }
+
+    fsY1564ConfigTestReportFrLossRatio OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Frame Loss Ratio observed during the test."
+    ::= { fsY1564ConfigTestReportEntry  10 }
+
+    fsY1564ConfigTestReportFrTxDelayMin OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Minimum Frame Transfer Delay observed 
+         during the test."
+      ::= { fsY1564ConfigTestReportEntry  11 }
+
+    fsY1564ConfigTestReportFrTxDelayMean OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Mean Frame Transfer Delay observed during 
+         the test."
+    ::= { fsY1564ConfigTestReportEntry  12 }
+
+    fsY1564ConfigTestReportFrTxDelayMax OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Maximum Frame Transfer Delay observed 
+         during the test."
+    ::= { fsY1564ConfigTestReportEntry  13 }
+
+    fsY1564ConfigTestReportFrDelayVarMin OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Minimum Frame Delay Variation observed 
+        during the test."
+      ::= { fsY1564ConfigTestReportEntry  14 }
+
+    fsY1564ConfigTestReportFrDelayVarMean OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Mean Frame Delay Variation observed 
+        during the test."
+    ::= { fsY1564ConfigTestReportEntry  15 }
+
+    fsY1564ConfigTestReportFrDelayVarMax OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Maximum Frame Delay Variation observed 
+        during the test."
+    ::= { fsY1564ConfigTestReportEntry  16 }
+ 
+    fsY1564ConfigTestReportTestStartTime OBJECT-TYPE
+      SYNTAX      TimeStamp
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the service start time of the test in Y1564 
+         for Service configuration test."
+    ::= { fsY1564ConfigTestReportEntry 17 }
+
+    fsY1564ConfigTestReportTestEndTime OBJECT-TYPE
+      SYNTAX      TimeStamp
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the service end time of the test in Y1564 
+         for Service configuration test."
+    ::= { fsY1564ConfigTestReportEntry 18 }
+
+    --- ***********************************************************************
+    --                      Sevice Performance Table
+    --- ***********************************************************************
+
+    fsY1564PerformanceTestTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564PerformanceTestEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This table contains Service performance test related information.
+         Each entry in this table corresponds to a configured SLA entry in fsy1564SlaTable.
+	 Entry in this table has to be created explicitly."
+
+      ::= {  fsY1564PerformanceTest 1 }
+
+    fsY1564PerformanceTestEntry OBJECT-TYPE
+      SYNTAX      FsY1564PerformanceTestEntry 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This entry contains information about a particular Y1564 performance 
+         specific configuration." 
+      INDEX   { fsY1564ContextId,
+                fsY1564PerformanceTestIndex }
+      ::= {  fsY1564PerformanceTestTable 1 }
+
+    FsY1564PerformanceTestEntry ::=
+    SEQUENCE {
+        fsY1564PerformanceTestIndex                 	Unsigned32,
+        fsY1564PerformanceTestSlaList  	      		OCTET STRING,
+        fsY1564PerformanceTestDuration       		INTEGER,
+	fsY1564PerformanceTestStatus         		INTEGER,
+        fsY1564PerformanceTestRowStatus                 RowStatus
+    }
+
+    fsY1564PerformanceTestIndex OBJECT-TYPE
+      SYNTAX      Unsigned32 ( 1..10 ) 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 performance test Identifier.
+         This is a free running index used to identify a service performance test."
+      ::= { fsY1564PerformanceTestEntry 1 }
+
+    fsY1564PerformanceTestSlaList OBJECT-TYPE
+      SYNTAX      OCTET STRING (SIZE (1..10))
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the SLA lists to be tested in Y1564
+         for Service performance test.
+         Example: SLA 1, 2, 3, 5, 7, 10 should be given as 1-2-3-5-7-10"
+      ::= { fsY1564PerformanceTestEntry 2 }
+
+    fsY1564PerformanceTestDuration OBJECT-TYPE
+      SYNTAX      INTEGER {
+                            interval15min     (1),
+                            interval2hour     (2),
+                            interval24hour    (3)
+                          }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object is used to configure the period to complete Service 
+         Performance Test.The default interval for this object is 2 
+         hours."
+      DEFVAL  { 2 }
+      ::= { fsY1564PerformanceTestEntry 3 }
+
+    fsY1564PerformanceTestStatus OBJECT-TYPE
+      SYNTAX      INTEGER { start(1), stop(2)}
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Y1564 Service Performance 
+         test initiation status.
+         An enumerated value set to 'start' initiates service
+         performance test will be started for the SLA 
+	 lists specified in object fsY1564PerfSlaList." 
+      DEFVAL  { 2 }
+      ::= { fsY1564PerformanceTestEntry 4 }
+ 
+   fsY1564PerformanceTestRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "Denotes the Row status of the service performance test entry.
+         This object specifies the row status and is used to create or 
+         delete a new entry by setting this object to the appropriate 
+         value as mentioned in SMI-v2."        
+      ::= { fsY1564PerformanceTestEntry 5 }
+    --- ***********************************************************************
+    -- SLA Performance Test Report Table
+    --- ***********************************************************************
+
+    fsY1564PerfTestReportTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsY1564PerfTestReportEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This table contains the statistics of the SLA operation performed."
+      ::= { fsY1564PerfTestReport 1 }
+
+    fsY1564PerfTestReportEntry OBJECT-TYPE
+      SYNTAX      FsY1564PerfTestReportEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "This entry specifies the statistics about a particular step in the SLA
+         operation performed."
+      INDEX   { fsY1564ContextId, fsY1564SlaId, fsY1564PerformanceTestIndex, 
+                fsY1564PerfTestReportFrSize }
+      ::= {  fsY1564PerfTestReportTable 1 }
+
+    FsY1564PerfTestReportEntry ::=
+    SEQUENCE {
+        fsY1564PerfTestReportFrSize             Integer32,
+        fsY1564PerfTestReportResult             INTEGER,
+        fsY1564PerfTestReportIrMin              Unsigned32,
+        fsY1564PerfTestReportIrMean             Unsigned32,
+        fsY1564PerfTestReportIrMax              Unsigned32,
+        fsY1564PerfTestReportFrLossCnt          Unsigned32,
+        fsY1564PerfTestReportFrLossRatio        Unsigned32,
+        fsY1564PerfTestReportFrTxDelayMin       Unsigned32,
+        fsY1564PerfTestReportFrTxDelayMean      Unsigned32,
+        fsY1564PerfTestReportFrTxDelayMax       Unsigned32,
+        fsY1564PerfTestReportFrDelayVarMin      Unsigned32,
+        fsY1564PerfTestReportFrDelayVarMean     Unsigned32,
+        fsY1564PerfTestReportFrDelayVarMax      Unsigned32,
+        fsY1564PerfTestReportAvailability       OCTET STRING,
+        fsY1564PerfTestReportUnavailableCount   Unsigned32,
+        fsY1564PerfTestReportTestStartTime      TimeStamp,
+        fsY1564PerfTestReportTestEndTime        TimeStamp
+    }
+
+    fsY1564PerfTestReportFrSize OBJECT-TYPE
+      SYNTAX      Integer32 ( 64..1518 )
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "This object specifies the frame size in SLA performance test statistics."
+       ::= { fsY1564PerfTestReportEntry 1 }  
+
+    fsY1564PerfTestReportResult OBJECT-TYPE
+      SYNTAX      INTEGER {
+                           pass (1),
+                           fail (2)
+                          }
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+         "This oject specifies the result of service Performance Test."
+      ::= { fsY1564PerfTestReportEntry 2 }
+
+    fsY1564PerfTestReportIrMin OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the Minimum value of Information Rate in KBPS for 
+        the test."
+      ::= { fsY1564PerfTestReportEntry 3 }
+
+    fsY1564PerfTestReportIrMean OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the Mean value of Information Rate in KBPS for 
+        the test."
+      ::= { fsY1564PerfTestReportEntry 4 }
+
+    fsY1564PerfTestReportIrMax OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the Maximum value of Information Rate in KBPS for 
+        the test."
+      ::= { fsY1564PerfTestReportEntry 5 }
+
+    fsY1564PerfTestReportFrLossCnt OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object indicates the number of frames lost during the test."
+    ::= { fsY1564PerfTestReportEntry  6 }
+
+    fsY1564PerfTestReportFrLossRatio OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Frame Loss Ratio observed during the test."
+    ::= { fsY1564PerfTestReportEntry  7 }
+
+    fsY1564PerfTestReportFrTxDelayMin OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Minimum Frame Transfer Delay observed 
+         during the test."
+      ::= { fsY1564PerfTestReportEntry  8 }
+
+    fsY1564PerfTestReportFrTxDelayMean OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Mean Frame Transfer Delay observed during 
+         the test."
+    ::= { fsY1564PerfTestReportEntry  9 }
+
+    fsY1564PerfTestReportFrTxDelayMax OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Maximum Frame Transfer Delay observed 
+         during the test."
+    ::= { fsY1564PerfTestReportEntry  10 }
+
+    fsY1564PerfTestReportFrDelayVarMin OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Minimum Frame Delay Variation observed 
+        during the test."
+      ::= { fsY1564PerfTestReportEntry  11 }
+
+    fsY1564PerfTestReportFrDelayVarMean OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Mean Frame Delay Variation observed 
+        during the test."
+    ::= { fsY1564PerfTestReportEntry  12 }
+
+    fsY1564PerfTestReportFrDelayVarMax OBJECT-TYPE
+      SYNTAX      Unsigned32 
+      MAX-ACCESS  read-only 
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Maximum Frame Delay Variation observed 
+        during the test."
+    ::= { fsY1564PerfTestReportEntry  13 }
+ 
+    fsY1564PerfTestReportAvailability OBJECT-TYPE
+      SYNTAX      OCTET STRING (SIZE(1..6))
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the Availability of the service during the 
+         test."
+      ::= { fsY1564PerfTestReportEntry  14 }
+
+    fsY1564PerfTestReportUnavailableCount OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+       "This object specifies the Unavailable frame count during
+        the test."
+      ::= { fsY1564PerfTestReportEntry  15 }
+
+    fsY1564PerfTestReportTestStartTime OBJECT-TYPE
+      SYNTAX      TimeStamp
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the service start time of the test in Y1564 
+         for Service performance test."
+    ::= { fsY1564PerfTestReportEntry 16 }
+
+    fsY1564PerfTestReportTestEndTime OBJECT-TYPE
+      SYNTAX      TimeStamp
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the service end time of the test in Y1564 
+         for Service performance test."
+    ::= { fsY1564PerfTestReportEntry 17 }
+    
+    --- ***********************************************************************
+    --                      Notification
+    --- ***********************************************************************
+
+    fsY1564Traps OBJECT IDENTIFIER ::= { fsY1564Notification 0 }
+    fsY1564TrapObjects OBJECT IDENTIFIER ::= { fsY1564Notification 1 }
+  
+    fsY1564TrapSlaId OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  accessible-for-notify
+      STATUS      current
+      DESCRIPTION
+        "This object refers to the SLA Id on which the Y1564 
+         is enabled. And will be used in sending the failure Traps."
+      ::= { fsY1564TrapObjects 1 }
+
+    fsY1564TypeOfFailure OBJECT-TYPE
+      SYNTAX      DisplayString (SIZE (1..32))
+      MAX-ACCESS  accessible-for-notify
+      STATUS      current
+      DESCRIPTION
+        "This object provides the text indicating a particular failure
+         condition.
+    
+         'Unrecoverable/Transaction failure' will be set, when the below 
+         defectes are detected by CFM when any of the Service configuration or 
+         Performance tests are in progress.
+         
+         These defect Conditions are:
+    
+         RdiCondition       - The MEP has encountered remote MEP defect condition.
+         LossOfContinuity   - The MEP has encountered loss of continuity defect condition."
+    
+    ::= { fsY1564TrapObjects 2 }
+ 
+    fsY1564FailureTrap NOTIFICATION-TYPE
+      OBJECTS  {
+           fsY1564ContextName,
+           fsY1564TrapSlaId,    
+           fsY1564TypeOfFailure
+      }
+      STATUS   current
+      DESCRIPTION
+        "This trap is generated when there is any failure on a link."
+      ::= { fsY1564Traps 1 }
+    
+END

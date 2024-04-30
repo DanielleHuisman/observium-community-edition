@@ -1,0 +1,742 @@
+--  =======================================================================
+--  File        : osERP.mib
+--  Description : Private MIB to manage the Ethernet Ring Protection G.8032 + amendment 1. 
+--  By          : Miri
+
+-- Copyright (c) 2011 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-ERP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+                 MODULE-IDENTITY, OBJECT-TYPE,
+                 NOTIFICATION-TYPE,
+                 Integer32,Unsigned32                          FROM SNMPv2-SMI
+                 TruthValue, TEXTUAL-CONVENTION, 
+                 DisplayString                                 FROM SNMPv2-TC                
+                 oaOptiSwitch,
+                 PortIndexOrNone, TagList                      FROM OS-COMMON-TC-MIB
+                 VlanIdOrNone                                  FROM IEEE8021-CFM-MIB
+                 MODULE-COMPLIANCE, OBJECT-GROUP,                  
+                 NOTIFICATION-GROUP                            FROM SNMPv2-CONF;                                     
+
+osERP            MODULE-IDENTITY
+                 LAST-UPDATED "201904240000Z" -- 24 Apr. 2019
+                 ORGANIZATION "MRV Communications, Inc."
+                 CONTACT-INFO
+                   "Miri Wolloch
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  mwolloch@mrv.com"
+                 DESCRIPTION
+                    "This private MIB allow to configure the Maintenance Domain table."
+
+                 REVISION     "201904240000Z" -- 24 Apr. 2019
+                 DESCRIPTION
+                  "Support ring-ID configuration"
+
+                 REVISION     "201108010000Z"
+                 DESCRIPTION
+                    "Initial edition."
+                 ::= { oaOptiSwitch 20 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osERPNotifications       OBJECT IDENTIFIER ::= { osERP 0 }
+osERPCapabilities        OBJECT IDENTIFIER ::= { osERP 1 }
+osERPNotificationObj     OBJECT IDENTIFIER ::= { osERP 99 }
+osERPConformance         OBJECT IDENTIFIER ::= { osERP 100 }
+osERPMIBCompliances      OBJECT IDENTIFIER ::= { osERPConformance 1 }
+osERPMIBGroups           OBJECT IDENTIFIER ::= { osERPConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+ErpEntryValidator ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+      "Admin Status for controlling of the entry."
+    SYNTAX       INTEGER { 
+                   disable    (1),
+                   enable     (2),
+                   delete     (3),
+                   create     (4)
+                 }    
+
+OsEthOamMepIdOrNone ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+       "Maintenance association End Point Identifier (MEPID): A small
+        integer, unique over a given Maintenance Association,
+        identifying a specific MEP.
+        Case MepId is not configured value 0 is set."
+    REFERENCE
+       "802.1ag clauses 3.19 and 19.2.1"
+    SYNTAX      Unsigned32 (0|1..4095)
+
+ErpPortState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "ERP group node contains 2 ports: east and west.
+        Each port can be in one of the following state:
+        unblocked - for traffic and R-APS.
+        blocked   - for traffic.
+        sf        - blocked (traffic and R-APS) due to SF (Signal Failure) event.
+        ms        - port is blocked due to manual-Switch command
+        fs        - port is blocked due to force-Switch command"
+                
+    REFERENCE
+       "G.8032 version 1 and 2."
+       SYNTAX       INTEGER {
+                      unblocked   (1),
+                      blocked     (2),
+                      sf          (3),
+                      ms          (4),
+                      fs          (5)                      
+                    }
+       
+-- ************************************************************
+-- The osERPCapabilities
+-- ************************************************************
+
+osERPSupport OBJECT-TYPE
+   SYNTAX     INTEGER { notSupported(1), supported(2) }
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Indicates that this MIB is supported."
+   ::= { osERPCapabilities 1 }
+   
+osERPVerSupport OBJECT-TYPE
+   SYNTAX     INTEGER { v1(1), 
+                        v1Amend1(2),
+                        v2(3) }
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Indicates which ERP version is supported."
+   ::= { osERPCapabilities 2 } 
+   
+osERPFeaturesSupport OBJECT-TYPE
+    SYNTAX       BITS {
+                      ringIdConfiguration     (0)
+                    }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates ERP related features, that supported by this agent."
+    ::= { osERPCapabilities 3 }
+     
+
+-- ************************************************************
+-- The osERPCfgTable Table
+-- ************************************************************
+osERPCfgTable  OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsERPCfgEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table is a private realization of dot1agCfmMdTable from do1ag MIB.
+        A Maintenance Domain is described in 802.1ag (3.22) as the
+        network or the part of the network for which faults in
+        connectivity are to be managed."
+    REFERENCE
+       "802.1ag clauses 3.22 and 18.1"
+    ::= { osERP 2 }    
+
+osERPCfgEntry  OBJECT-TYPE
+    SYNTAX       OsERPCfgEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osERPCfgGroupId } 
+    ::= { osERPCfgTable 1 }
+
+OsERPCfgEntry ::= SEQUENCE {
+      osERPCfgGroupId              Integer32,
+      osERPCfgEastPort             PortIndexOrNone,
+      osERPCfgWestPort             PortIndexOrNone,
+      osERPCfgRplMode              INTEGER,
+      osERPCfgRplPort              INTEGER,
+      osERPCfgPrimaryVlan          VlanIdOrNone,
+      osERPCfgVlans                TagList,
+      osERPCfgChannelBlocking      TruthValue,
+      osERPCfgWTRTimer             Integer32,
+      osERPCfgGuardTimer           Integer32,
+      osERPCfgHoldOffTimer         Integer32,
+      osERPCfgEPortVirtualChannel  TruthValue,
+      osERPCfgWPortVirtualChannel  TruthValue,      
+      osERPCfgCcmMd                Integer32,
+      osERPCfgCcmMa                Unsigned32,
+      osERPCfgCcmERMep             OsEthOamMepIdOrNone,
+      osERPCfgCcmWRMep             OsEthOamMepIdOrNone,      
+      osERPCfgCcmEEnable           TruthValue,
+      osERPCfgCcmWEnable           TruthValue,
+      osERPCfgVersion              INTEGER,
+      osERPCfgCommand              INTEGER,
+      osERPCfgRevertive            TruthValue,
+      osERPCfgDomain               Integer32,
+      osERPCfgSendSnmpTrap         TruthValue,
+      osERPCfgRingId               Integer32, 
+      osERPCfgLastError            DisplayString,
+      osERPCfgAdminStatus          ErpEntryValidator      
+}      
+
+
+osERPCfgGroupId  OBJECT-TYPE
+    SYNTAX       Integer32(0..59)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Ethernet Ring Protection group ID."
+    REFERENCE
+       "G.8032"
+    ::= { osERPCfgEntry 1 }
+
+
+osERPCfgEastPort  OBJECT-TYPE
+    SYNTAX       PortIndexOrNone
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "ERP contains two ports belong to the ring, east and west
+        Defines the east port of the ring."
+    REFERENCE "G.8032" 
+     DEFVAL { 0 }      
+    ::= { osERPCfgEntry 2 }
+
+
+osERPCfgWestPort  OBJECT-TYPE
+    SYNTAX       PortIndexOrNone
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "ERP instance contains two ports belong to the ring, east and west
+        Defines the west port of the ring."
+    REFERENCE
+        "G.8032"
+    DEFVAL { 0 }
+    ::= { osERPCfgEntry 3 }
+
+
+osERPCfgRplMode OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   rplNone     (1),
+                   rplOwner    (2),
+                   rplNeighbor (3)
+                 }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION       
+      "RPL -(ring protection link is a ring link that under normal conditions, 
+       i.e, without any failure or request, is blocked (at one or both ends)
+       for traffic channel, to prevent the information of loops).
+
+       rplNone (1) - not RPL owner / neighbor
+
+       rplOwner (2) - RPL owner is an ethernet ring node adjacent to the RPL that is responsible
+       for blocking its end of the RPL under normal conditions 
+       (i.e the ring is established and no requests are present in the ring)
+
+       rplNeighbor (3) - RPL neighbor is an ethernet ring node adjacent to the RPL that is responsible
+       for blocking its end of the RPL under normal conditions 
+       in addition to the block by the RPL owner node. However, it is not responsible for
+       activating the reversion behavior."
+
+    REFERENCE "G.8032" 
+    DEFVAL { rplNone }
+    ::= { osERPCfgEntry 4 }
+
+
+osERPCfgRplPort OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   none     (1),
+                   eastPort (2),
+                   westPort (3) 
+                 }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "One of the RPL owner node ring port, which is under normal conditions, 
+        i.e., without any failure or request, is blocked for traffic channel, to
+        prevent the formation of loops."
+    DEFVAL { none }
+    ::= { osERPCfgEntry 5 }  
+
+
+osERPCfgPrimaryVlan OBJECT-TYPE
+    SYNTAX       VlanIdOrNone
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Defines the Primary vlan of the ring used for R-APS."
+    DEFVAL { 0 }
+    ::= { osERPCfgEntry 6}
+
+
+osERPCfgVlans  OBJECT-TYPE
+    SYNTAX       TagList
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Defines vlan list to be protected."	  
+    ::= { osERPCfgEntry 7 }
+
+
+osERPCfgChannelBlocking OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "A mode of operation in which traffic blocking is VLAN-tag based."
+    DEFVAL { false }       
+    ::= { osERPCfgEntry 8 }          
+
+    
+osERPCfgWTRTimer OBJECT-TYPE
+    SYNTAX      Integer32 (60..720)
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "WTR (Wait to Restore) Timer - used by the RPL Owner to verify that the ring
+        has stabilized before blocking the RPL after SF recovery."
+    DEFVAL { 300 }
+    ::= { osERPCfgEntry 9 }    
+
+    
+osERPCfgGuardTimer OBJECT-TYPE
+    SYNTAX      Integer32 (10..2000)
+    UNITS       "milli-seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Guard timer causes the nodes whose port has recovered to ignore 
+        R-APS messages for a preset time period."
+    DEFVAL { 500 }
+    ::= { osERPCfgEntry 10 }
+
+    
+osERPCfgHoldOffTimer OBJECT-TYPE
+    SYNTAX      Integer32 (0..10)
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Hold-Off Timer - disables the ERPS mechanism for a time period in order to allow
+        intermittent link transients to die out or to allow some other agent, operating at 
+        a lower layer than ERPS mechanism, to stabilize the ring."
+    REFERENCE
+       "G.8032" 
+    DEFVAL { 0 }
+    ::= { osERPCfgEntry 11 }    
+
+
+osERPCfgEPortVirtualChannel OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Defines east-port as virtual-channel."
+    DEFVAL { false }       
+    ::= { osERPCfgEntry 12 }  
+    
+
+osERPCfgWPortVirtualChannel OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Defines west-port as virtual-channel."
+    DEFVAL { false }       
+    ::= { osERPCfgEntry 13 }                    
+    
+osERPCfgCcmMd  OBJECT-TYPE
+    SYNTAX       Integer32(0..7)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "It is a reflection of Dot1agCfmMDLevel.
+        Integer identifying the Maintenance Domain Level (MD Level).
+        Higher numbers correspond to higher Maintenance Domains,
+        those with the greatest physical reach, with the highest
+        values for customers' CFM PDUs.  Lower numbers correspond
+        to lower Maintenance Domains, those with more limited
+        physical reach, with the lowest values for CFM PDUs
+        protecting single bridges or physical links.
+        Creation of a row generates an entry with dot1agCfmMdIndex,
+        which is one greater than osEthOamMdLevel."
+    REFERENCE
+       "802.1ag clauses 18.3, 21.4.1"
+    DEFVAL { 0 }
+    ::= { osERPCfgEntry 14 }
+    
+osERPCfgCcmMa OBJECT-TYPE
+    SYNTAX      Unsigned32(0|1..4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association index.
+       Case Ma is not configured default value is 0."
+    REFERENCE
+       "Y1731"
+    DEFVAL { 0 }       
+    ::= { osERPCfgEntry 15 }  
+    
+osERPCfgCcmERMep OBJECT-TYPE
+    SYNTAX      OsEthOamMepIdOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Source RMEP for EAST port."    
+    DEFVAL { 0 }   
+    ::= { osERPCfgEntry 16 }    
+    
+
+osERPCfgCcmWRMep OBJECT-TYPE
+    SYNTAX      OsEthOamMepIdOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Source RMEP for WEST port."
+    DEFVAL { 0 }    
+    ::= { osERPCfgEntry 17 }    
+
+    
+osERPCfgCcmEEnable OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Enable ccm monitoring on east-port."
+    DEFVAL { false }   
+    ::= { osERPCfgEntry 18 }
+    
+    
+osERPCfgCcmWEnable OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Enable ccm monitoring on west-port."
+    DEFVAL { false }   
+    ::= { osERPCfgEntry 19 }            
+
+osERPCfgVersion OBJECT-TYPE
+    SYNTAX       INTEGER {                   
+                   versionOnePlusAmendOne (1),
+                   versionTwo             (2) 
+                 }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Setting ERPs. (G.8032) version.
+       version 1 including amendment 1 based on G.8032 06/2008 + amendment 1 04/2009.
+       version 2 based on G.8032 03/2010."
+    DEFVAL { versionTwo }
+    ::= { osERPCfgEntry 20 }
+    
+osERPCfgCommand OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   none       (1),
+                   msEastPort (2),
+                   msWestPort (3),
+                   fsEastPort (4),
+                   fsWestPort (5),
+                   clear      (6) 
+                 }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Execute command: 
+       ms - Manual-Switch, fs - Force-switch, clear - clear state fs,ms or clear non-revertive mode."
+    DEFVAL { none }
+    ::= { osERPCfgEntry 21 }
+    
+osERPCfgRevertive OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Enable revertive mode
+       true- means revertive mode
+       false - means non-revertive mode."
+    DEFVAL { true }   
+    ::= { osERPCfgEntry 22 }
+    
+osERPCfgDomain  OBJECT-TYPE
+    SYNTAX       Integer32(0..7)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "The ring MEL (Maintenance Entity Group Level) is a maintenance entity group (MEG) level
+      providing a communication channel for ring automatic protection switching (R-APS) information."
+    REFERENCE
+       "G.8032 03/2010  clauses 3.2.7"
+    DEFVAL { 0 }
+    ::= { osERPCfgEntry 24 }
+
+osERPCfgSendSnmpTrap OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Turn on/off the option of sending traps."      
+    DEFVAL { false }   
+    ::= { osERPCfgEntry 25 }
+    
+osERPCfgRingId  OBJECT-TYPE
+    SYNTAX       Integer32(1..239)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "A ring ID in the range 1..239 can be configured for each
+        ERP instance. This ring ID is used in the R-APS message transmission
+        to determine the last octet of the MAC destination address.  
+        It is also used in the validity check to discard any R-APS PDU received with
+        non-matching ring ID."
+    REFERENCE
+        "G.8032"
+    DEFVAL { 1 }   
+    ::= { osERPCfgEntry 26 }    
+           
+osERPCfgLastError OBJECT-TYPE
+    SYNTAX       DisplayString (SIZE (2..160))
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+       "Display last configuration error."
+    ::= { osERPCfgEntry 100 }
+
+osERPCfgAdminStatus OBJECT-TYPE
+    SYNTAX       ErpEntryValidator
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Allows creating new ERP group, deleting ERP group, enable/disable ERP group."       
+    ::= { osERPCfgEntry 101 }    
+    
+-- ************************************************************
+-- The osERPOperTable Table
+-- ************************************************************
+osERPOperTable  OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsERPOperEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION "Ethernet Ring Protection operation description table."
+    REFERENCE
+       "G.8032"
+    ::= { osERP 3 }    
+
+osERPOperEntry  OBJECT-TYPE
+    SYNTAX       OsERPOperEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    AUGMENTS    { osERPCfgEntry }
+--    INDEX { osERPCfgGroupId } 
+    ::= { osERPOperTable 1 }
+
+OsERPOperEntry ::= SEQUENCE {
+      osERPOperEastPortState  ErpPortState,
+      osERPOperWestPortState  ErpPortState,
+      osERPOperLastEvent      INTEGER,
+      osERPOperState          INTEGER      
+}      
+
+osERPOperEastPortState OBJECT-TYPE
+    SYNTAX       ErpPortState
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+       "Indicates east-port state."
+    REFERENCE
+       "G.8032"
+    ::= { osERPOperEntry 1 } 
+
+osERPOperWestPortState OBJECT-TYPE
+    SYNTAX       ErpPortState
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+       "Indicates west-port state."
+    ::= { osERPOperEntry 2 }
+    
+osERPOperLastEvent OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   none            (1),
+                   clear           (2),
+                   fs              (3),
+                   rapsFs          (4),                                                           
+                   localSf         (5),
+                   localClearSf    (6),
+                   rapsSf          (7),
+                   rapsMs          (8),
+                   ms              (9),              
+                   wtrExpires      (10),
+                   wtrRunning      (11),
+                   wtbExpires      (12),
+                   wtbRunning      (13),                   
+                   rapsNrRb        (14),
+                   rapsNr          (15)                                
+    }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+       "Indicates the last event that was received by rings ports."
+    DEFVAL { none }
+    ::= { osERPOperEntry 3 }
+
+
+osERPOperState   OBJECT-TYPE
+    SYNTAX       INTEGER {
+                   init         (1),
+                   idle         (2),
+                   protection   (3),
+                   forceSwitch  (4),                                                
+                   manualSwitch (5),
+                   pending      (6)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+       "Indicates the state of the node (and the ring)."
+    DEFVAL { init }
+    ::= { osERPOperEntry 4 }
+
+    
+-- *******************************************************************
+--   NOTIFICATIONS (TRAPS)
+-- *******************************************************************  
+osERPTrapWestPortStateChange NOTIFICATION-TYPE     
+    OBJECTS     { osERPOperWestPortState,                 
+                  osERPOperLastEvent
+                }
+    STATUS      current
+    DESCRIPTION
+       "."      
+    REFERENCE
+       "G.8032"
+    ::= { osERPNotifications 1 }
+    
+    
+osERPTrapEastPortStateChange NOTIFICATION-TYPE     
+    OBJECTS     { osERPOperEastPortState,                 
+                  osERPOperLastEvent
+                }
+    STATUS      current
+    DESCRIPTION
+       "."      
+    REFERENCE
+       "G.8032"
+    ::= { osERPNotifications 2 }          
+        
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+osERPCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osERPMandatoryGroup,
+                          osERPNotificationsGroup
+                         }
+
+    ::= { osERPMIBCompliances 1 }
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+osERPMandatoryGroup  OBJECT-GROUP
+    OBJECTS {                                                        
+        osERPVerSupport,
+        osERPSupport,
+        osERPFeaturesSupport,
+
+        osERPCfgEastPort,
+        osERPCfgWestPort,
+        osERPCfgRplMode,
+        osERPCfgRplPort,
+        osERPCfgPrimaryVlan,
+        osERPCfgVlans,
+        osERPCfgChannelBlocking,
+        osERPCfgWTRTimer,
+        osERPCfgGuardTimer,
+        osERPCfgHoldOffTimer,
+        osERPCfgEPortVirtualChannel,
+        osERPCfgWPortVirtualChannel,        
+        osERPCfgCcmMd,
+        osERPCfgCcmMa,
+        osERPCfgCcmERMep,
+        osERPCfgCcmWRMep,      
+        osERPCfgCcmEEnable,
+        osERPCfgCcmWEnable,
+        osERPCfgVersion,
+        osERPCfgCommand,
+        osERPCfgRevertive,
+        osERPCfgDomain,
+        osERPCfgSendSnmpTrap,
+        osERPCfgRingId,
+        osERPCfgLastError,
+        osERPCfgAdminStatus,
+                
+        osERPOperEastPortState,
+        osERPOperWestPortState,
+        osERPOperLastEvent,
+        osERPOperState                              
+    }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osERPMIBGroups 1 }
+
+
+-- ...................................................................
+--  NOTIFICATION-GROUP
+-- ................................................................... 
+osERPNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {           
+                   osERPTrapWestPortStateChange,
+                   osERPTrapEastPortStateChange                        
+                 }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osERPMIBGroups 2 }
+   
+END
+

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage entities
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -65,11 +65,7 @@ function discover_storage_definition($device, $mib, $entry, $object)
         $options['storage_type'] = $storage_entry['type'];
 
         // Generate storage description
-        $storage_entry['i']     = $i;
-        $storage_entry['index'] = $index;
-        foreach (explode('.', $index) as $k => $i) {
-            $storage_entry['index' . $k] = $i;           // Index parts
-        }
+        $storage_entry = array_merge($storage_entry, entity_index_tags($index, $i));
         $descr = entity_descr_definition('storage', $entry, $storage_entry, $storage_count);
 
         // Check valid exist with entity tags
@@ -91,7 +87,7 @@ function discover_storage_definition($device, $mib, $entry, $object)
 
         // Convert strings '3.40 TB' to value
         // See QNAP NAS-MIB or HIK-DEVICE-MIB
-        $unit = !isset($entry['unit']) ? NULL : $entry['unit'];
+        $unit = $entry['unit'] ?? NULL;
 
         // Fetch used, total, free and percentage values, if OIDs are defined for them
 
@@ -207,7 +203,7 @@ function discover_storage_ng($device, $storage_mib, $storage_object, $storage_in
     $storage_used = $storage['used'];
     $storage_free = $storage['free'];
     $storage_perc = $storage['perc'];
-    $storage_type = isset($options['storage_type']) ? $options['storage_type'] : $object;
+    $storage_type = $options['storage_type'] ?? $storage_object;
 
     print_debug($device['device_id'] . " -> $storage_index, $storage_object, $storage_mib, $storage_descr, $storage_units, $storage_size, $storage_used, $storage_hc");
 
@@ -242,25 +238,25 @@ function discover_storage_ng($device, $storage_mib, $storage_object, $storage_in
 
         $update = ['device_id' => $device_id];
         foreach (array_merge($params, $params_state) as $param) {
-            $update[$param] = ($$param === NULL ? ['NULL'] : $$param);
+            $update[$param] = $$param ?? [ 'NULL' ];
         }
         $id = dbInsert($update, 'storage');
 
-        $GLOBALS['module_stats']['storage']['added']++; //echo('+');
+        $GLOBALS['module_stats']['storage']['added']++;
         log_event("Storage added: index $storage_index, mib $storage_mib, descr $storage_descr", $device, 'storage', $id);
     } else {
         $update = [];
         foreach ($params as $param) {
             if ($$param != $storage_db[$param]) {
-                $update[$param] = ($$param === NULL ? ['NULL'] : $$param);
+                $update[$param] = $$param ?? [ 'NULL' ];
             }
         }
         if (count($update)) {
             dbUpdate($update, 'storage', '`storage_id` = ?', [$storage_db['storage_id']]);
-            $GLOBALS['module_stats']['storage']['updated']++; //echo('U');
+            $GLOBALS['module_stats']['storage']['updated']++;
             log_event("Storage updated: index $storage_index, mib $storage_mib, descr $storage_descr", $device, 'storage', $storage_db['storage_id']);
         } else {
-            $GLOBALS['module_stats']['storage']['unchanged']++; //echo('.');
+            $GLOBALS['module_stats']['storage']['unchanged']++;
         }
     }
     print_debug_vars($update);

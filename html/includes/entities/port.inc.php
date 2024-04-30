@@ -6,9 +6,60 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
+
+function build_ports_where_filter($device, $filters_array) {
+
+    $where = [];
+    foreach ($filters_array as $var => $value) {
+        if (!$value) {
+            continue;
+        }
+
+        $var = strtolower($var);
+        switch ($var) {
+            case 'up':       $where[] = '(`ifAdminStatus` = "up" AND `ifOperStatus` IN ("up", "testing", "monitoring") AND `ignore` = 0 AND `deleted` = 0)'; break;
+
+            case 'down':     $where[] = '(`ifAdminStatus` = "up" AND `ifOperStatus` IN ("lowerLayerDown", "down"))'; break;
+            case 'shutdown': $where[] = '`ifAdminStatus` = "down"'; break;
+
+            /* by port type
+            case 'ethernet': $where[] = '`ifType` IN ("ethernetCsmacd", "iso88023Csmacd", "gigabitEthernet", "fastEther", "fastEtherFX")'; break;
+            case 'virtual':  $where[] = '`ifType` IN ("other", "softwareLoopback", "bridge", "propVirtual", "l2vlan", "l3ipvlan")'; break;
+            case 'optical':  $where[] = '`ifType` LIKE "optical%"'; break;
+            case 'docs':     $where[] = '`ifType` LIKE "docs%"'; break;
+            case 'dsl':      $where[] = '`ifType` IN ("adsl", "vdsl")'; break;
+            */
+
+            case 'ignore':
+            case 'ignored':  $where[] = '`ignore` = 1'; break;
+
+            case 'delete':
+            case 'deleted':  $where[] = '`deleted` = 1'; break;
+
+            case 'all':
+                // hide all
+                return '0';
+                //return [ 0 ];
+
+            default:
+                // by port type
+                if (isset($GLOBALS['config']['port_types'][$var])) {
+                    $where[] = generate_query_values($GLOBALS['config']['port_types'][$var]['iftype'], 'ifType');
+                    break;
+                }
+        }
+    }
+    if (empty($where)) {
+        return '';
+    }
+
+    return '`port_id` NOT IN (' . dbMakeQuery('SELECT `port_id` FROM `ports` WHERE `device_id` = ? AND ((' . implode(') OR (', $where) . '))', [ $device['device_id'] ]) . ')';
+    //$ids = dbFetchColumn('SELECT `port_id` FROM `ports` WHERE `device_id` = ? AND ((' . implode(') OR (', $where) . '))', [ $device['device_id'] ]);
+    //return generate_query_values_ng($ids, 'port_id', '!=');
+}
 
 function build_ports_where_array_ng($vars)
 {
@@ -79,7 +130,7 @@ function build_ports_where_array($vars)
                     break;
                 case 'errors':
                     if (get_var_true($value)) {
-                        $where[] = " AND (`ifInErrors_delta` > '0' OR `ifOutErrors_delta` > '0')";
+                        $where[] = " AND (`ifInErrors_delta` > 0 OR `ifOutErrors_delta` > 0)";
                     }
                     break;
                 case 'alerted':
@@ -94,15 +145,12 @@ function build_ports_where_array($vars)
                     // Allowed multiple states as array
                     $state_where = [];
                     foreach ((array)$value as $state) {
-                        if ($state === "down") {
-                            $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("lowerLayerDown", "down")';
-                            //$state_where[] = generate_query_values_ng('up', 'ifAdminStatus') . generate_query_values_and(['down', 'lowerLayerDown'], 'ifOperStatus');
-                        } elseif ($state === "up") {
-                            $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("up", "testing", "monitoring")';
-                            //$state_where[] = generate_query_values_ng('up', 'ifAdminStatus') . generate_query_values_and(['up', 'testing', 'monitoring'], 'ifOperStatus');
-                        } elseif ($state === "admindown" || $state === "shutdown") {
-                            $state_where[] = '`ifAdminStatus` = "down"';
-                            //$state_where[] = generate_query_values_ng('down', 'ifAdminStatus');
+                        switch ($state) {
+                            case 'up':        $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("up", "testing", "monitoring")'; break;
+                            case 'down':      $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("lowerLayerDown", "down")'; break;
+                            case 'shutdown':
+                            case 'admindown': $state_where[] = '`ifAdminStatus` = "down"'; break;
+                            case 'adminup':   $state_where[] = '`ifAdminStatus` != "down"'; break;
                         }
                     }
                     switch (count($state_where)) {
@@ -173,8 +221,6 @@ function generate_port_popup_header($port)
  */
 function generate_port_popup($port, $text = NULL, $type = NULL)
 {
-    $time = $GLOBALS['config']['time'];
-
     if (!isset($port['os'])) {
         $port = array_merge($port, device_by_id_cache($port['device_id']));
     }
@@ -205,15 +251,15 @@ function generate_port_popup($port, $text = NULL, $type = NULL)
         $graph_array['legend'] = "yes";
         $graph_array['height'] = "100";
         $graph_array['width']  = "275";
-        $graph_array['to']     = $time['now'];
-        $graph_array['from']   = $time['day'];
+        $graph_array['to']     = get_time();
+        $graph_array['from']   = get_time('day');
         $graph_array['id']     = $port['port_id'];
         $content               .= generate_graph_tag($graph_array);
-        $graph_array['from']   = $time['week'];
+        $graph_array['from']   = get_time('week');
         $content               .= generate_graph_tag($graph_array);
-        $graph_array['from']   = $time['month'];
+        $graph_array['from']   = get_time('month');
         $content               .= generate_graph_tag($graph_array);
-        $graph_array['from']   = $time['year'];
+        $graph_array['from']   = get_time('year');
         $content               .= generate_graph_tag($graph_array);
         $content               .= "</div>";
         //$content .= generate_box_close();
@@ -248,10 +294,13 @@ function generate_port_link($port, $text = NULL, $type = NULL, $escape = FALSE, 
             $text = escape_html($text);
         }
 
+        if ($short) {
+            //$port['html_class'] .= ' text-nowrap';
+        }
         return '<a href="' . $url . '" class="entity-popup ' . $port['html_class'] . '" data-eid="' . $port['port_id'] . '" data-etype="port">' . $text . '</a>';
-    } else {
-        return escape_html($text);
     }
+
+    return escape_html($text);
 }
 
 // Just simplify function call, instead generate_port_link($port, NULL, NULL, TRUE, TRUE)
@@ -324,9 +373,10 @@ function generate_port_row($port, $vars = [])
         $vars['view'] = "basic";
     }
 
-    // Populate $port_adsl if the port has ADSL-MIB data
-    if (!isset($cache['ports_option']['ports_adsl']) || in_array($port['port_id'], $cache['ports_option']['ports_adsl'])) {
-        $port_adsl = dbFetchRow("SELECT * FROM `ports_adsl` WHERE `port_id` = ?", [$port['port_id']]);
+    // Pre-cache ports tables
+    if (!isset($cache['ports_cbqos'][$device['device_id']],
+               $cache['ports_mac_accounting'][$device['device_id']])) {
+        cache_ports_tables($device, $vars);
     }
 
     // Populate $port['tags'] with various tags to identify port statuses and features
@@ -352,20 +402,12 @@ function generate_port_row($port, $vars = [])
     }
 
     // Port CBQoS
-    if (isset($cache['ports_option']['ports_cbqos'])) {
-        if (in_array($port['port_id'], $cache['ports_option']['ports_cbqos'])) {
-            $port['tags'] .= '<a href="' . generate_port_url($port, ['view' => 'cbqos']) . '"><span class="label label-info">CBQoS</span></a>';
-        }
-    } elseif (dbExist('ports_cbqos', '`port_id` = ?', [$port['port_id']])) {
+    if (in_array($port['port_id'], (array)$cache['ports_cbqos'][$device['device_id']])) {
         $port['tags'] .= '<a href="' . generate_port_url($port, ['view' => 'cbqos']) . '"><span class="label label-info">CBQoS</span></a>';
     }
 
     // Port MAC Accounting
-    if (isset($cache['ports_option']['mac_accounting'])) {
-        if (in_array($port['port_id'], $cache['ports_option']['mac_accounting'])) {
-            $port['tags'] .= '<a href="' . generate_port_url($port, ['view' => 'macaccounting']) . '"><span class="label label-info">MAC</span></a>';
-        }
-    } elseif (dbExist('mac_accounting', '`port_id` = ?', [$port['port_id']])) {
+    if (in_array($port['port_id'], (array)$cache['ports_mac_accounting'][$device['device_id']])) {
         $port['tags'] .= '<a href="' . generate_port_url($port, ['view' => 'macaccounting']) . '"><span class="label label-info">MAC</span></a>';
     }
 
@@ -387,7 +429,7 @@ function generate_port_row($port, $vars = [])
             <td style="width: 1px;"></td>';
 
         if ($vars['page'] !== "device" && !get_var_true($vars['popup'])) {
-            // Print device name link if we're not inside the device page hierarchy.
+            // Print a device name link if we're not inside the device page hierarchy.
 
             $table_cols++; // Increment table columns by one to make sure graph line draws correctly
 
@@ -412,8 +454,14 @@ function generate_port_row($port, $vars = [])
           '<td style="width: 110px;"><small>' . $port['human_speed'] . '<br />' . $port['ifMtu'] . '</small></td>
             <td ><small>' . $port['human_type'] . '<br />' . $port['human_mac'] . '</small></td>
           </tr>';
-    } elseif ($vars['view'] === "details" || $vars['view'] === "detail") {
+    } elseif (str_starts_with($vars['view'], "detail")) {
         // Print detailed view table row
+
+        if (!isset($cache['ports_ipv4_addresses'][$device['device_id']],
+                   $cache['ports_ipv6_addresses'][$device['device_id']],
+                   $cache['ports_vlan'][$device['device_id']])) {
+            cache_ports_tables($device, $vars);
+        }
 
         $table_cols = '9';
 
@@ -448,20 +496,21 @@ function generate_port_row($port, $vars = [])
         unset($break);
 
         $ignore_type = $GLOBALS['config']['ip-address']['ignore_type'];
-        if (!isset($cache['ports_option']['ipv4_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv4_addresses'])) {
-            $sql = "SELECT * FROM `ipv4_addresses` WHERE `port_id` = ?";
-            // Do not exclude IPv4 link-local
-            $sql .= generate_query_values_and(array_diff($ignore_type, ['link-local']), 'ipv4_type', '!='); // Do not show ignored ip types
-            foreach (dbFetchRows($sql, [$port['port_id']]) as $ip) {
-                $string .= $break . generate_popup_link('ip', $ip['ipv4_address'] . '/' . $ip['ipv4_prefixlen'], NULL, 'small');
+        if (in_array($port['port_id'], (array)$cache['ports_ipv4_addresses'][$device['device_id']])) {
+            $sql = "SELECT * FROM `ipv4_addresses`";
+            // Do not show ignored ip types (Do not exclude IPv4 link-local)
+            $sql .= generate_where_clause('`port_id` = ?', generate_query_values(array_diff($ignore_type, ['link-local']), 'ipv4_type', '!='));
+            foreach (dbFetchRows($sql, [$port['port_id']]) as $address) {
+                $string .= $break . generate_popup_link('ip', $address['ipv4_address'] . '/' . $address['ipv4_prefixlen'], NULL, 'small');
                 $break  = "<br />";
             }
         }
-        if (!isset($cache['ports_option']['ipv6_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv6_addresses'])) {
-            $sql = "SELECT * FROM `ipv6_addresses` WHERE `port_id` = ?";
-            $sql .= generate_query_values_and($ignore_type, 'ipv6_type', '!='); // Do not show ignored ip types
-            foreach (dbFetchRows($sql, [$port['port_id']]) as $ip6) {
-                $string .= $break . generate_popup_link('ip', $ip6['ipv6_address'] . '/' . $ip6['ipv6_prefixlen'], NULL, 'small');
+        if (in_array($port['port_id'], (array)$cache['ports_ipv6_addresses'][$device['device_id']])) {
+            $sql = "SELECT * FROM `ipv6_addresses`";
+            // Do not show ignored ip types
+            $sql .= generate_where_clause('`port_id` = ?', generate_query_values($ignore_type, 'ipv6_type', '!='));
+            foreach (dbFetchRows($sql, [$port['port_id']]) as $address) {
+                $string .= $break . generate_popup_link('ip', $address['ipv6_address'] . '/' . $address['ipv6_prefixlen'], NULL, 'small');
                 $break  = "<br />";
             }
         }
@@ -475,13 +524,13 @@ function generate_port_row($port, $vars = [])
         $port['graph_type'] = "port_bits";
 
         $graph_array           = [];
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = $port['port_id'];
         $graph_array['type']   = $port['graph_type'];
         $graph_array['width']  = 100;
         $graph_array['height'] = 20;
         $graph_array['bg']     = 'ffffff00';
-        $graph_array['from']   = $config['time']['day'];
+        $graph_array['from']   = get_time('day');
 
         $string .= generate_port_link($port, generate_graph_tag($graph_array));
 
@@ -528,17 +577,14 @@ function generate_port_row($port, $vars = [])
         //$string .= '<br />';
 
         // Set VLAN data if the port has ifTrunk populated
-        if (strlen($port['ifTrunk']) &&
-            !in_array($port['ifTrunk'], ['access', 'routed'])) { // Skip on routed (or access)
+        if (!safe_empty($port['ifTrunk']) &&
+            !in_array($port['ifTrunk'], [ 'access', 'routed' ])) { // Skip on routed (or access)
+
+            $vlans_cache = $cache['ports_vlan'][$device['device_id']];
             if ($port['ifVlan']) {
                 // Native VLAN
-                if (!isset($cache['ports_vlan'])) {
-                    $native_state = dbFetchCell('SELECT `state` FROM `ports_vlans` WHERE `device_id` = ? AND `port_id` = ?', [$device['device_id'], $port['port_id']]);
-                    $native_name  = dbFetchCell('SELECT `vlan_name` FROM `vlans` WHERE `device_id` = ? AND `vlan_vlan` = ?', [$device['device_id'], $port['ifVlan']]);
-                } else {
-                    $native_state = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['state'];
-                    $native_name  = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['vlan_name'];
-                }
+                $native_state = $vlans_cache[$port['port_id']][$port['ifVlan']]['state'];
+                $native_name  = $vlans_cache[$port['port_id']][$port['ifVlan']]['vlan_name'];
                 switch ($native_state) {
                     case 'blocking':
                         $class = 'text-danger';
@@ -555,20 +601,13 @@ function generate_port_row($port, $vars = [])
                 $native_tooltip = 'NATIVE: <strong class=' . $class . '>' . $port['ifVlan'] . ' [' . $native_name . ']</strong><br />';
             }
 
-            if (!isset($cache['ports_vlan'])) {
-                $vlans = dbFetchRows('SELECT * FROM `ports_vlans` AS PV
-                         LEFT JOIN vlans AS V ON PV.`vlan` = V.`vlan_vlan` AND PV.`device_id` = V.`device_id`
-                         WHERE PV.`port_id` = ? AND PV.`device_id` = ? ORDER BY PV.`vlan`;', [$port['port_id'], $device['device_id']]);
-            } else {
-                $vlans = $cache['ports_vlan'][$port['port_id']];
-            }
-            $vlans_count = safe_count($vlans);
+            $vlans_count = safe_count($vlans_cache[$port['port_id']]);
             $rel         = ($vlans_count || $native_tooltip) ? 'tooltip' : ''; // Hide tooltip for empty
             $string      .= '<p class="small"><a class="label label-info" data-rel="' . $rel . '" data-tooltip="<div class=\'small\' style=\'max-width: 320px; text-align: justify;\'>' . $native_tooltip;
             if ($vlans_count) {
                 $string     .= 'ALLOWED: ';
                 $vlans_aggr = [];
-                foreach ($vlans as $vlan) {
+                foreach ($vlans_cache[$port['port_id']] as $vlan) {
                     if ($vlans_count > 20) {
                         // Aggregate VLANs
                         $vlans_aggr[] = $vlan['vlan'];
@@ -597,13 +636,11 @@ function generate_port_row($port, $vars = [])
             }
             $string .= '</div>">' . $port['ifTrunk'] . '</a></p>';
         } elseif ($port['ifVlan']) {
-            if (!isset($cache['ports_vlan'])) {
-                $native_state = dbFetchCell('SELECT `state` FROM `ports_vlans` WHERE `device_id` = ? AND `port_id` = ?', [$device['device_id'], $port['port_id']]);
-                $native_name  = dbFetchCell('SELECT `vlan_name` FROM `vlans` WHERE `device_id` = ? AND `vlan_vlan` = ?', [$device['device_id'], $port['ifVlan']]);
-            } else {
-                $native_state = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['state'];
-                $native_name  = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['vlan_name'];
-            }
+
+            $vlans_cache  = $cache['ports_vlan'][$device['device_id']];
+            $native_state = $vlans_cache[$port['port_id']][$port['ifVlan']]['state'];
+            $native_name  = $vlans_cache[$port['port_id']][$port['ifVlan']]['vlan_name'];
+
             switch ($native_state) {
                 case 'blocking':
                     $class = 'label-error';
@@ -614,16 +651,22 @@ function generate_port_row($port, $vars = [])
                 default:
                     $class = '';
             }
-            $rel       = ($native_name) ? 'tooltip' : ''; // Hide tooltip for empty
-            $vlan_name = ($port['ifTrunk'] !== 'access') ? nicecase($port['ifTrunk']) . ' ' : '';
+            $rel       = $native_name ? 'tooltip' : ''; // Hide tooltip for empty
+            $vlan_name = $port['ifTrunk'] !== 'access' ? nicecase($port['ifTrunk']) . ' ' : '';
             $vlan_name .= 'VLAN ' . $port['ifVlan'];
             $string    .= '<br /><span data-rel="' . $rel . '" class="label ' . $class . '"  data-tooltip="<strong class=\'small\'>' . $port['ifVlan'] . ' [' . $native_name . ']</strong>">' . $vlan_name . '</span>';
-        } elseif ($port['ifVrf']) { // Print the VRF name if the port is assigned to a VRF
+        } elseif ($port['ifVrf']) {
+            // Print the VRF name if the port is assigned to a VRF
             $vrf_name = dbFetchCell("SELECT `vrf_name` FROM `vrfs` WHERE `vrf_id` = ?", [$port['ifVrf']]);
             $string   .= '<br /><span class="label label-success" data-rel="tooltip" data-tooltip="VRF">' . $vrf_name . '</span>';
         }
 
         $string .= '</td>';
+
+        // Populate $port_adsl if the port has ADSL-MIB data
+        if (in_array($port['port_id'], (array)$cache['ports_adsl'][$device['device_id']])) {
+            $port_adsl = dbFetchRow("SELECT * FROM `ports_adsl` WHERE `port_id` = ?", [ $port['port_id'] ]);
+        }
 
         // If the port is ADSL, print ADSL port data.
         if ($port_adsl['adslLineCoding']) {
@@ -639,7 +682,7 @@ function generate_port_row($port, $vars = [])
             $string .= 'SNR <i class="icon-circle-arrow-down green"></i> ' . $port_adsl['adslAtucCurrSnrMgn'] . 'dB <i class="icon-circle-arrow-up blue"></i> ' . $port_adsl['adslAturCurrSnrMgn'] . 'dB';
             $string .= '</span>';
         } else {
-            // Otherwise print normal port data
+            // Otherwise, print normal port data
             $string .= '<td style="width: 150px;"><span class="small">';
             if (!safe_empty($port['ifPhysAddress'])) {
                 $string .= $port['human_mac'];
@@ -658,8 +701,8 @@ function generate_port_row($port, $vars = [])
             $br = '';
 
             // Populate links array for ports with direct links
-            if (!isset($cache['ports_option']['neighbours']) || in_array($port['port_id'], $cache['ports_option']['neighbours'])) {
-                foreach (dbFetchRows('SELECT * FROM `neighbours` WHERE `port_id` = ? AND `active` = ?', [$port['port_id'], 1]) as $neighbour) {
+            if (in_array($port['port_id'], (array)$cache['ports_neighbours'][$device['device_id']])) {
+                foreach (dbFetchRows('SELECT * FROM `neighbours` WHERE `port_id` = ? AND `active` = ?', [ $port['port_id'], 1 ]) as $neighbour) {
                     // print_r($neighbour);
                     if ($neighbour['remote_port_id']) {
                         // Do not show some "non-physical" interfaces links,
@@ -676,7 +719,7 @@ function generate_port_row($port, $vars = [])
             } // else {  }
 
             // Populate links array for devices which share an IPv4 subnet
-            if (!isset($cache['ports_option']['ipv4_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv4_addresses'])) {
+            if (in_array($port['port_id'], (array)$cache['ports_ipv4_addresses'][$device['device_id']])) {
                 $ignore_type   = $GLOBALS['config']['ip-address']['ignore_type'];
                 $ignore_type[] = 'loopback'; // Always ignore loopback on links
 
@@ -698,7 +741,7 @@ function generate_port_row($port, $vars = [])
                     foreach (dbFetchRows($link_sql, $params) as $new) {
                         //r($new);
                         if (!$config['web_show_disabled'] &&
-                            in_array($new['device_id'], $cache['devices']['disabled'])) {
+                            in_array($new['device_id'], (array)$cache['devices']['disabled'])) {
                             continue;
                         }
 
@@ -709,7 +752,7 @@ function generate_port_row($port, $vars = [])
             }
 
             // Populate links array for devices which share an IPv6 subnet
-            if (!isset($cache['ports_option']['ipv6_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv6_addresses'])) {
+            if (in_array($port['port_id'], (array)$cache['ports_ipv6_addresses'][$device['device_id']])) {
                 $ignore_type   = $GLOBALS['config']['ip-address']['ignore_type'];
                 $ignore_type[] = 'loopback'; // Always ignore loopback on links
 
@@ -732,7 +775,7 @@ function generate_port_row($port, $vars = [])
                     foreach (dbFetchRows($link_sql, $params) as $new) {
                         //r($new);
                         if (!$config['web_show_disabled'] &&
-                            in_array($new['device_id'], $cache['devices']['disabled'])) {
+                            in_array($new['device_id'], (array)$cache['devices']['disabled'])) {
                             continue;
                         }
 
@@ -794,17 +837,14 @@ function generate_port_row($port, $vars = [])
             }
         }
 
-        if (!isset($cache['ports_option']['pseudowires']) || in_array($port['port_id'], $cache['ports_option']['pseudowires'])) {
+        if (in_array($port['port_id'], (array)$cache['ports_pseudowires'][$device['device_id']])) {
             foreach (dbFetchRows("SELECT * FROM `pseudowires` WHERE `port_id` = ?", [$port['port_id']]) as $pseudowire) {
                 //`port_id`,`peer_device_id`,`peer_ldp_id`,`pwID`,`pwIndex`
-                #    $pw_peer_dev = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", array($pseudowire['peer_device_id']));
                 $pw_peer_int = dbFetchRow("SELECT * FROM `ports` AS I, `pseudowires` AS P WHERE I.`device_id` = ? AND P.`pwID` = ? AND P.`port_id` = I.`port_id`", [$pseudowire['peer_device_id'], $pseudowire['pwID']]);
-
-                #    $pw_peer_int = get_port_by_id_cache($pseudowire['peer_device_id']);
-                $pw_peer_dev = device_by_id_cache($pseudowire['peer_device_id']);
 
                 if (is_array($pw_peer_int)) {
                     humanize_port($pw_peer_int);
+                    $pw_peer_dev = device_by_id_cache($pseudowire['peer_device_id']);
                     $string .= $br . '<i class="' . $config['icon']['cross-connect'] . '"></i> <strong>' . generate_port_link_short($pw_peer_int) . ' on ' . generate_device_link_short($pw_peer_dev) . '</strong>';
                 } else {
                     $string .= $br . '<i class="' . $config['icon']['cross-connect'] . '"></i> <strong> VC ' . $pseudowire['pwID'] . ' on ' . $pseudowire['peer_addr'] . '</strong>';
@@ -839,46 +879,38 @@ function generate_port_row($port, $vars = [])
          * }
          **/
 
-        if (!isset($cache['ports_option']['ports_stack_low']) || in_array($port['ifIndex'], $cache['ports_option']['ports_stack_low'])) {
-            foreach (dbFetchRows("SELECT * FROM `ports_stack` WHERE `port_id_low` = ? AND `device_id` = ? AND `ifStackStatus` = ?", [$port['ifIndex'], $device['device_id'], 'active']) as $higher_if) {
-                if (!$higher_if['port_id_high']) {
-                    continue;
+        $higher_ifs = $cache['ports_stack'][$device['device_id']]['high'][$port['port_id']] ?? [];
+
+        foreach($higher_ifs as $high_if => $id) {
+            //if (isset($pagp[$device['device_id']][$higher_if['port_id_high']][$port['ifIndex']])) { continue; } // Skip if same PAgP port
+            if ($this_port = get_port_by_id_cache($high_if)) {
+                $label = '';
+                if ($this_port['ifType'] === 'l2vlan') {
+                    $label = '<span class="label label-primary">L2 VLAN</span> ';
+                } elseif ($this_port['ifType'] === 'l3ipvlan' || $this_port['ifType'] === 'l3ipxvlan') {
+                    $label = '<span class="label label-info">L3 VLAN</span> ';
+                } elseif ($this_port['ifType'] === 'ieee8023adLag') {
+                    $label = '<span class="label label-success">LAG</span> ';
+                } elseif (str_starts($this_port['port_label'], 'Stack')) {
+                    $label = '<span class="label label-warning">STACK</span> ';
+                } else {
+                    $label = '<span class="label label-default">' . $this_port['human_type'] . '</span> ';
+                    //r($this_port);
                 }
-                //if (isset($pagp[$device['device_id']][$higher_if['port_id_high']][$port['ifIndex']])) { continue; } // Skip if same PAgP port
-                if ($this_port = get_port_by_index_cache($device['device_id'], $higher_if['port_id_high'])) {
-                    $label = '';
-                    if ($this_port['ifType'] === 'l2vlan') {
-                        $label = '<span class="label label-primary">L2 VLAN</span> ';
-                    } elseif ($this_port['ifType'] === 'l3ipvlan' || $this_port['ifType'] === 'l3ipxvlan') {
-                        $label = '<span class="label label-info">L3 VLAN</span> ';
-                    } elseif ($this_port['ifType'] === 'ieee8023adLag') {
-                        $label = '<span class="label label-success">LAG</span> ';
-                    } elseif (str_starts($this_port['port_label'], 'Stack')) {
-                        $label = '<span class="label label-warning">STACK</span> ';
-                    } else {
-                        $label = '<span class="label label-default">' . $this_port['human_type'] . '</span> ';
-                        //r($this_port);
-                    }
-                    $string .= $br . '<i class="' . $config['icon']['split'] . '"></i> <strong>' . generate_port_link($this_port) . '</strong> ' . $label;
-                    $br     = "<br />";
-                }
+                $string .= $br . '<i class="' . $config['icon']['split'] . '"></i> <strong>' . generate_port_link($this_port) . '</strong> ' . $label;
+                $br = "<br />";
             }
         }
 
-        if (!isset($cache['ports_option']['ports_stack_high']) || in_array($port['ifIndex'], $cache['ports_option']['ports_stack_high'])) {
-            foreach (dbFetchRows("SELECT * FROM `ports_stack` 
-                              WHERE `port_id_high` = ? AND `device_id` = ? AND `ifStackStatus` = ?",
-                                 [$port['ifIndex'], $device['device_id'], 'active']) as $lower_if) {
-                if (!$lower_if['port_id_low']) {
-                    continue;
-                }
-                //if (isset($pagp[$device['device_id']][$port['ifIndex']][$lower_if['port_id_low']])) { continue; } // Skip if same PAgP ports
-                if ($this_port = get_port_by_index_cache($device['device_id'], $lower_if['port_id_low'])) {
+        $lower_ifs = $cache['ports_stack'][$device['device_id']]['low'][$port['port_id']] ?? [];
+
+        foreach($lower_ifs as $low_if => $id) {
+                if (isset($pagp[$device['device_id']][$port['ifIndex']][$low_if])) { continue; } // Skip if same PAgP ports
+                if ($this_port = get_port_by_id_cache($low_if)) {
                     $string .= $br . '<i class="' . $config['icon']['merge'] . '"></i> <strong>' . generate_port_link($this_port) . '</strong>';
                     $br     = "<br />";
                 }
             }
-        }
 
         unset($int_links, $int_links_v6, $int_links_v4, $int_links_phys, $br);
 
@@ -898,7 +930,7 @@ function generate_port_row($port, $vars = [])
         $string .= '<tr><td colspan="' . $table_cols . '">';
 
         $graph_array         = [];
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $port['port_id'];
         $graph_array['type'] = 'port_' . $vars['graph'];
 
@@ -934,20 +966,13 @@ function print_port_minigraph($port, $graph_type = 'port_bits', $period = 'day')
     $link_array         = $graph_array;
     $link_array['page'] = "graphs";
     unset($link_array['height'], $link_array['width']);
-    $link = generate_url($link_array);
 
-    echo '
-  <div class="box box-solid" style="float: left; margin-left: 10px; margin-bottom: 10px;  width:302px; min-width: 302px; max-width:302px; min-height:158px; max-height:158;">
-    <div class="box-header with-border">
-      <a href="device/device=682/"><h3 class="box-title">' . escape_html($port['port_label_short']) . '</h3></a>
-    </div>
-  <div class="box-body no-padding">
-  ' . overlib_link($link, generate_graph_tag($graph_array), generate_graph_tag($graph_array_zoom), NULL) . '
-  </div>
-  <div class="box-footer" style="padding: 0px 10px"><span style="font-size: 0.7em">' . short_port_descr($port['ifAlias']) . '</span></div>
-  
-</div>';
-
+    echo generate_box_open([ 'box-style' => 'float: left; margin-left: 10px; margin-bottom: 10px; width:302px; min-width: 302px; max-width:302px; min-height:158px; max-height:158;',
+                             'header-border' => TRUE, 'title' => $port['port_label_short'], 'url' => generate_port_url($port, [ 'view' => 'graphs' ]) ]);
+    //print_graph_popup($graph_array);
+    echo overlib_link(generate_url($link_array), generate_graph_tag($graph_array), generate_graph_tag($graph_array_zoom));
+    echo generate_box_close([ 'footer_content' => '<span style="font-size: 0.7em">' . short_port_descr($port['ifAlias']) . '</span>',
+                              'footer_nopadding' => TRUE ]);
 }
 
 function print_port_permission_box($mode, $perms, $params = []) {
@@ -1043,10 +1068,12 @@ function print_port_permission_box($mode, $perms, $params = []) {
         'type'     => 'select',
         'name'     => 'Select a device',
         'width'    => '150px',
-        'onchange' => "getInterfaceList(this, 'port_entity_id')",
+        'onload'   => "getEntityList(NULL, this, 'device')",
+        'onchange' => "getEntityList(this.value, 'port_entity_id', 'port')",
+        'attribs'  => ['data-load' => 'devices'],
         //'value'    => $vars['device_id'],
         'groups'   => ['', 'UP', 'DOWN', 'DISABLED'], // This is optgroup order for values (if required)
-        'values'   => $form_items['devices']
+        //'values'   => $form_items['devices']
     ];
     $form['row'][0]['port_entity_id'] = [
         'type'   => 'multiselect',
@@ -1066,6 +1093,292 @@ function print_port_permission_box($mode, $perms, $params = []) {
     print_form($form);
 
     echo generate_box_close();
+}
+
+function generate_port_sort($vars) {
+    if (isset($vars['sort'])) {
+        //$sort_order = get_sort_order($vars);
+        //$sort_neg = get_sort_order($vars, TRUE);
+        switch ($vars['sort']) {
+            case 'index':
+                return generate_query_sort('ifIndex', get_sort_order($vars), 'integer');
+
+            case 'traffic':
+                //$ports = array_sort_by($ports, 'ifOctets_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifOctets_rate', get_sort_order($vars, TRUE));
+
+            case 'traffic_in':
+                //$ports = array_sort_by($ports, 'ifInOctets_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifInOctets_rate', get_sort_order($vars, TRUE));
+
+            case 'traffic_out':
+                //$ports = array_sort_by($ports, 'ifOutOctets_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifOutOctets_rate', get_sort_order($vars, TRUE));
+
+            case 'traffic_perc_in':
+                //$ports = array_sort_by($ports, 'ifInOctets_perc', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifInOctets_perc', get_sort_order($vars, TRUE));
+
+            case 'traffic_perc_out':
+                //$ports = array_sort_by($ports, 'ifOutOctets_perc', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifOutOctets_perc', get_sort_order($vars, TRUE));
+
+            case 'traffic_perc':
+                //$ports = array_sort_by($ports, 'ifOctets_perc', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifOctets_perc', get_sort_order($vars, TRUE));
+
+            case 'packets':
+                //$ports = array_sort_by($ports, 'ifUcastPkts_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifUcastPkts_rate', get_sort_order($vars, TRUE));
+
+            case 'packets_in':
+                //$ports = array_sort_by($ports, 'ifInUcastPkts_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifInUcastPkts_rate', get_sort_order($vars, TRUE));
+
+            case 'packets_out':
+                //$ports = array_sort_by($ports, 'ifOutUcastPkts_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifOutUcastPkts_rate', get_sort_order($vars, TRUE));
+
+            case 'errors':
+                //$ports = array_sort_by($ports, 'ifErrors_rate', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifErrors_rate', get_sort_order($vars, TRUE));
+
+            case 'speed':
+                //$ports = array_sort_by($ports, 'ifSpeed', $sort_neg, SORT_NUMERIC);
+                return generate_query_sort('ifSpeed', get_sort_order($vars, TRUE));
+
+            case 'port':
+                //$ports = array_sort_by($ports, 'port_label', $sort_order, SORT_STRING);
+                return generate_query_sort('port_label', get_sort_order($vars));
+
+            case 'media':
+                //$ports = array_sort_by($ports, 'ifType', $sort_order, SORT_STRING);
+                return generate_query_sort('ifType', get_sort_order($vars));
+
+            case 'mtu':
+                //$ports = array_sort_by($ports, 'ifMtu', $sort_order, SORT_NUMERIC);
+                return generate_query_sort('ifMtu', get_sort_order($vars));
+
+            case 'descr':
+                //$ports = array_sort_by($ports, 'ifAlias', $sort_order, SORT_STRING);
+                return generate_query_sort('ifAlias', get_sort_order($vars));
+
+            case 'mac':
+                //$ports = array_sort_by($ports, 'ifPhysAddress', $sort_neg, SORT_STRING);
+                return generate_query_sort('ifPhysAddress', get_sort_order($vars, TRUE));
+
+            default:
+                //$ports = array_sort_by($ports, 'hostname', $sort_order, SORT_STRING, 'ifIndex', $sort_order, SORT_NUMERIC);
+                $sort_order = get_sort_order($vars);
+                return generate_query_sort([ 'hostname', 'ifIndex' ], $sort_order);
+        }
+    } else {
+        return generate_query_sort([ 'hostname', 'ifIndex' ]);
+    }
+}
+
+/**
+ * Start ports sorting based on port type, name and number
+ * Full sort order:
+ *  1. Port type (physical ports always first)
+ *  2. Port base name (TenGig, Gigabit, etc)
+ *  3. Module number
+ *  4. Port number
+ *  5. Port subinterface number
+ *
+ * @param array $device
+ * @param bool $get_ports When TRUE get sorted ports full arrays, otherwise only links (default)
+ * @return array
+ */
+function get_ports_links_sorted($device, $get_ports = FALSE) {
+
+    // Custom order for port types.
+    $sort_types  = array_merge($GLOBALS['config']['port_types']['ethernet']['iftype'],
+                               $GLOBALS['config']['port_types']['aggregation']['iftype'],
+                               $GLOBALS['config']['port_types']['docsmac']['iftype'],
+                               $GLOBALS['config']['port_types']['optical']['iftype'],
+                               $GLOBALS['config']['port_types']['dsl']['iftype'],
+                               $GLOBALS['config']['port_types']['radio']['iftype'],
+                               $GLOBALS['config']['port_types']['virtual']['iftype'],
+                               $GLOBALS['config']['port_types']['tunnel']['iftype'],
+                               $GLOBALS['config']['port_types']['loopback']['iftype'],
+                               $GLOBALS['config']['port_types']['other']['iftype']);
+    /*
+    $sort_types = [
+        'ethernetCsmacd', 'iso88023Csmacd',
+        'gigabitEthernet', 'fastEther', 'starLan', // Obsolete types same as Ethernet
+        'ieee8023adLag',
+        'docsCableMaclayer',
+        'fibreChannel', 'opticalChannel',
+        'adsl', 'adsl2', 'adsl2plus', 'vdsl', 'vdsl2', 'radsl', 'sdsl', 'idsl', 'hdsl2', 'shdsl',
+        'ieee80211',
+        'l2vlan', 'ciscoISLvlan', // L2 VLAN (802.1Q)
+        'l3ipvlan', 'l3ipxvlan',  // L3 VLAN (IP), L3 VLAN (IPX)
+        'propVirtual',
+        'tunnel', 'mplsTunnel',
+        'virtualTg',
+        'softwareLoopback',
+        'other',
+    ];
+    */
+    //r($sort_types);
+
+    $ports_links = [];
+    // We could possibly use different sorting methods for different devices. ifIndex is useful for most Cisco devices.
+    $sql = "SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` != ? ORDER BY `ifIndex`";
+    foreach (dbFetchRows($sql, [ $device['device_id'], '1' ]) as $port) {
+        // Workaround for devices/ports who long time not updated and have empty port_label
+        if (safe_empty($port['port_label']) || safe_empty($port['port_label_short']) || safe_empty($port['port_label_base'] . $port['port_label_num'])) {
+            unset($port['port_label'], $port['port_label_short'], $port['port_label_base'], $port['port_label_num']);
+            process_port_label($port, $device);
+            //r($port);
+        }
+        if (!in_array($port['ifType'], $sort_types, TRUE)) {
+            $sort_types[] = $port['ifType'];
+        }
+
+        $ports_links[$port['ifType']][$port['ifIndex']] = $port;
+
+        // Index example for TenGigabitEthernet3/10.324:
+        // $ports_links['Ethernet'][] = array('port_label_base' => 'TenGigabitEthernet', 'port_label_num' => '3/10.324')
+        $label_num = str_replace([ ':', '_' ], [ '/', '-' ], $port['port_label_num']);
+        //$label_num  = preg_replace('![^\d\.\/]!', '', substr($port['port_label'], strlen($port['port_label_base']))); // Remove base part and all not-numeric chars
+        //preg_match('!^(\d+)(?:\/(\d+)(?:\.(\d+))*)*!', $label_num, $label_nums); // Split by slash and point (1/1.324)
+        $label_nums = [];
+        $i          = 2;
+        //r(array_reverse(explode('/', $label_num)));
+        foreach (array_reverse(explode('/', $label_num)) as $num) {
+            //$num = preg_replace('/[^0-9.]/', '', $num); // Remove all not-numeric chars
+            if ($i === 2) {// && strpos($num, '-') !== FALSE)
+                $num = str_replace('-', '.', $num);
+                [ $label_nums[$i], $label_nums[$i + 1] ] = explode('.', $num, 2);
+            } else {
+                $label_nums[$i] = $num;
+            }
+            $i--;
+        }
+
+        $port['label_num0'] = $label_nums[0] ?: 0;
+        $port['label_num1'] = $label_nums[1] ?: 0;
+        $port['label_num2'] = $label_nums[2] ?: 0;
+        $port['label_num3'] = $label_nums[3] ?: 0;
+
+        $ports_links[$port['ifType']][$port['ifIndex']] = $port;
+    }
+    //r($ports_links);
+
+    // Sorting
+    $ports = [];
+    foreach ($sort_types as $port_type) {
+        if (!isset($ports_links[$port_type])) {
+            continue;
+        }
+        // Second sort iteration (by port label base name and port numbers)
+        $ports_links[$port_type] = array_sort_by($ports_links[$port_type], 'label_base', SORT_DESC, SORT_STRING,
+                                                                           'label_num0', SORT_ASC, SORT_NUMERIC,
+                                                                           'label_num1', SORT_ASC, SORT_NUMERIC,
+                                                                           'label_num2', SORT_ASC, SORT_NUMERIC,
+                                                                           'label_num3', SORT_ASC, SORT_NUMERIC);
+
+        foreach ($ports_links[$port_type] as $ifIndex => $port) {
+            $ports[] = $get_ports ? $port : generate_port_link_short($port);
+        }
+    }
+    //r(safe_count($ports));
+
+    return $ports;
+}
+
+/**
+ * Pre-cache exist device ports options. Used in generate_port_row()
+ *
+ * @param array $device
+ * @param array $vars
+ * @return void
+ */
+function cache_ports_tables($device, $vars = []) {
+    global $cache;
+
+    if (!is_intnum($device['device_id'])) {
+        return;
+    }
+
+    // Cache ports cbqos
+    if (!isset($cache['ports_cbqos'][$device['device_id']])) { // already cached?
+        $cache['ports_cbqos'][$device['device_id']] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `ports_cbqos` WHERE `device_id` = ?", [ $device['device_id'] ]);
+    }
+
+    // Cache ports mac_accounting
+    if (!isset($cache['ports_mac_accounting'][$device['device_id']])) { // already cached?
+        $cache['ports_mac_accounting'][$device['device_id']] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `mac_accounting` WHERE `device_id` = ?", [ $device['device_id'] ]);
+    }
+
+    // Other info used only in detail view
+    if (!str_starts_with($vars['view'], 'detail')) {
+        return;
+    }
+
+    // Cache ports addresses
+    if (!isset($cache['ports_ipv4_addresses'][$device['device_id']], $cache['ports_ipv6_addresses'][$device['device_id']])) { // already cached?
+        $cache['ports_ipv4_addresses'][$device['device_id']] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `ipv4_addresses` WHERE `device_id` = ?", [ $device['device_id'] ]);
+        $cache['ports_ipv6_addresses'][$device['device_id']] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `ipv6_addresses` WHERE `device_id` = ?", [ $device['device_id'] ]);
+    }
+
+    // Cache ports adsl
+    if (!isset($cache['ports_adsl'][$device['device_id']])) { // already cached?
+        $cache['ports_adsl'][$device['device_id']] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `ports_adsl` WHERE `device_id` = ?", [ $device['device_id'] ]);
+    }
+
+    // Cache ports pseudowires
+    if (!isset($cache['ports_pseudowires'][$device['device_id']])) { // already cached?
+        $cache['ports_pseudowires'][$device['device_id']] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `pseudowires` WHERE `device_id` = ?", [ $device['device_id'] ]);
+    }
+
+    // Cache ports neighbours
+    if (!isset($cache['ports_neighbours'][$device['device_id']])) { // already cached?
+        $sql = "SELECT DISTINCT `port_id` FROM `neighbours` WHERE `device_id` = ? AND `active` = 1";
+        $cache['ports_neighbours'][$device['device_id']] = dbFetchColumn($sql, [ $device['device_id'] ]);
+    }
+
+    // Pre-cache all port stacks for device
+    if (!isset($cache['ports_stack'][$device['device_id']])) { // already cached?
+        $cache['ports_stack'][$device['device_id']] = [];
+        foreach (dbFetchRows("SELECT `port_id_low`, `port_id_high` FROM `ports_stack` WHERE `device_id` = ? AND `ifStackStatus` = ?", [ $device['device_id'], 'active' ]) as $stack) {
+            $cache['ports_stack'][$device['device_id']]['high'][$stack['port_id_low']][$stack['port_id_high']] = $stack['port_id_high'];
+            $cache['ports_stack'][$device['device_id']]['low'][$stack['port_id_high']][$stack['port_id_low']]  = $stack['port_id_low'];
+        }
+    }
+
+    // Cache ports vlans
+    if (!isset($cache['ports_vlan'][$device['device_id']])) { // already cached?
+        $cache['ports_vlan'][$device['device_id']] = [];
+        foreach (dbFetchRows('SELECT * FROM `ports_vlans` AS PV LEFT JOIN vlans AS V ON PV.`vlan` = V.`vlan_vlan` AND PV.`device_id` = V.`device_id`
+                       WHERE PV.`device_id` = ? ORDER BY PV.`vlan`', [ $device['device_id'] ]) as $entry) {
+            $cache['ports_vlan'][$device['device_id']][$entry['port_id']][$entry['vlan']] = $entry;
+        }
+    }
+}
+
+// TESTME needs unit testing
+// DOCME needs phpdoc block
+function port_permitted($port_id, $device_id = NULL)
+{
+    return is_entity_permitted($port_id, 'port', $device_id);
+}
+
+// TESTME needs unit testing
+// DOCME needs phpdoc block
+function port_permitted_array(&$ports)
+{
+    // Strip out the ports the user isn't allowed to see, if they don't have global rights
+    if ($_SESSION['userlevel'] < '7') {
+        foreach ($ports as $key => $port) {
+            if (!port_permitted($port['port_id'], $port['device_id'])) {
+                //r($ports[$key]);
+                unset($ports[$key]);
+            }
+        }
+    }
 }
 
 // EOF

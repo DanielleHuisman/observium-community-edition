@@ -400,7 +400,7 @@ class HTML_ImageMap
 	{
 		$html = "";
 		$preg = '/'.$namefilter.'/';
-		
+
 		foreach ($this->shapes as $shape)
 		{
 			# if( ($namefilter == "") || ( preg_match($preg,$shape->name) ))
@@ -420,6 +420,7 @@ class HTML_ImageMap
 
 			}
 		}
+
 		return $html;
 	}
 

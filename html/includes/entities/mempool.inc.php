@@ -150,12 +150,12 @@ function generate_mempool_row($mempool, $vars)
     global $config;
 
     $table_cols = 7;
-    if ($vars['page'] !== "device" && $vars['popup'] != TRUE) {
+    if ($vars['page'] !== "device" && !get_var_true($vars['popup'])) {
         $table_cols++;
     } // Add a column for device.
 
     $graph_array           = [];
-    $graph_array['to']     = $config['time']['now'];
+    $graph_array['to']     = get_time();
     $graph_array['id']     = $mempool['mempool_id'];
     $graph_array['type']   = "mempool_usage";
     $graph_array['legend'] = "no";
@@ -172,7 +172,7 @@ function generate_mempool_row($mempool, $vars)
     $graph_array['width']  = 80;
     $graph_array['height'] = 20;
     $graph_array['bg']     = 'ffffff00';
-    $graph_array['from']   = $config['time']['day'];
+    $graph_array['from']   = get_time('day');
     $mini_graph            = generate_graph_tag($graph_array);
 
     if ($mempool['mempool_total'] != '100') {
@@ -180,7 +180,7 @@ function generate_mempool_row($mempool, $vars)
         $used  = format_bytes($mempool['mempool_used']);
         $free  = format_bytes($mempool['mempool_free']);
     } else {
-        // If total == 100, than memory not have correct size and uses percents only
+        // If total == 100, then memory not have correct size and uses percents only
         $total = $mempool['mempool_total'] . '%';
         $used  = $mempool['mempool_used'] . '%';
         $free  = $mempool['mempool_free'] . '%';
@@ -192,7 +192,7 @@ function generate_mempool_row($mempool, $vars)
 
     $row = '<tr class="' . $mempool['html_row_class'] . '">
             <td class="state-marker"></td>';
-    if ($vars['page'] !== "device" && $vars['popup'] != TRUE) {
+    if ($vars['page'] !== "device" && !get_var_true($vars['popup'])) {
         $row .= '<td class="entity">' . generate_device_link($mempool) . '</td>';
     }
 
@@ -216,7 +216,7 @@ function generate_mempool_row($mempool, $vars)
         $row .= '<td colspan="' . $table_cols . '">';
 
         unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $mempool['mempool_id'];
         $graph_array['type'] = 'mempool_' . $vars['graph'];
 

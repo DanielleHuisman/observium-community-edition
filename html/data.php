@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -26,12 +26,19 @@ if (is_numeric($_GET['id']) && ($config['allow_unauth_graphs'] || port_permitted
     //$title .= " :: Port  ".generate_port_link($port);
     $auth = TRUE;
 
-  $time = time();
-  $HC   = $port['port_64bit'] ? 'HC' : '';
+    if ($device['os'] === 'netapp' && is_device_mib($device, "NETAPP-MIB")) {
+        $oid_in_octets  = 'if64InOctets';
+        $oid_out_octets = 'if64OutOctets';
+        $mib = "NETAPP-MIB";
+    } else {
+        $oid_in_octets  = $port['port_64bit'] ? 'ifHCInOctets' : 'ifInOctets';
+        $oid_out_octets = $port['port_64bit'] ? 'ifHCOutOctets' : 'ifOutOctets';
+        $mib = "IF-MIB";
+    }
 
-    $data = snmp_get_multi_oid($device, "if{$HC}InOctets." . $port['ifIndex'] . " if{$HC}OutOctets." . $port['ifIndex'], [], "IF-MIB");
+    $data = snmp_get_multi_oid($device, [ $oid_in_octets . '.' . $port['ifIndex'], $oid_out_octets . '.' . $port['ifIndex'] ], [], $mib);
 
-    printf("%lf|%s|%s\n", $time, $data[$port['ifIndex']]["if{$HC}InOctets"], $data[$port['ifIndex']]["if{$HC}OutOctets"]);
+    printf("%lf|%s|%s\n", snmp_endtime(), $data[$port['ifIndex']][$oid_in_octets], $data[$port['ifIndex']][$oid_out_octets]);
 } else {
     // not authenticated
     die("Unauthenticated");

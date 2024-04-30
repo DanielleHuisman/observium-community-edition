@@ -1,0 +1,461 @@
+-- Copyright (C) 2011-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fstlm.mib,v 1.5 2013/06/28 13:25:35 siva Exp $
+
+-- TLM Proprietary MIB Definition
+
+-- This MIB contains table used to additional objects required to configure
+-- TE-link running TLM (Te Link Management Module) in addition to
+-- the standard MIB (RFC 4220)
+
+ARICENT-TE-LINK-MIB DEFINITIONS ::= BEGIN
+
+   IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, IpAddress, Integer32, enterprises
+        FROM SNMPv2-SMI                                           -- [RFC2578]
+    DisplayString, TruthValue, RowStatus 
+        FROM SNMPv2-TC                                            -- [RFC2579] 
+    teLinkEntry, TeLinkBandwidth
+        FROM TE-LINK-STD-MIB                                      -- [RFC4220]
+    ifIndex
+        FROM IF-MIB
+    ;
+		   
+fstlm MODULE-IDENTITY
+    LAST-UPDATED "201209170000Z"   
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com" 
+
+    DESCRIPTION  "Proprietary MIB Te-link Manager "
+    REVISION     "201209170000Z"    
+    DESCRIPTION  "The Proprietary MIB for TE-Link Manager"
+
+    ::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 67 }
+
+------------------------------------------------------
+-- groups in fstlm MIB 
+------------------------------------------------------
+fsTlmSystem                       OBJECT IDENTIFIER ::= { fstlm 1 }
+fsTeLinkConfigObjects             OBJECT IDENTIFIER ::= { fstlm 2 }
+
+--------------------------------------------------------
+-- The TLM System Group
+--------------------------------------------------------
+
+fsTeLinkTraceOption OBJECT-TYPE
+    SYNTAX         Integer32
+    MAX-ACCESS 	   read-write  
+    STATUS     	   current
+    DESCRIPTION        
+		"This object is used to define level of trace
+        required for TLM. Levels are defined as Follows.
+                  
+                  0x00000001 -- Critical Trace
+                  0x00000002 -- Function Entry Trace
+                  0x00000004 -- Function Exit Trace
+                  0x00000008 -- Search Failure Trace
+                  0x00000010 -- Resource allocation failure Trace
+                  0x00000020 -- Control Plane Trace."
+    DEFVAL { '00000001'H }                    
+    ::= { fsTlmSystem 1 }
+
+fsTeLinkModuleStatus OBJECT-TYPE
+    SYNTAX        INTEGER {
+                            enable(1),
+                            disable(2)
+                          }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the TE-Link Manager Module is enabled or not.
+         When the value is set to disable from enable, all TE-Link Informations
+         are flushed from OSPF-TE database. External modules will be able to
+         access the TE-Link information only if module status is set to enable."
+    DEFVAL          { disable }
+    ::= { fsTlmSystem 2 }
+        
+--------------------------------------------------------
+-- The TLM fsTeLinkConfigObjects Group
+--------------------------------------------------------
+
+-------------------------------------------------------
+-- TE Link Table "fsTeLinkTable" Start
+------------------------------------------------------
+
+fsTeLinkTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsTeLinkEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This table contains additional properties for TE-Links like
+        bundling or unbundling of TE-Links. 
+        This table augments the TeLink Table."
+   ::= { fsTeLinkConfigObjects 1 }
+
+fsTeLinkEntry OBJECT-TYPE
+   SYNTAX        FsTeLinkEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "An entry in this table exists for each ifEntry with an
+        ifType of teLink(200) for every TE link.  An ifEntry
+        in the ifTable must exist before a teLinkEntry is created
+        with the corresponding ifIndex.  If a TE link entry in the
+        ifTable is destroyed, then so is the corresponding entry
+        in the teLinkTable.  The operational status values are 
+        controlled from the ifEntry."
+
+        AUGMENTS    { teLinkEntry }
+   ::= { fsTeLinkTable 1 }
+
+FsTeLinkEntry ::= SEQUENCE {
+	 fsTeLinkName 		          DisplayString,
+	 fsTeLinkRemoteRtrId              IpAddress,
+       	 fsTeLinkMaximumBandwidth         TeLinkBandwidth,
+         fsTeLinkType                     INTEGER,
+         fsTeLinkInfoType                 INTEGER,
+         fsTeLinkIfType                   INTEGER,
+         fsTeLinkIsAdvertise              TruthValue
+     }
+	 	 
+fsTeLinkName OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE(1..20))
+    MAX-ACCESS read-create 
+    STATUS     current
+    DESCRIPTION 
+         "Textual name (unique on this system) of the TeLink interface. 
+    	  This is mandatory, user needs to provide TE-Link Name for 
+          configuring TE-Link on the router."
+    ::= { fsTeLinkEntry 1 }
+
+fsTeLinkRemoteRtrId OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS read-create  
+    STATUS     current
+    DESCRIPTION 
+         "This object identifies the routerId of the router/device at the 
+          other end of the link.  This is useful in the case of FA-TE links 
+          where it is not possible to get the routerId by the other means."
+    ::= { fsTeLinkEntry 2 }
+
+fsTeLinkMaximumBandwidth OBJECT-TYPE
+    SYNTAX         TeLinkBandwidth
+    UNITS           "bps"
+    MAX-ACCESS 	    read-only  
+    STATUS     	    current
+    DESCRIPTION        
+         "This attribute specifies the maximum bandwidth for a Te-link. This is 
+          the union of the maximum bandwidth of all the component links within 
+          TE link."
+    ::= { fsTeLinkEntry 3 }
+
+fsTeLinkType OBJECT-TYPE
+    SYNTAX     INTEGER  { 
+                   unbundle(0),
+                   bundle(1)
+               }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "This object identifies whether the TE-Link is bundled or unbundled.
+          By default, TE-Links are unbundled."
+    DEFVAL { unbundle }
+
+    ::= { fsTeLinkEntry 4 }
+
+fsTeLinkInfoType OBJECT-TYPE
+   SYNTAX        INTEGER {
+                 forwardingAdjacenyChannel (0),
+                 dataChannel (1),
+                 dataAndControlChannel (2)
+                 }
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+       "This is to indicate the link information type. This information
+    is very crucial for proper generation of Traffic Engineering LSAs.
+
+    forwardingAdjacencyChannel -- Indicates the link information is about the 
+                                  Forwarding Adjacency TE - Link. 
+                                  (Refer RFC: 4206 Section: 3.1 for populating
+                                  the TE Link Parameters of FA TE-Link)
+
+    dataChannel                -- Indicates the link information is about the
+                                  data channel.
+    dataAndControlChannel      -- Indicates the link is data and control
+                                  channel.
+       "
+   ::= { fsTeLinkEntry 5 }
+
+fsTeLinkIfType OBJECT-TYPE
+   SYNTAX        INTEGER {
+                  pointToPoint (1),
+                  multiAccess (2)
+                 }
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+     "This object defines the interface type of the TE link.
+      The links that are definitively point to point take the value
+      'pointToPoint. Rest will take 'multiAccess'.
+      When this TE link operates as dataAndControlChannel, this value
+      should have the same value as that of underlying control channel.
+      When this TE link operates as dataChannel, this value should be
+      equal to pointToPoint."
+   DEFVAL { pointToPoint }   
+   ::= { fsTeLinkEntry 6}   
+
+fsTeLinkIsAdvertise OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "This object identifies whether the TE-Link should be advertised in
+          IGP Domain. If set to true (1), then the TE-Link is advertised.
+          If set to false (2), then the TE-Link is not advertised.
+          By default, all TE-links are advertised in the IGP domain."
+    DEFVAL { true }
+    ::= { fsTeLinkEntry 7 }
+
+
+-- Definitions of fsTeLinkBwThresholdTable  - Starts
+fsTeLinkBwThresholdTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF FsTeLinkBwThresholdEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This table contains information about the Bandwidth Threshold
+              values which are used in bandwidth advertisement of TE-Links."
+         ::= { fsTeLinkConfigObjects 2 }
+
+fsTeLinkBwThresholdEntry OBJECT-TYPE
+         SYNTAX      FsTeLinkBwThresholdEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "An entry in this table represents a set of Bandwidth Thresholds
+              per TE-Link.
+              This table can have either fsTeLinkBwThresholdIndex as 1 or 2. 
+              fsTeLinkBwThresholdIndex = 1 specifies incremental threshold 
+              values and 
+              fsTeLinkBwThresholdIndex =2  specifies decremental threshold 
+              values.
+              The default values for incremental threshold from threshold0 
+              to threshold15 are 5,30,45,60,75,80,90,95,97,98,99,100 
+              respectively.
+              The default values for decremental threshold from threshold0 
+              to threshold15 are 100,99,98,97,96,95,90,85,80,75,60,45,30,15
+              respectively. "
+         INDEX      { ifIndex, fsTeLinkBwThresholdIndex }
+         ::= { fsTeLinkBwThresholdTable 1 }
+
+FsTeLinkBwThresholdEntry ::= SEQUENCE {
+         fsTeLinkBwThresholdIndex         Integer32,
+         fsTeLinkBwThreshold0             Integer32,
+         fsTeLinkBwThreshold1             Integer32,
+         fsTeLinkBwThreshold2             Integer32,
+         fsTeLinkBwThreshold3             Integer32,
+         fsTeLinkBwThreshold4             Integer32,
+         fsTeLinkBwThreshold5             Integer32,
+         fsTeLinkBwThreshold6             Integer32,
+         fsTeLinkBwThreshold7             Integer32,
+         fsTeLinkBwThreshold8             Integer32,
+         fsTeLinkBwThreshold9             Integer32,
+         fsTeLinkBwThreshold10            Integer32,
+         fsTeLinkBwThreshold11            Integer32,
+         fsTeLinkBwThreshold12            Integer32,
+         fsTeLinkBwThreshold13            Integer32,
+         fsTeLinkBwThreshold14            Integer32,
+         fsTeLinkBwThreshold15            Integer32,
+         fsTeLinkBwThresholdRowStatus     RowStatus
+     }
+
+fsTeLinkBwThresholdIndex         OBJECT-TYPE
+         SYNTAX      Integer32 (1..2)
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This object can have either index as 1 or 2.
+              Index = 1 specifies incremental threshold values and
+              Index = 2 specifies decremental threshold values."
+         ::= { fsTeLinkBwThresholdEntry 1 }
+
+fsTeLinkBwThreshold0           OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate first bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 2 }
+
+fsTeLinkBwThreshold1           OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate second bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 3 }
+
+fsTeLinkBwThreshold2         OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate third bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 4 }
+
+fsTeLinkBwThreshold3        OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate fourth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 5 }
+
+fsTeLinkBwThreshold4          OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate fifth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 6 }
+
+fsTeLinkBwThreshold5           OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate sixth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 7 }
+
+fsTeLinkBwThreshold6         OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate seventh bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 8 }
+
+fsTeLinkBwThreshold7         OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate eighth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 9 }
+
+fsTeLinkBwThreshold8          OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate ninth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 10 }
+
+fsTeLinkBwThreshold9           OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate tenth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 11 }
+
+fsTeLinkBwThreshold10         OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate eleventh bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 12 }
+
+fsTeLinkBwThreshold11          OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate twelfth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 13 }
+
+fsTeLinkBwThreshold12        OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate thirteenth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 14 }
+
+fsTeLinkBwThreshold13          OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate fourteenth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 15 }
+
+fsTeLinkBwThreshold14          OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate fifteenth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 16 }
+
+fsTeLinkBwThreshold15          OBJECT-TYPE
+         SYNTAX      Integer32 (0..100)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "16 Threshold values can be specified. 
+              This object is used to indicate sixteenth bandwidth threshold."
+         ::= { fsTeLinkBwThresholdEntry 17 }
+
+fsTeLinkBwThresholdRowStatus      OBJECT-TYPE
+         SYNTAX     RowStatus
+         MAX-ACCESS read-create
+         STATUS     current
+         DESCRIPTION 
+             "This object is used to create, modify or delete an entry in this
+              bandwidth threshold table."
+    ::= { fsTeLinkBwThresholdEntry 18 }
+
+-- Definitions of fsTeLinkBwThresholdTable  - Ends
+
+fsTeLinkBwThresholdForceOption OBJECT-TYPE
+         SYNTAX     INTEGER {
+                        enable (1),
+                        disable (2)
+                    }
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION 
+             "This object is used when bandwidth parameters needs to be sent
+             forcefully to other application without considering 
+             fsTeLinkBwThresholdTable.
+             
+             This object is not saved and restored during mib save-restore
+             operation. 
+             
+             1. enable - Used to send the bandwidth parameters forcefully
+                         without considering fsTeLinkBwThresholdTable.
+             2. disable - This state is set after sending the bandwidth
+                          parameters forcefully and this value can only be read
+                          and cannot be written."
+         DEFVAL { disable }
+     ::= { fsTeLinkConfigObjects 3 }
+
+END

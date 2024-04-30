@@ -1,0 +1,237 @@
+ELTEX-MES-ISS-COPY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Unsigned32
+                FROM SNMPv2-SMI
+        TruthValue, TEXTUAL-CONVENTION, DisplayString, RowStatus
+                FROM SNMPv2-TC
+        eltMesIss
+                FROM ELTEX-MES-ISS-MIB;
+
+eltMesIssCopyMIB MODULE-IDENTITY
+        LAST-UPDATED "201906250000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "MIB extensions for configuring backup file."
+        REVISION "201905020000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 15 }
+
+-- ----------------------
+-- Textual Conversions --
+-- ----------------------
+
+EltMesCopyLocationType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies file location."
+    SYNTAX  INTEGER {
+        tftp(1),
+        sftp(2)
+}
+
+EltMesBackupUserStatus ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Starting backup manually."
+    SYNTAX INTEGER {
+        starting(1),
+        stopped(2)
+    }
+
+EltMesCopyError ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The errors of copy prosess:
+         'no-error' indicates that copy process was successful.
+         'send-failed' indicates that an error occurred while connecting
+                       to a remote server or transferring a file.
+         'save-failed' indicates that an error occured while
+                       writing to the flash memory."
+    SYNTAX INTEGER {
+        no-error(1),
+        send-failed(2),
+        save-failed(3)
+    }
+
+-- --------------------------
+-- Top level MIB structure --
+-- --------------------------
+
+   eltMesIssCopyObjects       OBJECT IDENTIFIER ::= { eltMesIssCopyMIB 1 }
+
+-- -------------
+-- MIB Groups --
+-- -------------
+
+   eltMesIssCopyBackup        OBJECT IDENTIFIER ::= { eltMesIssCopyObjects 1 }
+   eltMesIssCopyGlobal        OBJECT IDENTIFIER ::= { eltMesIssCopyObjects 2 }
+
+   eltMesIssBackupConfigs     OBJECT IDENTIFIER ::= { eltMesIssCopyBackup 1 }
+   eltMesIssBackupStatistics  OBJECT IDENTIFIER ::= { eltMesIssCopyBackup 2 }
+
+-- ------------------------
+-- Global objects --
+-- ------------------------
+
+eltMesLastCopyError  OBJECT-TYPE
+    SYNTAX     EltMesCopyError
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object shows the specific error during the last copying process if any occurred."
+    ::= { eltMesIssCopyGlobal 1 }
+
+-- ------------------------
+-- Backup config objects --
+-- ------------------------
+
+eltMesBackupAutoEnable  OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "Enable automatic backup configuration."
+    DEFVAL { false }
+    ::= { eltMesIssBackupConfigs 1 }
+
+eltMesBackupAutoTimeout  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This MIB should be used in order to change the time-interval of automatic copy of
+         running-config to external server. The value should be the number of minutes for
+         the interval of time from the backup."
+    DEFVAL { 720 }
+    ::= { eltMesIssBackupConfigs 2 }
+
+eltMesBackupAutoFilePath OBJECT-TYPE
+    SYNTAX        DisplayString
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The name of the destination backup file."
+    ::= { eltMesIssBackupConfigs 3 }
+
+eltMesBackupAutoServerAddress OBJECT-TYPE
+    SYNTAX       DisplayString
+    MAX-ACCESS   read-write
+    STATUS current
+    DESCRIPTION
+        "The Inet address of the destination remote host."
+    ::= { eltMesIssBackupConfigs 4 }
+
+eltMesBackupAutoOnWrite OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Performing automatic backups every time
+         you write configuration in memory."
+    DEFVAL { false }
+    ::= { eltMesIssBackupConfigs 5 }
+
+eltMesBackupUserStartAction OBJECT-TYPE
+    SYNTAX      EltMesBackupUserStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Starting backup manually."
+    DEFVAL { stopped }
+    ::= { eltMesIssBackupConfigs 6 }
+
+eltMesBackupHistoryEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable storing data about a successful backup."
+    DEFVAL { false }
+    ::= { eltMesIssBackupConfigs 7 }
+
+eltMesBackupClearAction OBJECT-TYPE
+    SYNTAX      INTEGER {
+        noAction(1),  -- for get only
+        clearNow(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used to clear backup Table."
+    ::= { eltMesIssBackupConfigs 8 }
+
+-- --------------------
+-- Backup statistics --
+-- --------------------
+
+eltMesBackupHistoryTable  OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltMesBackupHistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Backup history table. Stores data about a successful backup
+         (date & time, destination location, ip address)."
+    ::= { eltMesIssBackupStatistics 1 }
+
+eltMesBackupHistoryEntry OBJECT-TYPE
+    SYNTAX      EltMesBackupHistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Backup history entry."
+    INDEX { eltMesBackupHistoryIndex }
+    ::= { eltMesBackupHistoryTable 1 }
+
+EltMesBackupHistoryEntry ::= SEQUENCE {
+    eltMesBackupHistoryIndex                  INTEGER,
+    eltMesBackupHistoryDateTime               DisplayString,
+    eltMesBackupHistoryDstLocationType        EltMesCopyLocationType,
+    eltMesBackupHistoryServerAddr             DisplayString,
+    eltMesBackupHistoryFilePath               DisplayString
+}
+
+eltMesBackupHistoryIndex OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary incremental index for the backup history table.
+         Zero for next free index."
+    ::= { eltMesBackupHistoryEntry 1 }
+
+eltMesBackupHistoryDateTime OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Date time the backup file was uploaded."
+    ::= { eltMesBackupHistoryEntry 2 }
+
+eltMesBackupHistoryDstLocationType OBJECT-TYPE
+    SYNTAX      EltMesCopyLocationType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Destination file location type."
+    ::=  { eltMesBackupHistoryEntry 3 }
+
+eltMesBackupHistoryServerAddr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Server IP address."
+    ::= { eltMesBackupHistoryEntry 4 }
+
+eltMesBackupHistoryFilePath OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The location of the file for backup."
+    ::= { eltMesBackupHistoryEntry 5 }
+
+END

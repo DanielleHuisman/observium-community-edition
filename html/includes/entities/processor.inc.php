@@ -155,7 +155,7 @@ function generate_processor_row($processor, $vars)
     //$text_descr = str_replace("DFC Card", "DFC", $text_descr);
 
     $graph_array           = [];
-    $graph_array['to']     = $config['time']['now'];
+    $graph_array['to']     = get_time();
     $graph_array['id']     = $processor['processor_id'];
     $graph_array['type']   = 'processor_usage';
     $graph_array['legend'] = "no";
@@ -172,7 +172,7 @@ function generate_processor_row($processor, $vars)
     $graph_array['width']  = 80;
     $graph_array['height'] = 20;
     $graph_array['bg']     = 'ffffff00';
-    $graph_array['from']   = $config['time']['day'];
+    $graph_array['from']   = get_time('day');
     $mini_graph            = generate_graph_tag($graph_array);
 
     $perc       = round($processor['processor_usage']);
@@ -205,7 +205,7 @@ function generate_processor_row($processor, $vars)
         $row .= '<td colspan=' . $table_cols . '>';
 
         unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $processor['processor_id'];
         $graph_array['type'] = 'processor_' . $vars['graph'];
 
@@ -257,7 +257,7 @@ function print_processor_form($vars, $single_device = FALSE)
       'value'       => $vars['processor_descr']];
 
     // Groups
-    foreach (get_type_groups('storage') as $entry) {
+    foreach (get_type_groups('processor') as $entry) {
         $form_items['group'][$entry['group_id']] = $entry['group_name'];
     }
     $form['row'][0]['group'] = [
@@ -304,15 +304,8 @@ function print_processor_form($vars, $single_device = FALSE)
     $panel_form['row'][0]['device_id'] = $form['row'][0]['device_id'];
     $panel_form['row'][0]['group']     = $form['row'][0]['group'];
 
-    //$panel_form['row'][1]['supply_colour']  = $form['row'][0]['supply_colour'];
-    //$panel_form['row'][1]['supply_type']    = $form['row'][0]['supply_type'];
-
-    //$panel_form['row'][2]['measured_state'] = $form['row'][0]['measured_state'];
-    //$panel_form['row'][2]['group']          = $form['row'][1]['group'];
-
     $panel_form['row'][3]['processor_descr'] = $form['row'][0]['processor_descr'];
 
-    //$panel_form['row'][5]['sort'] = $form['row'][0]['sort'];
     $panel_form['row'][5]['search'] = $form['row'][0]['search'];
 
     // Register custom panel

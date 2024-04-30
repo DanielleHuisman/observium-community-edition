@@ -1,0 +1,226 @@
+--  =======================================================================
+--  File        : osEthOamMd.mib
+--  Description : Private MIB to manage the Ethernet OAM (.1ag) Maintenance Domais
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-ETHOAM-MD-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+                 MODULE-IDENTITY, OBJECT-TYPE,
+                 Integer32                                     FROM SNMPv2-SMI
+                 oaOptiSwitch, PortList, EntryValidator        FROM OS-COMMON-TC-MIB
+                 MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osEthOamMd       MODULE-IDENTITY
+                 LAST-UPDATED "201008010000Z"
+                 ORGANIZATION "MRV Communications, Inc."
+                 CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                 DESCRIPTION
+                    "This private MIB allow to configure the Maintenance Domain table."
+                 REVISION     "201008010000Z"
+                 DESCRIPTION
+                    "Initial edition."
+                 ::= { oaOptiSwitch 13 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osEthOamMdCapabilities      OBJECT IDENTIFIER ::= { osEthOamMd 1 }
+osEthOamMdConformance       OBJECT IDENTIFIER ::= { osEthOamMd 100 }
+osEthOamMdMIBCompliances    OBJECT IDENTIFIER ::= { osEthOamMdConformance 1 }
+osEthOamMdMIBGroups         OBJECT IDENTIFIER ::= { osEthOamMdConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+
+osEthOamMdSupport OBJECT-TYPE
+   SYNTAX     INTEGER { notSupported(1), supported(2) }
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "Indicates that this MIB is supported."
+   ::= { osEthOamMdCapabilities 1 }
+
+-- ************************************************************
+-- The osEthOamMdTable Table
+-- ************************************************************
+osEthOamMdTable  OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsEthOamMdEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table is a private realization of dot1agCfmMdTable from do1ag MIB.
+        A Maintenance Domain is described in 802.1ag (3.22) as the
+        network or the part of the network for which faults in
+        connectivity are to be managed."
+    REFERENCE
+       "802.1ag clauses 3.22 and 18.1"
+    ::= { osEthOamMd 2 }
+
+osEthOamMdEntry  OBJECT-TYPE
+    SYNTAX       OsEthOamMdEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthOamMdLevel } 
+    ::= { osEthOamMdTable 1 }
+
+OsEthOamMdEntry ::= SEQUENCE {
+      osEthOamMdLevel              Integer32,
+      osEthOamMdFormat             INTEGER,
+      osEthOamMdName               OCTET STRING,
+      osEthOamMdCPorts             PortList,
+      osEthOamMdAdminStatus         EntryValidator
+}
+
+osEthOamMdLevel  OBJECT-TYPE
+    SYNTAX       Integer32(0..7)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "It is a reflection of Dot1agCfmMDLevel.
+        Integer identifying the Maintenance Domain Level (MD Level).
+        Higher numbers correspond to higher Maintenance Domains,
+        those with the greatest physical reach, with the highest
+        values for customers' CFM PDUs.  Lower numbers correspond
+        to lower Maintenance Domains, those with more limited
+        physical reach, with the lowest values for CFM PDUs
+        protecting single bridges or physical links.
+        Creation of a row generates an entry with dot1agCfmMdIndex,
+        which is one greater than osEthOamMdLevel."
+    REFERENCE
+       "802.1ag clauses 18.3, 21.4.1"
+
+    ::= { osEthOamMdEntry 1 }
+
+osEthOamMdFormat OBJECT-TYPE
+    SYNTAX       INTEGER {
+                  none              (1),
+                  dnsLikeName       (2),
+                  macAddressAndUint (3),
+                  charString        (4)
+                 }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "The type (and thereby format) of the Maintenance Domain Name.
+        A value that represents a type (and thereby the format)
+        of a Dot1agCfmMaintDomainName.  The value can be one of
+        the following:
+
+        none(1)           No format specified, usually because
+                          there is not (yet) a Maintenance
+                          Domain Name. In this case, a zero
+                          length OCTET STRING for the Domain
+                          Name field is acceptable.
+        dnsLikeName(2)    Domain Name like string, globally unique
+                          text string derived from a DNS name.
+        macAddrAndUint(3) MAC address + 2-octet (unsigned) integer.
+        charString(4)     RFC2579 DisplayString, except that the
+                          character codes 0-31 (decimal) are not
+                          used."
+    REFERENCE
+       "802.1ag clause 21.6.5, Table 21-19"
+    DEFVAL { none }
+    ::= { osEthOamMdEntry 2 }
+
+osEthOamMdName   OBJECT-TYPE
+    SYNTAX       OCTET STRING (SIZE(0..43))
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "The Maintenance Domain name. The type/format of this object
+        is determined by the value of the osEthOamMdNameType object."
+    REFERENCE
+       "802.1ag clauses 3.24, 12.14.5, and 21.6.5.3"
+    DEFVAL { "" }
+    ::= { osEthOamMdEntry 3 }
+
+osEthOamMdCPorts OBJECT-TYPE
+    SYNTAX       PortList
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "Defines customer ports, i.e. ports that are outside the domain."
+    ::= { osEthOamMdEntry 4 }
+
+osEthOamMdAdminStatus OBJECT-TYPE
+    SYNTAX       EntryValidator
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "Allows to create new rows or delete old rows."
+    ::= { osEthOamMdEntry 90 }
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osEthOamMdMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osEthOamMdMandatoryGroup
+                         }
+
+    ::= { osEthOamMdMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+osEthOamMdMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+              osEthOamMdSupport,
+              osEthOamMdFormat, osEthOamMdName,
+              osEthOamMdCPorts,
+              osEthOamMdAdminStatus
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osEthOamMdMIBGroups 1 }
+
+
+END
+

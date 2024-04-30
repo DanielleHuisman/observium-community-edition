@@ -120,7 +120,7 @@ if (!is_entity_write_permitted($device['device_id'], 'device')) {
 
         echo generate_box_open($box_args);
 
-        if ($config['smokeping']['dir'] != '') {
+        if (isset($config['smokeping']['dir']) && is_dir($config['smokeping']['dir'])) {
             $smokeping_files = get_smokeping_files(1);
 
             echo('<p />');

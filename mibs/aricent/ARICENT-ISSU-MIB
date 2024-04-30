@@ -1,0 +1,468 @@
+--*********************************************************************
+-- Copyright (C) 2015 Aricent Group . All Rights Reserved
+
+--$Id: fsissu.mib,v 1.4 2015/12/14 11:05:19 siva Exp $
+
+--Description: This file contains MIB definitions for 
+--		In-Service Software Upgrade (ISSU)  Feature.
+
+--*********************************************************************/
+
+ARICENT-ISSU-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+MODULE-IDENTITY, OBJECT-TYPE,
+    enterprises, Integer32, NOTIFICATION-TYPE  FROM SNMPv2-SMI
+    TruthValue,
+    TimeStamp,
+    DisplayString FROM SNMPv2-TC;
+
+fsIssu MODULE-IDENTITY
+    LAST-UPDATED "201507010000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO
+
+    "ARICENT COMMUNICATIONS SOFTWARE
+    3460 Hillview Avenue,
+    Palo Alto, CA 94304-1388, USA,
+    Phone: +1-650-391-1088
+    E-mail:support@aricent.com"
+
+    DESCRIPTION
+    "The MIB module for In-Service Software Upgrade (ISSU) feature."
+
+    REVISION "201507010000Z"
+
+    DESCRIPTION
+    "The enterprise ID 29601 is assigned to Aricent Communication
+    Holdings Limited. This is the initial version for ISSU module
+    related mib objects."
+    ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 103 }
+
+     -- ----------------------------------------------------------------- --
+     -- The different groups in  Aricent ISSU MIB are as follows:
+     -- ----------------------------------------------------------------- --
+
+     fsIssuSystem                 OBJECT IDENTIFIER ::= { fsIssu 1 }
+     fsIssuNotifications          OBJECT IDENTIFIER ::= { fsIssu 2 }
+
+     -- ----------------------------------------------------------------- --
+
+     -- fsIssuSystem - System group BEGIN
+
+     -- Specifying path for various software images/files
+
+fsIssuMaintenanceMode   OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+
+     "This object allows the system to enter into maintenance mode or exit from maintenance 
+     mode.
+
+     When this object is set as 'TRUE' it triggers the system to enter into 
+     maintenance  mode in which In-Service Software Upgrade (ISSU) can be 
+     carried out.
+     During this mode, 
+     --> Management configuration to the system other than ISSU related
+     commands/objects are not allowed.
+     --> Hardware MAC table is frozen.
+     --> Protocols are maintained in the same state.
+     --> New programming to hardware will not be allowed.
+
+     When this object is set as 'FALSE' it triggers the system to exit from the 
+     maintenance mode to restore normal system operations."
+
+     ::= { fsIssuSystem 1 }
+
+fsIssuMaintenanceOperStatus   OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+
+     "This object indicates if the configured maintenance mode is functionally 
+     applied to the system or not.
+
+     When 'Maintenance mode' is set as 'TRUE' the 'maintenance operational
+     status' may be initially false.
+     If there are any on-going remote NP calls from active node to standby node's 
+     hardware, those calls will be serviced and then the operational status 
+     becomes 'TRUE'. 
+     If there are no such pending remote NP calls, the 'maintenance operational 
+     status' immediately becomes'TRUE'. 
+
+     When 'Maintenance mode' is set as 'FALSE' the normal system operations 
+     are restored and'maintenance operational status' becomes 'FLASE'."
+
+     ::= { fsIssuSystem 2 }
+
+
+fsIssuLoadSWPath   OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE(1..128))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the path of the new software that can be 
+    loaded to the system through In-Service Software Upgrade procedure."
+
+    ::= { fsIssuSystem 3 }
+
+fsIssuRollbackSWPath   OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE(1..128))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This object defines the path from which software will be loaded if 
+    ISSU fails [during software upgrade]. After ISSU is completed, 
+    this will be same as the current software path. This MIB object is to aid 
+    the operator in the roll-back process and the operator is expected to 
+    initiate the roll-back if ISSU fails"
+
+    ::= { fsIssuSystem 4 }
+
+fsIssuCurrentSWPath   OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE(1..128))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the path of the current running software"
+
+    ::= { fsIssuSystem 5 }
+
+    ------- Software Compatibility Check objects  ---------
+
+fsIssuSoftwareCompatFilePath   OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE(1..128))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the path of the compatibility matrix file. 
+    When software compatibility check is initiated, current software 
+    version will be verified against this compatibility matrix file."
+    ::= { fsIssuSystem 6 }
+
+fsIssuSoftwareCompatCheckInit    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object specifies the software compatibility check initiation control.
+
+    When this object is set as 'true', software compatibility 
+    check will be initiated. 
+    Before initiating the compatibility check the software version proposed to be
+    loaded has to be configured through object 'fsIssuSoftwareCompatForVersion'.
+
+    When compatibility check is initiated, ISS will check the proposed software 
+	version - first in the compatibility file in the location configured in 
+	'fsIssuSoftwareCompatFilePath'.If the proposed software version is present, 
+	then that result will be 'compatible'.
+
+    If the above verification fails, then verification will be made in the 
+    compatibility-matrix file of current running software (Present in one 
+	of the flash banks).If the proposed software version is present in this file,
+	then the result will be 'compatible'.
+
+    Otherwise the proposed software is considered to be 'in-compatible' 
+	with the current running software version.
+
+    After initiating the compatibility check, this object returns back to 
+    'false' ."
+    DEFVAL   { false }
+    ::= { fsIssuSystem 7 }
+
+fsIssuSoftwareCompatCheckStatus    OBJECT-TYPE
+    SYNTAX      INTEGER {
+			notinitiated(0),
+	    	fullcompatible(1),
+			basecompatible(2),
+	    	incompatible(3),
+	    	checkinprogress(4),
+            failed(5)
+    		}
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the result of previous software compatibility 
+    check initiated.
+
+    notinitiated - ISSU compatibility check is not initiated and this 
+    is the default state.
+
+    fullcompatible/ basecompatible - The current  running software is 
+    compatible with the new software for upgrade/downgrade. The level
+    of compatibility is either fullcompatible or basecompatible.
+
+    incompatible - The current  running software is NOT compatible with 
+    the new software for upgrade/downgrade.
+    
+    checkinprogress - The compatibility check is going on.
+    
+    failed - The compatibility check has failed" 
+
+    DEFVAL  { notinitiated }
+    ::= { fsIssuSystem 8 }
+
+------- In-Service Software Upgrade Operation Objects --------------
+
+fsIssuMode  OBJECT-TYPE
+    SYNTAX      INTEGER {
+    			fullcompatible(1),
+				basecompatible(2),
+				incompatible(3)
+				}
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the ISSU upgrade process that can be done in two modes.
+
+    - In 'fullcompatible' software upgrade, the node which gets upgraded 
+    gets reloaded in 'warm-boot mode'. Hence data traffic through that 
+    node does not get impacted during the upgrade procedure. 
+    Static configuration and dynamic states are synched up from the active
+    node to the upgraded standby node.
+    This mode is feasible ONLY when software upgrade is across minor releases.
+
+    - In 'basecompatible' software upgrade, the standby node which gets
+    upgraded is booted in 'cold-boot'mode. 
+    Static configuration and dynamic states are synched up from the active
+    node to the upgraded standby node.
+    This mode feasible for a major version of software upgrade.
+
+    - In 'incompatible' software upgrade, the standby node which gets
+    upgraded is booted in 'cold-boot'mode. 
+    The static configuration and dynamic states are NOT synched up from the
+    active node.
+    When software upgrade to an incompatible software version is required 
+    then ISSU in 'incompatible mode' should be configured.
+
+    The administrator triggered compatibility check helps to decide whether 
+    the ISSU mode has to be configure in fullcompatible, basecompatible 
+    or incompatible mode.
+
+    Note:
+    - Configuring 'fullcompatible or basecompatible mode' of ISSU, will leave 
+    system unpredictable when the compatibility check resulted 'incompatible'.
+
+    - Appropriate ISSU mode should be configured before starting the ISSU 
+    procedure through ISSU commands"
+
+    DEFVAL   { fullcompatible }
+    ::= { fsIssuSystem 9 }
+
+fsIssuCommand  OBJECT-TYPE
+    SYNTAX      INTEGER {
+    			loadversion(1),
+				forcestandby(2)
+				}
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+    "This object specifies ISSU process that has the following three steps to upgrade the software in both 
+    active and standby nodes.
+
+    loadversion   - Load new software in fullcompatible, basecompatible mode 
+    or incompatible mode based on the configured ISSU Mode. The software present 
+    in the path specified in 'LoadSWPath' object will be loaded to the node.      
+
+    Note :- 
+    o In case of fullcompatible mode, issuing 'loadversion' will boot up the 
+      node in warm-boot mode.
+    o In case of basecompatible and incompatible mode, issuing 'loadversion' 
+      will boot up the node in cold-boot mode.
+
+    Hence the services established over the node that is undergoing reload will
+    be impacted.
+
+    ForceStandby  - This command has to be applied to a active node.
+    Forces the Active node to become Standby node.
+
+
+    The ISSU commands have to be issued only in Maintenance Mode in the given 
+    order. 
+    The order is :
+    o Loadversion (in standby node) 
+    o ForceStandby (in original active node) 
+    o Load version (in old active node)."
+
+    ::= { fsIssuSystem 10 }
+
+fsIssuCommandStatus  OBJECT-TYPE
+    SYNTAX     INTEGER {
+			notstarted(0),
+			inprogress(1),
+			successful(2),
+			failed(3)
+	}
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the status of previous ISSU command 
+
+    notstarted   - ISSU command is not triggered and this is the default state.
+
+    inprogress   - Indicates that the command is in progress.
+
+    successful   - Indicates that the command actions are completed 
+    SUCCESSFULLY. 
+
+    failed       - Indicates that the command has FAILED."
+    DEFVAL  { notstarted }
+
+    ::= { fsIssuSystem 11 }
+
+fsIssuProcedureStatus  OBJECT-TYPE
+    SYNTAX     INTEGER {
+			notinitiated(0),
+			inprogress(1),
+	    	successful(2),
+	    	failed(3)
+    		}
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the overall status of previous ISSU procedure. 
+
+    notinitiated - ISSU command is not triggered and this is the default state.
+
+    inprogress - Indicates that the ISSU procedure is in progress.
+    The 'ISSU State' will indicate the exact ISSU stage.
+
+    successful - Indicates that the previous ISSU procedure was completed 
+    SUCCESSFULLY.
+
+    failed     - Indicates that the previous ISSU procedure has FAILED."
+
+    DEFVAL  { notinitiated }
+    ::= { fsIssuSystem 12 }
+
+fsIssuRollbackSoftwareVersion OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE(1..32))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the version of the rollback software. When ISSU procedure has failed,
+    the system should be rolled back to this software version. 
+    When ISSU is completed, this software version will be same as 
+    current running Software version"
+    ::= { fsIssuSystem 13 }
+
+    ---------- Trace Facility related objects  ------------
+
+fsIssuTraceOption OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+    "This object enables tracing in the selected
+    Issu Management  module.
+
+    A 32 bit integer is used to store the Tracing level in the 
+    specified module.
+    Different Tracing Levels -
+
+    BIT 0 - Init and Shutdown Traces
+    BIT 1 - Management Traces
+    BIT 2 - All Failure Traces
+    BIT 3 - Control Plane traces.
+    BIT 4 - Critical Traces
+
+    Various combinations of levels are allowed.
+
+    For example if the bits 0 and 1 are set, then the Trace
+    Statements related to Init-Shutdown and management
+    will be printed.
+
+    if the bit value is 3 then state machine transitions and 
+    ISSU feature  related traces will be printed.
+
+    The user has to enter the corresponding INTEGER VALUE for the
+    bits set. For example if bits 0 and 1 are set then user has to
+    set the value 3."
+
+    DEFVAL{0}
+    ::= { fsIssuSystem 14 }
+
+fsIssuTrapStatus OBJECT-TYPE
+    SYNTAX        INTEGER { enable(1), disable(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object enables or disables the trap for ISSU Management feature."
+
+    DEFVAL { enable }
+    ::= { fsIssuSystem 15 }
+
+fsIssuLastUpgradeTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This object holds the timestamp of last software upgrade/downgrade through
+    ISSU procedure."
+
+    ::= { fsIssuSystem 16 }
+
+fsIssuSoftwareCompatForVersion   OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE(1..128))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+    "This object specifies the software version proposed to be loaded to the system
+    for which compatibility relationship with the current running software 
+    needs to be verified.
+    When software compatibility check is initiated, this 'proposed software version' 
+    will be verified in the compatibility matrix file in the row corresponding to the 
+    'running software version.'
+	"
+ 
+    ::= { fsIssuSystem 17 }
+
+    -- fsIssuSystem - System group END
+
+    -- fsIssuTraps - Traps group BEGIN
+
+    -- ----------------------------------------------------------------- --
+    fsIssuTraps OBJECT IDENTIFIER ::= {   fsIssuNotifications 0 }
+    -- ----------------------------------------------------------------- --
+
+    ------ Trap related objects --------
+
+fsIssuMaintenanceStatusTrap   NOTIFICATION-TYPE
+    OBJECTS {
+		fsIssuMaintenanceMode,
+	    	fsIssuMaintenanceOperStatus
+    	    }
+    STATUS   current
+    DESCRIPTION
+    "This object specifies the generation of the trap whenever the ISSU maintenance mode 
+    (operational) changes."
+    ::= { fsIssuTraps 1 }
+
+fsIssuCommandStatusTrap   NOTIFICATION-TYPE
+    OBJECTS {
+		fsIssuCommand,
+		fsIssuCommandStatus
+    	    }
+    STATUS   current
+    DESCRIPTION
+    "This object specifies the generation of the trap when the ISSU commands like load version/
+    force-standby are completed."
+    ::= { fsIssuTraps 2 }
+
+fsIssuProcedureStatusTrap   NOTIFICATION-TYPE
+    OBJECTS {
+    		fsIssuProcedureStatus
+	    }
+    STATUS   current
+    DESCRIPTION
+    "This object specifies the generation of the trap whenever the ISSU procedure is started 
+    and completed. The status of overall ISSU procedure state will be 
+    indicated as inprogress/successful/failed. "
+    ::= { fsIssuTraps 3 }
+
+-- fsIssuTraps - Traps group END
+
+END

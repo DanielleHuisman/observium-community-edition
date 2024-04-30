@@ -1,0 +1,730 @@
+-- Copyright (C) 2007-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsl2ipv6snp.mib,v 1.5 2018/06/04 09:52:05  $
+
+-- This MIB is to configure the IPV6 control packet snooping feature in a Layer2 switch
+--  (a) This mib supports Router Advertisement message snooping for the purpose of IPv6 RA-Guard feature 
+--      The RA guard feature validates the RA messages and blocks the illegitimate RA Messsages in the layer 2 switch 
+
+
+   ARICENT-L2IPV6SNP-MIB DEFINITIONS ::= BEGIN
+      IMPORTS
+         MODULE-IDENTITY, OBJECT-TYPE,
+         enterprises, IpAddress, Counter32,
+         Integer32, Unsigned32                    FROM SNMPv2-SMI
+         RowStatus, MacAddress                    FROM SNMPv2-TC
+         InterfaceIndex                           FROM IF-MIB;
+
+
+	fsIpv6Snp  MODULE-IDENTITY
+        LAST-UPDATED "201806180000Z"
+        ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+        CONTACT-INFO "support@aricent.com"
+
+        DESCRIPTION
+           " The proprietary MIB for IPV6 control packet Snooping in Layer2 Switch.
+	     (a) Used to maintain the policy information to validate the RA messages and forward/block
+	      the same"
+        REVISION "201806180000Z"
+        DESCRIPTION
+            "The first version of the mib "
+        ::=  { enterprises aricent-communication-holding-ltd(29601) 
+        iss(2) 122}
+
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+
+VlanList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Each octet within this value specifies a set of eight
+        vlans, with the first octet specifying vlan 1 through
+        8, the second octet specifying vlan 9 through 16, etc.
+        Within each octet, the most significant bit represents
+        the lowest numbered vlan id, and the least significant bit
+        represents the highest numbered vlan.  Thus, each vlan
+        of the port is represented by a single bit within the
+        value of this object.  If that bit has a value of '1',
+        then that vlan is included in the Vlan list; the vlan
+        is not included if its bit has a value of '0'."
+    SYNTAX      OCTET STRING
+
+Ipv6AddressPrefix ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+       "This data type is used to model IPv6 addresses.
+        This is a binary string of 16 octets in network
+         byte-order."
+    SYNTAX       OCTET STRING (SIZE (16))
+
+
+-- ***************************************************************************
+--                         Groups in the MIB
+-- ***************************************************************************
+    fsIpv6SnpSystem    		   OBJECT IDENTIFIER ::= { fsIpv6Snp 1 }
+    fsIpv6SnpRagPolicy             OBJECT IDENTIFIER ::= { fsIpv6Snp 2 }
+
+-- fsL2Ipv6System BEGIN
+	
+	fsIpv6SnpSystemTable OBJECT-TYPE
+		SYNTAX	     SEQUENCE OF FsIpv6SnpSystemEntry
+		MAX-ACCESS   not-accessible
+		STATUS	     current
+		DESCRIPTION
+			" Switch context specific parameters for IPv6 control packet snooping related features in
+                          Layer2 switch"
+	::= { fsIpv6SnpSystem 1 }
+
+	fsIpv6SnpSystemEntry OBJECT-TYPE
+		SYNTAX	     FsIpv6SnpSystemEntry
+		MAX-ACCESS   not-accessible
+		STATUS	     current
+		DESCRIPTION		
+			" Each entry contains the fields ralated to RA-Guard feature enable/disable, traces"
+		INDEX { fsIpv6SnpContexId }
+	::= { fsIpv6SnpSystemTable 1 }
+
+	FsIpv6SnpSystemEntry ::=  SEQUENCE {
+		fsIpv6SnpContexId	Integer32,
+		fsIpv6SnpSystemControl	INTEGER,
+		fsIpv6SnpRagStatus	INTEGER,
+		fsIpv6SnpTraceLevel     Integer32	
+	}	
+
+	fsIpv6SnpContexId  OBJECT-TYPE
+		SYNTAX	   Integer32(0..65535)
+		MAX-ACCESS not-accessible	
+		STATUS	   current
+		DESCRIPTION
+			"Identifies switch virtual context "
+	::= { fsIpv6SnpSystemEntry 1 }
+	
+	fsIpv6SnpSystemControl	OBJECT-TYPE
+		SYNTAX	    INTEGER {
+			    start(1),
+			    shutdown(2)
+			    }
+		MAX-ACCESS  read-write
+		STATUS	    current
+		DESCRIPTION	
+			" The Administrative system control status of IPv6 control packet snooping module.
+			  start : Indicates that all resource required for this module 
+			  are allocated. Configurations are allowed.
+			  shutdown : Indicates that all resource required for this module 
+			  are released. No configurations are allowed . "
+		DEFVAL { start }
+	::= { fsIpv6SnpSystemEntry 2 } 
+	
+	fsIpv6SnpRagStatus OBJECT-TYPE 
+		SYNTAX      INTEGER {
+                            disable(0),
+                            enable(1) 
+                            }
+        	MAX-ACCESS  read-write 
+        	STATUS      current 
+        	DESCRIPTION 
+            		" Object to enable/disable the RA Guard feature in the switch instance" 
+        	DEFVAL { disable }
+ 	::= { fsIpv6SnpSystemEntry 3 }
+
+	fsIpv6SnpTraceLevel OBJECT-TYPE
+		SYNTAX	    Integer32	
+		MAX-ACCESS  read-write 
+		STATUS	    current
+		DESCRIPTION
+			"  This object is to enable/disable the trace statements in IPv6 control packet snooping module
+			The mapping between bit position and the level of trace is
+			as follows:
+		
+			BIT 1 - Indicates all Traces
+			BIT 2 - Indicates packet level Trace
+			BIT 3 - Indicates Failure Traces
+			BIT 4 - Indicates Management Traces "
+		DEFVAL  { 4 }
+	::= { fsIpv6SnpSystemEntry 4 }
+
+--  fsL2Ipv6System END 
+
+----------------------------------
+-- RA Guard policy Table BEGIN
+----------------------------------
+
+    fsIpv6SnpRagPolicyTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FsIpv6SnpRagPolicyEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            " This table contains policy match criteria to validate the legitimagte RA messages "
+    ::= { fsIpv6SnpRagPolicy 1 }
+   
+    fsIpv6SnpRagPolicyEntry OBJECT-TYPE
+        SYNTAX 	    FsIpv6SnpRagPolicyEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            " Each entry contains the policy details. "
+        INDEX { fsIpv6SnpRagPolicyId }
+    ::= { fsIpv6SnpRagPolicyTable 1 }
+
+    FsIpv6SnpRagPolicyEntry ::= SEQUENCE {
+	fsIpv6SnpRagPolicyId		    Integer32,
+    fsIpv6SnpRagDeviceRole     	    INTEGER,
+	fsIpv6SnpRagMbit		        INTEGER,
+	fsIpv6SnpRagObit		        INTEGER,
+    fsIpv6SnpMatchRagAclId	  	    Integer32,
+    fsIpv6SnpMatchRagPrefixListId  	Integer32,
+    fsIpv6SnpMatchRagSrcIp6ListId   Integer32,
+	fsIpv6SnpRagHopLimit       	    INTEGER,
+	fsIpv6SnpRagRouterPreference 	INTEGER,
+	fsIpv6SnpRagPolicyRowStatus	    RowStatus
+    }	
+
+     fsIpv6SnpRagPolicyId  OBJECT-TYPE 
+	SYNTAX      Integer32(1..65535) 
+	MAX-ACCESS  not-accessible 
+	STATUS      current 
+	DESCRIPTION 
+	   " Indicates the RA Guard Policy id. "
+    ::= { fsIpv6SnpRagPolicyEntry 1 }
+
+    fsIpv6SnpRagDeviceRole OBJECT-TYPE 
+       	SYNTAX      INTEGER {
+                    host(1), 
+               	    router(2)
+               	    }
+       	MAX-ACCESS  read-write 
+       	STATUS      current 
+       	DESCRIPTION 
+            	" Indicates the role of the device 
+		  host mode : All RA messages are disallowed and will be dropped 
+		  Rotuer mode: RA messages are validated against the policy. "
+        DEFVAL { router }
+    ::= { fsIpv6SnpRagPolicyEntry 2 }
+
+
+    fsIpv6SnpRagMbit OBJECT-TYPE 
+    	SYNTAX      INTEGER {
+           	        off(0),
+            	    on(1), 
+            	    none(2)
+           	    }
+       	MAX-ACCESS  read-write 
+       	STATUS      current 
+       	DESCRIPTION 
+    	   " Enables verification of the advertised 'managed address 
+	     configuration flag' to be  on / off
+	     None : Indicates that validation of this field in RA message will be bypassed."
+       	DEFVAL { none }
+    ::= { fsIpv6SnpRagPolicyEntry 3 }
+
+
+    fsIpv6SnpRagObit OBJECT-TYPE 
+       	SYNTAX      INTEGER {
+            	    off(0),
+              	    on(1), 
+               	    none(2)
+               	    }
+      	MAX-ACCESS  read-write 
+       	STATUS      current 
+       	DESCRIPTION 
+      	      " Enables verification of the advertised 'other
+      	        configuration flag' to be on / off 
+      		None : Indicates that validation of this field in RA message will be bypassed."
+       	DEFVAL { none }
+    ::= { fsIpv6SnpRagPolicyEntry 4 }
+
+
+     fsIpv6SnpMatchRagAclId OBJECT-TYPE
+       	SYNTAX      Integer32(0..65535) 
+       	MAX-ACCESS  read-write
+       	STATUS      current
+       	DESCRIPTION
+      	      " Configures the access list for the policy entry which is used to validate the 
+		source link layer address carried by RA message.
+      		Value 0 indicates that no access list is associated to the policy entry. " 
+	DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPolicyEntry 5 }
+
+     fsIpv6SnpMatchRagPrefixListId OBJECT-TYPE
+       	SYNTAX      Integer32(0..65535)
+      	MAX-ACCESS  read-write
+       	STATUS      current
+       	DESCRIPTION
+     	      " Configures the prefix list Id used to validate the
+      		source ipv6 address prefixes carried by RA message.
+      		Value 0 indicates that no IPV6 prefix list is associated to the policy entry. " 
+	DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPolicyEntry 6 }
+
+    fsIpv6SnpMatchRagSrcIp6ListId OBJECT-TYPE
+    SYNTAX      Integer32(0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    " Configures the Src Ip6 list Id used to validate the
+    source ipv6 address carried by RA message.
+    Value 0 indicates that no Src Ip6  list is associated to the policy entry. "
+    DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPolicyEntry 7 }
+
+    fsIpv6SnpRagHopLimit OBJECT-TYPE 
+       	SYNTAX      Integer32 (0..255)
+       	MAX-ACCESS  read-write 
+       	STATUS      current 
+       	DESCRIPTION 
+	      " Value 0: Indicates that validation of this field in RA message will be bypassed
+	        Enables the validation of advertised hoplimit carried by RA massage and the values will be as below
+	 	Value 255: Indicates that the received RA message should have the maximum hop limit value as 255
+	 	Value 1-254 : Indicates that the received RA message should contain a hop limit value lesser than or
+                equal to the configured hop limit value." 
+	DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPolicyEntry 8 }
+
+
+    fsIpv6SnpRagRouterPreference OBJECT-TYPE 
+       	SYNTAX    INTEGER {
+	 	          medium(0),
+	   	          high(1),
+	  	          none(2),
+	  	          low(3)
+	   	          } 
+      	MAX-ACCESS  read-write 
+	STATUS      current 
+       	DESCRIPTION 
+      		" Enables the validation of advertised router preference carried by RA massage to be low/medium/high.
+		None : Indicates that validation of this field in RA message will be bypassed "
+	DEFVAL { none }
+    ::= { fsIpv6SnpRagPolicyEntry 9 }
+
+    fsIpv6SnpRagPolicyRowStatus OBJECT-TYPE 
+       	SYNTAX      RowStatus 
+       	MAX-ACCESS  read-create 
+       	STATUS      current 
+       	DESCRIPTION 
+      		" This object is used to create or delete the entry in the RAG policy table."
+    ::= { fsIpv6SnpRagPolicyEntry 10 }
+
+-- RA Guard policy Table END
+
+-----------------------------------
+-- RA Guard Access list Table BEGIN
+-----------------------------------
+
+    fsIpv6SnpRagACLTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF FsIpv6SnpRagAclEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION			
+		" This table contains access list information to be 
+		set as match criteria in the RA Guard policy table 
+		to validate the incoming RA message "
+    ::= { fsIpv6SnpRagPolicy 2 }
+
+    fsIpv6SnpRagAclEntry OBJECT-TYPE
+	SYNTAX 		FsIpv6SnpRagAclEntry
+	MAX-ACCESS 	not-accessible	
+	STATUS		current
+	DESCRIPTION	
+		" Each entry contains the information about access list "
+	INDEX { fsIpv6SnpRagAclNo , fsIpv6SnpRagAclEntryNo }
+    ::= { fsIpv6SnpRagACLTable 1 }
+
+    FsIpv6SnpRagAclEntry ::= SEQUENCE 	{
+	fsIpv6SnpRagAclNo		        Integer32,
+	fsIpv6SnpRagAclEntryNo		    Integer32,
+	fsIpv6SnpRagAclSrcMacAddress	MacAddress,
+	fsIpv6SnpRagAclRowStatus	    RowStatus
+    }
+
+	
+    fsIpv6SnpRagAclNo OBJECT-TYPE
+	SYNTAX	    Integer32(1..65535)	
+	MAX-ACCESS  not-accessible	
+	STATUS 	    current
+	DESCRIPTION
+		" Indicates the acl number for this entry. 
+                  This acl number can be mapped to RA Guard policy entry to configure the matching criteria for the policy entry. "
+    ::= { fsIpv6SnpRagAclEntry 1 }
+
+
+    fsIpv6SnpRagAclEntryNo OBJECT-TYPE
+	SYNTAX	    Integer32(1..100)	
+	MAX-ACCESS  not-accessible	
+	STATUS	    current
+	DESCRIPTION
+		" Indicates an entry associated with the acl number.
+                  For a single acl number, many entries can be created. Thus several MAC addresses can be associated to 
+                  an acl number."
+    ::= { fsIpv6SnpRagAclEntry 2 }
+
+
+    fsIpv6SnpRagAclSrcMacAddress OBJECT-TYPE
+	SYNTAX	     MacAddress		
+	MAX-ACCESS   read-write
+	STATUS       current
+	DESCRIPTION
+		"Indicates the source Mac address associated with the acl-id. "
+    ::= { fsIpv6SnpRagAclEntry 3 }
+
+    fsIpv6SnpRagAclRowStatus OBJECT-TYPE
+	SYNTAX	     RowStatus
+	MAX-ACCESS   read-create
+	STATUS	     current
+	DESCRIPTION
+	 " This object is used to create or delete entry in the RA guard acl table. "
+    ::= { fsIpv6SnpRagAclEntry 4 }
+
+-- RA Guard Access list Table END
+
+------------------------------------
+-- RA Guard Prefix list Table BEGIN
+------------------------------------
+
+    fsipv6SnpRagPrefixListTable OBJECT-TYPE
+	SYNTAX	    SEQUENCE OF FsIpv6SnpRagPrefixListEntry
+	MAX-ACCESS  not-accessible
+	STATUS	    current
+	DESCRIPTION			
+		 " This table contains Ipv6 address Prefix list information that can be  
+	  	 set as match criteria in the RA Guard policy entry.
+		 This can be used for validating the ipv6 address prefixes carried by incoming RA messages. "
+    ::= { fsIpv6SnpRagPolicy 3 }
+
+    fsIpv6SnpRagPrefixListEntry OBJECT-TYPE
+	SYNTAX 	    FsIpv6SnpRagPrefixListEntry	
+	MAX-ACCESS  not-accessible	
+	STATUS	    current
+	DESCRIPTION	
+		" Each entry contains the Ipv6 address Prefixes used to validate the prefix information
+		carried in RA messages. "
+	INDEX { fsIpv6SnpRagPrefixListNo , fsIpv6SnpRagPrefixListEntryNo }
+    ::= { fsipv6SnpRagPrefixListTable 1 }
+
+    FsIpv6SnpRagPrefixListEntry ::= SEQUENCE 	{
+	fsIpv6SnpRagPrefixListNo	Integer32,
+	fsIpv6SnpRagPrefixListEntryNo	Integer32,
+	fsIpv6SnpRagPrefixListPrefix    Ipv6AddressPrefix,	
+	fsIpv6SnpRagPrefixListLength	Integer32,
+	fsIpv6SnpRagPrefixListGe	Integer32,
+	fsIpv6SnpRagPrefixListLe	Integer32,
+	fsIpv6SnpRagPrefixListRowStatus	RowStatus
+    }
+
+	
+    fsIpv6SnpRagPrefixListNo OBJECT-TYPE
+	SYNTAX	    Integer32(1..65535)	
+	MAX-ACCESS  not-accessible
+	STATUS	    current
+	DESCRIPTION
+      		" Indicates the Prefix-list number of this entry.
+                  This prefix-list number can be mapped to RA Guard policy entry to configure the matching criteria for the policy entry. "
+    ::= { fsIpv6SnpRagPrefixListEntry 1 }
+
+
+    fsIpv6SnpRagPrefixListEntryNo OBJECT-TYPE
+	SYNTAX	    Integer32(1..100)
+	MAX-ACCESS  not-accessible	
+	STATUS	    current
+	DESCRIPTION
+		" Indicates entry number for each prefix.
+                  For a single prefix-list number, many entries can be created. Thus several prefixes can be associated to 
+                  a prefix-list number."
+    ::= { fsIpv6SnpRagPrefixListEntry 2 }
+
+    fsIpv6SnpRagPrefixListPrefix OBJECT-TYPE
+ 	SYNTAX	    Ipv6AddressPrefix		
+	MAX-ACCESS  read-write
+	STATUS	    current
+	DESCRIPTION
+		" Ipv6 prefix value of this entry." 
+    ::= { fsIpv6SnpRagPrefixListEntry 3 }
+
+    fsIpv6SnpRagPrefixListLength OBJECT-TYPE
+	SYNTAX	    Integer32(1..128)
+	MAX-ACCESS  read-write
+	STATUS	    current
+	DESCRIPTION
+		" Indicates prefix length for each Ipv6 prefix "
+    ::= { fsIpv6SnpRagPrefixListEntry 4 }
+
+    fsIpv6SnpRagPrefixListGe OBJECT-TYPE
+	SYNTAX	    Integer32(0..128)
+	MAX-ACCESS  read-write
+	STATUS	    current
+	DESCRIPTION
+		" Minimum prefix length to be matched 
+		  Value 0 indicates that no miminum prefix lenth, and this check would be bypassed "
+	DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPrefixListEntry 5 }
+
+    fsIpv6SnpRagPrefixListLe OBJECT-TYPE
+	SYNTAX	    Integer32(0..128)
+	MAX-ACCESS  read-write
+	STATUS	    current
+	DESCRIPTION
+		" Maximum prefix length to be matched 
+		  Value 0 indicates that no maximum prefix lenth, and this check would be bypassed "
+	DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPrefixListEntry 6 }
+
+    fsIpv6SnpRagPrefixListRowStatus OBJECT-TYPE
+	SYNTAX	    RowStatus
+	MAX-ACCESS  read-create
+	STATUS	    current
+	DESCRIPTION
+		" This object is used to create or delete entry in the prefix list table. "
+    ::= { fsIpv6SnpRagPrefixListEntry 7 }
+
+-- RA Guard Prefix list Table END
+
+----------------------------------
+-- RA Guard Interface Table BEGIN
+----------------------------------
+
+    fsIpv6SnpRagPortTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF FsIpv6SnpRagInterfaceEntry
+	MAX-ACCESS  not-accessible
+	STATUS	    current
+	DESCRIPTION
+		"This table contains RA Guard interface specific configurations." 
+    ::= { fsIpv6SnpRagPolicy 4 }
+
+
+    fsIpv6SnpRagPortEntry OBJECT-TYPE
+	SYNTAX	   FsIpv6SnpRagInterfaceEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+		"Each row in this table contains the RA guard configuration information for 
+                 the interface."
+	INDEX { fsIpv6SnpRagPortNumber }
+    ::= { fsIpv6SnpRagPortTable 1 } 
+
+
+    FsIpv6SnpRagInterfaceEntry  ::= SEQUENCE {
+	fsIpv6SnpRagPortNumber	           Integer32,
+	fsIpv6SnpRagPortStatus	           INTEGER,
+	fsIpv6SnpRagPortPolicyId           INTEGER,	
+	fsIpv6SnpRagPortMode	           INTEGER,
+	fsIpv6SnpRagPortCurrentState	   INTEGER,	
+	fsIpv6SnpRagPortTriggerStateChange INTEGER,
+	fsIpv6SnpRagPortLearnTime	   Integer32,
+	fsIpv6SnpRagPortTrustState	   INTEGER,
+	fsIpv6SnpRagPortVlanlist	   VlanList,
+	fsIpv6SnpRagPortRowStatus	   RowStatus
+    }
+
+
+    fsIpv6SnpRagPortNumber OBJECT-TYPE
+	SYNTAX	    InterfaceIndex
+	MAX-ACCESS  not-accessible
+	STATUS	    current
+	DESCRIPTION
+			"Indicates the inteface index for which RA guard configurations are applied." 
+    ::= { fsIpv6SnpRagPortEntry 1 }
+
+    fsIpv6SnpRagPortStatus OBJECT-TYPE
+	SYNTAX	    INTEGER {
+		    disable(0),
+		    enable(1)
+		    }
+	MAX-ACCESS  read-write
+	STATUS	    current
+	DESCRIPTION
+		"Object to enable/disable the RA Guard feature on the port "
+	DEFVAL { disable }
+    ::= { fsIpv6SnpRagPortEntry 2 }
+
+    fsIpv6SnpRagPortPolicyId OBJECT-TYPE
+	SYNTAX		Integer32(0..65535)
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION	
+		" Indicates RA Guard policy ID applied to the interface. 
+		A value of 0 indicates that no policy is applied on the interface."
+
+	DEFVAL { 0 }
+    ::= { fsIpv6SnpRagPortEntry 3 }
+
+
+    fsIpv6SnpRagPortMode OBJECT-TYPE
+	SYNTAX	    INTEGER {
+		    stateless(1),
+		    stateful(2)
+		    }
+	MAX-ACCESS  read-write
+	STATUS	    current
+	DESCRIPTION
+		" Indicates the mode in which RA Guard functions on this interface. 
+                  It can be stateful or stateless."
+	DEFVAL { stateless }
+    ::= { fsIpv6SnpRagPortEntry 4 }
+
+
+    fsIpv6SnpRagPortCurrentState OBJECT-TYPE
+	SYNTAX	  INTEGER {
+		   na(0),
+		   learn(1),
+		   forward(2),
+		   block(3)
+		   }
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+		" Indicates current state of the RA Guard on port while operating in stateful mode.
+                  In stateless mode of operation, this object is not applicble and indicates a value 'na'."
+	DEFVAL { na }
+    ::= { fsIpv6SnpRagPortEntry 5 }
+
+    fsIpv6SnpRagPortTriggerStateChange OBJECT-TYPE
+	SYNTAX	   INTEGER {
+		   none(0),
+		   learn(1),
+	           forward(2),
+		   block(3)
+		   }  
+	MAX-ACCESS read-write
+	STATUS	   current
+	DESCRIPTION
+		" This objects allows manual triggering for movement of port state to learning/forwarding or blocking.
+                  This object is applicable when RA guard feature works in stateful mode on the interface."
+	DEFVAL { none }
+    ::= { fsIpv6SnpRagPortEntry 6 }
+
+    fsIpv6SnpRagPortLearnTime OBJECT-TYPE
+	SYNTAX	   Integer32(180..900)
+	UNITS      "seconds"
+	MAX-ACCESS read-write
+	STATUS	   current
+	DESCRIPTION	
+                " When the port state change is triggered to 'learn', the port remains in the learning state for the 'Learn Time'
+                  duration. After this time, the port state moves to 'forwarding' state if legitimate RA messages are 
+                  received on the interface. 
+                  In case if any illegitimate RA messages are received on the interface during the learning period,
+                  the interface is immediately moved to 'blocking' state for RA messaged. 
+                  This object is applicable when RA guard feature works in stateful mode on the interface
+                  and the PortState is configured as learning."
+	DEFVAL { 240 }
+    ::= { fsIpv6SnpRagPortEntry 7 }
+
+
+    fsIpv6SnpRagPortTrustState OBJECT-TYPE
+	SYNTAX	   INTEGER {
+		   trusted(1),
+		   untrusted(2)
+		   } 
+	MAX-ACCESS read-write
+	STATUS	   current
+	DESCRIPTION
+	     " Indicates RA guard port trust state as trusted/untrusted.
+	       trusted : RA messages will be forwarded without any validation 
+		untrusted : RA messages will be forwarded based on the RA guard policy validation on the interface "
+	DEFVAL { untrusted }
+    ::= { fsIpv6SnpRagPortEntry 8 }
+
+    fsIpv6SnpRagPortVlanlist OBJECT-TYPE
+	SYNTAX	     VlanList	
+	MAX-ACCESS   read-write
+	STATUS	     current
+	DESCRIPTION
+		" This object indicates the list of VLAN on which the RA guard feature is applicable.
+                   When VLAN list is NULL, the RA guard configurations are applicable at port level and for all VLANs on the port.
+                   When VLAN list is configured, the RA guard will be applicable only for the set of VLANs.
+                   If RA messages are received on other VLANs, RA guard feature will not be applied. "
+    ::= { fsIpv6SnpRagPortEntry 9 }
+	
+
+    fsIpv6SnpRagPortRowStatus OBJECT-TYPE
+	SYNTAX	    RowStatus
+	MAX-ACCESS  read-create
+	STATUS	    current
+	DESCRIPTION	
+		" This object is used to create or delete entry in the table "
+    ::= { fsIpv6SnpRagPortEntry 10 }
+
+-- RA Guard Interface Table END
+
+---------------------------------------
+-- RA Guard SourceIPv6 List Table BEGIN
+---------------------------------------
+
+    fsIPv6SnpRagSrcIPv6ListTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF FsIpv6SnpRagSrcIPv6ListEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION			
+		" This table contains Src Ipv6 Prefix List information that can 
+        be set as match criteria in the RA Guard policy entry.
+        This can be used for validating the Src IPv6 carried by 
+        incoming RA messages."
+    ::= { fsIpv6SnpRagPolicy 5 }
+
+    fsIpv6SnpRagSrcIPv6ListEntry OBJECT-TYPE
+	SYNTAX 		FsIpv6SnpRagSrcIPv6ListEntry
+	MAX-ACCESS 	not-accessible	
+	STATUS		current
+	DESCRIPTION	
+		" Each entry contains the Src Ipv6 Prefixes used to validate the prefix information
+        carried in RA messages."
+	INDEX { fsIpv6SnpRagSrcIPv6ListNo , fsIpv6SnpRagSrcIPv6EntryNo }
+    ::= { fsIPv6SnpRagSrcIPv6ListTable 1 }
+
+    FsIpv6SnpRagSrcIPv6ListEntry ::= SEQUENCE 	{
+	fsIpv6SnpRagSrcIPv6ListNo             Integer32,
+	fsIpv6SnpRagSrcIPv6EntryNo            Integer32,
+	fsIpv6SnpRagSrcIPv6Addr      	      Ipv6AddressPrefix,
+    fsIpv6SnpRagSrcIPv6PrefixLength       Integer32,
+	fsIpv6SnpRagSrcIPv6RowStatus          RowStatus
+    }
+
+	
+    fsIpv6SnpRagSrcIPv6ListNo OBJECT-TYPE
+	SYNTAX	    Integer32(1..65535)	
+	MAX-ACCESS  not-accessible	
+	STATUS 	    current
+	DESCRIPTION
+		"Indicates the Src IPv6 Prefix-list number of this entry 
+         The Src IPv6 Prefix List  number can be mapped to RA Guard policy entry to 
+         configure the matching criteria for the policy entry."
+    ::= { fsIpv6SnpRagSrcIPv6ListEntry 1 }
+
+
+    fsIpv6SnpRagSrcIPv6EntryNo OBJECT-TYPE
+	SYNTAX	    Integer32(1..100)	
+	MAX-ACCESS  not-accessible	
+	STATUS	    current
+	DESCRIPTION
+		" Indicates entry number for each Src IPv6 prefix.
+        For a single Src IPv6 prefix-list number, many entries can be created. Thus several 
+         Src IPv6 prefixes can be associated to a prefix-list number."
+    ::= { fsIpv6SnpRagSrcIPv6ListEntry 2 }
+
+
+    fsIpv6SnpRagSrcIPv6Addr OBJECT-TYPE
+	SYNTAX	     Ipv6AddressPrefix		
+	MAX-ACCESS   read-write
+	STATUS       current
+	DESCRIPTION
+		"Src Ipv6 prefix value of this entry "
+    ::= { fsIpv6SnpRagSrcIPv6ListEntry 3 }
+
+   fsIpv6SnpRagSrcIPv6PrefixLength OBJECT-TYPE
+       SYNTAX      Integer32(1..128)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               " Indicates prefix length for each Src Ipv6 prefix "
+     ::= { fsIpv6SnpRagSrcIPv6ListEntry 4 }
+
+    fsIpv6SnpRagSrcIPv6RowStatus OBJECT-TYPE
+	SYNTAX	     RowStatus
+	MAX-ACCESS   read-create
+	STATUS	     current
+	DESCRIPTION
+	 " This object is used to create or delete entry in the Src IPv6 Prefix List table. "
+    ::= { fsIpv6SnpRagSrcIPv6ListEntry 5 }
+
+-- RA Guard Access list Table END
+
+END

@@ -18,10 +18,10 @@ $background       = get_percentage_colours($cpu_load_percent);
 $graph_array           = [];
 $graph_array['height'] = "100";
 $graph_array['width']  = "512";
-$graph_array['to']     = $config['time']['now'];
+$graph_array['to']     = get_time();
 $graph_array['id']     = $app['app_id'];
 $graph_array['type']   = 'application_mssql_cpu_usage';
-$graph_array['from']   = $config['time']['day'];
+$graph_array['from']   = get_time('day');
 $graph_array['legend'] = "no";
 $graph                 = generate_graph_tag($graph_array);
 

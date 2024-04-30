@@ -1,7 +1,7 @@
 --**MOD+***********************************************************************
 --* Module:    ARUBAWIRED-LOOPPROTECT-MIB.mib
 --*
---* (c) Copyright 2017 Hewlett Packard Enterprise Development LP
+--* (c) Copyright 2017,2022-2023 Hewlett Packard Enterprise Development LP
 --* All Rights Reserved.
 --*
 --* The contents of this software are proprietary and confidential
@@ -22,20 +22,12 @@ ARUBAWIRED-LOOPPROTECT-MIB DEFINITIONS ::= BEGIN
             FROM SNMPv2-SMI
         TruthValue, TimeStamp, TEXTUAL-CONVENTION
             FROM SNMPv2-TC
-        MODULE-COMPLIANCE, OBJECT-GROUP
+        MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
             FROM SNMPv2-CONF
-        dot1dBasePortEntry
-            FROM BRIDGE-MIB
-        VlanIndex,VlanId
-            FROM Q-BRIDGE-MIB
         wndFeatures
               FROM ARUBAWIRED-NETWORKING-OID
-        dot1qVlanStaticEntry
-            FROM Q-BRIDGE-MIB
         InterfaceIndex, ifIndex
-            FROM IF-MIB
-        portCopyEntry
-            FROM SMON-MIB;
+            FROM IF-MIB;
 
     arubaWiredLoopProtectMIB MODULE-IDENTITY
         LAST-UPDATED "201711020000Z" -- November 02, 2017
@@ -80,7 +72,7 @@ ARUBAWIRED-LOOPPROTECT-MIB DEFINITIONS ::= BEGIN
                     bit has a value of 0.  This list represents the entire
                     range of VlanIndex values defined in the scope of IEEE
                     802.1Q."
-        SYNTAX OCTET STRING (SIZE (512))
+        SYNTAX OCTET STRING (SIZE (0..512))
 
     arubaWiredLoopProtectObjects
         OBJECT IDENTIFIER ::= { arubaWiredLoopProtectMIB 1 }
@@ -168,6 +160,13 @@ ARUBAWIRED-LOOPPROTECT-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION "A list of VLANs on which Loop Protection is enabled."
         ::= { arubaWiredLoopProtectBase 5 }
 
+    arubaWiredLoopProtectPortTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ArubaWiredLoopProtectPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Per-interface configuration for Loop Protection."
+        ::= { arubaWiredLoopProtectPort 1 }
+
     arubaWiredLoopProtectPortEntry OBJECT-TYPE
         SYNTAX      ArubaWiredLoopProtectPortEntry
         MAX-ACCESS  not-accessible
@@ -234,7 +233,7 @@ ARUBAWIRED-LOOPPROTECT-MIB DEFINITIONS ::= BEGIN
                      a port."
         ::= { arubaWiredLoopProtectPortEntry 5 }
 
-   arubaWiredLoopProtectPortReceiverAction OBJECT-TYPE
+    arubaWiredLoopProtectPortReceiverAction OBJECT-TYPE
         SYNTAX      LoopProtectReceiverAction
         MAX-ACCESS  read-write
         STATUS      current
@@ -248,29 +247,20 @@ ARUBAWIRED-LOOPPROTECT-MIB DEFINITIONS ::= BEGIN
         ::= { arubaWiredLoopProtectPortEntry 6 }
 
 
-   arubaWiredLoopProtectLoopDetectedVlan OBJECT-TYPE
-        SYNTAX      Integer32(1..4096)
+    arubaWiredLoopProtectLoopDetectedVlan OBJECT-TYPE
+        SYNTAX      Integer32(0..4096)
         MAX-ACCESS  read-only
         STATUS      current
-        DESCRIPTION "Refers to this object for the port on which loop is
-                     detected."
+        DESCRIPTION "The loop-detected VLAN ID. A value of 0 indicates no loop."
         ::= { arubaWiredLoopProtectPortEntry 7 }
 
 
-   arubaWiredLoopProtectPortVlanList OBJECT-TYPE
+    arubaWiredLoopProtectPortVlanList OBJECT-TYPE
         SYNTAX      VidList
         MAX-ACCESS  read-write
         STATUS      current
         DESCRIPTION "A list of VLANs for this interface in which Loop Protection is enabled."
         ::= { arubaWiredLoopProtectPortEntry 8 }
-
-   arubaWiredLoopProtectPortTable OBJECT-TYPE
-        SYNTAX      SEQUENCE OF ArubaWiredLoopProtectPortEntry
-        MAX-ACCESS  not-accessible
-        STATUS      current
-        DESCRIPTION "Per-interface configuration for Loop Protection."
-        ::= { arubaWiredLoopProtectPort 1 }
-
 
 -- **********************************************************************
 -- arubaWiredLoopProtect Notifications
@@ -333,14 +323,14 @@ ARUBAWIRED-LOOPPROTECT-MIB DEFINITIONS ::= BEGIN
         STATUS      current
         DESCRIPTION "A collection of objects providing basic instrumentation
                      and control of the HP Loop protection entity."
-
         ::= {arubaWiredLoopProtectGroups 4 }
 
 
-arubaWiredLoopProtectVLANGroup OBJECT-GROUP
+    arubaWiredLoopProtectVLANGroup OBJECT-GROUP
         OBJECTS     { arubaWiredLoopProtectMode,
                       arubaWiredLoopProtectVIDList,
-                      arubaWiredLoopProtectLoopDetectedVlan
+                      arubaWiredLoopProtectLoopDetectedVlan,
+                      arubaWiredLoopProtectPortVlanList
                     }
         STATUS      current
         DESCRIPTION "A collection of objects providing support for Loop Protect
@@ -348,24 +338,23 @@ arubaWiredLoopProtectVLANGroup OBJECT-GROUP
 
         ::= {arubaWiredLoopProtectGroups 10 }
 
+    arubaWiredLoopProtectNotificationsGroup NOTIFICATION-GROUP
+         NOTIFICATIONS { arubaWiredLoopProtectLoopDetectedNotification,
+                         arubaWiredLoopProtectVlanLoopDetectedNotification
+                       }
+         STATUS current
+         DESCRIPTION "Aruba Wired Loop Protect notification group."
+         ::= { arubaWiredLoopProtectGroups 11 }
 
     arubaWiredLoopProtectCompliance MODULE-COMPLIANCE
         STATUS      current
         DESCRIPTION "The compliance statement for HP Switches with
                      support for arubaWired loop protection objects."
-
         MODULE
-            MANDATORY-GROUPS { arubaWiredLoopProtectBaseGroup,
-                               arubaWiredLoopProtectNotifications }
-
-            GROUP       arubaWiredLoopProtectBaseGroup
-            DESCRIPTION "Support for this group is mandatory for switches
-                        that implement the loop protection feature."
-
-            GROUP       arubaWiredLoopProtectNotifications
-            DESCRIPTION "Implementation of this group is mandatory
-                         for switches that implement the loop protection
-                         feature."
+        MANDATORY-GROUPS { arubaWiredLoopProtectBaseGroup,
+                           arubaWiredLoopProtectNotificationsGroup,
+                           arubaWiredLoopProtectVLANGroup
+                         }
         ::= { arubaWiredLoopProtectCompliances 5 }
 
 END

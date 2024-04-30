@@ -1,0 +1,565 @@
+-- Copyright (C) 2010-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsmtpoam.mib,v 1.4 2012/09/07 09:52:05 siva Exp $
+ARICENT-MPLS-TP-OAM-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+       MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+       Unsigned32, zeroDotZero, enterprises
+          FROM SNMPv2-SMI                   -- [RFC2578]
+       RowStatus, TruthValue, RowPointer, 
+       DisplayString
+          FROM SNMPv2-TC                    -- [RFC2579]
+       InterfaceIndexOrZero
+          FROM IF-MIB                       -- [RFC2863]
+       fsMplsTpContextId
+          FROM ARICENT-MPLS-TP-MIB;
+          
+    fsMplsTpOamMIB MODULE-IDENTITY
+       LAST-UPDATED "201209050000Z"
+       ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+       CONTACT-INFO "support@aricent.com"
+       DESCRIPTION  "The Proprietary MIB for MPLS-TP-OAM module"
+       REVISION "201209050000Z" 
+       DESCRIPTION  "The Proprietary MIB for MPLS-TP-OAM module"
+       ::= { enterprises futuresoftware (2076) futureMpls (13) 9}
+
+   -- Notifications
+    fsMplsTpOamNotifications OBJECT IDENTIFIER  ::= { fsMplsTpOamMIB 0 }
+    -- MPLS OAM objects
+    fsMplsTpOamObjects        OBJECT IDENTIFIER ::= { fsMplsTpOamMIB 1 }
+    -- conformance
+    fsMplsTpOamConformance    OBJECT IDENTIFIER ::= { fsMplsTpOamMIB 2 }
+    -- MPLS OAM scalar objects
+    fsMplsTpOamScalarObjects OBJECT IDENTIFIER ::= { fsMplsTpOamObjects 1 }
+
+    -- Start of MPLS Transport Profile MEG table
+
+    fsMplsTpMegTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsTpMegEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "This table contains information about the Maintenance Entity
+            Groups (MEG). 
+
+            MEG as mentioned in MPLS-TP OAM framework defines a set of one or
+            more maintenance entities (ME). Maintenance Entities define a
+            relationship between any two points of a transport path in an OAM
+            doamin to which maintenance and monitoring operations apply."
+     ::= { fsMplsTpOamObjects 2 }
+
+    fsMplsTpMegEntry OBJECT-TYPE
+     SYNTAX        FsMplsTpMegEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "An entry in this table represents MPLS-TP MEG.
+            An entry can be created by a network administrator
+            or by an SNMP agent as instructed by an MPLS-TP OAM Framework.
+            
+            When a new entry is created with fsMplsTpMegOperatorType set to
+            ipCompatible (1), then as per MPLS-TP identifiers (MEG_ID for LSP
+            is LSP_ID and MEG_ID for PW is PW_Path_ID), MEP_ID can be
+            automatically formed. 
+
+            For LSP, MEP_ID is formed using 
+            Src-Global_ID::Src-Node_ID::Src-Tunnel_Num::LSP_Num.
+
+            For PW, MEP_ID is formed using 
+            AGI::Src-Global_ID::Src-Node_ID::Src-AC_Id.MEG_ID.
+
+            MEP_ID is retrieved from the fsMplsTpMegServicePointer
+            object based on the fsMplsTpMegServiceType value.
+
+            MEG_ID for LSP and PW based on ICC based operator type is formed
+            using the objects fsMplsTpMegIdIcc and fsMplsTpMegIdUmc.
+            
+            MEP_ID can be formed using MEG_ID::MEP_Index."
+     REFERENCE
+         "1. RFC 5860, Requirements for OAM in MPLS Transport Networks, May 2010.
+          2. draft-ietf-mpls-tp-oam-framework-07, MPLS-TP OAM Framework 
+             (work in progress), July 2010."
+     INDEX { fsMplsTpContextId,
+             fsMplsTpMegIndex
+           }
+     ::= { fsMplsTpMegTable 1 }
+
+     FsMplsTpMegEntry ::= SEQUENCE {
+          fsMplsTpMegIndex            Unsigned32,
+          fsMplsTpMegName             DisplayString,
+          fsMplsTpMegOperatorType     INTEGER,
+          fsMplsTpMegIdIcc            DisplayString,
+          fsMplsTpMegIdUmc            DisplayString,
+          fsMplsTpMegServiceType      INTEGER, 
+          fsMplsTpMegMpLocation       INTEGER,
+          fsMplsTpMegRowStatus        RowStatus
+    }
+
+    fsMplsTpMegIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+           "Index for the conceptual row identifying a MEG within this MEG
+            table."
+       ::= { fsMplsTpMegEntry 1 }
+
+    fsMplsTpMegName  OBJECT-TYPE
+       SYNTAX        DisplayString (SIZE(1..48))
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+           "Each Maintenance Entity Group has unique name amongst all those
+            used or available to a service provider or operator. It
+            facilitates easy identification of administrative
+            responsibility for each MEG.
+            
+            Note: When the MEG entry is created using SNMP this field will
+            be automatically filled. When created using CLI, the user is 
+            expected to provide an unique name."
+       ::= { fsMplsTpMegEntry 2 }
+
+    fsMplsTpMegOperatorType OBJECT-TYPE
+       SYNTAX        INTEGER {
+                         ipCompatible (1), 
+                         iccBased (2)
+                     }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+           "Indicates the operator type for MEG. Conceptual rows having
+            'iccBased' as operator type, should have valid values for the 
+            objects fsMplsTpMegIdIcc and fsMplsTpMegIdUmc while making the
+            row status active."
+       REFERENCE
+          "MPLS-TP Identifiers draft, section 3.1 and 3.2" 
+       DEFVAL { ipCompatible }
+       ::= { fsMplsTpMegEntry 3 }
+    
+    fsMplsTpMegIdIcc OBJECT-TYPE
+       SYNTAX      DisplayString (SIZE(1..6))
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+         "Unique code assigned to Network Operator or Service Provider 
+          maintained by ITU-T. The ITU Carrier Code used to form MEGID.
+          This object should to be configured, if fsMplsTpMegOperatorType
+          object value is configured as iccBased (2)."
+       REFERENCE
+         "MPLS-TP Identifiers draft, section 7.1.1"
+       DEFVAL {""}   
+       ::= { fsMplsTpMegEntry 4 }
+   
+    fsMplsTpMegIdUmc OBJECT-TYPE
+       SYNTAX      DisplayString (SIZE(1..7))
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+         "Unique code assigned by Network Operator or Service Provider
+          and is appended to fsMplsTpMegIdIcc to form the MEGID.
+          The unique MEGID Code used to form MEGID. This object should 
+          to be configured, if fsMplsTpMegOperatorType object value 
+          is configured as iccBased (2)."
+       REFERENCE
+         "MPLS-TP Identifiers draft, section 7.1.1"
+       DEFVAL {""}
+       ::= { fsMplsTpMegEntry 5 }
+
+    fsMplsTpMegServiceType OBJECT-TYPE
+       SYNTAX        INTEGER {
+                         lsp (1), 
+                         pseudowire (2),
+                         section (3)
+                     }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the service type for which the MEG is created.
+          
+          If the value is lsp, the service pointer in fsMplsTpMeTable
+          points to the TE tunnel table entry.
+          
+          If the value is pseudowire, the service pointer in fsMplsTpMeTable
+          points to the pseudowire table entry.
+          
+          If the value is section, the service pointer in fsMplsTpMeTable
+          points to a section entry."
+       DEFVAL { lsp }
+       ::= { fsMplsTpMegEntry 6 }
+
+    fsMplsTpMegMpLocation OBJECT-TYPE
+       SYNTAX        INTEGER {
+                         perNode (1), 
+                         perInterface (2)
+                     }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the MP location type for this MEG.
+         
+          If the value is perNode, then the MEG in the LSR supports only
+          pernode MEP/MIP, i.e., only one MEP/MIP in an LSR.
+          
+          If the value is perInterface, then the MEG in the LSR supports
+          perInterface MEPs/MIPs, i.e., two MEPs/MIPs in an LSR."
+       REFERENCE
+         "MPLS-TP OAM draft, section 3.3 and 3.4" 
+       DEFVAL { perNode }
+       ::= { fsMplsTpMegEntry 7 }
+
+    fsMplsTpMegRowStatus OBJECT-TYPE
+       SYNTAX        RowStatus
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+          "This variable is used to create, modify, and/or delete a row in this
+           table. When a row in this table is in active(1) state, no objects in 
+           that row can be modified by the agent except fsMplsTpMegRowStatus."
+       ::= { fsMplsTpMegEntry 8 }
+
+    -- End of MPLS Transport Profile MEG table
+    
+    -- Start of MPLS Transport Profile ME table
+    fsMplsTpMeTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsTpMeEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "This table contains MPLS-TP maintanece entity information.
+            
+            ME is some portion of a transport path that requires
+            management bounded by two points (called MEPs), and the
+            relationship between those points to which maintenance and
+            monitoring operations apply.
+            
+            This table is generic enough to handle MEPs and MIPs informations 
+            within a MEG."
+     ::= { fsMplsTpOamObjects 3 }
+
+    fsMplsTpMeEntry OBJECT-TYPE
+     SYNTAX        FsMplsTpMeEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "An entry in this table represents MPLS-TP maintanence entity.
+           This entry represents the ME if the source and sink MEPs are defined.
+           An ME is a p2p entity. One ME has two such MEPs.
+           A MEG is a group of one or more MEs. One MEG can have two or more MEPs.
+           
+           For P2P LSP, one MEG has one ME and this ME is associated 
+           two MEPs (source and sink MEPs) within a MEG. 
+           Each fsMplsTpMeIndex value denotes the ME within a MEG.
+
+           In case of unidirectional point-to-point transport paths, a
+           single unidirectional Maintenance Entity is defined to monitor it.
+
+           In case of associated bi-directional point-to-point transport
+           paths, two independent unidirectional Maintenance Entities are
+           defined to independently monitor each direction. This has
+           implications for transactions that terminate at or query a MIP,
+           as a return path from MIP to source MEP does not necessarily
+           exist in the MEG.
+
+           In case of co-routed bi-directional point-to-point transport
+           paths, a single bidirectional Maintenance Entity is defined to
+           monitor both directions congruently.
+
+           In case of unidirectional point-to-multipoint transport paths, a
+           single unidirectional Maintenance entity for each leaf is
+           defined to monitor the transport path from the root to that leaf."
+      INDEX { fsMplsTpContextId,
+              fsMplsTpMegIndex,
+              fsMplsTpMeIndex, 
+              fsMplsTpMeMpIndex 
+            }
+      ::= { fsMplsTpMeTable 1 }
+
+     FsMplsTpMeEntry ::= SEQUENCE {
+          fsMplsTpMeIndex                         Unsigned32,
+          fsMplsTpMeMpIndex                       Unsigned32,
+          fsMplsTpMeName                          DisplayString,
+          fsMplsTpMeMpIfIndex                     InterfaceIndexOrZero,
+          fsMplsTpMeSourceMepIndex                Unsigned32,
+          fsMplsTpMeSinkMepIndex                  Unsigned32,
+          fsMplsTpMeMpType                        INTEGER,
+          fsMplsTpMeMepDirection                  INTEGER,
+          fsMplsTpMeProactiveOamSessIndex         Unsigned32,
+          fsMplsTpMeProactiveOamPhbTCValue        INTEGER,
+          fsMplsTpMeOnDemandOamPhbTCValue         INTEGER,
+          fsMplsTpMeServiceSignaled               TruthValue,
+          fsMplsTpMeServicePointer                RowPointer, 
+          fsMplsTpMeRowStatus                     RowStatus
+    }
+
+    fsMplsTpMeIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+         "Uniquely identifies a maintenance entity index within a MEG."
+       ::= { fsMplsTpMeEntry 1 }
+
+    fsMplsTpMeMpIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+         "Indicates the maintenance point index. 
+          The value of this object can be MEP index or MIP index."
+       ::= { fsMplsTpMeEntry 2 }
+    
+    fsMplsTpMeName  OBJECT-TYPE
+       SYNTAX        DisplayString (SIZE(1..48))
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+           "This object denotes the ME name, each 
+            Maintenance Entity has unique name within MEG."
+       ::= { fsMplsTpMeEntry 3 }
+    
+    fsMplsTpMeMpIfIndex OBJECT-TYPE
+       SYNTAX        InterfaceIndexOrZero
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the maintenance point interface.
+          If the fsMplsTpMegMpLocation object value is perNode (1), 
+          the MP interface index should point to incoming interface or 
+          outgoing interface or zero (indicates the MP OAM packets are 
+          initiated from forwarding engine).
+
+          If the fsMplsTpMegMpLocation object value is perInterface (2),
+          the MP interface index should point to incoming interface or 
+          outgoing interface." 
+       REFERENCE
+         "MPLS-TP OAM framework draft, 3.3 and 3.4"
+       DEFVAL { 0 }
+       ::= { fsMplsTpMeEntry 4 }
+
+    fsMplsTpMeSourceMepIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the source MEP Index of the ME. This object 
+          should be configured if fsMplsTpMegOperatorType object 
+          in the fsMplsTpMegEntry is configured as iccBased (2).
+          If the MEG is configured for IP based operator, 
+          the value of this object should be set zero and the MEP 
+          ID will be automatically derived from the service
+          Identifiers(MPLS-TP LSP/PW Identifier)."
+       DEFVAL { 0 } 
+       ::= { fsMplsTpMeEntry 5 }
+
+    fsMplsTpMeSinkMepIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the sink MEP Index of the ME. This object 
+          should be configured if fsMplsTpMegOperatorType object 
+          in the fsMplsTpMegEntry is configured as iccBased (2). 
+          If the MEG is configured for IP based operator, 
+          the value of this object should be set zero and the MEP
+          ID will be automatically derived from the service
+          Identifiers(MPLS-TP LSP/PW Identifier)."
+       DEFVAL { 0 } 
+       ::= { fsMplsTpMeEntry 6 }
+
+    fsMplsTpMeMpType OBJECT-TYPE
+       SYNTAX        INTEGER {
+                         mep (1), 
+                         mip (2)
+                     }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+           "Indicates the maintanence point type within the MEG.
+            
+            The object should have the value mep (1),  only in the 
+            Ingress or Egress nodes of the transport path.
+            
+            The object can have the value mip (2), in the intermediate
+            nodes and possibly in the end nodes of the transport path."
+       DEFVAL { mep } 
+       ::= { fsMplsTpMeEntry 7 }
+
+    fsMplsTpMeMepDirection OBJECT-TYPE
+       SYNTAX        INTEGER {
+                         up (1), 
+                         down (2)
+                     }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the direction of the MEP. This object 
+          should be configured if fsMplsTpMeMpType is 
+          configured as mep (1)."
+       DEFVAL { down } 
+       ::= { fsMplsTpMeEntry 8 }
+    
+    fsMplsTpMeProactiveOamSessIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the proactive session index for this MP.
+          When a proactive session for this MP is established,
+          the application has to update this object with the 
+          session index."
+       DEFVAL { 0 }
+       ::= { fsMplsTpMeEntry 9 }
+      
+    fsMplsTpMeProactiveOamPhbTCValue  OBJECT-TYPE
+       SYNTAX        INTEGER {
+                       ef1 (1),
+                       ef2 (2),
+                       af1 (3),
+                       af2 (4),
+                       af3 (5),
+                       be (6)
+                    }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the PHB value for this source 
+          MEP generated proactive traffic."
+       DEFVAL { ef1 }
+       ::= { fsMplsTpMeEntry 10 }
+
+   fsMplsTpMeOnDemandOamPhbTCValue  OBJECT-TYPE
+       SYNTAX        INTEGER {
+                       ef1 (1),
+                       ef2 (2),
+                       af1 (3),
+                       af2 (4),
+                       af3 (5),
+                       be (6)
+                    }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the PHB value for this source MEP generated ondemand traffic."
+       DEFVAL { ef1 }
+       ::= { fsMplsTpMeEntry 11 }
+
+    fsMplsTpMeServiceSignaled OBJECT-TYPE
+       SYNTAX        TruthValue
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates whether the service associated with ME is created by 
+          signaling or static."
+       DEFVAL { false }
+       ::= { fsMplsTpMeEntry 12 }
+
+    fsMplsTpMeServicePointer OBJECT-TYPE
+       SYNTAX        RowPointer
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "This variable represents a pointer to the MPLS-TP
+          transport path. This value may point at an entry in the
+          mplsTunnelEntry if fsMplsTpMegServiceType is configured 
+          as lsp (1) or at an entry in the pwEntry if 
+          fsMplsTpMegServiceType is configured as pseudowire (2).
+          
+          Note: This service pointer object, is placed in ME table 
+          instead of MEG table, since it will be useful in case of 
+          poinit-to-multipoint, where each ME will point to different
+          branches of a P2MP tree."
+       DEFVAL { zeroDotZero } 
+       ::= { fsMplsTpMeEntry 13 }
+  
+    fsMplsTpMeRowStatus OBJECT-TYPE
+       SYNTAX        RowStatus
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+          "This variable is used to create, modify, and/or
+           delete a row in this table.  When a row in this
+           table is in active(1) state, no objects in that row
+           can be modified by the agent except
+           fsMplsTpMeRowStatus."
+       ::= { fsMplsTpMeEntry 14 }
+
+    -- End of MPLS Transport Profile ME table
+
+    -- End of MPLS-TP OAM Tables
+
+-- Trap Definitions
+    fsMplsTpOamContextName OBJECT-TYPE
+       SYNTAX       DisplayString (SIZE (0..32)) 
+       MAX-ACCESS   accessible-for-notify
+       STATUS       current
+       DESCRIPTION
+           "This object specifies the context name of the virtual instance. "
+     ::= {  fsMplsTpOamObjects 4 }
+
+    fsMplsTpOamMegOperStatus OBJECT-TYPE
+       SYNTAX       INTEGER {
+                     up (1),
+                     down (2) 
+                    }
+       MAX-ACCESS   accessible-for-notify
+       STATUS       current
+       DESCRIPTION
+           "This object specifies the operational status of the Maintenance
+            Entity Group (MEG). This object is used to send the notification
+            to the SNMP manager about the MEG when the operational status of 
+            the MEG changes.
+
+            The value up (1) indicates that the MEG and its monitored path are
+            operationally up. The value down (2) indicates that the MEG is
+            operationally down.
+            "
+     ::= {  fsMplsTpOamObjects 5 }
+
+    fsMplsTpOamMegSubOperStatus OBJECT-TYPE
+       SYNTAX       BITS {
+                     megDown (0),
+                     meDown (1),
+                     oamAppDown (2),
+                     pathDown (3)
+                    }
+       MAX-ACCESS   accessible-for-notify
+       STATUS       current
+       DESCRIPTION
+           "This object specifies the reason why the MEG operational status as
+            mentioned by the object fsMplsTpOamMegOperStatus is down.
+            This object is used to send the notification to the SNMP manager
+            about the MEG.
+
+            The bit 0 (megDown) when set, indicates that the MEG is down 
+            i.e., when MEG is made down administratively. 
+            The bit 1 (meDown) when set, indicates that the ME table is down 
+            i.e., when ME is made down administratively. 
+            The bit 2 (oamAppDown) when set, indicates that the 
+            OAM application has notified that the entity (LSP or PW)
+            monitored by this MEG is down. Currently, BFD is the only supported
+            OAM application. 
+            The bit 3 (pathDown) when set, indicates that the underlying LSP or
+            PW is down.
+            "
+     ::= {  fsMplsTpOamObjects 6 }   
+
+    fsMplsTpOamDefectCondition NOTIFICATION-TYPE
+     OBJECTS      {
+                    fsMplsTpOamContextName,
+                    fsMplsTpMegName,
+                    fsMplsTpMeName,
+                    fsMplsTpOamMegOperStatus,
+                    fsMplsTpOamMegSubOperStatus
+                  }
+     STATUS       current
+     DESCRIPTION
+         "This notification signifies the operational status of MEG.
+
+          The information that are carried in this notification are 
+          Context Name, Meg Name, Me Name, MegOperStatus and
+          MegSubOperStatus.
+         "
+     ::= { fsMplsTpOamNotifications 1 }
+
+END

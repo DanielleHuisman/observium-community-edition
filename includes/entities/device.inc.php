@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -62,6 +62,171 @@ function build_initial_device_array($hostname, $snmp_community, $snmp_version, $
     return $device;
 }
 
+function get_device_snmp_argv($add, &$snmp_options) {
+    global $config;
+
+    if (!$add) {
+        return [];
+    }
+
+    // SNMPv1/2c:                    add_device.php <hostname> [community] [v1|v2c] [port] [udp|udp6|tcp|tcp6] [context]
+    // SNMPv3   :         Defaults : add_device.php <hostname> any v3 [user] [port] [udp|udp6|tcp|tcp6] [context]
+    //            No Auth, No Priv : add_device.php <hostname> nanp v3 [user] [port] [udp|udp6|tcp|tcp6] [context]
+    //               Auth, No Priv : add_device.php <hostname> anp v3 <user> <password> [md5|sha|sha-224|sha-256|sha-384|sha-512] [port] [udp|udp6|tcp|tcp6] [context]
+    //               Auth,    Priv : add_device.php <hostname> ap v3 <user> <password> <enckey> [md5|sha|sha-224|sha-256|sha-384|sha-512] [des|aes|aes-192|aes-192-c|aes-256|aes-256-c] [port] [udp|udp6|tcp|tcp6] [context]
+
+    $hostname       = strtolower($add[0]);
+    $snmp_community = $add[1];
+    $snmp_version   = strtolower($add[2]);
+
+    $snmp_port = 161;
+    if (str_contains($hostname, ':') && get_ip_version($hostname) !== 6) {
+        // Allow pass common hostname:port
+        [ $host_tmp, $port_tmp ] = explode(':', $hostname, 2);
+        if (is_valid_param($port_tmp, 'port')) {
+            $hostname  = $host_tmp;
+            $snmp_port = $port_tmp;
+        }
+        unset($host_tmp, $port_tmp);
+    }
+
+    $return = [ 'hostname' => $hostname ];
+
+    $snmp_transport = 'udp';
+
+    if ($snmp_version === "v3") {
+        //$config['snmp']['v3'] = $snmp_config_v3; // Restore base SNMP v3 credentials
+        $snmp_v3_seclevel     = $snmp_community;
+
+        // These values are the same as in defaults.inc.php
+        $snmp_v3_auth = [
+            'authlevel'  => "noAuthNoPriv",
+            'authname'   => "observium",
+            'authpass'   => "",
+            'authalgo'   => "MD5",
+            'cryptopass' => "",
+            'cryptoalgo' => "AES"
+        ];
+
+        $add_context = FALSE; // Derp, last arg after transport is context
+        if ($snmp_v3_seclevel === "nanp" || $snmp_v3_seclevel === "any" || $snmp_v3_seclevel === "noAuthNoPriv") {
+            $snmp_v3_auth['authlevel'] = "noAuthNoPriv";
+            $snmp_v3_args              = array_slice($add, 3);
+
+            while ($arg = array_shift($snmp_v3_args)) {
+                // parse all remaining args
+                if (is_valid_param($arg, 'port')) {
+                    $snmp_port = $arg;
+                } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/', $arg)) {
+                    $snmp_transport = $arg;
+                    $add_context    = TRUE; // Derp, last arg after transport is context
+                } elseif ($add_context && strlen($arg)) {
+                    $snmp_context = $arg;
+                    break;
+                } else {
+                    // FIXME: should add a sanity check of chars allowed in user
+                    $user = $arg;
+                }
+            }
+
+            if ($snmp_v3_seclevel !== "any") {
+                //$config['snmp']['v3'] = [$snmp_v3_auth];
+                $return['snmp_v3_auth'] = [ $snmp_v3_auth ];
+            }
+        } elseif ($snmp_v3_seclevel === "anp" || $snmp_v3_seclevel === "authNoPriv") {
+
+            $snmp_v3_auth['authlevel'] = "authNoPriv";
+            $snmp_v3_args              = array_slice($add, 4);
+            $snmp_v3_auth['authname']  = array_shift($snmp_v3_args);
+            $snmp_v3_auth['authpass']  = array_shift($snmp_v3_args);
+
+            while ($arg = array_shift($snmp_v3_args)) {
+                // parse all remaining args
+                if (is_valid_param($arg, 'port')) {
+                    $snmp_port = $arg;
+                } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
+                    $snmp_transport = $arg;
+                    $add_context    = TRUE; // Derp, last arg after transport is context
+                } elseif (is_valid_param($arg, 'snmp_authalgo')) {
+                    $snmp_v3_auth['authalgo'] = $arg;
+                } elseif ($add_context && !safe_empty($arg)) {
+                    $snmp_context = $arg;
+                    break;
+                }
+            }
+
+            //$config['snmp']['v3'] = [$snmp_v3_auth];
+            $return['snmp_v3_auth'] = [ $snmp_v3_auth ];
+        } elseif ($snmp_v3_seclevel === "ap" || $snmp_v3_seclevel === "authPriv") {
+            $snmp_v3_auth['authlevel']  = "authPriv";
+            $snmp_v3_args               = array_slice($add, 4);
+            $snmp_v3_auth['authname']   = array_shift($snmp_v3_args);
+            $snmp_v3_auth['authpass']   = array_shift($snmp_v3_args);
+            $snmp_v3_auth['cryptopass'] = array_shift($snmp_v3_args);
+
+            while ($arg = array_shift($snmp_v3_args)) {
+                // parse all remaining args
+                if (is_valid_param($arg, 'port')) {
+                    $snmp_port = $arg;
+                } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
+                    $snmp_transport = $arg;
+                    $add_context    = TRUE; // Derp, last arg after transport is context
+                } elseif (is_valid_param($arg, 'snmp_authalgo')) {
+                    $snmp_v3_auth['authalgo'] = $arg;
+                } elseif (is_valid_param($arg, 'snmp_cryptoalgo')) {
+                    $snmp_v3_auth['cryptoalgo'] = $arg;
+                } elseif ($add_context && !safe_empty($arg)) {
+                    $snmp_context = $arg;
+                    break;
+                }
+            }
+
+            //$config['snmp']['v3'] = [ $snmp_v3_auth ];
+            $return['snmp_v3_auth'] = [ $snmp_v3_auth ];
+        }
+        //print_debug_vars($snmp_v3_auth);
+        //print_debug_vars($config['snmp']['v3']);
+    } else {
+        // v1 or v2c
+        $snmp_v2_args = array_slice($add, 2);
+
+        $add_context = FALSE; // Derp, last arg after transport is context
+        while ($arg = array_shift($snmp_v2_args)) {
+            // parse all remaining args
+            if (is_valid_param($arg, 'port')) {
+                $snmp_port = $arg;
+            } elseif (preg_match('/(' . implode("|", $config['snmp']['transports']) . ')/i', $arg)) {
+                $snmp_transport = $arg;
+                $add_context    = TRUE; // Derp, last arg after transport is context
+            } elseif (preg_match('/^(v1|v2c)$/i', $arg)) {
+                $snmp_version = $arg;
+            } elseif ($add_context && !safe_empty($arg)) {
+                $snmp_context = $arg;
+                break;
+            }
+        }
+        if (!preg_match('/^(v1|v2c)$/i', $snmp_version)) {
+            $snmp_version = $config['snmp']['version'] !== 'v3' ? $config['snmp']['version'] : 'v2c';
+        }
+
+        //$config['snmp']['community'] = ($snmp_community ? [$snmp_community] : $snmp_config_community);
+        $return['snmp_community'] = $snmp_community ? [ $snmp_community ] : $config['snmp']['community'];
+    }
+    $return['snmp_version']   = $snmp_version;
+    $return['snmp_transport'] = $snmp_transport;
+    $return['snmp_port']      = $snmp_port;
+
+    // Add snmp context to params
+    if (isset($snmp_context)) {
+        $snmp_options['snmp_context'] = $snmp_context;
+    } else {
+        // Reset snmp context if in loop
+        unset($snmp_options['snmp_context']);
+    }
+
+    return $return;
+}
+
 /**
  * Add device to DB or queue.
  *
@@ -69,43 +234,43 @@ function build_initial_device_array($hostname, $snmp_community, $snmp_version, $
  *
  * @return bool|int
  */
-function add_device_vars($vars)
-{
+function add_device_vars($vars) {
     global $config;
 
     $hostname = strip_tags($vars['hostname']);
+    $printname = escape_html($hostname);
 
-    // Add device to remote poller,
+    // Add a device to remote poller,
     // only validate vars and add to pollers_actions
     if (is_intnum($vars['poller_id']) && $vars['poller_id'] != $config['poller_id']) {
-        print_message("Requested add device with hostname '$hostname' to remote Poller [{$vars['poller_id']}].");
+        print_message("Requested add device with hostname '$printname' to remote Poller [{$vars['poller_id']}].");
         if (!(is_valid_hostname($hostname) || get_ip_version($hostname))) {
             // Failed DNS lookup
-            print_error("Hostname '$hostname' is not valid.");
+            print_error("Hostname '$printname' is not valid.");
             return FALSE;
         }
         if (!dbExist('pollers', '`poller_id` = ?', [$vars['poller_id']])) {
             // Incorrect Poller ID
-            print_error("Device with hostname '$hostname' not added. Unknown target Poller requested.");
+            print_error("Device with hostname '$printname' not added. Unknown target Poller requested.");
             return FALSE;
         }
         if ($tmp_id = dbFetchCell('SELECT `poller_id` FROM `observium_actions` WHERE `action` = ? AND `identifier` = ?', ['device_add', $hostname])) {
             // Incorrect Poller ID
-            print_error("Already queued addition device with hostname '$hostname' on remote Poller [$tmp_id].");
+            print_error("Already queued addition device with hostname '$printname' on remote Poller [$tmp_id].");
             return FALSE;
         }
         if (dbExist('devices', '`hostname` = ?', [$hostname])) {
             // found in database
-            print_error("Already got device with hostname '$hostname'.");
+            print_error("Already got device with hostname '$printname'.");
             return FALSE;
         }
         if (function_exists('add_action_queue') &&
             $action_id = add_action_queue('device_add', $hostname, $vars)) {
-            print_message("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].");
-            log_event("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].", NULL, 'info', NULL, 7);
+            print_message("Device with hostname '$printname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].");
+            log_event("Device with hostname '$printname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].", NULL, 'info', NULL, 7);
             return TRUE;
         }
-        print_error("Device with hostname '$hostname' not added. Incorrect addition to actions queue.");
+        print_error("Device with hostname '$printname' not added. Incorrect addition to actions queue.");
         return FALSE;
     }
 
@@ -123,7 +288,7 @@ function add_device_vars($vars)
                 // Named MIB::Oid which we can translate
                 $snmp_oids[] = $oid_num;
             } else {
-                print_warning("Invalid or unknown OID: " . $oid);
+                print_warning("Invalid or unknown OID: " . escape_html($oid));
             }
         }
         if (empty($snmp_oids)) {
@@ -158,7 +323,7 @@ function add_device_vars($vars)
 
             $snmp_version = $vars['snmp_version'];
 
-            print_message("Adding SNMP$snmp_version host $hostname port $snmp_port");
+            print_message("Adding SNMP$snmp_version host $printname port $snmp_port");
             break;
 
         case 'v3':
@@ -178,7 +343,7 @@ function add_device_vars($vars)
 
             $snmp_version = "v3";
 
-            print_message("Adding SNMPv3 host $hostname port $snmp_port");
+            print_message("Adding SNMPv3 host $printname port $snmp_port");
             break;
 
         default:
@@ -367,7 +532,7 @@ function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_trans
                             // Hide snmp auth
                             print_message("Trying v3 parameters *** / ### [$auth_iter] ... ");
                         } else {
-                            print_message("Trying v3 parameters " . $device['snmp_authname'] . "/" . $device['snmp_authlevel'] . " ... ");
+                            print_message("Trying v3 parameters " . escape_html($device['snmp_authname'] . "/" . $device['snmp_authlevel']) . " ... ");
                         }
 
                         if (is_snmpable($device)) {
@@ -388,12 +553,11 @@ function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_trans
                                     }
                                 }
                                 return $device_id;
-                            } else {
-                                // When detected duplicate device, this mean it already SNMPable and not need check next auth!
-                                return FALSE;
                             }
+                            // When detected a duplicate device, this mean it already SNMPable and not need to check next auth!
+                            return FALSE;
                         } else {
-                            print_warning("No reply on credentials " . $device['snmp_authname'] . "/" . $device['snmp_authlevel'] . " using $snmp_version.");
+                            print_warning("No reply on credentials " . escape_html($device['snmp_authname'] . "/" . $device['snmp_authlevel']) . " using $snmp_version.");
                         }
                     }
                 } elseif ($snmp_version === "v2c" || $snmp_version === "v1") {
@@ -427,7 +591,7 @@ function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_trans
                             // Hide snmp auth
                             print_message("Trying $snmp_version community *** [$auth_iter] ...");
                         } else {
-                            print_message("Trying $snmp_version community $snmp_community ...");
+                            print_message("Trying $snmp_version community " . escape_html($snmp_community) . " ...");
                         }
 
                         //r($options);
@@ -451,15 +615,14 @@ function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_trans
                                     }
                                 }
                                 return $device_id;
-                            } else {
-                                // When detected duplicate device, this mean it already SNMPable and not need check next auth!
-                                return FALSE;
                             }
+                            // When detected a duplicate device, this mean it already SNMPable and not need to check next auth!
+                            return FALSE;
                         } else {
                             if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
                                 print_warning("No reply on given community *** using $snmp_version.");
                             } else {
-                                print_warning("No reply on community $snmp_community using $snmp_version.");
+                                print_warning("No reply on community " . escape_html($snmp_community) . " using $snmp_version.");
                             }
                             $return = 0; // Return zero for continue trying next auth
                         }
@@ -1504,12 +1667,89 @@ function device_uptime($device, $format = "long")
     return format_uptime($device['uptime'], $format);
 }
 
+function device_rebooted($device, &$uptimes) {
+    global $config;
+
+    // Notify only if current uptime less than one week (eg if changed from sysUpTime to snmpEngineTime)
+    $rebooted = 0;
+    if ($uptimes['uptime'] < 604800) {
+        if ($uptimes['diff'] > 60) {
+            // If the difference between old uptime ($device['uptime']) and new ($uptime)
+            // greater than 60 sec, than device truly rebooted
+            $rebooted = 1;
+        } elseif ($uptimes['previous'] < 300 && $uptimes['diff'] !== 0 && abs($uptimes['diff']) < 280) {
+            // This is a rare boundary case, when device rebooted multiple times between polling runs
+            // diff 0 mean we monitor snmp dump
+            $rebooted = 1;
+        }
+
+        // Fix a reboot flag with some borderline states (roll over counters)
+        if ($rebooted) {
+            switch ($uptimes['use']) {
+                case 'hrSystemUptime':
+                case 'sysUpTime':
+                    $uptimes_max = [ 42949673 ];   // 497 days 2 hours 27 minutes 53 seconds, counter 2^32 (4294967296) divided by 100
+                    break;
+                case 'snmpEngineTime':
+                    $uptimes_max = [ 2147483647 ]; // Average 68.05 years, counter is 2^32 (4294967296) divided by 2
+                    break;
+                default:
+                    // By default, uptime limited only by PHP max values
+                    // Usually int(2147483647) in 32 bit systems and int(9223372036854775807) in 64 bit systems
+                    $uptimes_max = [ PHP_INT_MAX ];
+            }
+            if (isset($config['os'][$device['os']]['uptime_max'][$uptimes['use']])) {
+                // Add rollover counter time from definitions
+                $uptimes_max = array_merge($uptimes_max, (array)$config['os'][$device['os']]['uptime_max'][$uptimes['use']]);
+            }
+            // Exclude uptime counter rollover
+            /**
+             * Examples with APC PDU (rollover max sysUpTime is 49 days, 17h 2m 47s):
+             * 1. rebooted uptime previous: 49 days, 16h 52m 18s
+             *               less than max:              10m 29s
+             * 2. rebooted uptime previous: 49 days, 16h 54m 50s
+             *               less than max:               7m 57s
+             */
+            foreach ($uptimes_max as $max) {
+                // Exclude 660 sec (11 min) from maximal
+                if ($uptimes['previous'] > ($max - 660) && $uptimes['previous'] <= $max) {
+                    $uptimes['max'] = $max;
+                    $rebooted       = 0;
+                    break;
+                }
+            }
+        }
+    }
+    $uptimes['rebooted'] = $rebooted;
+
+    return $rebooted;
+}
+
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 function device_by_name($name, $refresh = FALSE)
 {
     // FIXME - cache name > id too.
     return device_by_id_cache(get_device_id_by_hostname($name), $refresh);
+}
+
+/**
+ * Get localhost device if exist in db
+ */
+function get_localhost_id($where = '') {
+    $localhost = get_localhost();
+
+    if ($dev_id = dbFetchCell('SELECT `device_id` FROM `devices`' . generate_where_clause('`hostname` = ? AND `disabled` = 0', $where), [ $localhost ])) {
+        return $dev_id;
+    }
+    if (safe_empty($where)) {
+        $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `sysName` = ? AND `disabled` = 0', [ $localhost ]);
+    } else {
+        $shorthost = explode('.', $localhost)[0];
+        $dev_id = dbFetchCell('SELECT `device_id` FROM `devices`' . generate_where_clause('(`sysName` = ? OR `sysName` = ?) AND `disabled` = 0', $where), [ $localhost, $shorthost ]);
+    }
+
+    return $dev_id;
 }
 
 /**
@@ -1542,6 +1782,152 @@ function get_device_id_by_entity_id($entity_id, $entity_type)
     return FALSE;
 }
 
+function get_device_id_by_syslog_host($host) {
+    global $config;
+
+    // Try by map in config
+    if (isset($config['syslog']['host_map'][$host])) {
+        $new_host = $config['syslog']['host_map'][$host];
+        if (is_numeric($new_host)) {
+            // Check if device id exist
+            $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [ $new_host ]);
+        } else {
+            $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [ $new_host, $new_host ]);
+        }
+        // If syslog host map correct, return device id or try onward
+        if ($dev_id) {
+            return $dev_id;
+        }
+    } elseif (isset($config['syslog']['host_map_regexp'])) {
+        // Regexp conversions for hosts
+        foreach ($config['syslog']['host_map_regexp'] as $pattern => $to) {
+            $new_host = preg_replace($pattern, $to, $host);
+            if (!$new_host || $new_host === $host) {
+                continue;
+            } // skip same of false
+            $dev_id = FALSE;
+            if (is_intnum($new_host)) {
+                $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [ $new_host ]);
+            } elseif (is_valid_hostname($new_host) || get_ip_version($new_host)) {
+                $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [ $new_host, $new_host ]);
+            }
+
+            // If syslog host map correct, return device id or try onward
+            if ($dev_id) {
+                //print_cli("'$host' -> '$new_host' ($dev_id)");
+                return $dev_id;
+            }
+        }
+    }
+
+    // Localhost IPs, try to detect as local system
+    if (in_array($host, [ '127.0.0.1', '::1', '0:0:0:0:0:0:0:1', '0000:0000:0000:0000:0000:0000:0000:0001' ], TRUE)) {
+        if ($dev_id = get_localhost_id()) {
+            return $dev_id;
+        }
+        // NOTE in other cases localhost IPs associated with random device
+    } else {
+        // Try by hostname
+        $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [ $host, $host ]);
+        if (!$dev_id && is_valid_hostname($host, TRUE)) {
+            // Try short hostname host.domain -> host (only by hostname field)
+            $short_host = explode('.', $host)[0];
+            $dev_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ?', [ $short_host ]);
+        }
+    }
+
+    // If failed, try by IP
+    if (!is_numeric($dev_id)) {
+
+        if ($ip_version = get_ip_version($host)) {
+            $ip = $host;
+            if ($ip_version === 6 && preg_match('/::ffff:(\d+\.\d+\.\d+\.\d+)/', $ip, $matches)) {
+                // IPv4 mapped to IPv6, like ::ffff:192.0.2.128
+                // See: http://jira.observium.org/browse/OBSERVIUM-1274
+                $ip         = $matches[1];
+                $ip_version = 4;
+            }
+            $ip = ip_uncompress($ip);
+
+            // Detect associated device by IP address, exclude deleted ports
+            // IS NULL allow to search addresses without associated port
+            $query         = 'SELECT * FROM `ipv' . $ip_version . '_addresses` LEFT JOIN `ports` USING (`device_id`, `port_id`) WHERE `ipv' . $ip_version . '_address` = ? AND (`ports`.`deleted` = ? OR `ports`.`deleted` IS NULL);';
+            $addresses     = dbFetchRows($query, [ $ip, 0 ]);
+            $address_count = safe_count($addresses);
+
+            // Try to check cached IP addresses
+            if ($address_count === 0 && $config['syslog']['use_ip']) {
+                // Cached IPs compressed
+                $query         = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
+                $addresses     = dbFetchRows($query, [ ip_compress($host) ]);
+                $address_count = safe_count($addresses);
+            }
+
+            if ($address_count) {
+                $dev_id = $addresses[0]['device_id'];
+
+                // Additional checks if multiple addresses found
+                if ($address_count > 1) {
+                    foreach ($addresses as $entry) {
+                        if (isset($entry['ifAdminStatus'])) {
+                            // IP & ports table query
+                            $device_tmp = device_by_id_cache($entry['device_id']);
+                            if ($device_tmp['disabled'] || !$device_tmp['status']) {              // Skip disabled and down devices
+                                continue;
+                            }
+                            if ($entry['ifAdminStatus'] === 'down' ||                             // Skip disabled ports
+                                in_array($entry['ifOperStatus'], [ 'down', 'lowerLayerDown' ])) { // Skip down ports
+                                continue;
+                            }
+                        } elseif ($entry['disabled'] || !$entry['status']) {                      // Skip disabled and down devices
+                            // Cached IP & devices table query
+                            continue;
+                        }
+
+                        // Override cached host device_id
+                        $dev_id = $entry['device_id'];
+                        break; // End loop on first founded entry
+                    }
+                    unset($device_tmp);
+                }
+
+            }
+
+        } elseif ($config['syslog']['use_ip'] && is_valid_hostname($host)) {
+            // Try associate hosts by DNS IP query
+            $dns_found = FALSE;
+            $dns_ip = gethostbyname6($host, OBS_DNS_A); // IPv4
+            if (!$dns_ip) {
+                $dns_ip = gethostbyname6($host, OBS_DNS_AAAA); // IPv6
+            }
+            if ($dns_ip) {
+                $query = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
+                if ($addresses = dbFetchRows($query, [ ip_compress($dns_ip) ])) {
+                    $dns_found = TRUE;
+                    $dev_id = $addresses[0]['device_id'];
+
+                    foreach ($addresses as $entry) {
+                        if ($entry['disabled'] || !$entry['status']) { // Skip disabled and down devices
+                            // Cached IP & devices table query
+                            continue;
+                        }
+
+                        // Override cached host device_id
+                        $dev_id = $entry['device_id'];
+                        break; // End loop on first founded entry
+                    }
+                }
+            }
+
+            if (!$dns_found) {
+                // Set empty device_id for prevent other DNS queries while not expired
+                $dev_id = 0;
+            }
+        }
+    }
+
+    return $dev_id;
+}
 
 /**
  * Get cached/humanized device array
@@ -2029,10 +2415,10 @@ function device_filter_secrets(&$device, $filter = FALSE, $replace = NULL) {
  *
  * @return array
  */
-function poll_device_mib_metatypes($device, $metatypes, &$poll_device = [])
-{
+function poll_device_mib_metatypes($device, $metatypes, &$poll_device = []) {
     global $config;
 
+    $return_values = [];
     foreach ($metatypes as $metatype) {
 
         switch ($metatype) {
@@ -2065,7 +2451,7 @@ function poll_device_mib_metatypes($device, $metatypes, &$poll_device = [])
                         }
 
                         // Force HEX to UTF8 conversion by default
-                        $flags = isset($entry['snmp_flags']) ? $entry['snmp_flags'] : OBS_SNMP_ALL_UTF8;
+                        $flags = $entry['snmp_flags'] ?? OBS_SNMP_ALL_UTF8;
 
                         if (isset($entry['table'])) {
                             // Get Oid by table walk (with possible tests)
@@ -2149,7 +2535,7 @@ function poll_device_mib_metatypes($device, $metatypes, &$poll_device = [])
                             // Detect uptime with MIB defined oids, see below uptimes 2.
                             if ($metatype_uptime) {
                                 // Previous uptime from standard sysUpTime or other MIB::oid
-                                $uptime_previous = isset($poll_device['device_uptime']) ? $poll_device['device_uptime'] : $poll_device['sysUpTime'];
+                                $uptime_previous = $poll_device['device_uptime'] ?? $poll_device['sysUpTime'];
                                 if ($param === 'uptime' && !isset($entry['transformations']) && !is_numeric($value)) {
                                     // Convert common uptime strings to seconds by default
                                     // See MDS-SYSTEM-MIB
@@ -2179,7 +2565,8 @@ function poll_device_mib_metatypes($device, $metatypes, &$poll_device = [])
                                 continue;
                             }
 
-                            $poll_device[$metatype] = $value;
+                            $return_values[$metatype] = $value;
+                            $poll_device[$metatype]   = $value;
                             print_debug("Added Device param from SNMP definition by [$full_oid]: '$metatype' = '$value'");
 
                             // Exit both foreach loops and move on to the next metatype.
@@ -2191,9 +2578,65 @@ function poll_device_mib_metatypes($device, $metatypes, &$poll_device = [])
         }
 
     }
-    print_debug_vars($poll_device);
 
-    return $poll_device;
+    print_debug_vars($return_values);
+    return $return_values;
+}
+
+/**
+ * Poll device metatypes by sysDescr and sysName regex
+ *
+ * @param array $device    Device array
+ * @param array $metatypes List of required metatypes
+ * @param array $os_values Append found os metatypes to array
+ * @param array $poll_device Device polled data with sysDescr and sysName
+ *
+ * @return array Return only found metatypes and values
+ */
+function poll_device_sys_regex($device, $metatypes, &$os_values, $poll_device) {
+    global $config;
+
+    $return_values = [];
+    foreach ([ 'sysDescr', 'sysName' ] as $oid) {
+        $regex_param = $oid . '_regex'; // sysDescr_regex, sysName_regex
+
+        if (!isset($config['os'][$device['os']][$regex_param], $poll_device[$oid])) {
+            continue;
+        }
+
+        // Find OS-specific SNMP data via OID regex: serial number, version number, hardware description, features, asset tag
+        foreach ($config['os'][$device['os']][$regex_param] as $pattern) {
+            if (preg_match($pattern, $poll_device[$oid], $matches)) {
+                foreach ($metatypes as $metatype) {
+                    if (!isset($os_values[$metatype]) &&
+                        isset($matches[$metatype]) && is_valid_param($matches[$metatype], $metatype)) {
+                        // Skip unknown type
+                        if ($metatype === 'type' && !array_key_exists($matches[$metatype], $config['devicetypes'])) {
+                            continue;
+                        }
+
+                        $os_values[$metatype] = $matches[$metatype];
+
+                        // Additional sub-data (up to 2), ie hardware1, hardware2
+                        // See example in timos definition
+                        for ($num = 1; $num <= 2; $num++) {
+                            if (isset($matches[$metatype . $num]) && is_valid_param($matches[$metatype . $num], $metatype)) {
+                                $os_values[$metatype] .= ' ' . $matches[$metatype . $num];
+                            } else {
+                                break;
+                            }
+                        }
+
+                        $return_values[$metatype] = $os_values[$metatype]; // Set metatype variable
+                        print_debug("Added OS param from $oid pattern: '$metatype' = '" . $os_values[$metatype] . "' (" . $pattern . ")");
+                    }
+                }
+            }
+        }
+    }
+
+    print_debug_vars($return_values);
+    return $return_values;
 }
 
 function poll_device_unix_packages($device, $metatypes, $defs = [])
@@ -2335,6 +2778,89 @@ function poll_device_unix_packages($device, $metatypes, $defs = [])
     }
 
     return $data;
+}
+
+function poll_device_mib_la($device, $mib, &$device_state) {
+    global $config, $graphs;
+
+    if (!isset($config['mibs'][$mib]['la'])) {
+        return FALSE;
+    }
+    if (isset($graphs['la']) && $graphs['la']) {
+        // Already polled and found LA
+        print_debug("Already polled and found LA for device. MIB $mib skipped.");
+        return FALSE;
+    }
+
+    $la_def = $config['mibs'][$mib]['la'];
+
+    // See Cisco CISCO-PROCESS-MIB
+    if (discovery_check_requires_pre($device, $la_def, 'device')) {
+        return FALSE;
+    }
+
+    $la = [];
+    $la_oids = [];
+    if (isset($la_def['type']) && $la_def['type'] === 'table') {
+        // First element from table walk, with test condition, see JUNIPER-MIB
+        $la_oids = [
+            '1min'  => explode('.', $la_def['oid_1min'])[0],
+            '5min'  => explode('.', $la_def['oid_5min'])[0],
+            '15min' => explode('.', $la_def['oid_15min'])[0]
+        ];
+        // Fetch table or Oids
+        $table_oids    = [ 'oid_1min', 'oid_5min', 'oid_15min', 'oid_extra' ];
+        foreach (discover_fetch_oids($device, $mib, $la_def, $table_oids) as $index => $la_entry) {
+            // Check array requirements list
+            if (discovery_check_requires($device, $la_def, $la_entry, 'la')) {
+                continue;
+            }
+            $la = $la_entry;
+            break; // Stop on first test match
+        }
+
+    } else {
+        // Single oid / getnext
+        foreach ([ '1min', '5min', '15min' ] as $min) {
+            if (isset($la_def['oid_' . $min . '_num'])) {
+                $la_oids[$min] = $la_def['oid_' . $min . '_num'];
+            } elseif (isset($la_def['oid_' . $min])) {
+                $la_oids[$min] = snmp_translate($la_def['oid_' . $min], $mib);
+            } elseif (isset($la_def['oid_next_' . $min])) {
+                // See CISCO-PROCESS-MIB, currently only for Cisco IOS-XE
+                $oid = $la_def['oid_next_' . $min];
+                $la_oids[$min] = $oid;
+                $la[$oid] = snmp_getnext_oid($device, $oid, $mib);
+            }
+        }
+        if (empty($la)) {
+            $la = snmp_get_multi_oid($device, $la_oids, [], $mib, NULL, OBS_SNMP_ALL_NUMERIC);
+        }
+    }
+
+    print_debug_vars($la_oids);
+    print_debug_vars($la);
+
+    if (snmp_status() && is_numeric($la[$la_oids['5min']])) {
+        $scale       = $la_def['scale'] ?? 1;
+        $scale_graph = $scale * 100; // Since want to keep compatibility with old UCD-SNMP-MIB LA, graph stored as la * 100
+
+        foreach ($la_oids as $min => $oid) {
+            $device_state['la'][$min] = $la[$oid] * $scale;
+            // Now, graph specific scale if not equals 1
+            $la[$min] = $la[$oid] * $scale_graph;
+        }
+        $device_state['ucd_load'] = $device_state['la']['5min']; // Compatibility with old UCD-SNMP-MIB code
+
+        rrdtool_update_ng($device, 'la', [ '1min' => $la['1min'], '5min' => $la['5min'], '15min' => $la['15min'] ]);
+        $graphs['la'] = TRUE;
+
+        print_cli_data('Load average', $device_state['la']['1min'] . ', ' . $device_state['la']['5min'] . ', ' . $device_state['la']['15min']);
+
+        return TRUE; // Stop walking other LAs
+    }
+
+    return FALSE;
 }
 
 function cache_device_attribs_exist($device, $refresh = FALSE)

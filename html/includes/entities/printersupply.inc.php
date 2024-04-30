@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -136,8 +136,8 @@ function generate_printersupplies_row($supply, $vars)
 
     $graph_array['type']   = $graph_type;
     $graph_array['id']     = $supply['supply_id'];
-    $graph_array['from']   = $GLOBALS['config']['time']['day'];
-    $graph_array['to']     = $GLOBALS['config']['time']['now'];
+    $graph_array['from']   = get_time('day');
+    $graph_array['to']     = get_time();
     $graph_array['height'] = "20";
     $graph_array['width']  = "80";
 
@@ -180,7 +180,7 @@ function generate_printersupplies_row($supply, $vars)
         $output .= '<td colspan=' . $table_cols . '>';
 
         unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $supply['supply_id'];
         $graph_array['type'] = $graph_type;
 

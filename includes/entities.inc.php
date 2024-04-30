@@ -6,13 +6,14 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 // Include entity specific functions
 require_once($config['install_dir'] . "/includes/entities/device.inc.php");
 require_once($config['install_dir'] . "/includes/entities/port.inc.php");
+require_once($config['install_dir'] . "/includes/entities/processor.inc.php");
 require_once($config['install_dir'] . "/includes/entities/storage.inc.php");
 require_once($config['install_dir'] . "/includes/entities/sensor.inc.php");
 require_once($config['install_dir'] . "/includes/entities/status.inc.php");
@@ -20,9 +21,11 @@ require_once($config['install_dir'] . "/includes/entities/counter.inc.php");
 if (OBSERVIUM_EDITION !== 'community') {
     include_once($config['install_dir'] . "/includes/entities/probe.inc.php");
 }
+require_once($config['install_dir'] . "/includes/entities/sla.inc.php");
 require_once($config['install_dir'] . "/includes/entities/ip-address.inc.php");
 require_once($config['install_dir'] . "/includes/entities/routing.inc.php");
 require_once($config['install_dir'] . "/includes/entities/wifi.inc.php");
+//require_once($config['install_dir'] . "/includes/entities/p2p-radio.inc.php");
 
 /**
  *
@@ -985,8 +988,8 @@ function get_entity_ids_ip_by_network($entity_type, $network, $add_where = '')
                 $params[] = [binary_to_hex($network_array['network_end_binary'])];
             } else {
                 // Match IP addresses by part of string
-                $where .= ' AND (' . generate_query_values_ng($network_array['address'], 'ipv6_address', $network_array['query_type']) .
-                          ' OR ' . generate_query_values_ng($network_array['address'], 'ipv6_compressed', $network_array['query_type']) . ')';
+                $where .= ' AND (' . generate_query_values($network_array['address'], 'ipv6_address', $network_array['query_type']) .
+                          ' OR ' . generate_query_values($network_array['address'], 'ipv6_compressed', $network_array['query_type']) . ')';
             }
             break;
     }
@@ -1022,6 +1025,22 @@ function entity_type_translate($entity_type)
   return array($data['table'], $data['id_field'], $data['name_field'], $data['ignore_field'], $data['entity_humanize']);
 }
 */
+
+function entity_index_tags($index, $i = NULL) {
+    $tags = [];
+
+    $tags['index']      = $index;            // Index in descr
+    $tags['index_text'] = snmp_oid_to_string($index);
+    foreach (explode('.', $index) as $k => $idx) {
+        $tags['index' . $k] = $idx;          // Index parts
+    }
+    if (is_numeric($i)) {
+        // entity counter++
+        $tags['i']      = $i;
+    }
+
+    return $tags;
+}
 
 // Returns a text name from an entity type and an id
 // A little inefficient.
@@ -1201,7 +1220,7 @@ function entity_descr_definition($entity_type, $definition, $descr_entry, $count
     //print_vars($descr_entry);
 
     // Per index definitions
-    if (isset($descr_entry['index']) && isset($definition['indexes'][$descr_entry['index']]['descr'])) {
+    if (isset($descr_entry['index'], $definition['indexes'][$descr_entry['index']]['descr'])) {
         // Override with per index descr definition
         $definition['descr'] = $definition['indexes'][$descr_entry['index']]['descr'];
     }
@@ -1295,8 +1314,7 @@ function entity_descr_definition($entity_type, $definition, $descr_entry, $count
  *
  * @return array
  */
-function entity_measured_match_definition($device, $definition, $entity = [], $entity_type = NULL)
-{
+function entity_measured_match_definition($device, $definition, $entity = [], $entity_type = NULL) {
     // $entity_type unused currently
 
     $options = [];
@@ -1304,6 +1322,21 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
     // Just append label for sorting and grouping
     if (isset($definition['measured_label'])) {
         $options['measured_entity_label'] = array_tag_replace($entity, $definition['measured_label']);
+
+        // See ARUBAWIRED-FAN-MIB definition
+        if (isset($definition['measured_label_match'])) {
+            foreach ((array)$definition['measured_label_match'] as $measured_class => $pattern) {
+                if (preg_match($pattern, $options['measured_entity_label'], $matches)) {
+                    $options['measured_class'] = $measured_class; // set measured class
+                    if (!safe_empty($matches['label'])) {
+                        $options['measured_entity_label'] = $matches['label'];
+                    } elseif (!safe_empty($matches[1])) {
+                        $options['measured_entity_label'] = $matches[1];
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     if (isset($definition['entity_match'])) {
@@ -1311,16 +1344,16 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
         $definition['measured_match'] = $definition['entity_match'];
     }
     if (!isset($definition['measured_match'])) {
-        if (isset($definition['measured']) && in_array($definition['measured'], ['port', 'outlet'], TRUE)) {
-            // Currently for outlets
+        if (isset($definition['measured']) && !safe_empty($options['measured_entity_label'])) {
+            // Store measured class when entity label not empty
             $options['measured_class'] = $definition['measured'];
         }
         return $options;
     }
 
-    // Convert single match array to multi-array
+    // Convert a single match array to multi-array
     if (isset($definition['measured_match']['match'])) {
-        $definition['measured_match'] = [$definition['measured_match']];
+        $definition['measured_match'] = [ $definition['measured_match'] ];
     }
 
     $measured_found = FALSE;
@@ -1330,7 +1363,7 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
         // First we make substitutions using %key%, then we run transformations
 
         // Switch search by LIKE or any (default is exactly match)
-        $sql_condition = isset($rule['condition']) && $rule['condition'] ? $rule['condition'] : NULL;
+        $sql_condition = $rule['condition'] ?? NULL;
 
         $rule['match'] = array_tag_replace($entity, $rule['match']);
 
@@ -1338,25 +1371,27 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
             $rule['match'] = string_transform($rule['match'], $rule['transform']);
         }
 
+        $where_array = [
+            generate_query_values($device['device_id'], 'device_id'),
+            '`deleted` = 0'
+        ];
+
         // Associate defined entity type
-        //$sql_options = [ 'no_leading_and' ];
-        $sql_options = [];
         switch ($rule['entity_type']) {
             case 'entity':
                 // Generic entities
+                $sql = "SELECT * FROM `entities`";
                 switch (strtolower($rule['field'])) {
                     case 'descr':
                     case 'name':
                     case 'label':
                         $sql_rules   = [];
-                        $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_descr', $sql_condition, $sql_options);
+                        $sql_rules[] = generate_query_values($rule['match'], 'entity_descr', $sql_condition);
                         if (!safe_empty($rule['class'])) {
-                            $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_class', $sql_condition, $sql_options);
+                            $sql_rules[] = generate_query_values($rule['match'], 'entity_class', $sql_condition);
                         }
-                        $sql_rule = implode(' AND ', $sql_rules);
-                        $sql      = "SELECT * FROM `entities` WHERE `device_id` = ? AND ($sql_rule) AND `deleted` = ? LIMIT 1";
-                        $params   = [$device['device_id'], 0];
-                        if ($measured = dbFetchRow($sql, $params)) {
+                        $sql_rule = '(' . implode(' AND ', $sql_rules) . ')';
+                        if ($measured = dbFetchRow($sql . generate_where_clause($where_array, $sql_rule))) {
                             $options['measured_class']            = 'entity';
                             $options['measured_entity']           = $measured['entity_id'];
                             $options['entPhysicalIndex_measured'] = $measured['entity_index'];
@@ -1369,14 +1404,12 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
 
                     case 'index':
                         $sql_rules   = [];
-                        $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_index', $sql_condition, $sql_options);
+                        $sql_rules[] = generate_query_values($rule['match'], 'entity_index', $sql_condition);
                         if (!safe_empty($rule['class'])) {
-                            $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_class', $sql_condition, $sql_options);
+                            $sql_rules[] = generate_query_values($rule['match'], 'entity_class', $sql_condition);
                         }
-                        $sql_rule = implode(' AND ', $sql_rules);
-                        $sql      = "SELECT * FROM `entities` WHERE `device_id` = ? AND ($sql_rule) AND `deleted` = ? LIMIT 1";
-                        $params   = [$device['device_id'], 0];
-                        if ($measured = dbFetchRow($sql, $params)) {
+                        $sql_rule = '(' . implode(' AND ', $sql_rules) . ')';
+                        if ($measured = dbFetchRow($sql . generate_where_clause($where_array, $sql_rule))) {
                             $options['measured_class']            = 'entity';
                             $options['measured_entity']           = $measured['entity_id'];
                             $options['entPhysicalIndex_measured'] = $measured['entity_index'];
@@ -1391,19 +1424,18 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
 
             case 'port':
                 // Port entities
+                $sql = "SELECT * FROM `ports`";
                 switch (strtolower($rule['field'])) {
                     case 'ifdescr':
                     case 'ifname':
                     case 'label':
                         $sql_rules   = [];
-                        $sql_rules[] = generate_query_values_ng($rule['match'], 'ifDescr', $sql_condition, $sql_options);
-                        $sql_rules[] = generate_query_values_ng($rule['match'], 'ifName', $sql_condition, $sql_options);
-                        $sql_rules[] = generate_query_values_ng($rule['match'], 'port_label', $sql_condition, $sql_options);
-                        $sql_rules[] = generate_query_values_ng($rule['match'], 'port_label_short', $sql_condition, $sql_options);
-                        $sql_rule    = implode(' OR ', $sql_rules);
-                        $sql         = "SELECT * FROM `ports` WHERE `device_id` = ? AND ($sql_rule) AND `deleted` = ? LIMIT 1";
-                        $params      = [$device['device_id'], 0];
-                        if ($measured = dbFetchRow($sql, $params)) {
+                        $sql_rules[] = generate_query_values($rule['match'], 'ifDescr', $sql_condition);
+                        $sql_rules[] = generate_query_values($rule['match'], 'ifName', $sql_condition);
+                        $sql_rules[] = generate_query_values($rule['match'], 'port_label', $sql_condition);
+                        $sql_rules[] = generate_query_values($rule['match'], 'port_label_short', $sql_condition);
+                        $sql_rule    = '(' . implode(' OR ', $sql_rules) . ')';
+                        if ($measured = dbFetchRow($sql . generate_where_clause($where_array, $sql_rule))) {
                             $options['measured_class']            = 'port';
                             $options['measured_entity']           = $measured['port_id'];
                             $options['entPhysicalIndex_measured'] = $measured['ifIndex'];
@@ -1415,10 +1447,8 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
                         break;
 
                     case 'ifalias':
-                        $sql_rule = generate_query_values_ng($rule['match'], 'ifAlias', $sql_condition, $sql_options);
-                        $sql      = "SELECT * FROM `ports` WHERE `device_id` = ? AND $sql_rule AND `deleted` = ? LIMIT 1";
-                        $params   = [$device['device_id'], 0];
-                        if ($measured = dbFetchRow($sql, $params)) {
+                        $sql_rule = generate_query_values($rule['match'], 'ifAlias', $sql_condition);
+                        if ($measured = dbFetchRow($sql . generate_where_clause($where_array, $sql_rule))) {
                             $options['measured_class']            = 'port';
                             $options['measured_entity']           = $measured['port_id'];
                             $options['entPhysicalIndex_measured'] = $measured['ifIndex'];
@@ -1512,8 +1542,7 @@ function entity_class_definition($device, $definition, $entity, $entity_type = N
     return ''; // Break foreach. Proceed to next!
 }
 
-function entity_scale_definition($device, $definition, $entity, $entity_type = NULL)
-{
+function entity_scale_definition($device, $definition, $entity, $entity_type = NULL) {
 
     if (isset($definition['oid_scale'])) {
         if (isset($entity[$definition['oid_scale']])) {
@@ -1548,6 +1577,16 @@ function entity_scale_definition($device, $definition, $entity, $entity_type = N
             if (isset($definition['map_scale'][$scale])) {
                 print_debug("Scale mapped from value [" . $scale . "] to " . $definition['map_scale'][$scale]);
                 return $definition['map_scale'][$scale];
+            }
+        }
+    }
+
+    if ($entity_type === 'processor' && isset($definition['oid_precision']) && !is_numeric($scale)) {
+        // Precision
+        if (isset($entity[$definition['oid_precision']])) {
+            $scale = float_div(1, $entity[$definition['oid_precision']]);
+            if ($scale === 0) {
+                unset($scale);
             }
         }
     }
@@ -1863,20 +1902,29 @@ function entity_type_translate_array($entity_type)
  */
 function is_entity_permitted($entity_id, $entity_type, $device_id = NULL, $permissions = NULL)
 {
+    if ($_SESSION['userlevel'] >= 5) {
+        // User not limited (userlevel >= 5)
+        if (OBS_DEBUG) {
+            $debug_msg = "PERMISSIONS CHECK. Entity type: $entity_type, Entity ID: $entity_id, Device ID: " . ($device_id ?: 'NULL') . ", Allowed: TRUE.";
+            if (isset($GLOBALS['notifications'])) {
+                $GLOBALS['notifications'][] = ['text' => $debug_msg, 'severity' => 'debug'];
+            } else {
+                print_debug($debug_msg);
+            }
+        }
+        return TRUE;
+    }
 
     if (is_null($permissions) && isset($GLOBALS['permissions'])) {
         // Note, pass permissions array by param used in permissions_cache()
         $permissions = (array)$GLOBALS['permissions'];
     }
 
-    if (!is_numeric($device_id) && $entity_type != "group") {
+    if (!is_numeric($device_id) && $entity_type !== "group") {
         $device_id = get_device_id_by_entity_id($entity_id, $entity_type);
     }
 
-    if ($_SESSION['userlevel'] >= 5) {
-        // User not limited (userlevel >= 5)
-        $allowed = TRUE;
-    } elseif (isset($device_id) && is_numeric($device_id) && device_permitted($device_id)) {
+    if (is_numeric($device_id) && device_permitted($device_id)) {
         $allowed = TRUE;
     } elseif (isset($permissions[$entity_type][$entity_id]) && $permissions[$entity_type][$entity_id]) {
         $allowed = TRUE;
@@ -2231,6 +2279,9 @@ function get_entity_rrd_by_id($entity_type, $entity_id)
             break;
         case 'counter':
             $filename = get_counter_rrd($device, $entity);
+            break;
+        case 'processor':
+            $filename = get_processor_rrd($device, $entity);
             break;
     }
 

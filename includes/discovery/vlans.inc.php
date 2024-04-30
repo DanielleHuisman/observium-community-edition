@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -17,8 +17,7 @@ $vlans_db              = [];
 $ports_vlans_db        = [];
 $ports_vlans           = [];
 
-$vlans_db_raw = dbFetchRows("SELECT * FROM `vlans` WHERE `device_id` = ?;", [$device['device_id']]);
-foreach ($vlans_db_raw as $vlan_db) {
+foreach (dbFetchRows("SELECT * FROM `vlans` WHERE `device_id` = ?", [ $device['device_id'] ]) as $vlan_db) {
     if (isset($vlans_db[$vlan_db['vlan_domain']][$vlan_db['vlan_vlan']])) {
         // Clean duplicates
         print_debug("Duplicate VLAN entry in DB found:");
@@ -28,9 +27,9 @@ foreach ($vlans_db_raw as $vlan_db) {
     }
     $vlans_db[$vlan_db['vlan_domain']][$vlan_db['vlan_vlan']] = $vlan_db;
 }
+print_debug_vars($vlans_db);
 
-$ports_vlans_db_raw = dbFetchRows("SELECT * FROM `ports_vlans` WHERE `device_id` = ?;", [$device['device_id']]);
-foreach ($ports_vlans_db_raw as $vlan_db) {
+foreach (dbFetchRows("SELECT * FROM `ports_vlans` WHERE `device_id` = ?", [ $device['device_id'] ]) as $vlan_db) {
     if (isset($ports_vlans_db[$vlan_db['port_id']][$vlan_db['vlan']])) {
         // Clean duplicates
         print_debug("Duplicate Port VLAN entry in DB found:");
@@ -46,6 +45,8 @@ print_debug_vars($ports_vlans_db);
 $include_dir = "includes/discovery/vlans";
 include("includes/include-dir-mib.inc.php");
 
+print_debug_vars($discovery_vlans, 1);
+print_debug_vars($discovery_ports_vlans, 1);
 
 /* Process discovered Vlans */
 $table_rows  = [];

@@ -4,212 +4,13 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
-/**
- * Display status alerts.
- *
- * Display pages with alerts about device troubles.
- * Examples:
- * print_status(array('devices' => TRUE)) - display for devices down
- *
- * Another statuses:
- * devices, uptime, ports, errors, services, bgp
- *
- * @param array $options
- *
- * @return none
- *
- */
-function print_status_old($options)
-{
-    global $config;
-
-    $max_interval = filter_var($options['max']['interval'], FILTER_VALIDATE_INT, ['options' => ['default' => 24, 'min_range' => 1]]);
-    $max_count    = filter_var($options['max']['count'], FILTER_VALIDATE_INT, ['options' => ['default' => 200, 'min_range' => 1]]);
-
-    $string = '<table class="table  table-striped table-hover table-condensed">' . PHP_EOL;
-    /* $string .= '  <thead>' . PHP_EOL;
-     $string .= '  <tr>' . PHP_EOL;
-     $string .= '    <th>Device</th>' . PHP_EOL;
-     $string .= '    <th>Type</th>' . PHP_EOL;
-     $string .= '    <th>Status</th>' . PHP_EOL;
-     $string .= '    <th>Entity</th>' . PHP_EOL;
-     // $string .= '    <th>Location</th>' . PHP_EOL;
-     $string .= '    <th>Information</th>' . PHP_EOL;
-     $string .= '  </tr>' . PHP_EOL;
-     $string .= '  </thead>' . PHP_EOL;
-     $string .= '  <tbody>' . PHP_EOL;
-    */
-
-    $query_device_permitted = generate_query_permitted(['device'], ['device_table' => 'D', 'hide_ignored' => TRUE]);
-    $query_port_permitted   = generate_query_permitted(['port'], ['port_table' => 'I', 'hide_ignored' => TRUE]);
-
-    // Show Device Status
-    if ($options['devices']) {
-        $query   = 'SELECT * FROM `devices` AS D';
-        $query   .= ' WHERE D.`status` = 0' . $query_device_permitted;
-        $query   .= ' ORDER BY D.`hostname` ASC';
-        $entries = dbFetchRows($query);
-        foreach ($entries as $device) {
-            $string .= '  <tr>' . PHP_EOL;
-            $string .= '    <td class="entity">' . generate_device_link_short($device) . '</td>' . PHP_EOL;
-            // $string .= '    <td><span class="badge badge-inverse">Device</span></td>' . PHP_EOL;
-            $string .= '    <td><span class="label label-important">Device Down</span></td>' . PHP_EOL;
-            $string .= '    <td class="entity"><i class="' . $config['icon']['devices'] . '"></i> ' . generate_device_link_short($device) . '</td>' . PHP_EOL;
-            // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($device['location'], 30)) . '</td>' . PHP_EOL;
-            $string .= '    <td style="white-space: nowrap">' . device_uptime($device, 'short') . '</td>' . PHP_EOL;
-            $string .= '  </tr>' . PHP_EOL;
-        }
-    }
-
-    // Uptime
-    if ($options['uptime']) {
-        if (filter_var($config['uptime_warning'], FILTER_VALIDATE_FLOAT) !== FALSE && $config['uptime_warning'] > 0) {
-            $query = 'SELECT * FROM `devices` AS D';
-            // Since reboot event more complicated than just device uptime less than some time
-            //$query .= ' WHERE D.`status` = 1 AND D.`uptime` > 0 AND D.`uptime` < ' . $config['uptime_warning'];
-            $query   .= ' WHERE D.`status` = 1 AND D.`uptime` > 0 AND D.`last_rebooted` > ?';
-            $query   .= $query_device_permitted;
-            $query   .= 'ORDER BY D.`hostname` ASC';
-            $entries = dbFetchRows($query, [$config['time']['now'] - $config['uptime_warning'] - 10]);
-
-            foreach ($entries as $device) {
-                $string .= '  <tr>' . PHP_EOL;
-                $string .= '    <td class="entity">' . generate_device_link_short($device) . '</td>' . PHP_EOL;
-                // $string .= '    <td><span class="badge badge-inverse">Device</span></td>' . PHP_EOL;
-                $string .= '    <td><span class="label label-success">Device Rebooted</span></td>' . PHP_EOL;
-                $string .= '    <td class="entity"><i class="' . $config['icon']['devices'] . '"></i> ' . generate_device_link_short($device) . '</td>' . PHP_EOL;
-                // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($device['location'], 30)) . '</td>' . PHP_EOL;
-                $string .= '    <td style="white-space: nowrap">Uptime ' . format_uptime($device['uptime'], 'short') . '</td>' . PHP_EOL;
-                $string .= '  </tr>' . PHP_EOL;
-            }
-        }
-    }
-
-    // Ports Down
-    if ($options['ports'] || $options['neighbours'] || $options['links']) {
-        $options['neighbours'] = $options['neighbours'] && !$options['ports']; // Disable 'neighbours' if 'ports' already enabled
-
-        $query = 'SELECT * FROM `ports` AS I ';
-        if ($options['neighbours']) {
-            $query .= 'INNER JOIN `neighbours` AS L ON I.`port_id` = L.`port_id` ';
-        }
-        $query .= 'LEFT JOIN `devices` AS D ON I.`device_id` = D.`device_id` ';
-        $query .= "WHERE D.`status` = 1 AND D.ignore = 0 AND I.ignore = 0 AND I.deleted = 0 AND I.`ifAdminStatus` = 'up' AND (I.`ifOperStatus` = 'lowerLayerDown' OR I.`ifOperStatus` = 'down') ";
-        if ($options['neighbours']) {
-            $query .= ' AND L.`active` = 1 ';
-        }
-        $query .= $query_port_permitted;
-        $query .= ' AND I.`ifLastChange` >= DATE_SUB(NOW(), INTERVAL ' . $max_interval . ' HOUR) ';
-        if ($options['neighbours']) {
-            $query .= 'GROUP BY L.`port_id` ';
-        }
-        $query   .= 'ORDER BY I.`ifLastChange` DESC, D.`hostname` ASC, I.`ifDescr` * 1 ASC ';
-        $entries = dbFetchRows($query);
-        $i       = 1;
-        foreach ($entries as $port) {
-            if ($i > $max_count) {
-                $string .= '  <tr><td></td><td><span class="badge badge-info">Port</span></td>';
-                $string .= '<td><span class="label label-important">Port Down</span></td>';
-                $string .= '<td colspan=3>Too many ports down. See <strong><a href="' . generate_url(['page' => 'ports'], ['state' => 'down']) . '">All DOWN ports</a></strong>.</td></tr>' . PHP_EOL;
-                break;
-            }
-            humanize_port($port);
-            $string .= '  <tr>' . PHP_EOL;
-            $string .= '    <td class="entity">' . generate_device_link_short($port) . '</td>' . PHP_EOL;
-            // $string .= '    <td><span class="badge badge-info">Port</span></td>' . PHP_EOL;
-            $string .= '    <td><span class="label label-important">Port Down</span></td>' . PHP_EOL;
-            $string .= '    <td class="entity">' . get_icon('port') . ' ' . generate_port_link_short($port) . '</td>' . PHP_EOL;
-            // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($port['location'], 30)) . '</td>' . PHP_EOL;
-            $string .= '    <td style="white-space: nowrap">Down for ' . format_uptime($config['time']['now'] - strtotime($port['ifLastChange']), 'short'); // This is like deviceUptime()
-            if ($options['links']) {
-                $string .= ' (' . nicecase($port['protocol']) . ': ' . $port['remote_hostname'] . ' / ' . $port['remote_port'] . ')';
-            }
-            $string .= '</td>' . PHP_EOL;
-            $string .= '  </tr>' . PHP_EOL;
-            $i++;
-        }
-    }
-
-    // Ports Errors (only deltas)
-    if ($options['errors']) {
-        $query = 'SELECT * FROM `ports` AS I ';
-        //$query .= 'LEFT JOIN `ports-state` AS E ON I.`port_id` = E.`port_id` ';
-        $query   .= 'LEFT JOIN `devices` AS D ON I.`device_id` = D.`device_id` ';
-        $query   .= "WHERE D.`status` = 1 AND I.`ifOperStatus` = 'up' AND (I.`ifInErrors_delta` > 0 OR I.`ifOutErrors_delta` > 0)";
-        $query   .= $query_port_permitted;
-        $query   .= 'ORDER BY D.`hostname` ASC, I.`ifDescr` * 1 ASC';
-        $entries = dbFetchRows($query);
-        foreach ($entries as $port) {
-            humanize_port($port);
-            $string .= '  <tr>' . PHP_EOL;
-            $string .= '    <td class="entity">' . generate_device_link_short($port) . '</td>' . PHP_EOL;
-            // $string .= '    <td><span class="badge badge-info">Port</span></td>' . PHP_EOL;
-            $string .= '    <td><span class="label label-important">Port Errors</span></td>' . PHP_EOL;
-            $string .= '    <td class="entity">' . get_icon('port') . ' ' . generate_port_link_short($port, NULL, 'port_errors') . '</td>' . PHP_EOL;
-            // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($port['location'], 30)) . '</td>' . PHP_EOL;
-            $string .= '    <td>Errors ';
-            if ($port['ifInErrors_delta']) {
-                $string .= 'In: ' . $port['ifInErrors_delta'];
-            }
-            if ($port['ifInErrors_delta'] && $port['ifOutErrors_delta']) {
-                $string .= ', ';
-            }
-            if ($port['ifOutErrors_delta']) {
-                $string .= 'Out: ' . $port['ifOutErrors_delta'];
-            }
-            $string .= '</td>' . PHP_EOL;
-            $string .= '  </tr>' . PHP_EOL;
-        }
-    }
-
-    // BGP
-    if ($options['bgp']) {
-        if (isset($config['enable_bgp']) && $config['enable_bgp']) {
-            // Description for BGP states
-            $bgpstates = 'IDLE - Router is searching routing table to see whether a route exists to reach the neighbor. &#xA;';
-            $bgpstates .= 'CONNECT - Router found a route to the neighbor and has completed the three-way TCP handshake. &#xA;';
-            $bgpstates .= 'OPEN SENT - Open message sent, with parameters for the BGP session. &#xA;';
-            $bgpstates .= 'OPEN CONFIRM - Router received agreement on the parameters for establishing session. &#xA;';
-            $bgpstates .= 'ACTIVE - Router did not receive agreement on parameters of establishment. &#xA;';
-            //$bgpstates .= 'ESTABLISHED - Peering is established; routing begins.';
-
-            $query   = 'SELECT * FROM `devices` AS D ';
-            $query   .= 'LEFT JOIN `bgpPeers` AS B ON B.`device_id` = D.`device_id` ';
-            $query   .= "WHERE D.`status` = 1 AND (`bgpPeerAdminStatus` = 'start' OR `bgpPeerAdminStatus` = 'running') AND `bgpPeerState` != 'established' ";
-            $query   .= $query_device_permitted;
-            $query   .= 'ORDER BY D.`hostname` ASC';
-            $entries = dbFetchRows($query);
-            foreach ($entries as $peer) {
-                humanize_bgp($peer);
-                $peer_ip = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
-
-                $string .= '  <tr>' . PHP_EOL;
-                $string .= '    <td class="entity">' . generate_device_link_short($peer, ['tab' => 'routing', 'proto' => 'bgp']) . '</td>' . PHP_EOL;
-                // $string .= '    <td><span class="badge badge-warning">BGP</span></td>' . PHP_EOL;
-                $string .= '    <td><span class="label label-warning" title="' . $bgpstates . '">BGP ' . nicecase($peer['bgpPeerState']) . '</span></td>' . PHP_EOL;
-                $string .= '    <td class="entity" style="white-space: nowrap"><i class="' . $config['icon']['bgp'] . '"></i> ' . $peer_ip . '</td>' . PHP_EOL;
-                // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($peer['location'], 30)) . '</td>' . PHP_EOL;
-                $string .= '    <td><strong>AS' . $peer['human_remote_as'] . ' :</strong> ' . $peer['astext'] . '</td>' . PHP_EOL;
-                $string .= '  </tr>' . PHP_EOL;
-            }
-        }
-    }
-
-    // $string .= '  </tbody>' . PHP_EOL;
-    $string .= '</table>';
-
-    // Final print all statuses
-    echo($string);
-}
-
-function generate_alert_entries($vars)
-{
+function generate_alert_entries($vars) {
 
     global $alert_rules;
     global $config;
@@ -222,12 +23,13 @@ function generate_alert_entries($vars)
 
     $vars['sort'] = 'alert_last_changed';
 
-    [$query, $param, $query_count] = build_alert_table_query($vars);
+    [ $query, $param, $query_count ] = build_alert_table_query($vars);
 
     // Fetch alerts
-    $count  = dbFetchCell($query_count, $param);
+    //$count  = dbFetchCell($query_count, $param);
     $alerts = dbFetchRows($query, $param);
 
+    $array = [];
     foreach ($alerts as $alert) {
         $alert_rule        = &$alert_rules[$alert['alert_test_id']];
         $alert['severity'] = $alert_rule['severity'];
@@ -235,16 +37,18 @@ function generate_alert_entries($vars)
 
         $device = device_by_id_cache($alert['device_id']);
 
-        $array[] = ['sev'           => 100,
-                    'icon_tag'      => '<i class="' . $config['entities'][$alert['entity_type']]['icon'] . '"></i>',
-                    'alert_test_id' => $alert['alert_test_id'],
-                    'event'         => '<a href="' . generate_url(['page' => 'alert_check', 'alert_test_id' => $alert_rule['alert_test_id']]) . '">' . escape_html($alert_rule['alert_name']) . '</a>',
-                    'entity_type'   => $alert['entity_type'],
-                    'entity_id'     => $alert['entity_id'],
-                    'entity_link'   => ($alert['entity_type'] != "device" ? generate_entity_link($alert['entity_type'], $alert['entity_id'], NULL, NULL, TRUE, TRUE) : NULL),
-                    'device_id'     => $device['device_id'],
-                    'device_link'   => generate_device_link_short($device),
-                    'time'          => $alert['changed']];
+        $array[] = [
+            'sev'           => 100,
+            'icon'          => $config['entities'][$alert['entity_type']]['icon'],
+            'alert_test_id' => $alert['alert_test_id'],
+            'event'         => '<a href="' . generate_url(['page' => 'alert_check', 'alert_test_id' => $alert_rule['alert_test_id']]) . '">' . escape_html($alert_rule['alert_name']) . '</a>',
+            'entity_type'   => $alert['entity_type'],
+            'entity_id'     => $alert['entity_id'],
+            'entity_link'   => $alert['entity_type'] !== "device" ? generate_entity_link($alert['entity_type'], $alert['entity_id'], NULL, NULL, TRUE, TRUE) : NULL,
+            'device_id'     => $device['device_id'],
+            'device_link'   => generate_device_link_short($device),
+            'time'          => $alert['changed']
+        ];
     }
 
     return $array;
@@ -313,7 +117,7 @@ function print_status_boxes($options, $limit = NULL)
 
         echo '<h4>' . $entry['device_link'] . '</h4>';
         echo '' . $entry['event'] . '<br />';
-        echo '<h4 style="margin-bottom: 2px;">' . ($entry['entity_link'] ? $entry['icon_tag'] . $entry['entity_link'] : 'Device') . ' </h4>';
+        echo '<h4 style="margin-bottom: 2px;">' . ($entry['entity_link'] ? get_icon($entry['icon']) . $entry['entity_link'] : 'Device') . ' </h4>';
         echo '<small>' . $entry['time'] . '</small>';
         echo('</p></div>');
 
@@ -325,14 +129,11 @@ function print_status_boxes($options, $limit = NULL)
 
 }
 
-function generate_status_table($options, $print = FALSE)
-{
+function generate_status_table($options, $print = FALSE) {
 
     $status_array = get_status_array($options);
     $status_array = array_sort($status_array, 'sev', 'SORT_DESC');
-    $i            = 1;
-    $string       = '';
-    $string       .= '<table style="" class="table table-striped table-hover table-condensed">' . PHP_EOL;
+    $string       = '<table style="" class="table table-striped table-hover table-condensed">' . PHP_EOL;
 
     foreach ($status_array as $entry) {
         if ($entry['sev'] > 51) {
@@ -343,111 +144,120 @@ function generate_status_table($options, $print = FALSE)
             $row_class = 'warning';
         } else {
             $class = "info";
+            $row_class = '';
         }
 
         $string .= '  <tr class="' . $row_class . '">' . PHP_EOL;
         $string .= '    <td class="state-marker"></td>';
         $string .= '    <td class="entity">' . $entry['device_link'] . '</td>' . PHP_EOL;
         $string .= '    <td><span class="label label-' . $class . '" title="' . $entry['event'] . '">' . $entry['class'] . ' ' . $entry['event'] . '</span></td>' . PHP_EOL;
-        $string .= '    <td class="entity" style="white-space: nowrap">' . $entry['icon_tag'] . ($entry['entity_link'] ? $entry['entity_link'] : $entry['device_link']) . '</td>' . PHP_EOL;
+        $string .= '    <td class="entity" style="white-space: nowrap">' . get_icon($entry['icon']) . ($entry['entity_link'] ?: $entry['device_link']) . '</td>' . PHP_EOL;
         $string .= '    <td>' . $entry['time'] . '</td>' . PHP_EOL;
         $string .= '  </tr>' . PHP_EOL;
     }
     $string .= '</table>';
-    if ($print == TRUE) {
+    if ($print) {
         echo $string;
         return TRUE;
-    } else {
-        return $string;
     }
+
+    return $string;
 }
 
 
 // DOCME needs phpdoc block
-function get_status_array($options)
-{
-    // Mike: I know that there are duplicated variables, but later will remove global
+function get_status_array($options) {
     global $config;
 
+    $boxes                  = [];
     $max_interval           = filter_var($options['max']['interval'], FILTER_VALIDATE_INT, ['options' => ['default' => 24, 'min_range' => 1]]);
     $max_count              = filter_var($options['max']['count'], FILTER_VALIDATE_INT, ['options' => ['default' => 200, 'min_range' => 1]]);
-    $query_device_permitted = generate_query_permitted(['device'], ['device_table' => 'D', 'hide_ignored' => TRUE, 'hide_disabled' => TRUE]);
-    $query_port_permitted   = generate_query_permitted(['port'], ['port_table' => 'I', 'hide_ignored' => TRUE]);
+    $query_device_permitted = generate_query_permitted_ng([ 'device' ], [ 'hide_ignored' => TRUE, 'hide_disabled' => TRUE ]);
 
     // Show Device Status
     if ($options['devices']) {
-        $query   = 'SELECT * FROM `devices` AS D ';
-        $query   .= 'WHERE D.`status` = 0' . $query_device_permitted;
-        $query   .= 'ORDER BY D.`hostname` ASC';
-        $entries = dbFetchRows($query);
-        foreach ($entries as $device) {
-            $boxes[] = ['sev'         => 100,
-                        'class'       => 'Device',
-                        'event'       => 'Down',
-                        'device_link' => generate_device_link_short($device),
-                        'time'        => device_uptime($device, 'short-3'),
-                        'icon_tag'    => '<i class="' . $config['entities']['device']['icon'] . '"></i>'];
+        $query   = 'SELECT * FROM `devices`';
+        $query   .= generate_where_clause('`status` = 0', $query_device_permitted);
+        $query   .= 'ORDER BY `hostname` ASC';
+
+        foreach (dbFetchRows($query) as $device) {
+            $boxes[] = [
+                'sev'         => 100,
+                'class'       => 'Device',
+                'event'       => 'Down',
+                'device_link' => generate_device_link_short($device),
+                'time'        => device_uptime($device, 'short-3'),
+                'icon'        => $config['entities']['device']['icon']
+            ];
         }
     }
 
     // Uptime
-    if ($options['uptime']) {
-        if (filter_var($config['uptime_warning'], FILTER_VALIDATE_FLOAT) !== FALSE && $config['uptime_warning'] > 0) {
-            $query = 'SELECT * FROM `devices` AS D ';
-            // Since reboot event more complicated than just device uptime less than some time
-            //$query .= ' WHERE D.`status` = 1 AND D.`uptime` > 0 AND D.`uptime` < ' . $config['uptime_warning'];
-            $query   .= ' WHERE D.`status` = 1 AND D.`uptime` > 0 AND D.`last_rebooted` > ?';
-            $query   .= $query_device_permitted;
-            $query   .= 'ORDER BY D.`hostname` ASC';
-            $entries = dbFetchRows($query, [$config['time']['now'] - $config['uptime_warning'] - 10]);
+    if ($options['uptime'] && $config['uptime_warning'] > 0 &&
+        filter_var($config['uptime_warning'], FILTER_VALIDATE_FLOAT) !== FALSE) {
+        $where_array = [ '`status` = 1', '`uptime` > 0' ];
+        $where_array[] = generate_query_values(get_time() - $config['uptime_warning'] - 10, 'last_rebooted', '>');
+        $query = 'SELECT * FROM `devices`';
+        $query   .= generate_where_clause($where_array, $query_device_permitted);
+        $query   .= 'ORDER BY `hostname` ASC';
 
-            foreach ($entries as $device) {
-                $boxes[] = ['sev'         => 10,
-                            'class'       => 'Device',
-                            'event'       => 'Rebooted',
-                            'device_link' => generate_device_link_short($device),
-                            'time'        => device_uptime($device, 'short-3'),
-                            'location'    => $device['location'],
-                            'icon_tag'    => '<i class="' . $config['entities']['device']['icon'] . '"></i>'];
-            }
+        foreach (dbFetchRows($query) as $device) {
+            $boxes[] = [
+                'sev'         => 10,
+                'class'       => 'Device',
+                'event'       => 'Rebooted',
+                'device_link' => generate_device_link_short($device),
+                'time'        => device_uptime($device, 'short-3'),
+                'location'    => $device['location'],
+                'icon'        => $config['entities']['device']['icon']
+            ];
         }
     }
 
     // Ports Down
     if ($options['ports'] || $options['neighbours']) {
+
         $options['neighbours'] = $options['neighbours'] && !$options['ports']; // Disable 'neighbours' if 'ports' already enabled
+        $query_port_permitted  = generate_query_permitted([ 'port' ], [ 'port_table' => 'I', 'hide_ignored' => TRUE ]);
 
         $query = 'SELECT * FROM `ports` AS I ';
         if ($options['neighbours']) {
             $query .= 'INNER JOIN `neighbours` as L ON I.`port_id` = L.`port_id` ';
         }
         $query .= 'LEFT JOIN `devices` AS D ON I.`device_id` = D.`device_id` ';
-        $query .= "WHERE D.`status` = 1 AND D.ignore = 0 AND I.ignore = 0 AND I.deleted = 0 AND I.`ifAdminStatus` = 'up' AND (I.`ifOperStatus` = 'lowerLayerDown' OR I.`ifOperStatus` = 'down') ";
+
+        $where_array = [ 'D.`status` = 1', 'D.`ignore` = 0', 'I.`ignore` = 0', 'I.`deleted` = 0' ];
+        $where_array[] = generate_query_values('up', 'I.ifAdminStatus');
+        $where_array[] = generate_query_values([ 'down', 'lowerLayerDown' ], 'I.ifOperStatus');
+
         if ($options['neighbours']) {
-            $query .= ' AND L.`active` = 1 ';
+            $where_array[] = 'L.`active` = 1';
         }
-        $query .= $query_port_permitted;
-        $query .= ' AND I.`ifLastChange` >= DATE_SUB(NOW(), INTERVAL ' . $max_interval . ' HOUR) ';
+        $where_array[] = generate_query_values('DATE_SUB(NOW(), INTERVAL ' . $max_interval . ' HOUR)', 'I.ifLastChange', '>=');
+
+        $query .= generate_where_clause($where_array, $query_port_permitted);
         if ($options['neighbours']) {
-            $query .= 'GROUP BY L.`port_id` ';
+            $query .= ' GROUP BY L.`port_id`'; // hrm.. this works?
         }
-        $query   .= 'ORDER BY I.`ifLastChange` DESC, D.`hostname` ASC, I.`ifDescr` * 1 ASC ';
-        $entries = dbFetchRows($query);
+        $query   .= ' ORDER BY I.`ifLastChange` DESC, D.`hostname` ASC, I.`ifDescr` * 1 ASC';
+
         $i       = 1;
-        foreach ($entries as $port) {
+        foreach (dbFetchRows($query) as $port) {
             if ($i > $max_count) {
                 // Limit to 200 ports on overview page
                 break;
             }
             //humanize_port($port);
-            $boxes[] = ['sev'         => 50,
-                        'class'       => 'Port',
-                        'event'       => 'Down',
-                        'device_link' => generate_device_link_short($port),
-                        'entity_link' => generate_port_link_short($port),
-                        'time'        => format_uptime($config['time']['now'] - strtotime($port['ifLastChange'])),
-                        'location'    => $device['location'],
-                        'icon_tag'    => '<i class="' . $config['entities']['port']['icon'] . '"></i>'];
+            $boxes[] = [
+                'sev'         => 50,
+                'class'       => 'Port',
+                'event'       => 'Down',
+                'device_link' => generate_device_link_short($port),
+                'entity_link' => generate_port_link_short($port),
+                'time'        => format_uptime(get_time() - strtotime($port['ifLastChange'])),
+                'location'    => $device['location'],
+                'icon'        => $config['entities']['port']['icon']
+            ];
         }
     }
 
@@ -483,48 +293,52 @@ function get_status_array($options)
                 $sev = 45;
             }
 
-            $boxes[] = ['sev'         => $sev,
-                        'class'       => 'Port',
-                        'event'       => 'Errors',
-                        'device_link' => generate_device_link_short($device),
-                        'entity_link' => generate_port_link_short($port),
-                        'time'        => $port['string'],
-                        'location'    => $device['location'],
-                        'icon_tag'    => '<i class="' . $config['entities']['port']['icon'] . '"></i>'];
+            $boxes[] = [
+                'sev'         => $sev,
+                'class'       => 'Port',
+                'event'       => 'Errors',
+                'device_link' => generate_device_link_short($device),
+                'entity_link' => generate_port_link_short($port),
+                'time'        => $port['string'],
+                'location'    => $device['location'],
+                'icon'        => $config['entities']['port']['icon']
+            ];
         }
     }
 
     // BGP
-    if ($options['bgp']) {
-        if (isset($config['enable_bgp']) && $config['enable_bgp']) {
-            $query = 'SELECT * FROM `bgpPeers` AS B ';
-            $query .= 'LEFT JOIN `devices` AS D ON B.`device_id` = D.`device_id` ';
-            //$query .= 'LEFT JOIN `bgpPeers-state` AS BS ON B.`bgpPeer_id` = BS.`bgpPeer_id` ';
-            $query   .= "WHERE D.`status` = 1 AND (`bgpPeerAdminStatus` = 'start' OR `bgpPeerAdminStatus` = 'running') AND `bgpPeerState` != 'established' ";
-            $query   .= $query_device_permitted;
-            $query   .= 'ORDER BY D.`hostname` ASC';
-            $entries = dbFetchRows($query);
-            foreach ($entries as $peer) {
-                humanize_bgp($peer);
+    if ($options['bgp'] && isset($config['enable_bgp']) && $config['enable_bgp']) {
+        $where_array = [ '`status` = 1' ];
+        $where_array[] = generate_query_values([ 'start', 'running' ], 'bgpPeerAdminStatus');
+        $where_array[] = generate_query_values('established', 'bgpPeerState', '!=');
+
+        $query = 'SELECT * FROM `bgpPeers`';
+        $query .= ' LEFT JOIN `devices` USING(`device_id`)';
+        $query .= generate_where_clause($where_array, $query_device_permitted);
+        $query .= ' ORDER BY D.`hostname` ASC';
+
+        foreach (dbFetchRows($query) as $peer) {
+            humanize_bgp($peer);
+
+            if (isset($options['bgp_peer_name']) && $options['bgp_peer_name'] === "peer_dns" &&
+                !safe_empty($peer['reverse_dns'])) {
+                $peer_link = generate_entity_link("bgp_peer", $peer, short_hostname($peer['reverse_dns']));
+            } else {
                 $peer_link = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
-
-                if (isset($options['bgp_peer_name']) && $options['bgp_peer_name'] == "peer_dns") {
-                    if (strlen($peer['reverse_dns'])) {
-                        $peer_link = generate_entity_link("bgp_peer", $peer, short_hostname($peer['reverse_dns']));
-                    }
-                }
-
-                $peer['wide'] = str_contains($peer['bgpPeerRemoteAddr'], ':');
-                $boxes[]      = ['sev'         => 75,
-                                 'class'       => 'BGP Session',
-                                 'event'       => 'Down',
-                                 'device_link' => generate_device_link_short($peer),
-                                 'entity_link' => $peer_link,
-                                 'wide'        => $peer['wide'],
-                                 'time'        => format_uptime($peer['bgpPeerFsmEstablishedTime'], 'short-3'),
-                                 'location'    => $device['location'],
-                                 'icon_tag'    => '<i class="' . $config['entities']['bgp_peer']['icon'] . '"></i>'];
             }
+
+            $peer['wide'] = str_contains($peer['bgpPeerRemoteAddr'], ':');
+            $boxes[]      = [
+                'sev'         => 75,
+                'class'       => 'BGP Session',
+                'event'       => 'Down',
+                'device_link' => generate_device_link_short($peer),
+                'entity_link' => $peer_link,
+                'wide'        => $peer['wide'],
+                'time'        => format_uptime($peer['bgpPeerFsmEstablishedTime'], 'short-3'),
+                'location'    => $device['location'],
+                'icon'        => $config['entities']['bgp_peer']['icon']
+            ];
         }
     }
 

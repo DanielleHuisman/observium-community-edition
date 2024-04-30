@@ -169,9 +169,9 @@ function wm_warn($string,$notice_only=FALSE)
 	{ cacti_log($message, true, "WEATHERMAP"); }
 	else
 	{
-		$stderr=fopen('php://stderr', 'w');
-		fwrite($stderr, $message."\n");
-		fclose ($stderr);
+        if(OBS_DEBUG){
+            r($message);
+        }
 	}
 }
 

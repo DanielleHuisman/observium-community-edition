@@ -25,7 +25,7 @@ foreach ($vars['id'] as $port_id) {
 
     $device = device_by_id_cache($processor['device_id']);
 
-    $rrd_filename = get_rrd_path($device, "processor-" . $processor['processor_type'] . "-" . $processor['processor_index'] . ".rrd");
+    $rrd_filename = get_rrd_path($device, get_processor_rrd($device, $processor));
 
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr']    = rewrite_entity_name($processor['processor_descr'], 'processor');

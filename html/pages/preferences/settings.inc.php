@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -16,7 +16,7 @@ Please correct the URL and try again.');
   return;
 }
 
-register_html_resource('js', 'js/jquery.serializejson.js');
+register_html_resource('js', 'js/jquery.serializejson.min.js');
 
 register_html_resource('js', 'clipboard.min.js');
 register_html_resource('script', 'new Clipboard("#clipboard");');

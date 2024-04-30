@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     common
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -15,8 +15,7 @@
  * Autoloader for Classes used in Observium
  *
  */
-function observium_autoload($class_name)
-{
+function observium_autoload($class_name) {
     //var_dump($class_name);
     if (isset($GLOBALS['config']['install_dir'])) {
         $base_dir = $GLOBALS['config']['install_dir'] . '/libs/';
@@ -43,10 +42,12 @@ function observium_autoload($class_name)
             }
             break;
 
+        case 'flight':
         case 'Flight':
             $class_file = array_pop($class_array) . '.php';
             if (PHP_VERSION_ID >= 70400) {
-                $class_file = 'flight2/' . $class_file;
+                // PHP 7.4+ (for 8.1 required)
+                $class_file = 'flight3/' . $class_file;
             } else {
                 // Old compat version
                 $class_file = 'flight/' . $class_file;
@@ -58,6 +59,14 @@ function observium_autoload($class_name)
                 // PHP 7.2+ (for 8.1 required)
                 //$class_array[1] = 'Uuid4';
                 $class_file = str_replace('/Uuid/', '/Uuid4/', $class_file);
+                //$class_file     = str_replace('_', '/', implode('/', $class_array)) . '.php';
+            }
+            break;
+
+        case 'Brick':
+            if (PHP_VERSION_ID >= 80000 && $class_array[1] === 'Math') {
+                // PHP 8.0+ (for 0.11 required)
+                $class_file = str_replace('/Math/', '/Math11/', $class_file);
                 //$class_file     = str_replace('_', '/', implode('/', $class_array)) . '.php';
             }
             break;

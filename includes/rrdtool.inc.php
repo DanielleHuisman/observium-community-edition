@@ -11,7 +11,7 @@
  */
 
 /**
- * Get full path for rrd file.
+ * Get a full path for rrd file.
  *
  * @param array  $device   Device array
  * @param string $filename Base filename for rrd file
@@ -98,8 +98,8 @@ function rename_rrd($device, $old_rrd, $new_rrd, $overwrite = FALSE)
 /**
  * Opens up a pipe to RRDTool using handles provided
  *
- * @param &rrd_process
- * @param &rrd_pipes
+ * @param resource $rrd_process
+ * @param array $rrd_pipes
  *
  * @return boolean
  * @global array $config
@@ -150,8 +150,8 @@ function rrdtool_pipe_open(&$rrd_process, &$rrd_pipes)
 /**
  * Closes the pipe to RRDTool
  *
- * @param resource rrd_process
- * @param array rrd_pipes
+ * @param resource $rrd_process
+ * @param array    $rrd_pipes
  *
  * @return integer
  */
@@ -195,15 +195,15 @@ function rrdtool_pipe_close($rrd_process, &$rrd_pipes)
  * Generates a graph file at $graph_file using $options
  * Opens its own rrdtool pipe.
  *
- * @param string graph_file
- * @param string options
+ * @param string $graph_file
+ * @param string $options
  *
- * @return integer
+ * @return string|null
  */
 // TESTME needs unit testing
 function rrdtool_graph($graph_file, $options)
 {
-    global $config;
+    global $config, $exec_status;
 
     // Note, always use pipes, because standard command line has limits!
     if ($config['rrdcached']) {
@@ -217,9 +217,11 @@ function rrdtool_graph($graph_file, $options)
     $cmd = str_replace(["\r", "\n"], '', $cmd);
 
     $GLOBALS['rrd_status'] = FALSE;
-    $exec_status           = ['command'  => $config['rrdtool'] . ' ' . $cmd,
-                              'stdout'   => '',
-                              'exitcode' => -1];
+    $exec_status = [
+        'command'  => $config['rrdtool'] . ' ' . $cmd,
+        'stdout'   => '',
+        'exitcode' => -1
+    ];
 
     $start = microtime(TRUE);
     rrdtool_pipe_open($rrd_process, $rrd_pipes);
@@ -227,7 +229,7 @@ function rrdtool_graph($graph_file, $options)
 
         $stdout = pipe_read($cmd, $rrd_pipes, FALSE);
 
-        $runtime = microtime(TRUE) - $start;
+        $runtime = elapsed_time($start);
 
         // Check rrdtool's output for the command.
         if (preg_match('/\d+x\d+/', $stdout)) {
@@ -244,7 +246,7 @@ function rrdtool_graph($graph_file, $options)
         $exec_status['stdout']   = $stdout;
         $exec_status['stderr']   = $stderr;
     } else {
-        $runtime = microtime(TRUE) - $start;
+        $runtime = elapsed_time($start);
         $stdout  = NULL;
     }
     $exec_status['runtime'] = $runtime;
@@ -273,9 +275,9 @@ function rrdtool_graph($graph_file, $options)
 /**
  * Generates and pipes a command to rrdtool
  *
- * @param string command
- * @param string filename
- * @param string options
+ * @param string $command
+ * @param string $filename
+ * @param string $options
  *
  * @global array $config
  * @global mixed $rrd_pipes
@@ -288,10 +290,10 @@ function rrdtool($command, $filename, $options)
     $fsfilename = $filename; // keep full filename
     // Remote RRDcached require minimum version 1.5.5
     // Do not use rrdcached on local hosted rrd, for some commands
-    if ($config['rrdcached'] && (OBS_RRD_NOLOCAL || !in_array($command, ['create', 'tune', 'info', 'last', 'lastupdate']))) {
+    if ($config['rrdcached'] && (OBS_RRD_NOLOCAL || !in_array($command, [ 'create', 'tune', 'info', 'last', 'lastupdate' ]))) {
         $filename = str_replace($config['rrd_dir'] . '/', '', $filename);
         if (OBS_RRD_NOLOCAL && $command === 'create') {
-            // No overwrite for remote rrdtool, since no way for check if rrdfile exist
+            // No overwriting for remote rrdtool, since no way for check if rrdfile exist
             $options .= ' --no-overwrite';
         }
         $options .= ' --daemon ' . $config['rrdcached'];
@@ -310,7 +312,7 @@ function rrdtool($command, $filename, $options)
         return NULL;
     }
 
-    if (in_array($command, ['fetch', 'last', 'lastupdate', 'tune', 'xport', 'dump', 'restore', 'info', 'graphv'])) {
+    if (in_array($command, [ 'fetch', 'last', 'lastupdate', 'tune', 'xport', 'dump', 'restore', 'info', 'graphv' ])) {
         // This commands require exact STDOUT, skip use pipes
         //$command = $config['rrdtool'] . ' ' . $cmd;
         $stdout                = external_exec($config['rrdtool'] . ' ' . $cmd, $exec_status, 500); // Limit exec time to 500ms
@@ -330,7 +332,7 @@ function rrdtool($command, $filename, $options)
 
         $stdout  = trim(stream_get_contents($rrd_pipes[1]));
         $stderr  = trim(stream_get_contents($rrd_pipes[2]));
-        $runtime = microtime(TRUE) - $start;
+        $runtime = elapsed_time($start);
 
         $exec_status['stdout']  = $stdout;
         $exec_status['stderr']  = $stderr;
@@ -410,10 +412,10 @@ function rrdtool_debug_log($command, $exec_status, $fsfilename = NULL, $debug = 
  * Creates the file if it does not exist yet.
  * DEPRECATED: use rrdtool_create_ng(), this will disappear and ng will be renamed when conversion is complete.
  *
- * @param array  device
- * @param string filename
- * @param string ds
- * @param string options
+ * @param array  $device
+ * @param string $filename
+ * @param string $ds
+ * @param string $options
  */
 function rrdtool_create($device, $filename, $ds, $options = '')
 {
@@ -457,8 +459,8 @@ function rrdtool_create($device, $filename, $ds, $options = '')
 /**
  * Generates RRD filename from definition
  *
- * @param string/array $def    Original filename, using %index% (or %custom% %keys%) as placeholder for indexes
- * @param string/array $index  Index, if RRD type is indexed (or array of multiple indexes)
+ * @param string|array $def    Original filename, using %index% (or %custom% %keys%) as placeholder for indexes
+ * @param string|array $index  Index, if RRD type is indexed (or array of multiple indexes)
  *
  * @return string              Filename of RRD
  */
@@ -484,7 +486,7 @@ function rrdtool_generate_filename($def, $index)
     // Convert to single element array if not an array.
     // This will automatically use %index% as the field to replace (see below).
     if (!is_array($index)) {
-        $index = ['index' => $index];
+        $index = [ 'index' => $index ];
     }
 
     // Replace %index% by $index['index'], %foo% by $index['foo'] etc.
@@ -498,10 +500,10 @@ function rrdtool_generate_filename($def, $index)
  * Only creates the file if it does not exist yet.
  * Should most likely not be called on its own, as an update call will check for existence.
  *
- * @param array $device  Device array
- * @param string/array $type     rrd file type from $config['rrd_types'] or actual config array
- * @param string/array $index    Index, if RRD type is indexed (or array of multiple tags)
- * @param array $options Options for create RRD, like STEP, RRA, MAX or SPEED
+ * @param array        $device  Device array
+ * @param string|array $type     rrd file type from $config['rrd_types'] or actual config array
+ * @param string|array $index    Index, if RRD type is indexed (or array of multiple tags)
+ * @param array        $options Options for create RRD, like STEP, RRA, MAX or SPEED
  *
  * @return string
  */
@@ -538,57 +540,14 @@ function rrdtool_create_ng($device, $type, $index = NULL, $options = [])
     }
 
     // Set RRA option
-    $rra = isset($options['rra']) ? $options['rra'] : $config['rrd']['rra'];
+    $rra = $options['rra'] ?? $config['rrd']['rra'];
     $rra = preg_replace('/\s+/', ' ', $rra);
 
     // Set step
-    $step = isset($options['step']) ? $options['step'] : $config['rrd']['step'];
-
-    // Create tags, for use in replace
-    $tags = [];
-    if (strlen((string)$index)) {
-        $tags['index'] = $index;
-    }
-    if (isset($options['speed'])) {
-        print_debug("Passed speed: " . $options['speed']);
-        $options['speed'] = (int)(unit_string_to_numeric($options['speed']) / 8); // Detect passed speed value (converted to bits)
-        $tags['speed']    = max($options['speed'], $config['max_port_speed']);    // But result select maximum between passed and default!
-        print_debug("   RRD speed: " . $options['speed'] . PHP_EOL .
-                    "     Default: " . $config['max_port_speed'] . PHP_EOL .
-                    "         Max: " . $tags['speed']);
-    } else {
-        // Default speed
-        $tags['speed'] = $config['max_port_speed'];
-    }
+    $step = $options['step'] ?? $config['rrd']['step'];
 
     // Create DS parameter based on the definition
-    $ds = [];
-
-    foreach ($definition['ds'] as $name => $def) {
-        if (strlen($name) > 19) {
-            print_warning("SEVERE: DS name $name is longer than 19 characters - over RRD limit!");
-        }
-
-        // Set defaults for missing attributes
-        if (!isset($def['type'])) {
-            $def['type'] = 'COUNTER';
-        }
-        if (!isset($def['max'])) {
-            $def['max'] = 'U';
-        } else {
-            $def['max'] = array_tag_replace($tags, $def['max']);
-        } // can use %speed% tag, speed must passed by $options['speed']
-        if (!isset($def['min'])) {
-            $def['min'] = 'U';
-        }
-        if (!isset($def['heartbeat'])) {
-            $def['heartbeat'] = 2 * $step;
-        }
-
-        // Create DS string to pass on the command line
-        $ds[] = "DS:$name:" . $def['type'] . ':' . $def['heartbeat'] . ':' . $def['min'] . ':' . $def['max'];
-    }
-
+    $ds = rrdtool_def_ds('create', $definition, $index, $options);
 
     return rrdtool('create', $fsfilename, implode(' ', $ds) . " --step $step $rra");
 
@@ -598,19 +557,19 @@ function rrdtool_create_ng($device, $type, $index = NULL, $options = [])
  * Updates an rrd database at $filename using $options
  * Where $options is an array, each entry which is not a number is replaced with "U"
  *
- * @param array $device  Device array
- * @param string/array $type    RRD file type from $config['rrd_types'] or actual config array
- * @param array $ds      DS data (key/value)
- * @param string/array $index   Index, if RRD type is indexed (or array of multiple indexes)
- * @param bool  $create  Create RRD file if it does not exist
- * @param array $options Options to pass to create function if file does not exist
+ * @param array        $device  Device array
+ * @param string|array $type    RRD file type from $config['rrd_types'] or actual config array
+ * @param array        $ds      DS data (key/value)
+ * @param string|array $index   Index, if RRD type is indexed (or array of multiple indexes)
+ * @param bool         $create  Create RRD file if it does not exist
+ * @param array        $options Options to pass to create function if file does not exist
  *
  * @return string
  */
 // TESTME needs unit testing
 function rrdtool_update_ng($device, $type, $ds, $index = NULL, $create = TRUE, $options = [])
 {
-    global $config, $graphs;
+    global $config;
 
     if (!is_array($type)) { // We were passed a string
         if (!is_array($config['rrd_types'][$type])) { // Check if definition exists
@@ -642,19 +601,14 @@ function rrdtool_update_ng($device, $type, $ds, $index = NULL, $create = TRUE, $
         rrdtool_update_ds($device, $type, $index, $options);
     }
 
-    $update = ['N'];
+    $update = [ 'N' ];
 
     foreach ($definition['ds'] as $name => $def) {
-        if (isset($ds[$name])) {
-            if (is_numeric($ds[$name])) {
-                // Add data to DS update string
-                $update[] = $ds[$name];
-            } else {
-                // Data not numeric, mark unknown
-                $update[] = 'U';
-            }
+        if (isset($ds[$name]) && is_numeric($ds[$name])) {
+            // Add data to DS update string
+            $update[] = $ds[$name];
         } else {
-            // Data not sent, mark unknown
+            // Data aren't sent, mark unknown
             $update[] = 'U';
         }
     }
@@ -673,6 +627,78 @@ function rrdtool_update_ng($device, $type, $ds, $index = NULL, $create = TRUE, $
     }
 
     return rrdtool('update', $fsfilename, implode(':', $update));
+}
+
+function rrdtool_tags($index = NULL, $options = []) {
+    // Create tags, for use in replace
+    $tags = [];
+    if (!safe_empty($index)) {
+        $tags['index'] = $index;
+    }
+    if (isset($options['speed'])) {
+        print_debug("Passed speed: " . $options['speed']);
+        $options['speed'] = (int)(unit_string_to_numeric($options['speed']) / 8);         // Detect passed speed value (converted to bits)
+        $tags['speed']    = max($options['speed'], $GLOBALS['config']['max_port_speed']); // But result selects maximum between passed and default!
+        print_debug("   RRD speed: " . $options['speed'] . PHP_EOL .
+            "     Default: " . $GLOBALS['config']['max_port_speed'] . PHP_EOL .
+            "         Max: " . $tags['speed']);
+    } else {
+        // Default speed
+        $tags['speed'] = $GLOBALS['config']['max_port_speed'];
+    }
+
+    return $tags;
+}
+
+function rrdtool_def_ds($type, $definition, $index = NULL, $options = []) {
+
+    // Set step
+    $step = $options['step'] ?? $GLOBALS['config']['rrd']['step'];
+
+    // Create tags, for use in replacement
+    $tags = rrdtool_tags($index, $options);
+
+    // Create DS parameter based on the definition
+    $ds = [];
+
+    foreach ($definition['ds'] as $name => $def) {
+        if (strlen($name) > 19) {
+            print_warning("SEVERE: DS name $name is longer than 19 characters - over RRD limit!");
+        }
+
+        // Set defaults for missing attributes
+        if (!isset($def['type'])) {
+            $def['type'] = 'COUNTER';
+        }
+        if (isset($def['max'])) {
+            // can use %speed% tag, speed must pass by $options['speed']
+            $def['max'] = array_tag_replace($tags, $def['max']);
+        } else {
+            $def['max'] = 'U';
+        }
+        if (!isset($def['min'])) {
+            $def['min'] = 'U';
+        }
+        if (!isset($def['heartbeat'])) {
+            $def['heartbeat'] = 2 * $step;
+        }
+
+        if ($type === 'update') {
+            // Update DS strings to pass on the command line
+            if (isset($options['update_min']) && $options['update_min']) {
+                $ds[] = "--minimum $name:" . $def['min'];
+            }
+            if (isset($options['update_max']) && $options['update_max']) {
+                $ds[] = "--maximum $name:" . $def['max'];
+            }
+
+        } else {
+            // Create DS string to pass on the command line
+            $ds[] = "DS:$name:" . $def['type'] . ':' . $def['heartbeat'] . ':' . $def['min'] . ':' . $def['max'];
+        }
+    }
+
+    return $ds;
 }
 
 /**
@@ -700,7 +726,7 @@ function rrdtool_update($device, $filename, $options)
         $options = implode(':', $values);
     }
 
-    if ($filename[0] == '/') {
+    if ($filename[0] === '/') {
         $filename = basename($filename);
         print_debug("You should pass the filename only (not the full path) to this function!");
     }
@@ -929,8 +955,7 @@ function rrdtool_rename_ds($device, $filename, $oldname, $newname)
         return $return;
     }
 
-    // rrdtool tune rename DS supported since v1.4
-    // really not, see:
+    // rrdtool tune rename DS supported (really) since v1.8, see:
     // https://github.com/oetiker/rrdtool-1.x/pull/1139
     $version = get_versions();
     if (version_compare($version['rrdtool_version'], '1.4', '>=')) {
@@ -1040,57 +1065,11 @@ function rrdtool_update_ds($device, $type, $index = NULL, $options = [])
     }
     print_debug("RRD update DSes requested.");
 
-    // Create tags, for use in replace
-    $tags = [];
-    if (strlen((string)$index)) {
-        $tags['index'] = $index;
-    }
-    if (isset($options['speed'])) {
-        print_debug("Passed speed: " . $options['speed']);
-        $options['speed'] = (int)(unit_string_to_numeric($options['speed']) / 8); // Detect passed speed value (converted to bits)
-        $tags['speed']    = max($options['speed'], $config['max_port_speed']);    // But result select maximum between passed and default!
-        print_debug("   RRD speed: " . $options['speed'] . PHP_EOL .
-                    "     Default: " . $config['max_port_speed'] . PHP_EOL .
-                    "         Max: " . $tags['speed']);
-    } else {
-        // Default speed
-        $tags['speed'] = $config['max_port_speed'];
-    }
-
     // Create DS parameter based on the definition
-    $update = [];
+    $update = rrdtool_def_ds('update', $definition, $index, $options);
 
-    foreach ($definition['ds'] as $name => $def) {
-        if (strlen($name) > 19) {
-            print_warning("SEVERE: DS name $name is longer than 19 characters - over RRD limit!");
-        }
-
-        // Set defaults for missing attributes
-        if (!isset($def['type'])) {
-            $def['type'] = 'COUNTER';
-        }
-        if (!isset($def['max'])) {
-            $def['max'] = 'U';
-        } else {
-            $def['max'] = array_tag_replace($tags, $def['max']);
-        } // can use %speed% tag, speed must passed by $options['speed']
-        if (!isset($def['min'])) {
-            $def['min'] = 'U';
-        }
-        if (!isset($def['heartbeat'])) {
-            $def['heartbeat'] = 2 * $step;
-        }
-
-        if (isset($options['update_min']) && $options['update_min']) {
-            $update[] = "--minimum $name:" . $def['min'];
-        }
-        if (isset($options['update_max']) && $options['update_max']) {
-            $update[] = "--maximum $name:" . $def['max'];
-        }
-    }
-
-    if (safe_count($update)) {
-        if (OBS_DEBUG) {
+    if (!safe_empty($update)) {
+        if (OBS_DEBUG > 1) {
             rrdtool_file_info($fsfilename);
         }
         //return TRUE;
@@ -1156,7 +1135,7 @@ function rrdtool_escape($string, $maxlength = NULL)
 function rrd_strip_quotes($str)
 {
     if ($str[0] == '"' && $str[strlen($str) - 1] == '"') {
-        return substr($str, 1, strlen($str) - 2);
+        return substr($str, 1, -1);
     }
 
     return $str;

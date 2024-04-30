@@ -25,8 +25,8 @@ include(__DIR__ . '/../includes/observium.inc.php');
  */
 
 // SNMPsim tests
-$snmpsimd_ip   = $config['tests']['snmpsim_ip'] ?: '127.0.0.1';
-$snmpsimd_port = $config['tests']['snmpsim_port'] ?: 16111;
+$snmpsimd_ip   = $config['tests']['snmpsim_ip'] ?? '127.0.0.1';
+$snmpsimd_port = $config['tests']['snmpsim_port'] ?? 16111;
 $snmpsimd_data = $config['tests']['snmpsim_dir'] . '/os';
 if (is_dir($snmpsimd_data)) {
   snmpsimd_init($snmpsimd_data);

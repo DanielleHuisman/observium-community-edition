@@ -22,10 +22,11 @@ IMPORTS
     HmEnabledStatus,
     hm2ConfigurationMibs,
     HmTimeSeconds1970	        FROM HM2-TC-MIB
+    InterfaceIndexOrZero,
     ifIndex     				FROM IF-MIB;
 
 hm2TimeSyncMib MODULE-IDENTITY
-	LAST-UPDATED "201103160000Z" -- March 16, 2011
+	LAST-UPDATED "201809070000Z" -- Sep 07, 2018
     ORGANIZATION "Hirschmann Automation and Control GmbH"
     CONTACT-INFO
         "Postal:     Stuttgarter Str. 45-51
@@ -36,7 +37,7 @@ hm2TimeSyncMib MODULE-IDENTITY
     DESCRIPTION
         "Hirschmann Time Sync MIB.
          Copyright (C) 2011. All Rights Reserved."
-    REVISION     "201103160000Z" -- March 16, 2011
+    REVISION     "201809070000Z" -- Sep 07, 2018
     DESCRIPTION
          "Initial version."
     ::= { hm2ConfigurationMibs 50 }
@@ -201,7 +202,8 @@ hm2SntpGroup       OBJECT IDENTIFIER ::= { hm2TimeSyncMibObjects 2 }
 hm2NtpGroup        OBJECT IDENTIFIER ::= { hm2TimeSyncMibObjects 3 }
 hm2PtpGroup        OBJECT IDENTIFIER ::= { hm2TimeSyncMibObjects 4 }
 hm2IrigGroup       OBJECT IDENTIFIER ::= { hm2TimeSyncMibObjects 5 }
- 
+hm2Dot1asGroup     OBJECT IDENTIFIER ::= { hm2TimeSyncMibObjects 6 }
+
 --
 -- *************************************************************
 -- hm2SystemTimeGroup
@@ -306,6 +308,15 @@ hm2SntpServerStatus OBJECT-TYPE
        			"Operational status of the SNTP server."
    ::= { hm2SntpServerGroup 4 }
 
+hm2SntpServerInterface OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS 	read-write
+   STATUS 		current
+   DESCRIPTION
+       			"Interface used by the SNTP server."
+   DEFVAL { 0 }
+   ::= { hm2SntpServerGroup 5 }
+   
 --
 -- *************************************************************
 -- hm2SNTPServerBroadcast group
@@ -480,6 +491,15 @@ hm2SntpClientBroadcastRecvTimeout    OBJECT-TYPE
                  to 'notSynchronized' if no broadcast packets are received."
    DEFVAL  { 320 }         
    ::= { hm2SntpClientGroup 6 }
+   
+hm2SntpClientInterface OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS 	read-write
+   STATUS 		current
+   DESCRIPTION
+       			"Interface used by the SNTP client."
+   DEFVAL { 0 }
+   ::= { hm2SntpClientGroup 7 }
    
 hm2SntpClientServerAddrTable OBJECT-TYPE
    SYNTAX SEQUENCE OF Hm2SntpClientServerAddrEntry
@@ -690,7 +710,7 @@ hm2NtpClientServerAddressType OBJECT-TYPE
     STATUS      current
     DESCRIPTION 
         "Address type for external time server.
-         Currently, only IPv4 and DNS is supported."
+         Currently, only IPv4, IPv6 and DNS are supported."
     DEFVAL      { ipv4 }
     ::= { hm2NtpClientServerAddrEntry 2 }
 
@@ -816,7 +836,7 @@ hm2NtpClientListenAddrAddressType OBJECT-TYPE
     STATUS      current
     DESCRIPTION 
         "Address type for external time server.
-         Currently, only IPv4 and DNS is supported."
+         Currently, only IPv4, IPv6 and DNS are supported."
     DEFVAL      { ipv4 }
     ::= { hm2NtpClientListenAddrEntry 2 }
 
@@ -1507,7 +1527,7 @@ hm2Ptp2VlanPriority	OBJECT-TYPE
 		STATUS 		current
 		DESCRIPTION
 			"VLAN priority of tagged ptp packets"
-		DEFVAL  { 4 }
+		DEFVAL  { 6 }
 		::= { hm2Ptp2PortEntry 16 }
 		
 --
@@ -1632,7 +1652,7 @@ hm2Ptp2TCVlanPriority	OBJECT-TYPE
 		STATUS 		current
 		DESCRIPTION
 			"VLAN priority of tagged PTP packets."
-		DEFVAL  { 4 }
+		DEFVAL  { 6 }
 		::= { hm2Ptp2TCConfiguration 12 }
 				
 hm2Ptp2TCCapability  OBJECT-TYPE 
@@ -1822,6 +1842,71 @@ hm2IrigTimeQuality OBJECT-TYPE
 	  "Current IRIG-B time quality according to IEEE 1344."
    ::= { hm2IrigGroup 6 }
 
+
+--
+-- *************************************************************
+-- hm2Dot1asGroup
+-- *************************************************************
+--
+hm2Dot1asGlobal	OBJECT IDENTIFIER ::= { hm2Dot1asGroup 1 }
+
+hm2Dot1asEnable OBJECT-TYPE
+		SYNTAX HmEnabledStatus
+		MAX-ACCESS 	read-write
+		STATUS 		current
+		DESCRIPTION
+			"Enable or disable the 802.1AS Protocol
+			on this node."
+		DEFVAL  { disable }
+		::= { hm2Dot1asGlobal 1 }
+
+hm2Dot1asIsSynchronized OBJECT-TYPE
+		SYNTAX		INTEGER {
+					true (1),
+					false (2)
+					}
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"If the clock is synchronized to the current Master this object is set to true.
+			Otherwise it is set to false. The clock sets this object to true, if the offset (ns)
+			to the current Master is less than hm2dot1asSyncLowerBound. The clock sets this object to false,
+			if the offset (ns) to the current Master is bigger than hm2dot1asSyncUpperBound."
+		::= { hm2Dot1asGlobal 2 }
+
+hm2Dot1asSyncLowerBound OBJECT-TYPE
+		SYNTAX		Integer32(1..999999999)
+		MAX-ACCESS	read-write
+		STATUS		current
+		DESCRIPTION
+			"This object defines when the hm2dot1asIsSynchronized object is set to true.
+			If the absolute value of the offset is smaller than hm2dot1asSyncLowerBound,
+			the hm2dot1asIsSynchronized is set true.
+			The value is interpreted as nanoseconds."
+		DEFVAL  { 30 }
+		::= { hm2Dot1asGlobal 3 }
+
+hm2Dot1asSyncUpperBound OBJECT-TYPE
+		SYNTAX		Integer32(31..1000000000)
+		MAX-ACCESS	read-write
+		STATUS		current
+		DESCRIPTION
+			"This object defines when the hm2dot1asIsSynchronized object is set to false.
+			If the absolute value of the offset is bigger than hm2dot1asSyncUpperBound, the hm2dot1asIsSynchronized is set false.
+			The value is interpreted as nanoseconds."
+		DEFVAL  { 5000 }
+		::= { hm2Dot1asGlobal 4 }
+
+hm2Dot1asAbsMaxOffset OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"This members value shall indicate the absolute value for the maximum offset between its parent and this node. 
+			The value is set to zero if the offset is the first time smaller than hm2dot1asSyncLowerBound.
+			Offsets bigger than +/-1 second are indicated by the maximum value."
+		::= { hm2Dot1asGlobal 5 }
+
 -- ***********************************************************
 -- hm2TimeSyncSNMPExtensionGroup
 -- ***********************************************************
@@ -1830,6 +1915,7 @@ hm2TimeSyncSntpSESGroup 		OBJECT IDENTIFIER ::= { hm2TimeSyncMibSNMPExtensionGro
 hm2TimeSyncNtpSESGroup	 		OBJECT IDENTIFIER ::= { hm2TimeSyncMibSNMPExtensionGroup 3 }
 hm2TimeSyncPtpSESGroup	 		OBJECT IDENTIFIER ::= { hm2TimeSyncMibSNMPExtensionGroup 4 }
 hm2TimeSyncIrigSESGroup	 		OBJECT IDENTIFIER ::= { hm2TimeSyncMibSNMPExtensionGroup 5 }
+hm2TimeSyncDot1asSESGroup	 	OBJECT IDENTIFIER ::= { hm2TimeSyncMibSNMPExtensionGroup 6 }
 
 -- ***********************************************************
 -- hm2TimeSyncSntpSESGroup
@@ -1845,7 +1931,21 @@ hm2TimeSyncSntpSESDnsPortNumberPairInUse OBJECT-IDENTITY
            DESCRIPTION 
            		"Indicates that the given DNS name / port number combination is already in use."
            ::= { hm2TimeSyncSntpSESGroup 2 }
-    
+
+hm2TimeSyncSntpSESIpv6PortNumberPairInUse OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION
+           		"Indicates that the given IPv6 address / port number combination is already in use."
+           ::= { hm2TimeSyncSntpSESGroup 3 }
+
+-- ***********************************************************
+-- hm2TimeSyncPtpSESGroup
+-- ***********************************************************
+hm2TimeSyncPtpSESPortIsNotCapable OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION
+                "Indicates that the given port number is not PTP capable."
+           ::= { hm2TimeSyncPtpSESGroup 1 }
     
 -- *************************************************************
 -- Notifications
@@ -1870,6 +1970,16 @@ hm2SntpClientSynchronizationChangeTrap  NOTIFICATION-TYPE
 	DESCRIPTION 
 	"This notification is sent if the SNTP synchronization status (hm2SntpClientStatus) is changed."
 	::= { hm2TimeSyncMibNotifications 10 }
+
+-- *************************************************************
+-- Dot1as notifications
+-- *************************************************************
+hm2Dot1asSynchronizationChange  NOTIFICATION-TYPE
+	OBJECTS		{ hm2Dot1asIsSynchronized }
+	STATUS		current
+	DESCRIPTION 
+	"This notification is sent if the dot1as synchronization status is changed."
+	::= { hm2TimeSyncMibNotifications 20 }
 
 END
 

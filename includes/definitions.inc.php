@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -19,8 +19,17 @@
 $def_start = microtime(TRUE);
 $def_pre   = memory_get_usage();
 
-require($config['install_dir'] . '/includes/definitions/version.inc.php');
 $definition_loaded = [ 'version.inc.php' ];
+require($config['install_dir'] . '/includes/definitions/version.inc.php');
+
+// Here whitelist of base definitions keys which can be overridden by config.php file
+// Note, this required only for override already exist definitions, for additions not required
+$config['definitions_whitelist'] = [ 'os', 'mibs', 'device_types', 'probes', 'rancid', 'geo_api', 'search_modules', 'rewrites', 'nicecase', 'wui' ];
+
+if (defined('OBS_DEFINITIONS_SKIP') && OBS_DEFINITIONS_SKIP === TRUE) {
+    // Do not load full definitions in observium-wrapper, while not required at this point
+    return;
+}
 
 // Community specific definition
 if (OBSERVIUM_EDITION === 'community' &&
@@ -67,85 +76,91 @@ foreach ($definition_files as $file => $valid) {
 // IP types
 // https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
 $config['ip_types']['unspecified']   = [
-  'networks'    => ['0.0.0.0', '::/128'],
+  'networks'    => [ '0.0.0.0', '::/128' ],
   'name'        => 'Unspecified', 'subtext' => 'Example: ::/128, 0.0.0.0',
   'label-class' => 'error',
   'descr'       => 'This address may only be used as a source address by an initialising host before it has learned its own address. Example: ::/128, 0.0.0.0'
 ];
 $config['ip_types']['loopback']      = [
-  'networks'    => ['127.0.0.0/8', '::1/128'],
+  'networks'    => [ '127.0.0.0/8', '::1/128' ],
   'name'        => 'Loopback', 'subtext' => 'Example: ::1/128, 127.0.0.1',
   'label-class' => 'info',
   'descr'       => 'This address is used when a host talks to itself. Example: ::1/128, 127.0.0.1'
 ];
 $config['ip_types']['private']       = [
-  'networks'    => ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'],
+  'networks'    => [ '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7' ],
   'name'        => 'Private Local Addresses', 'subtext' => 'Example: fdf8:f53b:82e4::53, 192.168.0.1',
   'label-class' => 'warning',
   'descr'       => 'These addresses are reserved for local use in home and enterprise environments and are not public address space. Example: fdf8:f53b:82e4::53, 192.168.0.1'
 ];
+$config['ip_types']['cgnat']       = [
+    'networks'    => [ '100.64.0.0/10' ],
+    'name'        => 'Carrier Grade NAT (CGNAT)', 'subtext' => 'Example: 100.80.76.30',
+    'label-class' => 'warning',
+    'descr'       => 'Carrier Grade NAT is expressly reserved as a range that does not conflict with either the private network address ranges or the public Internet ranges. Example: 100.80.76.30'
+];
 $config['ip_types']['multicast']     = [
-  'networks'    => ['224.0.0.0/4', 'ff00::/8'],
+  'networks'    => [ '224.0.0.0/4', 'ff00::/8' ],
   'name'        => 'Multicast', 'subtext' => 'Example: ff01:0:0:0:0:0:0:2, 224.0.0.1',
   'label-class' => 'inverse',
   'descr'       => 'These addresses are used to identify multicast groups. Example: ff01:0:0:0:0:0:0:2, 224.0.0.1'
 ];
 $config['ip_types']['link-local']    = [
-  'networks'    => ['169.254.0.0/16', 'fe80::/10'],
+  'networks'    => [ '169.254.0.0/16', 'fe80::/10' ],
   'name'        => 'Link-Local Addresses', 'subtext' => 'Example: fe80::200:5aee:feaa:20a2, 169.254.3.1',
   'label-class' => 'suppressed',
   'descr'       => 'These addresses are used on a single link or a non-routed common access network, such as an Ethernet LAN. Example: fe80::200:5aee:feaa:20a2, 169.254.3.1'
 ];
 $config['ip_types']['ipv4mapped']    = [
-  'networks'    => ['::ffff/96'],
+  'networks'    => [ '::ffff/96' ],
   'name'        => 'IPv6 IPv4-Mapped', 'subtext' => 'Example: ::ffff:192.0.2.47',
   'label-class' => 'primary',
   'descr'       => 'These addresses are used to embed IPv4 addresses in an IPv6 address. Example: 64:ff9b::192.0.2.33'
 ];
 $config['ip_types']['ipv4embedded']  = [
-  'networks'    => ['64:ff9b::/96'],
+  'networks'    => [ '64:ff9b::/96' ],
   'name'        => 'IPv6 IPv4-Embedded', 'subtext' => 'Example: ::ffff:192.0.2.47',
   'label-class' => 'primary',
   'descr'       => 'IPv4-converted IPv6 addresses and IPv4-translatable IPv6 addresses. Example: 64:ff9b::192.0.2.33'
 ];
 $config['ip_types']['6to4']          = [
-  'networks'    => ['192.88.99.0/24', '2002::/16'],
+  'networks'    => [ '192.88.99.0/24', '2002::/16' ],
   'name'        => 'IPv6 6to4', 'subtext' => 'Example: 2002:cb0a:3cdd:1::1, 192.88.99.1',
   'label-class' => 'primary',
   'descr'       => 'A 6to4 gateway adds its IPv4 address to this 2002::/16, creating a unique /48 prefix. Example: 2002:cb0a:3cdd:1::1, 192.88.99.1'
 ];
 $config['ip_types']['documentation'] = [
-  'networks'    => ['192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '2001:db8::/32'],
+  'networks'    => [ '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '2001:db8::/32' ],
   'name'        => 'Documentation', 'subtext' => 'Example: 2001:db8:8:4::2, 203.0.113.1',
   'label-class' => 'primary',
   'descr'       => 'These addresses are used in examples and documentation. Example: 2001:db8:8:4::2, 203.0.113.1'
 ];
 $config['ip_types']['teredo']        = [
-  'networks'    => ['2001:0000::/32'],
+  'networks'    => [ '2001:0000::/32' ],
   'name'        => 'IPv6 Teredo', 'subtext' => 'Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2',
   'label-class' => 'primary',
   'descr'       => 'This is a mapped address allowing IPv6 tunneling through IPv4 NATs. The address is formed using the Teredo prefix, the servers unique IPv4 address, flags describing the type of NAT, the obfuscated client port and the client IPv4 address, which is probably a private address. Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2'
 ];
 $config['ip_types']['benchmark']     = [
-  'networks'    => ['198.18.0.0/15', '2001:0002::/48'],
+  'networks'    => [ '198.18.0.0/15', '2001:0002::/48' ],
   'name'        => 'Benchmarking', 'subtext' => 'Example: 2001:0002:6c::430, 198.18.0.1',
   'label-class' => 'error',
   'descr'       => 'These addresses are reserved for use in documentation. Example: 2001:0002:6c::430, 198.18.0.1'
 ];
 $config['ip_types']['orchid']        = [
-  'networks'    => ['2001:0010::/28', '2001:0020::/28'],
+  'networks'    => [ '2001:0010::/28', '2001:0020::/28' ],
   'name'        => 'IPv6 Orchid', 'subtext' => 'Example: 2001:10:240:ab::a',
   'label-class' => 'primary',
   'descr'       => 'These addresses are used for a fixed-term experiment. Example: 2001:10:240:ab::a'
 ];
 $config['ip_types']['reserved']      = [
-    //'networks' => [],
+    'networks' => [ '192.0.0.0/24' ],
     'name'        => 'Reserved', 'subtext' => 'Address in reserved address space',
     'label-class' => 'error',
     'descr'       => 'Reserved address space'
 ];
 $config['ip_types']['broadcast']     = [
-    //'networks' => [],
+    'networks' => [ '255.255.255.255/32' ],
     'name'        => 'IPv4 Broadcast', 'subtext' => 'Example: 255.255.255.255',
     'label-class' => 'disabled',
     'descr'       => 'IPv4 broadcast address. Example: 255.255.255.255'
@@ -158,7 +173,7 @@ $config['ip_types']['anycast']       = [
 ];
 // Keep this at last!
 $config['ip_types']['unicast'] = [
-  'networks'    => ['2000::/3'], // 'networks' => [ '0.0.0.0/0', '2000::/3' ],'
+  'networks'    => [ '2000::/3' ], // 'networks' => [ '0.0.0.0/0', '2000::/3' ],'
   'name'        => 'Global Unicast', 'subtext' => 'Example: 2a02:408:7722::, 80.94.60.2', 'disabled' => 1,
   'label-class' => 'success',
   'descr'       => 'Global Unicast addresses. Example: 2a02:408:7722::, 80.94.60.2'
@@ -266,6 +281,11 @@ $config['snmp']['errorcodes'][900] = [
   'reason' => 'isSNMPable',             // Device up/down test, not used for counting
   'name'   => 'OBS_SNMP_ERROR_ISSNMPABLE',
   'msg'    => ''
+];
+$config['snmp']['errorcodes'][990] = [
+    'reason' => 'Authorization Error', // Snmp access denied to that object
+    'name'   => 'OBS_SNMP_ERROR_AUTHORIZATION_ERROR',
+    'msg'    => ''
 ];
 $config['snmp']['errorcodes'][991] = [
   'reason' => 'Authentication failure', // Snmp auth errors
@@ -408,7 +428,7 @@ $config['user_level'][9]  = [
     'roles'     => [ 'SECURE_EDIT' ],
     'name'      => 'Global Secure Read/Write',
     'subtext'   => 'This user has secure global read access with add/edit/delete entities and alerts.',
-    'notes'     => 'User can see all devices and entities without limits. User can add, edit and remove devices, maintenance and alerts.',
+    'notes'     => 'User can see all devices and entities without limits. User can add, edit and remove devices, maintenance, alerts and bills.',
     'row_class' => 'warning',
     'icon'      => $config['icon']['user-self']
 ];
@@ -420,24 +440,6 @@ $config['user_level'][10] = [
   'row_class' => 'success',
   'icon'      => $config['icon']['user-log']
 ];
-
-// Set some times needed by loads of scripts (it's dynamic, so we do it here!)
-$config['time']['now']        = time();
-$config['time']['fiveminute'] = $config['time']['now'] - 300;      //time() - (5 * 60);
-$config['time']['fourhour']   = $config['time']['now'] - 14400;    //time() - (4 * 60 * 60);
-$config['time']['sixhour']    = $config['time']['now'] - 21600;    //time() - (6 * 60 * 60);
-$config['time']['twelvehour'] = $config['time']['now'] - 43200;    //time() - (12 * 60 * 60);
-$config['time']['day']        = $config['time']['now'] - 86400;    //time() - (24 * 60 * 60);
-$config['time']['twoday']     = $config['time']['now'] - 172800;   //time() - (2 * 24 * 60 * 60);
-$config['time']['week']       = $config['time']['now'] - 604800;   //time() - (7 * 24 * 60 * 60);
-$config['time']['twoweek']    = $config['time']['now'] - 1209600;  //time() - (2 * 7 * 24 * 60 * 60);
-$config['time']['month']      = $config['time']['now'] - 2678400;  //time() - (31 * 24 * 60 * 60);
-$config['time']['twomonth']   = $config['time']['now'] - 5356800;  //time() - (2 * 31 * 24 * 60 * 60);
-$config['time']['threemonth'] = $config['time']['now'] - 8035200;  //time() - (3 * 31 * 24 * 60 * 60);
-$config['time']['sixmonth']   = $config['time']['now'] - 16070400; //time() - (6 * 31 * 24 * 60 * 60);
-$config['time']['year']       = $config['time']['now'] - 31536000; //time() - (365 * 24 * 60 * 60);
-$config['time']['twoyear']    = $config['time']['now'] - 63072000; //time() - (2 * 365 * 24 * 60 * 60);
-$config['time']['threeyear']  = $config['time']['now'] - 94608000; //time() - (3 * 365 * 24 * 60 * 60);
 
 
 // Obsolete config variables
@@ -491,11 +493,7 @@ $config['hide_config'] = [
     //'wmi->user', 'wmi->pass',
 ];
 
-// Here whitelist of base definitions keys which can be overridden by config.php file
-// Note, this required only for override already exist definitions, for additions not required
-$config['definitions_whitelist'] = ['os', 'mibs', 'device_types', 'rancid', 'geo_api', 'search_modules', 'rewrites', 'nicecase', 'wui'];
-
-$defs_time = microtime(TRUE) - $def_start;
+$defs_time = elapsed_time($def_start);
 $defs_mem  = memory_get_usage() - $def_pre;
 
 print_debug("DEFINITIONS Time  : " . format_number_short($defs_time, 6) . " ms\n");

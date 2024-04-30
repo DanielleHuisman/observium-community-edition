@@ -1,0 +1,973 @@
+-- **************************************************************
+--
+-- AX-BGP-MIB.txt
+-- Copyright(C) 2007-2022, A10 Networks Inc. All rights reserved.
+-- Software for all A10 products contain trade secrets and confidential
+-- information of A10 Networks and its subsidiaries and may not be disclosed,
+-- copied, reproduced or distributed to anyone outside of A10 Networks
+-- without prior written consent of A10 Networks, Inc.
+--
+-- **************************************************************
+
+AX-BGP-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+            MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+            IpAddress, Integer32, Counter32, Gauge32, mib-2
+                FROM SNMPv2-SMI
+            MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+            InetAddressType, InetAddress, InetPortNumber,
+            InetAutonomousSystemNumber, InetAddressPrefixLength
+                FROM INET-ADDRESS-MIB
+            a10Mgmt 
+                FROM A10-COMMON-MIB;
+
+        axBgpMIB MODULE-IDENTITY
+            LAST-UPDATED "202204070000Z"
+            ORGANIZATION "A10 Networks, Inc."
+            CONTACT-INFO "E-mail: support@A10Networks.com"
+
+            DESCRIPTION
+                    "This MIB module defines the management object
+                    for the BGP protocol. This MIB extends the 
+                    RFC 4273 to cover both IPv4 and IPv6 address 
+                    families and A10 extensions."
+
+            ::= { a10Mgmt 5 }
+
+        axBgpVersion OBJECT-TYPE
+            SYNTAX     OCTET STRING (SIZE (1..255))
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Vector of supported BGP protocol version
+                     numbers.  Each peer negotiates the version
+                     from this vector.  Versions are identified
+                     via the string of bits contained within this
+                     object.  The first octet contains bits 0 to
+                     7, the second octet contains bits 8 to 15,
+                     and so on, with the most significant bit
+                     referring to the lowest bit number in the
+                     octet (e.g., the MSB of the first octet
+                     refers to bit 0).  If a bit, i, is present
+                     and set, then the version (i+1) of the BGP
+                     is supported."
+            ::= { axBgpMIB 1 }
+
+        axBgpLocalAs OBJECT-TYPE
+            SYNTAX     InetAutonomousSystemNumber
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The local autonomous system number. Support 
+                    for two-octet and four-octet AS number space."
+            REFERENCE
+                     "RFC 4271, Section 4.2, 'My Autonomous System'.
+                     RFC 6793, BGP Support for Four-Octet Autonomous 
+                     System (AS) Number Space"
+            ::= { axBgpMIB 2 }
+
+        axBgpIdentifier OBJECT-TYPE
+            SYNTAX     IpAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The BGP Identifier of the local system."
+            ::= { axBgpMIB 3 }
+
+        -- BGP Peer table.  This table contains, one entry per
+        -- BGP peer, information about the BGP peer.
+
+        axBgpPeerTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF AxBgpPeerEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "BGP peer table.  This table contains,
+                     one entry per BGP peer, information about the
+                     connections with BGP peers."
+            ::= { axBgpMIB 4 }
+
+        axBgpPeerEntry OBJECT-TYPE
+            SYNTAX     AxBgpPeerEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "Entry containing information about the
+                     connection with a BGP peer."
+            INDEX { axBgpPeerType, axBgpPeerRemoteAddr }
+            ::= { axBgpPeerTable 1 }
+
+        AxBgpPeerEntry ::= SEQUENCE {
+                axBgpPeerType
+                    INTEGER,
+                axBgpPeerIdentifier
+                    IpAddress,
+                axBgpPeerState
+                    INTEGER,
+                axBgpPeerAdminStatus
+                    INTEGER,
+                axBgpPeerNegotiatedVersion
+                    Integer32,
+                axBgpPeerLocalAddr
+                    InetAddress,
+                axBgpPeerLocalPort
+                    Integer32,
+                axBgpPeerRemoteAddr
+                    InetAddress,
+                axBgpPeerRemotePort
+                    Integer32,
+                axBgpPeerRemoteAs
+                    InetAutonomousSystemNumber,
+                axBgpPeerInUpdates
+                    Counter32,
+                axBgpPeerOutUpdates
+                    Counter32,
+                axBgpPeerInTotalMessages
+                    Counter32,
+                axBgpPeerOutTotalMessages
+                    Counter32,
+                axBgpPeerLastError
+                    OCTET STRING,
+                axBgpPeerFsmEstablishedTransitions
+                    Counter32,
+                axBgpPeerFsmEstablishedTime
+                    Gauge32,
+                axBgpPeerConnectRetryInterval
+                    Integer32,
+                axBgpPeerHoldTime
+                    Integer32,
+                axBgpPeerKeepAlive
+                    Integer32,
+                axBgpPeerHoldTimeConfigured
+                    Integer32,
+                axBgpPeerKeepAliveConfigured
+                    Integer32,
+                axBgpPeerMinASOriginationInterval
+                    Integer32,
+                axBgpPeerMinRouteAdvertisementInterval
+                    Integer32,
+                axBgpPeerInUpdateElapsedTime
+                    Gauge32,
+                axBgpPeerMaxPrefixLimit
+                    Gauge32,
+                axBgpPeerThreshold
+                    Integer32
+                }
+        
+        axBgpPeerType OBJECT-TYPE
+            SYNTAX     InetAddressType
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "The type of the BGP peer address"
+            ::= { axBgpPeerEntry 1 }
+ 
+
+        axBgpPeerIdentifier OBJECT-TYPE
+            SYNTAX     IpAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The BGP Identifier of this entry's BGP peer.
+                     This entry MUST be 0.0.0.0 unless the
+                     axBgpPeerState is in the openconfirm or the
+                     established state."
+            ::= { axBgpPeerEntry 2 }
+
+        axBgpPeerState OBJECT-TYPE
+            SYNTAX     INTEGER {
+                                idle(1),
+                                connect(2),
+                                active(3),
+                                opensent(4),
+                                openconfirm(5),
+                                established(6)
+                       }
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The BGP peer connection state."
+            ::= { axBgpPeerEntry 3 }
+
+        axBgpPeerAdminStatus OBJECT-TYPE
+            SYNTAX     INTEGER {
+                                stop(1),
+                                start(2)
+                       }
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The desired state of the BGP connection.
+                     A transition from 'stop' to 'start' will cause
+                     the BGP Manual Start Event to be generated.
+                     A transition from 'start' to 'stop' will cause
+                     the BGP Manual Stop Event to be generated.
+                     This parameter can be used to restart BGP peer
+                     connections."
+            ::= { axBgpPeerEntry 4 }
+
+        axBgpPeerNegotiatedVersion OBJECT-TYPE
+            SYNTAX     Integer32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The negotiated version of BGP running between
+                     the two peers.
+
+                     This entry MUST be zero (0) unless the
+                     axBgpPeerState is in the openconfirm or the
+                     established state.
+
+                     Note that legal values for this object are
+                     between 0 and 255."
+            ::= { axBgpPeerEntry 5 }
+
+        axBgpPeerLocalAddr OBJECT-TYPE
+            SYNTAX     InetAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The local IP address of this entry's BGP
+                     connection."
+            ::= { axBgpPeerEntry 6 }
+
+        axBgpPeerLocalPort OBJECT-TYPE
+            SYNTAX     Integer32 (0..65535)
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The local port for the TCP connection between
+                     the BGP peers."
+            ::= { axBgpPeerEntry 7 }
+
+        axBgpPeerRemoteAddr OBJECT-TYPE
+            SYNTAX     InetAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The remote IP address of this entry's BGP
+                     peer."
+            ::= { axBgpPeerEntry 8 }
+
+        axBgpPeerRemotePort OBJECT-TYPE
+            SYNTAX     Integer32 (0..65535)
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The remote port for the TCP connection
+                     between the BGP peers.  Note that the
+                     objects axBgpPeerLocalAddr,
+                     axBgpPeerLocalPort, axBgpPeerRemoteAddr, and
+                     axBgpPeerRemotePort provide the appropriate
+                     reference to the standard MIB TCP
+                     connection table."
+            ::= { axBgpPeerEntry 9 }
+
+        axBgpPeerRemoteAs OBJECT-TYPE
+            SYNTAX     InetAutonomousSystemNumber
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The remote autonomous system number received in
+                     the BGP OPEN message."
+            ::= { axBgpPeerEntry 10 }
+
+        axBgpPeerInUpdates OBJECT-TYPE
+            SYNTAX     Counter32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The number of BGP UPDATE messages
+                     received on this connection."
+            ::= { axBgpPeerEntry 11 }
+
+        axBgpPeerOutUpdates OBJECT-TYPE
+            SYNTAX     Counter32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The number of BGP UPDATE messages
+                     transmitted on this connection."
+            ::= { axBgpPeerEntry 12 }
+
+        axBgpPeerInTotalMessages OBJECT-TYPE
+            SYNTAX     Counter32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The total number of messages received
+                     from the remote peer on this connection."
+            ::= { axBgpPeerEntry 13 }
+
+        axBgpPeerOutTotalMessages OBJECT-TYPE
+            SYNTAX     Counter32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The total number of messages transmitted to
+                     the remote peer on this connection."
+            ::= { axBgpPeerEntry 14 }
+
+        axBgpPeerLastError OBJECT-TYPE
+            SYNTAX     OCTET STRING (SIZE (2))
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The last error code and subcode seen by this
+                     peer on this connection.  If no error has
+                     occurred, this field is zero.  Otherwise, the
+                     first byte of this two byte OCTET STRING
+                     contains the error code, and the second byte
+                     contains the subcode."
+            ::= { axBgpPeerEntry 15 }
+
+        axBgpPeerFsmEstablishedTransitions OBJECT-TYPE
+            SYNTAX     Counter32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The total number of times the BGP FSM
+                     transitioned into the established state
+                     for this peer."
+            ::= { axBgpPeerEntry 16 }
+
+        axBgpPeerFsmEstablishedTime OBJECT-TYPE
+            SYNTAX     Gauge32
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "This timer indicates how long (in
+                     seconds) this peer has been in the
+                     established state or how long
+                     since this peer was last in the
+                     established state.  It is set to zero when
+                     a new peer is configured or when the router is
+                     booted."
+            ::= { axBgpPeerEntry 17 }
+
+        axBgpPeerConnectRetryInterval OBJECT-TYPE
+            SYNTAX     Integer32 (1..65535)
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the
+                     ConnectRetry timer.  The suggested value
+                     for this timer is 120 seconds."
+            ::= { axBgpPeerEntry 18 }
+
+        axBgpPeerHoldTime OBJECT-TYPE
+            SYNTAX     Integer32  ( 0 | 3..65535 )
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the Hold
+                     Timer established with the peer.  The
+                     value of this object is calculated by this
+                     BGP speaker, using the smaller of the
+                     values in axBgpPeerHoldTimeConfigured and the
+                     Hold Time received in the OPEN message.
+
+                     This value must be at least three seconds
+                     if it is not zero (0).
+
+                     If the Hold Timer has not been established
+                     with the peer this object MUST have a value
+                     of zero (0).
+
+                     If the axBgpPeerHoldTimeConfigured object has
+                     a value of (0), then this object MUST have a
+                     value of (0)."
+            ::= { axBgpPeerEntry 19 }
+
+        axBgpPeerKeepAlive OBJECT-TYPE
+            SYNTAX     Integer32 ( 0 | 1..21845 )
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the KeepAlive
+                     timer established with the peer.  The value
+                     of this object is calculated by this BGP
+                     speaker such that, when compared with
+                     axBgpPeerHoldTime, it has the same proportion
+                     that axBgpPeerKeepAliveConfigured has,
+                     compared with axBgpPeerHoldTimeConfigured.
+
+                     If the KeepAlive timer has not been established
+                     with the peer, this object MUST have a value
+                     of zero (0).
+
+                     If the of axBgpPeerKeepAliveConfigured object
+                     has a value of (0), then this object MUST have
+                     a value of (0)."
+            ::= { axBgpPeerEntry 20 }
+
+        axBgpPeerHoldTimeConfigured OBJECT-TYPE
+            SYNTAX     Integer32 ( 0 | 3..65535 )
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the Hold Time
+                     configured for this BGP speaker with this
+                     peer.  This value is placed in an OPEN
+                     message sent to this peer by this BGP
+                     speaker, and is compared with the Hold
+                     Time field in an OPEN message received
+                     from the peer when determining the Hold
+                     Time (axBgpPeerHoldTime) with the peer.
+                     This value must not be less than three
+                     seconds if it is not zero (0).  If it is
+                     zero (0), the Hold Time is NOT to be
+                     established with the peer.  The suggested
+                     value for this timer is 90 seconds."
+            ::= { axBgpPeerEntry 21 }
+
+        axBgpPeerKeepAliveConfigured OBJECT-TYPE
+            SYNTAX     Integer32 ( 0 | 1..21845 )
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the
+                     KeepAlive timer configured for this BGP
+                     speaker with this peer.  The value of this
+                     object will only determine the
+                     KEEPALIVE messages' frequency relative to
+                     the value specified in
+                     axBgpPeerHoldTimeConfigured; the actual
+                     time interval for the KEEPALIVE messages is
+                     indicated by axBgpPeerKeepAlive.  A
+                     reasonable maximum value for this timer
+                     would be one third of that of
+                     axBgpPeerHoldTimeConfigured.
+                     If the value of this object is zero (0),
+                     no periodical KEEPALIVE messages are sent
+                     to the peer after the BGP connection has
+                     been established.  The suggested value for
+                     this timer is 30 seconds."
+            ::= { axBgpPeerEntry 22 }
+
+        axBgpPeerMinASOriginationInterval OBJECT-TYPE
+            SYNTAX     Integer32 (1..65535)
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the
+                     MinASOriginationInterval timer.
+                     The suggested value for this timer is 15
+                     seconds."
+            ::= { axBgpPeerEntry 23 }
+
+        axBgpPeerMinRouteAdvertisementInterval OBJECT-TYPE
+            SYNTAX     Integer32 (1..65535)
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Time interval (in seconds) for the
+                     MinRouteAdvertisementInterval timer.
+                     The suggested value for this timer is 30
+                     seconds for EBGP connections and 5
+                     seconds for IBGP connections."
+            ::= { axBgpPeerEntry 24 }
+
+        axBgpPeerInUpdateElapsedTime OBJECT-TYPE
+            SYNTAX     Gauge32
+            UNITS      "seconds"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Elapsed time (in seconds) since the last BGP
+                     UPDATE message was received from the peer.
+                     Each time axBgpPeerInUpdates is incremented,
+                     the value of this object is set to zero (0)."
+            ::= { axBgpPeerEntry 25 }
+
+         axBgpPeerMaxPrefixLimit OBJECT-TYPE
+            SYNTAX     Gauge32
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Maximum number of prefix accept from this peer"
+            ::= { axBgpPeerEntry 26 }
+
+        axBgpPeerThreshold OBJECT-TYPE
+            SYNTAX    Integer32 (1..100)  
+            UNITS      "percent"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Max-Prefix Threshold-value (1-100)%. Once an accepted
+                    prefixes exceed the threshold limit a warning message is
+                    generatead and the SNMP notification is sent" 
+            ::= { axBgpPeerEntry 27 }
+
+        -- BGP Received Path Attribute Table.  This table
+        -- contains one entry per path to a network, and path
+        -- attributes received from all peers running BGP.
+
+        axBgpPathAttrTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF AxBgpPathAttrEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "The BGP Received Path Attribute Table
+                     contains information about paths to
+                     destination networks, received from all
+                     BGP peers."
+            ::= { axBgpMIB 5 }
+
+        axBgpPathAttrEntry OBJECT-TYPE
+            SYNTAX     AxBgpPathAttrEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "Information about a path to a network."
+            INDEX { axBgpPathAttrIpAddrType,
+                    axBgpPathAttrIpAddrPrefix,
+                    axBgpPathAttrIpAddrPrefixLen,
+                    axBgpPathAttrPeerType,
+                    axBgpPathAttrPeer            }
+            ::= { axBgpPathAttrTable 1 }
+
+        AxBgpPathAttrEntry ::= SEQUENCE {
+            axBgpPathAttrIpAddrType
+                 InetAddressType,
+            axBgpPathAttrPeerType
+                 InetAddressType,
+            axBgpPathAttrPeer
+                 InetAddress,
+            axBgpPathAttrIpAddrPrefixLen
+                 InetAddressPrefixLength,
+            axBgpPathAttrIpAddrPrefix
+                 InetAddress,
+            axBgpPathAttrOrigin
+                 INTEGER,
+            axBgpPathAttrASPathSegment
+                 OCTET STRING,
+            axBgpPathAttrNextHopType
+                 InetAddressType,
+            axBgpPathAttrNextHop
+                 InetAddress,
+            axBgpPathAttrMultiExitDisc
+                 Integer32,
+            axBgpPathAttrLocalPref
+                 Integer32,
+            axBgpPathAttrAtomicAggregate
+                 INTEGER,
+            axBgpPathAttrAggregatorAS
+                 Integer32,
+            axBgpPathAttrAggregatorAddr
+                 IpAddress,
+            axBgpPathAttrCalcLocalPref
+                 Integer32,
+            axBgpPathAttrBest
+                 INTEGER,
+            axBgpPathAttrUnknown
+                 OCTET STRING
+        }
+
+        axBgpPathAttrIpAddrType OBJECT-TYPE
+            SYNTAX     InetAddressType
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "The address family of the prfix specified 
+                    in axBgpPathAttrIpAddrPrefix"
+            ::= { axBgpPathAttrEntry 1 }
+
+            axBgpPathAttrPeerType OBJECT-TYPE
+            SYNTAX     InetAddress
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                    "The type of the address of the peer where the path
+                    information was learned."
+            ::= { axBgpPathAttrEntry 2 }
+
+            axBgpPathAttrPeer OBJECT-TYPE
+            SYNTAX     InetAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The IP address of the peer where the path
+                     information was learned."
+            ::= { axBgpPathAttrEntry 3 }
+
+        axBgpPathAttrIpAddrPrefixLen OBJECT-TYPE
+            SYNTAX     InetAddressPrefixLength
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "Length in bits of the IP address prefix in
+                     the Network Layer Reachability
+                     Information field."
+            ::= { axBgpPathAttrEntry 4 }
+
+        axBgpPathAttrIpAddrPrefix OBJECT-TYPE
+            SYNTAX     InetAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "An IP address prefix in the Network Layer
+                     Reachability Information field.  This object
+                     is an IP address containing the prefix with
+                     length specified by
+                     axBgpPathAttrIpAddrPrefixLen.
+                     Any bits beyond the length specified by
+                     axBgpPathAttrIpAddrPrefixLen are zeroed."
+            ::= { axBgpPathAttrEntry 5 }
+
+        axBgpPathAttrOrigin OBJECT-TYPE
+            SYNTAX     INTEGER {
+                           igp(1),-- networks are interior
+                           egp(2),-- networks learned via the
+                                  -- EGP protocol
+                           incomplete(3) -- networks that
+                                  -- are learned by some other
+                                  -- means
+                       }
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The ultimate origin of the path
+                     information."
+            ::= { axBgpPathAttrEntry 6 }
+
+        axBgpPathAttrASPathSegment OBJECT-TYPE
+            SYNTAX     OCTET STRING (SIZE (2..255))
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The sequence of AS path segments.  Each AS
+                     path segment is represented by a triple
+                     <type, length, value>.
+
+                     The type is a 1-octet field that has two
+                     possible values:
+                         1      AS_SET: unordered set of ASes that a
+                                     route in the UPDATE message
+                                     has traversed
+
+                         2      AS_SEQUENCE: ordered set of ASes that
+                                     a route in the UPDATE message
+                                     has traversed.
+
+                     The length is a 1-octet field containing the
+                     number of ASes in the value field.
+
+                     The value field contains one or more AS
+                     numbers.  Each AS is represented in the octet
+                     string as a pair of octets according to the
+                     following algorithm:
+
+                        first-byte-of-pair = ASNumber / 256;
+                        second-byte-of-pair = ASNumber & 255;
+
+                     Known IssueVs:
+                     o BGP Confederations will result in
+                       a type of either 3 or 4.
+                     o An AS Path may be longer than 255 octets.
+                       This may result in this object containing
+                       a truncated AS Path."
+            ::= { axBgpPathAttrEntry 7 }
+
+        axBgpPathAttrNextHopType OBJECT-TYPE
+            SYNTAX     InetAddressType
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The address family of the address of the border
+                    router that should be used for the destination network."
+            ::= { axBgpPathAttrEntry 8 }
+    
+        axBgpPathAttrNextHop OBJECT-TYPE
+            SYNTAX     InetAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The address of the border router that
+                     should be used for the destination
+                     network.  This address is the NEXT_HOP
+                     address received in the UPDATE packet."
+            ::= { axBgpPathAttrEntry 9 }
+
+        axBgpPathAttrMultiExitDisc OBJECT-TYPE
+            SYNTAX     Integer32 (-1..2147483647)
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "This metric is used to discriminate
+                     between multiple exit points to an
+                     adjacent autonomous system.  A value of -1
+                     indicates the absence of this attribute."
+            ::= { axBgpPathAttrEntry 10 }
+
+        axBgpPathAttrLocalPref OBJECT-TYPE
+            SYNTAX     Integer32 (-1..2147483647)
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The originating BGP speaker's degree of
+                     preference for an advertised route.  A
+                     value of -1 indicates the absence of this
+                     attribute."
+            ::= { axBgpPathAttrEntry 11 }
+
+        axBgpPathAttrAtomicAggregate OBJECT-TYPE
+            SYNTAX     INTEGER {
+                           lessSpecificRouteNotSelected(1),
+                               -- Typo corrected from RFC 1657
+                           lessSpecificRouteSelected(2)
+                       }
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "If the ATOMIC_AGGREGATE attribute is present
+                     in the Path Attributes then this object MUST
+                     have a value of 'lessSpecificRouteNotSelected'.
+
+                     If the ATOMIC_AGGREGATE attribute is missing
+                     in the Path Attributes then this object MUST
+                     have a value of 'lessSpecificRouteSelected'.
+
+                     Note that ATOMIC_AGGREGATE is now a primarily
+                     informational attribute."
+            ::= { axBgpPathAttrEntry 12 }
+
+        axBgpPathAttrAggregatorAS OBJECT-TYPE
+            SYNTAX     Integer32 (0..65535)
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The AS number of the last BGP speaker that
+                     performed route aggregation.  A value of
+                     zero (0) indicates the absence of this
+                     attribute.
+
+                     Note that propagation of AS of zero is illegal
+                     in the Internet."
+            ::= { axBgpPathAttrEntry 13 }
+
+        axBgpPathAttrAggregatorAddr OBJECT-TYPE
+            SYNTAX     IpAddress
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The IP address of the last BGP speaker
+                     that performed route aggregation.  A
+                     value of 0.0.0.0 indicates the absence
+                     of this attribute."
+            ::= { axBgpPathAttrEntry 14 }
+
+        axBgpPathAttrCalcLocalPref OBJECT-TYPE
+            SYNTAX     Integer32 (-1..2147483647)
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "The degree of preference calculated by the
+                     receiving BGP speaker for an advertised
+                     route.  A value of -1 indicates the
+                     absence of this attribute."
+            ::= { axBgpPathAttrEntry 15 }
+
+        axBgpPathAttrBest OBJECT-TYPE
+            SYNTAX     INTEGER {
+                           false(1),-- not chosen as best route
+                           true(2) -- chosen as best route
+                       }
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "An indication of whether this route
+                     was chosen as the best BGP route for this
+                     destination."
+            ::= { axBgpPathAttrEntry 16 }
+
+        axBgpPathAttrUnknown OBJECT-TYPE
+            SYNTAX     OCTET STRING (SIZE(0..255))
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                    "One or more path attributes not understood by
+                     this BGP speaker.
+
+                     Path attributes are recorded in the Update Path
+                     attribute format of type, length, value.
+
+                     Size zero (0) indicates the absence of such
+                     attributes.
+
+                     Octets beyond the maximum size, if any, are not
+                     recorded by this object.
+
+                     Known Issues:
+                     o Attributes understood by this speaker, but not
+                       represented in this MIB, are unavailable to
+                       the agent."
+            ::= { axBgpPathAttrEntry 17 }
+
+        --
+        -- Notifications.
+        --
+        
+        axBgpNotification OBJECT IDENTIFIER ::= { axBgpMIB 0 }
+
+        axBgpEstablishedNotification NOTIFICATION-TYPE
+            OBJECTS { axBgpPeerRemoteAddr,
+                      axBgpPeerLastError,
+                      axBgpPeerState      }
+            STATUS  current
+            DESCRIPTION
+                    "The axbgpEstablishedNotification event is generated
+                     when the BGP FSM enters the established state."
+            ::= { axBgpNotification 1 }
+
+        axBgpBackwardTransNotification NOTIFICATION-TYPE
+            OBJECTS { axBgpPeerRemoteAddr,
+                      axBgpPeerLastError,
+                      axBgpPeerState      }
+            STATUS  current
+            DESCRIPTION
+                    "The axbgpBackwardTransNotification event is
+                     generated when the BGP FSM moves from a higher
+                     numbered state to a lower numbered state."
+            ::= { axBgpNotification 2 }
+
+        axBgpPrefixThresholdExceededNotification NOTIFICATION-TYPE
+            OBJECTS { axBgpPeerRemoteAddr,
+                      axBgpPeerMaxPrefixLimit,
+                      axBgpPeerThreshold      }
+            STATUS  current
+            DESCRIPTION
+                    "The axBgpPrefixThresholdExceededNotification event is
+                     generated when the prefix count exceeds the warning
+                     threshold configured for the BGP peer."
+            ::= { axBgpNotification 3 }
+
+        axBgpPrefixThresholdClearNotification NOTIFICATION-TYPE
+            OBJECTS { axBgpPeerRemoteAddr,
+                      axBgpPeerMaxPrefixLimit,
+                      axBgpPeerThreshold      }
+            STATUS  current
+            DESCRIPTION
+                    "The axBgpPrefixThresholdClearNotification event is
+                     generated when the prefix count drops below the warning
+                     threshold configured for the BGP peer if it exceeded the
+                     threshold before."
+            ::= { axBgpNotification 4 }
+
+        -- Conformance information
+
+        axBgpMIBConformance OBJECT IDENTIFIER
+            ::= { axBgpMIB 8 }
+        axBgpMIBCompliances OBJECT IDENTIFIER
+                    ::= { axBgpMIBConformance 1 }
+        axBgpMIBGroups      OBJECT IDENTIFIER
+            ::= { axBgpMIBConformance 2 }
+
+        -- Compliance statements
+
+        axBgpMIBCompliance MODULE-COMPLIANCE
+            STATUS  current
+            DESCRIPTION
+                    "The compliance statement for entities which
+                     implement the AX BGP mib."
+            MODULE  -- this module
+                MANDATORY-GROUPS { axBgpMIBGlobalsGroup,
+                                   axBgpMIBPeerGroup,
+                                   axBgpMIBPathAttrGroup }
+                GROUP axBgpMIBNotificationGroup
+                DESCRIPTION
+                        "Implementation of BGP Notifications are
+                         completely optional in this MIB."
+            ::= { axBgpMIBCompliances 1 }
+
+        -- Units of conformance
+
+        axBgpMIBGlobalsGroup OBJECT-GROUP
+            OBJECTS { axBgpVersion,
+                      axBgpLocalAs,
+                      axBgpIdentifier }
+            STATUS  current
+            DESCRIPTION
+                    "A collection of objects providing
+                     information on global BGP state."
+            ::= { axBgpMIBGroups 1 }
+
+        axBgpMIBPeerGroup OBJECT-GROUP
+            OBJECTS { axBgpPeerType,
+                      axBgpPeerIdentifier,
+                      axBgpPeerState,
+                      axBgpPeerAdminStatus,
+                      axBgpPeerNegotiatedVersion,
+                      axBgpPeerLocalAddr,
+                      axBgpPeerLocalPort,
+                      axBgpPeerRemoteAddr,
+                      axBgpPeerRemotePort,
+                      axBgpPeerRemoteAs,
+                      axBgpPeerInUpdates,
+                      axBgpPeerOutUpdates,
+                      axBgpPeerInTotalMessages,
+                      axBgpPeerOutTotalMessages,
+                      axBgpPeerLastError,
+                      axBgpPeerFsmEstablishedTransitions,
+                      axBgpPeerFsmEstablishedTime,
+                      axBgpPeerConnectRetryInterval,
+                      axBgpPeerHoldTime,
+                      axBgpPeerKeepAlive,
+                      axBgpPeerHoldTimeConfigured,
+                      axBgpPeerKeepAliveConfigured,
+                      axBgpPeerMinASOriginationInterval,
+                      axBgpPeerMinRouteAdvertisementInterval,
+                      axBgpPeerInUpdateElapsedTime,
+                      axBgpPeerMaxPrefixLimit,
+                      axBgpPeerThreshold }
+            STATUS  current
+            DESCRIPTION
+                    "A collection of objects for managing
+                     BGP peers."
+            ::= { axBgpMIBGroups 2 }
+
+        axBgpMIBPathAttrGroup OBJECT-GROUP
+            OBJECTS { axBgpPathAttrIpAddrType,
+                      axBgpPathAttrPeerType,
+                      axBgpPathAttrPeer,
+                      axBgpPathAttrIpAddrPrefixLen,
+                      axBgpPathAttrIpAddrPrefix,
+                      axBgpPathAttrOrigin,
+                      axBgpPathAttrASPathSegment,
+                      axBgpPathAttrNextHopType,
+                      axBgpPathAttrNextHop,
+                      axBgpPathAttrMultiExitDisc,
+                      axBgpPathAttrLocalPref,
+                      axBgpPathAttrAtomicAggregate,
+                      axBgpPathAttrAggregatorAS,
+                      axBgpPathAttrAggregatorAddr,
+                      axBgpPathAttrCalcLocalPref,
+                      axBgpPathAttrBest,
+                      axBgpPathAttrUnknown }
+            STATUS  current
+            DESCRIPTION
+                    "A collection of objects for managing
+                     BGP path entries."
+            ::= { axBgpMIBGroups 3 }
+
+        axBgpMIBNotificationGroup NOTIFICATION-GROUP
+            NOTIFICATIONS { axBgpEstablishedNotification,
+                            axBgpBackwardTransNotification,
+                            axBgpPrefixThresholdExceededNotification,
+                            axBgpPrefixThresholdClearNotification }
+            STATUS current
+            DESCRIPTION
+                    "A collection of notifications related to
+                     BGP events."
+            ::= { axBgpMIBGroups 4 }
+    END 

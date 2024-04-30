@@ -1,0 +1,3160 @@
+--  =======================================================================
+--  File        : osRfc2544.mib
+--  Description : Private MIB support the functionality of RFC2544
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-RFC2544-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE,
+                Unsigned32, Counter64                         FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION, RowStatus, TruthValue,
+                DateAndTime, MacAddress                       FROM SNMPv2-TC
+                SnmpAdminString                               FROM SNMP-FRAMEWORK-MIB         -- RFC2571
+                InetAddressType, InetAddress                  FROM INET-ADDRESS-MIB           -- RFC2851
+                oaOptiSwitch, PortIndexOrNone,
+                PortList, RespType                            FROM OS-COMMON-TC-MIB
+                VlanIdOrNone                                  FROM IEEE8021-CFM-MIB
+                NOTIFICATION-GROUP,
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osRfc2544       MODULE-IDENTITY
+                LAST-UPDATED "202101150000Z" -- 15 Feb. 2021
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "RFC 2544  Benchmarking Methodology for Network Interconnect Devices."
+                -- Revision history
+                -- ================
+                
+                REVISION     "202101150000Z" -- 15 Feb. 2021
+                DESCRIPTION
+                    "Added osRfc2544ResultsAccumulatedTable and osRfc2544HistoryAccumulatedTable"
+
+                REVISION     "202006250000Z" -- 25 July 2020
+                DESCRIPTION
+                    "New object osRfc2544WithConsideringDmms"
+
+                REVISION     "202003030000Z" -- 03 March 2020
+                DESCRIPTION
+                    "Destination-to-source jitters:
+                       osRfc2544ResultsDsJittMin, osRfc2544ResultsDsJittMax,
+                       osRfc2544ResultsDsJittAverage, osRfc2544ResultsDsJittSum2,
+                       osRfc2544HistoryDsJittMin, osRfc2544HistoryDsJittMax,
+                       osRfc2544HistoryDsJittAverage, osRfc2544HistoryDsJittSum2,
+                       osRfc2544LengthDsJittMin, osRfc2544LengthDsJittMax,
+                       osRfc2544LengthDsJittAverage, osRfc2544LengthDsJittSum2"
+
+                REVISION     "201802010000Z"
+                DESCRIPTION
+                    "Added support to multi source-mac address, object osRfc2544SrcMacRange."
+                
+                REVISION     "201708060000Z" -- 01 Feb. 2017
+                DESCRIPTION
+                    "1. Added the TestProtocol TEXTUAL-CONVENTION.
+                     2. The names of bits and description of osRfc2544ProtocolSupported have been changed.
+                     3. The gbjects osRfc2544Protocol, osRfc2544ResultsProtocol,
+                        osRfc2544HistoryProtocol and osRfc2544LengthProtocol have now syntax of TestProtocol."
+
+                REVISION     "201610200000Z" -- 20 Oct. 2016
+                DESCRIPTION
+                    "New 'High Capacity' tables osRfc2544HcResultsTable, osRfc2544HcHistoryTable and osRfc2544HcLengthTable."
+
+                REVISION     "201202070000Z"
+                DESCRIPTION
+                    "Md Level was added"
+
+
+                REVISION     "200901090000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 7 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osRfc2544Notifications  OBJECT IDENTIFIER ::= { osRfc2544 0 }
+osRfc2544Gen            OBJECT IDENTIFIER ::= { osRfc2544 1 }
+osRfc2544Capabilities   OBJECT IDENTIFIER ::= { osRfc2544Gen 1 }
+osRfc2544Conformance    OBJECT IDENTIFIER ::= { osRfc2544 100 }
+osRfc2544MIBCompliances OBJECT IDENTIFIER ::= { osRfc2544Conformance 1 }
+osRfc2544MIBGroups      OBJECT IDENTIFIER ::= { osRfc2544Conformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+TestType        ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates the type of the test:
+        - throughput(2):    The device sends a specific number of frames at a specific rate
+                            and then count the replies.  The frame loss ratios calculated. If this
+                            frame loss ration is geater than osRfc2544AllwdPcktLoss the rate of the offered stream
+                            is reduced and the test is rerun.
+                            The throughput is the fastest rate at which the frame loss ration is not
+                            greater than osRfc2544AllwdPcktLoss.
+        - latency(3):       The device sends a stream of frames at a particular frame size at the
+                            specific rate (usually this rate is equal to the throughput) to a specific
+                            destination.
+                            An identifying tag SHOULD be included in one frame after 60 seconds
+                            with the type of tag being implementation dependent. The time at
+                            which this frame is fully transmitted is recorded (timestamp A).  The
+                            receiver logic in the test equipment MUST recognize the tag
+                            information in the frame stream and record the time at which the
+                            tagged frame was received (timestamp B).
+
+                            The latency is timestamp B minus timestamp A as per the relevant
+                            definition frm RFC 1242, namely latency as defined for store and
+                            forward devices or latency as defined for bit forwarding devices.
+
+                            The report MUST state which definition of latency
+                            was used for this test.  The latency results SHOULD
+                            be reported in the format of a table with a row for each of the
+                            tested frame sizes.  There SHOULD be columns for the frame size, the
+                            rate at which the latency test was run for that frame size, for the
+                            media types tested, and for the resultant latency values for each
+                            type of data stream tested.
+                            Frame sizes to be tested: 64, 128, 256, 512, 768, 1024, 1280, 1518.
+        - frameLossRate(4): The device sends a specific number of frames at a specific rate
+                            through and count the frames that are received.  The frame loss
+                            rate at each point is calculated using the following equation:
+                                ( ( input_count - output_count ) * 100 ) / input_count
+
+                            The first trial SHOULD be run for the frame rate that corresponds to
+                            100% of the maximum rate for the frame size on the input media.
+                            Repeat the procedure for the rate that corresponds to 90% of the
+                            maximum rate used and then for 80% of this rate.  This sequence
+                            SHOULD be continued (at reducing 10% intervals) until there are two
+                            successive trials in which no frames are lost. The maximum
+                            granularity of the trials MUST be 10% of the maximum rate, a finer
+                            granularity is encouraged.
+         - basic (5):       The device sends specific number of specific bursts. Round trip delay, jitters and
+                            frame loss ratio are calculated for all bursts.
+                            This type of test is not defined in RFC2544."
+    REFERENCE
+       "RFC 2544, Clause 26."
+    SYNTAX      INTEGER {
+                  unknown      (1),
+                  throughput   (2),
+                  latency      (3),
+                  frameLossRate(4),
+                  basic        (5)
+                }
+
+TestRunState        ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates the running state of the Test:
+        notRunning  (1) - Test is not active,
+        running     (2) - Test is running,
+        waitInQueue (3) - Test is waiting for hardware resources,
+        readyForRun (4) - Test have received hardware resource and ready to run,
+        idle        (5) - Test is waiting for the next burst."
+    REFERENCE
+       "."
+    SYNTAX      INTEGER {
+                  notRunning  (1),
+                  running     (2),
+                  waitInQueue (3),
+                  readyForRun (4),
+                  idle        (5)
+                }
+
+DSField     ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+       "Specifies the value to store in the Differentiated
+        Services (DS) Field in the IP packet used to
+        encapsulate the probe.  The DS Field is defined
+        as the Type of Service (TOS) octet in a IPv4 header
+        or as the Traffic Class octet in a IPv6 header.
+
+        Not all values are legal or
+        meaningful.  A value of 0 means that the function
+        represented by this option is not supported.  DS Field
+        usage is often not supported by IP implementations and
+        not all values are supported.  Refer to RFC 2474 for
+        guidance on usage of this field."
+    REFERENCE
+        "Refer to RFC 2474 for the definition of the
+        Differentiated Services Field and to RFC 1812
+        Section 5.3.2 for Type of Service (TOS)."
+    SYNTAX       Unsigned32 (0..255)
+
+TestProtocol        ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Protocol of a test.
+         In Legacy OS these values mean:
+           l2Protocol - dmmITUtY1731 (2), -- ITU-T Y.1721
+           l3Protocol - icmpEcho     (5)  -- RFC792
+         In OSA-V* these values mean:
+           l2Protocol - LBM and selectively DMM
+           l3Protocol - icmpEcho
+       "
+    REFERENCE
+       "."
+    SYNTAX      INTEGER {
+                  unknown      (1),
+                  l2Protocol   (2), -- ITU-T Y.1721
+                  l3Protocol   (5)  -- RFC792
+                }
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+-- *******************************************************************
+--  osRfc2544Capabilities global configuration, status & capatibilities
+-- ******************************************************************* 
+ 
+osRfc2544ProtocolSupported OBJECT-TYPE
+    SYNTAX       BITS
+                   {
+                     l2Supported (0),
+                     l3Supported (1)
+                   }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates protocols supported by this agent:
+         l2Supported(0) means that l2Protocol of ITU-T Y.1721 is supported;
+         l3Supported(1) means that l2Protocol of RFC792 is supported
+       Additionally this object serves as a SupportValue."
+    ::= { osRfc2544Capabilities 1 }
+
+osRfc2544TestTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  throughput   (0),
+                  latency      (1),
+                  frameLossRate(2),
+                  basic        (3)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of tests, that supported by this agent."
+    ::= { osRfc2544Capabilities 2 }
+
+osRfc2544IpAddrTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  ipv4     (0),
+                  ipv6     (1),
+                  ipv4z    (2),
+                  ipv6z    (3)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of supported Internet address In terms of RFC 3291 (INET-ADDRESS-MIB)."
+    ::= { osRfc2544Capabilities 3 }
+
+osRfc2544MinRate OBJECT-TYPE
+      SYNTAX     Unsigned32
+      UNITS      "Kbits/sec"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+        "Minimum positive value for osRfc2544Rate, supported by the aggent."
+    ::= { osRfc2544Capabilities 4 }
+
+osRfc2544MaxRate OBJECT-TYPE
+      SYNTAX     Unsigned32
+      UNITS      "Kbits/sec"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+        "Minimum value for osRfc2544Rate, supported by the aggent."
+    ::= { osRfc2544Capabilities 5 }
+
+osRfc2544MaxNumOfLengths OBJECT-TYPE
+      SYNTAX     Unsigned32
+      UNITS      "rows"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+        "Maximum number of rows in osRfc2544LengthTable (minimum number is equal to '1')."
+    ::= { osRfc2544Capabilities 6 }
+
+osRfc2544WithConsideringDmms OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "The RFC25544 and Y.1564 streams include both LBM/LBR and DMM/DMR frames.
+       If osRfc2544WithConsideringDmms is 'false', then only LBM/LBR are taken
+       into account when calculating rate and packet loss.
+       If osRfc2544WithConsideringDmms is 'true', then DMM/DMR are also taken
+       into account when calculating rate and packet loss."
+    REFERENCE
+       "CLI command '[no ]adv-dmm-in-rfc2544-method'"
+    DEFVAL { false }
+    ::= { osRfc2544Capabilities 9 }
+
+osRfc2544TholdReason OBJECT-TYPE
+    SYNTAX          INTEGER {
+                      risingAlarm(1),
+                      fallingAlarm(2)
+                    }
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+       "."
+    ::= { osRfc2544Gen 2 }
+
+-- ************************************************************
+-- The osRfc2544CtlTable Table - configuration
+-- ************************************************************
+osRfc2544CtlTable   OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsRfc2544CtlEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Rfc2544 service configuration table."
+    ::= { osRfc2544 2 }
+
+osRfc2544CtlEntry   OBJECT-TYPE
+    SYNTAX       OsRfc2544CtlEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osRfc2544Owner, osRfc2544Test }
+    ::= { osRfc2544CtlTable 1 }
+
+
+OsRfc2544CtlEntry ::= SEQUENCE {
+      osRfc2544Owner                  SnmpAdminString,
+      osRfc2544Test                   SnmpAdminString,
+      osRfc2544Descr                  SnmpAdminString,
+
+      osRfc2544TestType               TestType,
+      osRfc2544Protocol               TestProtocol,
+
+      osRfc2544DstMac                 MacAddress,
+      osRfc2544SrcMac                 MacAddress,
+      osRfc2544SrcMacRange            PortList,
+
+      osRfc2544DstIpType              InetAddressType,
+      osRfc2544DstIpAddr              InetAddress,
+
+      osRfc2544SrcIpType              InetAddressType,
+      osRfc2544SrcIpAddr              InetAddress,
+
+      osRfc2544TxPort                 PortIndexOrNone,
+      osRfc2544VlanId                 VlanIdOrNone,
+
+      osRfc2544BurstNumber            Unsigned32,
+      osRfc2544BurstInterval          Unsigned32,
+
+      osRfc2544ProbeNumber            Unsigned32,
+      osRfc2544Duration               Unsigned32,
+      osRfc2544ProbeInterval          Unsigned32,
+      osRfc2544Rate                   Unsigned32,
+      osRfc2544ProbeTimeout           Unsigned32,
+      osRfc2544AllwdPcktLoss          Unsigned32,
+      osRfc2544MinStep                Unsigned32,
+
+      osRfc2544PacketLength           Unsigned32,
+      osRfc2544DataFill               OCTET STRING,
+      osRfc2544DSField                DSField,
+      osRfc2544Ttl                    Unsigned32,
+      osRfc2544Priority               Unsigned32,
+      osRfc2544MdLevel                Unsigned32,
+      osRfc2544MaxRows                Unsigned32,
+
+      osRfc2544TrapsGeneration        BITS,
+      osRfc2544TholdFdRiseThold       Unsigned32,
+      osRfc2544TholdFdFallThold       Unsigned32,
+
+      osRfc2544TholdJittRiseThold     Unsigned32,
+      osRfc2544TholdJittFallThold     Unsigned32,
+      
+      osRfc2544TholdPcktLossRiseThold Unsigned32,
+      osRfc2544TholdPcktLossFallThold Unsigned32,
+
+      osRfc2544RowStatus              RowStatus
+      }
+
+osRfc2544Owner       OBJECT-TYPE
+    SYNTAX           SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "Owner name."
+    ::= { osRfc2544CtlEntry 1 }
+
+osRfc2544Test        OBJECT-TYPE
+    SYNTAX           SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "Test name."
+    ::= { osRfc2544CtlEntry 2 }
+
+osRfc2544Descr       OBJECT-TYPE
+    SYNTAX           SnmpAdminString
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The purpose of this object is to provide a
+        descriptive name of the remote ping test."
+    DEFVAL { "" }
+    ::= { osRfc2544CtlEntry 3 }
+
+osRfc2544TestType    OBJECT-TYPE
+    SYNTAX           TestType
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "."
+    DEFVAL { basic }
+    ::= { osRfc2544CtlEntry 4 }
+
+osRfc2544Protocol    OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    DEFVAL { l3Protocol }
+    ::= { osRfc2544CtlEntry 5 }
+
+osRfc2544DstMac      OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osRfc2544Protocol is equal to l2Protocol(2), then osRfc2544DstMac must be defined
+       with a host physical address to be used as a remote host for performing an operation.
+
+       If osRfc2544Protocol is equal to l3Protocol(5), then the test cannot be enabled if osRfc2544DstMac
+       is not equal to 00:00:00:00:00:00."
+    DEFVAL { '000000000000'H }
+    ::= { osRfc2544CtlEntry 6 }
+
+osRfc2544SrcMac      OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osRfc2544Protocol is equal to l2Protocol(2), then osRfc2544SrcMac must be defined.
+        In case configured, override osRfc2544SrcMacRange parameter value.
+
+       If osRfc2544Protocol is equal to l3Protocol(5), then the test cannot be enabled if osRfc2544SrcMac
+       is not equal to 00:00:00:00:00:00."
+    DEFVAL { '000000000000'H }
+    ::= { osRfc2544CtlEntry 7 }
+ 
+ 
+osRfc2544SrcMacRange OBJECT-TYPE
+    SYNTAX       PortList
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "Defines customer source-mac range, i.e. multi source-mac addresses based on machine source-mac 
+        changing the thrid byte corresponding to the configured range.
+        This parameter overwrite osRfc2544SrcMac parameter. If source-mac was configured before setting this value, 
+        then after deleting this value the previous source-mac value will set instead.  
+        Corresponds to cli command 'source-mac range'."
+    DEFVAL { "" }
+    ::= { osRfc2544CtlEntry 8 }
+ 
+
+osRfc2544DstIpType   OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Specifies the type of host address to be used at a remote
+        host for performing an operation."
+    DEFVAL { ipv4 }
+    ::= { osRfc2544CtlEntry 10 }
+
+osRfc2544DstIpAddr   OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osRfc2544Protocol is equal to l2Protocol(2), then he test cannot be enabled if osRfc2544DstIpAddr
+       is not equal to 0.0.0.0.
+
+       If osRfc2544Protocol is equal to l3Protocol(5), then osRfc2544DstIpAddr must be defined
+       with a host Layer 3 address to be used as a remote host for performing an operation."
+    DEFVAL { '00000000'H }
+    ::= { osRfc2544CtlEntry 11 }
+
+osRfc2544SrcIpType   OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Specifies the type of host address to be used at a source
+       host for performing an operation."
+    DEFVAL { ipv4 }
+    ::= { osRfc2544CtlEntry 12 }
+
+osRfc2544SrcIpAddr   OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "If osRfc2544Protocol is equal to l2Protocol(2), then he test cannot be enabled if osRfc2544SrcIpAddr
+       is not equal to 0.0.0.0.
+
+       If osRfc2544Protocol is equal to l3Protocol(5), then osRfc2544DstIpAddr is optional and may  be defined
+       to be used as a source host for performing an operation."
+    DEFVAL { '00000000'H }
+    ::= { osRfc2544CtlEntry 13 }
+
+osRfc2544TxPort      OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "If osRfc2544Protocol is equal to l2Protocol(2), then osRfc2544TxPort may be defined
+      and used when osRfc2544DstMac is absent in learning table (FDB) to determine the port,
+      from wich the requests are to be transmitted.
+
+      If osRfc2544Protocol is equal to l3Protocol(5), then the test cannot be enabled if osRfc2544TxPort
+      is not equal to 0."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 14 }
+
+osRfc2544VlanId      OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "If osRfc2544Protocol is equal to l2Protocol(2), then osRfc2544VlanId must be defined
+      with valid and non-zero value before the test start.
+
+      If osRfc2544Protocol is equal to l3Protocol(5), then the test cannot be enabled if osRfc2544VlanId
+      is not equal to 0."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 15 }
+
+osRfc2544BurstNumber   OBJECT-TYPE
+    SYNTAX           Unsigned32 (0|1..4294967295)
+    UNITS            "bursts"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Number of bursts. The value 0 means forever."
+    DEFVAL { 1 }
+    ::= { osRfc2544CtlEntry 16 }
+
+osRfc2544BurstInterval OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..86400)
+    UNITS            "seconds"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Time interval between bursts, in seconds."
+    DEFVAL { 60 }
+    ::= { osRfc2544CtlEntry 17 }
+
+osRfc2544ProbeNumber   OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..1000000)
+    UNITS            "messages"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Number of packets (probes) in a burst. If osRfc2544Duration is not equal to 0,
+       this object does not make sense and is not used.
+       Objects osRfc2544ProbeNumber and osRfc2544Duration DO NOT NECESSARILY CORRESPOND 
+       TO EACH OTHER on GET operation.
+       GET operation always returns the last configured or default value."
+    DEFVAL { 3 }
+    ::= { osRfc2544CtlEntry 21 }
+
+osRfc2544Duration OBJECT-TYPE
+    SYNTAX           Unsigned32 (0|1..3600)
+    UNITS            "seconds"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Duration of one burst. The value 0 means, that osRfc2544ProbeNumber will be used.
+       Objects osRfc2544ProbeNumber and osRfc2544Duration DO NOT NECESSARILY CORRESPOND 
+       TO EACH OTHER on GET operation.
+       GET operation always returns the last configured or default value."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 22 }
+
+osRfc2544ProbeInterval OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..1000000)
+    UNITS            "microseconds"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The interval between transmitted frames in a burst.
+       This object is not used if osRfc2544Rate is not equal to 0.
+       Objects osRfc2544ProbeInterval and osRfc2544Rate DO NOT NECESSARILY CORRESPOND 
+       TO EACH OTHER on GET operation.
+       GET operation always returns the last configured or default value."
+    DEFVAL { 100000 }
+    ::= { osRfc2544CtlEntry 24 }
+
+osRfc2544Rate        OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "Kbits/sec"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The rate of transmition frames in bursts. The value 0 means, that osRfc2544ProbeInterval will be used.
+       Objects osRfc2544ProbeInterval and osRfc2544Rate DO NOT NECESSARILY CORRESPOND 
+       TO EACH OTHER on GET operation.
+       GET operation always returns the last configured or default value."
+    DEFVAL { 0 } 
+    ::= { osRfc2544CtlEntry 25 }
+
+osRfc2544ProbeTimeout  OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..60000)
+    UNITS            "milliseconds"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Specifies the duration to wait for a responce (milliseconds)."
+    DEFVAL { 300 }
+    ::= { osRfc2544CtlEntry 26 }
+
+osRfc2544AllwdPcktLoss OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..10000)
+    UNITS            "0.01%"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Maximum loss ratio allowed in the throughput test."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 28 }
+
+osRfc2544MinStep OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..1000000)
+    UNITS            "Kbits/sec"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Minimum rate step in the throughput test."
+    DEFVAL { 1000 }
+    ::= { osRfc2544CtlEntry 29 }
+
+osRfc2544PacketLength OBJECT-TYPE
+    SYNTAX           Unsigned32 (64..9216)
+    UNITS            "octets"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Packet length, including VLAN ID and CRC.
+       For throughput(2) and latency(3) returns first value from osRfc2544LengthValue as a reply on GET operation
+       and rejects SET operation."
+    DEFVAL { 64 }
+    ::= { osRfc2544CtlEntry 32 }
+
+osRfc2544DataFill    OBJECT-TYPE
+    SYNTAX           OCTET STRING (SIZE(0..32))
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Determine how to fill the data portion of a probe
+       packet, while number of characters is a multiple of 8."
+    DEFVAL { ''H }
+    ::= { osRfc2544CtlEntry 35 }
+
+osRfc2544DSField     OBJECT-TYPE
+    SYNTAX           DSField
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "."
+    REFERENCE
+        "Refer to RFC 2474 and to RFC 1812 Section 5.3.2 for Type of Service (TOS)."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 36 }
+
+osRfc2544Ttl         OBJECT-TYPE
+    SYNTAX           Unsigned32 (1..255)
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Time To Live."
+    DEFVAL { 128 }
+    ::= { osRfc2544CtlEntry 37 }
+
+osRfc2544Priority    OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Priority Code Point (PCP): a 3-bit field which refers to the IEEE 802.1p
+      priority. It indicates the frame priority level from 0 (lowest) to 7 (highest),
+      which can be used to prioritize different classes of traffic (voice, video, data, etc)."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 38 }
+    
+osRfc2544MdLevel     OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+      "Maintenance Domain Level (MD Level) as described in 802.1ag.
+       Higher numbers correspond to higher Maintenance Domains.
+       Only valid If osRfc2544Protocol is equal to l2Protocol(2)"
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 39 }
+
+osRfc2544MaxRows     OBJECT-TYPE
+    SYNTAX           Unsigned32 (2..65535)
+    UNITS            "rows"
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The maximum number of entries allowed in the
+        osRfc2544HistTable.  An implementation of this
+        MIB will remove the oldest entry in the
+        osRfc2544HistTable to allow the addition of an
+        new entry once the number of rows in the
+        osRfc2544HistTable reaches this value.
+
+        Old entries are not removed when a new test is
+        started.  Entries are added to the osRfc2544HistTable
+        until pingCtlMaxRows is reached before entries begin to
+        be removed.
+
+        A value of 0 for this object disables creation of
+        osRfc2544HistTable entries."
+    DEFVAL { 10 }
+    ::= { osRfc2544CtlEntry 50 }
+    
+osRfc2544TrapsGeneration OBJECT-TYPE
+    SYNTAX           BITS  {
+                       burstComplete(0),
+                       burstFail    (1),
+                       testComplete (2),
+                       rtt          (3),
+                       jitter       (4),
+                       pcktLoss     (5)
+                     }
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The value of this object determines when and if
+        to generate a notification for this entry:
+        burstComplete(0)- Generate a osRfc2544BurstComplete notification.
+        burstFail(1)    - Generate a osRfc2544BurstFail notification.
+        testComplete(2) - Generate a osRfc2544TestComplete notification.
+        rtt(3)          - Generate a traps about osRfc2544ResultsRttAverage crossing its thresholds.
+        jitter(4)       - Generate a traps about osRfc2544ResultsJittAverage crossing its thresholds.
+        pcktLoss(5)     - Generate a traps about osRfc2544ResultsPcktLoss crossing its thresholds."
+    DEFVAL { {testComplete} }
+    ::= { osRfc2544CtlEntry 55 }
+
+osRfc2544TholdFdRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Frame delay (Average of Round Trip Time) Rising threshold.
+        Value 0 means, that this the agent will not check this type of threshold."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 60 }
+
+osRfc2544TholdFdFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Frame delay (Average of Round Trip Time) Falling threshold"
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 61 }
+
+osRfc2544TholdJittRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Jitter Rising threshold.
+        Value 0 means, that this the agent will not check this type of threshold."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 62 }
+
+osRfc2544TholdJittFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "Jitter Falling threshold."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 63 }
+
+osRfc2544TholdPcktLossRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "0.01%"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "The packet loss Rising threshold."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 64 }
+    
+osRfc2544TholdPcktLossFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "0.01%"
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "The packet loss Falling threshold."
+    DEFVAL { 0 }
+    ::= { osRfc2544CtlEntry 65 }
+
+osRfc2544RowStatus   OBJECT-TYPE
+    SYNTAX           RowStatus
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "This object allows entries to be created, deleted, activated and deactivated.
+        Deletion of an entry in this table results in all
+        corresponding tables being deleted."
+    REFERENCE
+        "See definition of RowStatus in RFC 2579, 'Textual
+        Conventions for SMIv2.'"
+    ::= { osRfc2544CtlEntry 99 }
+
+-- ************************************************************
+-- The osRfc2544ResultsTable - last complete result
+-- ************************************************************
+osRfc2544ResultsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRfc2544ResultsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contain the last completed burst results. Exception is the object osRfc2544ResultsTestRunState - it
+       indicates a current state of the test."
+    ::= { osRfc2544 3 }
+
+osRfc2544ResultsEntry OBJECT-TYPE
+    SYNTAX      OsRfc2544ResultsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osRfc2544ResultsTable table."
+    AUGMENTS { osRfc2544CtlEntry }
+    -- INDEX { osRfc2544Owner, osRfc2544Test }
+    ::= { osRfc2544ResultsTable 1 }
+
+OsRfc2544ResultsEntry ::= SEQUENCE {
+      osRfc2544ResultsStarted               DateAndTime,
+      osRfc2544ResultsTestType              TestType,
+      osRfc2544ResultsRespType              RespType,
+      osRfc2544ResultsTestRunState          TestRunState,
+      osRfc2544ResultsProtocol              TestProtocol,
+      osRfc2544ResultsDstMac                MacAddress,
+      osRfc2544ResultsSrcMac                MacAddress,
+      osRfc2544ResultsIpDstType             InetAddressType,
+      osRfc2544ResultsIpDstAddr             InetAddress,
+      osRfc2544ResultsIpSrcType             InetAddressType,
+      osRfc2544ResultsIpSrcAddr             InetAddress,
+      osRfc2544ResultsTxPort                PortIndexOrNone,
+      osRfc2544ResultsVlanId                VlanIdOrNone,
+      osRfc2544ResultsHistIndx              Unsigned32,
+      osRfc2544ResultsMsgTransmitted        Unsigned32,
+      osRfc2544ResultsMsgReceived           Unsigned32,
+      osRfc2544ResultsRttMin                Unsigned32,
+      osRfc2544ResultsRttMax                Unsigned32,
+      osRfc2544ResultsRttAverage            Unsigned32,
+      osRfc2544ResultsRttSum2               Unsigned32,
+
+      osRfc2544ResultsJittMin               Unsigned32,
+      osRfc2544ResultsJittMax               Unsigned32,
+      osRfc2544ResultsJittAverage           Unsigned32,
+      osRfc2544ResultsJittSum2              Unsigned32,
+
+      osRfc2544ResultsDsJittMin             Unsigned32,
+      osRfc2544ResultsDsJittMax             Unsigned32,
+      osRfc2544ResultsDsJittAverage         Unsigned32,
+      osRfc2544ResultsDsJittSum2            Unsigned32,
+
+      osRfc2544ResultsPcktLoss              Unsigned32,
+
+      osRfc2544ResultsProbeInterval         Unsigned32,
+      osRfc2544ResultsRate                  Unsigned32,
+      osRfc2544ResultsPacketLength          Unsigned32,
+
+      osRfc2544ResultsPriority              Unsigned32,
+      osRfc2544ResultsDSField               DSField,
+      osRfc2544ResultsMdLevel               Unsigned32
+}
+
+osRfc2544ResultsStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osRfc2544ResultsEntry 4 }
+
+osRfc2544ResultsTestType OBJECT-TYPE
+    SYNTAX           TestType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsEntry 5 }
+
+osRfc2544ResultsRespType OBJECT-TYPE
+    SYNTAX           RespType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsEntry 6 }
+
+osRfc2544ResultsTestRunState OBJECT-TYPE
+    SYNTAX           TestRunState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsEntry 7 }
+
+osRfc2544ResultsProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osRfc2544ResultsEntry 8 }
+
+osRfc2544ResultsDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544DstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osRfc2544ResultsEntry 10 }
+
+osRfc2544ResultsSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544SrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osRfc2544ResultsEntry 11 }
+
+
+
+osRfc2544ResultsIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpType."
+    ::= { osRfc2544ResultsEntry 12 }
+
+osRfc2544ResultsIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpAddr."
+    ::= { osRfc2544ResultsEntry 13 }
+
+osRfc2544ResultsIpSrcType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpType."
+    ::= { osRfc2544ResultsEntry 14 }
+
+osRfc2544ResultsIpSrcAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpAddr."
+    ::= { osRfc2544ResultsEntry 15 }
+
+osRfc2544ResultsTxPort OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsEntry 16 }
+
+osRfc2544ResultsVlanId OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsEntry 17 }
+
+osRfc2544ResultsHistIndx OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Corresponding osRfc2544HistoryIndex."
+    ::= { osRfc2544ResultsEntry 20 }
+
+
+osRfc2544ResultsMsgTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544ResultsEntry 21 }
+
+osRfc2544ResultsMsgReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544ResultsEntry 22 }
+
+osRfc2544ResultsRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osRfc2544ResultsEntry 23 }
+
+osRfc2544ResultsRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osRfc2544ResultsEntry 24 }
+
+osRfc2544ResultsRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osRfc2544ResultsEntry 25 }
+
+osRfc2544ResultsRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544ResultsEntry 26 }
+
+osRfc2544ResultsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destiantion jitter values."
+    ::= { osRfc2544ResultsEntry 30 }
+
+osRfc2544ResultsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destiantion jitter values."
+    ::= { osRfc2544ResultsEntry 32 }
+
+osRfc2544ResultsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destiantion jitter values."
+    ::= { osRfc2544ResultsEntry 33 }
+
+osRfc2544ResultsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for source-to-destiantion all 
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544ResultsEntry 34 }
+
+osRfc2544ResultsDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destiantion-to-source jitter values."
+    ::= { osRfc2544ResultsEntry 35 }
+
+osRfc2544ResultsDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destiantion-to-source jitter values."
+    ::= { osRfc2544ResultsEntry 36 }
+
+osRfc2544ResultsDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destiantion-to-source jitter values."
+    ::= { osRfc2544ResultsEntry 37 }
+
+osRfc2544ResultsDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for destiantion-to-source all 
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544ResultsEntry 38 }
+
+
+osRfc2544ResultsPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osRfc2544ResultsEntry 40 }
+
+osRfc2544ResultsProbeInterval OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The interval between packets.
+       Objects osRfc2544ResultsProbeInterval and osRfc2544ResultsRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as equal to 0, then agent returns osRfc2544ProbeInterval
+       equal to osRfc2544ResultsProbeInterval.
+       If osRfc2544Rate has been configured as not equal to 0, then agent calculates interval
+       between packets, corresponding to osRfc2544Rate and returns it
+       as osRfc2544ResultsProbeInterval."
+    ::= { osRfc2544ResultsEntry 46 }
+
+osRfc2544ResultsRate OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "Kbits/sec"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The rate of transmition frames in bursts.
+       Objects osRfc2544ResultsProbeInterval and osRfc2544ResultsRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as not equal to 0, then
+       agent returns osRfc2544ResultsRate equal to osRfc2544Rate.
+       If osRfc2544Rate has been configured as equal to 0, then agent calculates
+       rate, corresponding to osRfc2544ProbeInterval and returns it as osRfc2544ResultsRate."
+    ::= { osRfc2544ResultsEntry 47 }
+
+osRfc2544ResultsPacketLength OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "octets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object is equal to corresponding osRfc2544PacketLength."
+    ::= { osRfc2544ResultsEntry 48 }
+
+osRfc2544ResultsPriority OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Priority number."
+    ::= { osRfc2544ResultsEntry 55 }
+
+osRfc2544ResultsDSField OBJECT-TYPE
+    SYNTAX           DSField
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "."
+    REFERENCE
+        "Refer to RFC 2474 and to RFC 1812 Section 5.3.2 for Type of Service (TOS)."
+    ::= { osRfc2544ResultsEntry 57 }
+
+osRfc2544ResultsMdLevel OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Md Level number."
+    ::= { osRfc2544ResultsEntry 58 }
+
+-- ************************************************************
+-- The osRfc2544HistoryTable - history table
+-- ************************************************************
+osRfc2544HistoryTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRfc2544HistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contain at most last osRfc2544MaxRows samples, each of them reflects results of 
+       comleted burst."
+    ::= { osRfc2544 4 }
+
+osRfc2544HistoryEntry OBJECT-TYPE
+    SYNTAX      OsRfc2544HistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osRfc2544HistoryTable table."
+    INDEX { osRfc2544Owner, osRfc2544Test, osRfc2544HistoryIndex }
+    ::= { osRfc2544HistoryTable 1 }
+
+OsRfc2544HistoryEntry ::= SEQUENCE {
+      osRfc2544HistoryIndex                 Unsigned32,
+      osRfc2544HistoryStarted               DateAndTime,
+      osRfc2544HistoryTestType              TestType,
+      osRfc2544HistoryRespType              RespType,
+      osRfc2544HistoryProtocol              TestProtocol,
+      osRfc2544HistoryDstMac                MacAddress,
+      osRfc2544HistorySrcMac                MacAddress,
+      osRfc2544HistoryIpDstType             InetAddressType,
+      osRfc2544HistoryIpDstAddr             InetAddress,
+      osRfc2544HistoryIpSrcType             InetAddressType,
+      osRfc2544HistoryIpSrcAddr             InetAddress,
+      osRfc2544HistoryTxPort                PortIndexOrNone,
+      osRfc2544HistoryVlanId                VlanIdOrNone,
+      osRfc2544HistoryMsgTransmitted        Unsigned32,
+      osRfc2544HistoryMsgReceived           Unsigned32,
+      osRfc2544HistoryRttMin                Unsigned32,
+      osRfc2544HistoryRttMax                Unsigned32,
+      osRfc2544HistoryRttAverage            Unsigned32,
+      osRfc2544HistoryRttSum2               Unsigned32,
+
+      osRfc2544HistoryJittMin               Unsigned32,
+      osRfc2544HistoryJittMax               Unsigned32,
+      osRfc2544HistoryJittAverage           Unsigned32,
+      osRfc2544HistoryJittSum2              Unsigned32,
+
+      osRfc2544HistoryDsJittMin             Unsigned32,
+      osRfc2544HistoryDsJittMax             Unsigned32,
+      osRfc2544HistoryDsJittAverage         Unsigned32,
+      osRfc2544HistoryDsJittSum2            Unsigned32,
+
+      osRfc2544HistoryPcktLoss              Unsigned32,
+
+      osRfc2544HistoryProbeInterval         Unsigned32,
+      osRfc2544HistoryRate                  Unsigned32,
+      osRfc2544HistoryPacketLength          Unsigned32,
+
+      osRfc2544HistoryPriority              Unsigned32,
+      osRfc2544HistoryDSField               DSField,
+      osRfc2544HistoryMdLevel               Unsigned32
+}
+
+osRfc2544HistoryIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An index that uniquely identifies the particular
+        sample this entry represents among all samples
+        associated with the same osRfc2544CtlEntry.
+        This index starts at 1 and increases by one
+        as each new sample is taken."
+    REFERENCE
+       "."
+    ::= { osRfc2544HistoryEntry 3 }
+
+osRfc2544HistoryStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osRfc2544HistoryEntry 4 }
+
+osRfc2544HistoryTestType OBJECT-TYPE
+    SYNTAX           TestType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryEntry 5 }
+
+osRfc2544HistoryRespType OBJECT-TYPE
+    SYNTAX           RespType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryEntry 6 }
+
+osRfc2544HistoryProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osRfc2544HistoryEntry 8 }
+
+osRfc2544HistoryDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544DstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osRfc2544HistoryEntry 10 }
+
+osRfc2544HistorySrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544SrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osRfc2544HistoryEntry 11 }
+
+
+
+osRfc2544HistoryIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpType."
+    ::= { osRfc2544HistoryEntry 12 }
+
+osRfc2544HistoryIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpAddr."
+    ::= { osRfc2544HistoryEntry 13 }
+
+osRfc2544HistoryIpSrcType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpType."
+    ::= { osRfc2544HistoryEntry 14 }
+
+osRfc2544HistoryIpSrcAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpAddr."
+    ::= { osRfc2544HistoryEntry 15 }
+
+osRfc2544HistoryTxPort  OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryEntry 16 }
+
+osRfc2544HistoryVlanId OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryEntry 17 }
+
+osRfc2544HistoryMsgTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544HistoryEntry 21 }
+
+osRfc2544HistoryMsgReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544HistoryEntry 22 }
+
+osRfc2544HistoryRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osRfc2544HistoryEntry 23 }
+
+osRfc2544HistoryRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osRfc2544HistoryEntry 24 }
+
+osRfc2544HistoryRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osRfc2544HistoryEntry 25 }
+
+osRfc2544HistoryRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544HistoryEntry 26 }
+
+osRfc2544HistoryJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destination jitter values."
+    ::= { osRfc2544HistoryEntry 30 }
+
+osRfc2544HistoryJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destination jitter values."
+    ::= { osRfc2544HistoryEntry 32 }
+
+osRfc2544HistoryJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destination jitter values."
+    ::= { osRfc2544HistoryEntry 33 }
+
+osRfc2544HistoryJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544HistoryEntry 34 }
+
+osRfc2544HistoryDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destination-to-source jitter values."
+    ::= { osRfc2544HistoryEntry 35 }
+
+osRfc2544HistoryDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destination-to-source jitter values."
+    ::= { osRfc2544HistoryEntry 36 }
+
+osRfc2544HistoryDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destination-to-source jitter values."
+    ::= { osRfc2544HistoryEntry 37 }
+
+osRfc2544HistoryDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544HistoryEntry 38 }
+
+
+osRfc2544HistoryPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osRfc2544HistoryEntry 40 }
+
+osRfc2544HistoryProbeInterval OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The interval between packets.
+       Objects osRfc2544HistoryProbeInterval and osRfc2544HistoryRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as equal to 0, then agent returns osRfc2544ProbeInterval
+       equal to osRfc2544HistoryProbeInterval.
+       If osRfc2544Rate has been configured as not equal to 0, then agent calculates interval
+       between packets, corresponding to osRfc2544Rate and returns it
+       as osRfc2544HistoryProbeInterval."
+    DEFVAL { 0 }
+    ::= { osRfc2544HistoryEntry 46 }
+
+osRfc2544HistoryRate OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "Kbits/sec"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The rate of transmition frames in bursts.
+       Objects osRfc2544HistoryProbeInterval and osRfc2544HistoryRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as not equal to 0, then
+       agent returns osRfc2544HistoryRate equal to osRfc2544Rate.
+       If osRfc2544Rate has been configured as equal to 0, then agent calculates
+       rate, corresponding to osRfc2544ProbeInterval and returns it as osRfc2544HistoryRate."
+    ::= { osRfc2544HistoryEntry 47 }
+
+osRfc2544HistoryPacketLength OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "octets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object is equal to corresponding osRfc2544PacketLength."
+    ::= { osRfc2544HistoryEntry 48 }
+
+osRfc2544HistoryPriority OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Priority number."
+    ::= { osRfc2544HistoryEntry 55 }
+
+osRfc2544HistoryDSField OBJECT-TYPE
+    SYNTAX           DSField
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "."
+    REFERENCE
+        "Refer to RFC 2474 and to RFC 1812 Section 5.3.2 for Type of Service (TOS)."
+    ::= { osRfc2544HistoryEntry 57 }
+
+osRfc2544HistoryMdLevel OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Md Level number."
+    ::= { osRfc2544HistoryEntry 58 }
+
+-- ************************************************************
+-- The osRfc2544ResultsAccumulatedTable - last complete accumultedresult
+-- ************************************************************
+osRfc2544ResultsAccumulatedTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRfc2544ResultsAccumulatedEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contain the last completed accumulated bursts results."
+    ::= { osRfc2544 10 }
+
+osRfc2544ResultsAccumulatedEntry OBJECT-TYPE
+    SYNTAX      OsRfc2544ResultsAccumulatedEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osRfc2544ResultsAccumulatedTable table."
+    AUGMENTS { osRfc2544CtlEntry }
+    -- INDEX { osRfc2544Owner, osRfc2544Test }
+    ::= { osRfc2544ResultsAccumulatedTable 1 }
+
+OsRfc2544ResultsAccumulatedEntry ::= SEQUENCE {
+      osRfc2544ResultsAccumulatedStarted               DateAndTime,
+      osRfc2544ResultsAccumulatedBurstsNumber          Unsigned32,
+      osRfc2544ResultsAccumulatedTotalDuration         Unsigned32,
+      osRfc2544ResultsAccumulatedTestType              TestType,
+      osRfc2544ResultsAccumulatedRespType              RespType,
+      osRfc2544ResultsAccumulatedTestRunState          TestRunState,
+      osRfc2544ResultsAccumulatedProtocol              TestProtocol,
+      osRfc2544ResultsAccumulatedDstMac                MacAddress,
+      osRfc2544ResultsAccumulatedSrcMac                MacAddress,
+      osRfc2544ResultsAccumulatedIpDstType             InetAddressType,
+      osRfc2544ResultsAccumulatedIpDstAddr             InetAddress,
+      osRfc2544ResultsAccumulatedIpSrcType             InetAddressType,
+      osRfc2544ResultsAccumulatedIpSrcAddr             InetAddress,
+      osRfc2544ResultsAccumulatedTxPort                PortIndexOrNone,
+      osRfc2544ResultsAccumulatedVlanId                VlanIdOrNone,
+      osRfc2544ResultsAccumulatedHistIndx              Unsigned32,
+      osRfc2544ResultsAccumulatedMsgTransmitted        Unsigned32,
+      osRfc2544ResultsAccumulatedMsgReceived           Unsigned32,
+      osRfc2544ResultsAccumulatedRttMin                Unsigned32,
+      osRfc2544ResultsAccumulatedRttMax                Unsigned32,
+      osRfc2544ResultsAccumulatedRttAverage            Unsigned32,
+      osRfc2544ResultsAccumulatedRttSum2               Unsigned32,
+
+      osRfc2544ResultsAccumulatedJittMin               Unsigned32,
+      osRfc2544ResultsAccumulatedJittMax               Unsigned32,
+      osRfc2544ResultsAccumulatedJittAverage           Unsigned32,
+      osRfc2544ResultsAccumulatedJittSum2              Unsigned32,
+
+      osRfc2544ResultsAccumulatedDsJittMin             Unsigned32,
+      osRfc2544ResultsAccumulatedDsJittMax             Unsigned32,
+      osRfc2544ResultsAccumulatedDsJittAverage         Unsigned32,
+      osRfc2544ResultsAccumulatedDsJittSum2            Unsigned32,
+
+      osRfc2544ResultsAccumulatedPcktLoss              Unsigned32,
+
+      osRfc2544ResultsAccumulatedProbeInterval         Unsigned32,
+      osRfc2544ResultsAccumulatedRate                  Unsigned32,
+      osRfc2544ResultsAccumulatedPacketLength          Unsigned32,
+
+      osRfc2544ResultsAccumulatedPriority              Unsigned32,
+      osRfc2544ResultsAccumulatedDSField               DSField,
+      osRfc2544ResultsAccumulatedMdLevel               Unsigned32
+}
+
+osRfc2544ResultsAccumulatedStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osRfc2544ResultsAccumulatedEntry 4 }
+
+osRfc2544ResultsAccumulatedBurstsNumber OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Number of bursts in accumulated entry"
+    ::= { osRfc2544ResultsAccumulatedEntry 5 }
+
+osRfc2544ResultsAccumulatedTotalDuration OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Running time of accumulated entry"
+    ::= { osRfc2544ResultsAccumulatedEntry 6 }
+
+osRfc2544ResultsAccumulatedTestType OBJECT-TYPE
+    SYNTAX           TestType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsAccumulatedEntry 7 }
+
+osRfc2544ResultsAccumulatedRespType OBJECT-TYPE
+    SYNTAX           RespType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsAccumulatedEntry 8 }
+
+osRfc2544ResultsAccumulatedTestRunState OBJECT-TYPE
+    SYNTAX           TestRunState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsAccumulatedEntry 9 }
+
+osRfc2544ResultsAccumulatedProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osRfc2544ResultsAccumulatedEntry 10 }
+
+osRfc2544ResultsAccumulatedDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544DstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osRfc2544ResultsAccumulatedEntry 11 }
+
+osRfc2544ResultsAccumulatedSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544SrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osRfc2544ResultsAccumulatedEntry 12 }
+
+
+
+osRfc2544ResultsAccumulatedIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpType."
+    ::= { osRfc2544ResultsAccumulatedEntry 13 }
+
+osRfc2544ResultsAccumulatedIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpAddr."
+    ::= { osRfc2544ResultsAccumulatedEntry 14 }
+
+osRfc2544ResultsAccumulatedIpSrcType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpType."
+    ::= { osRfc2544ResultsAccumulatedEntry 15 }
+
+osRfc2544ResultsAccumulatedIpSrcAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpAddr."
+    ::= { osRfc2544ResultsAccumulatedEntry 16 }
+
+osRfc2544ResultsAccumulatedTxPort OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsAccumulatedEntry 17 }
+
+osRfc2544ResultsAccumulatedVlanId OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544ResultsAccumulatedEntry 18 }
+
+osRfc2544ResultsAccumulatedHistIndx OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Corresponding osRfc2544HistoryIndex."
+    ::= { osRfc2544ResultsAccumulatedEntry 20 }
+
+
+osRfc2544ResultsAccumulatedMsgTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544ResultsAccumulatedEntry 21 }
+
+osRfc2544ResultsAccumulatedMsgReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544ResultsAccumulatedEntry 22 }
+
+osRfc2544ResultsAccumulatedRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osRfc2544ResultsAccumulatedEntry 23 }
+
+osRfc2544ResultsAccumulatedRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osRfc2544ResultsAccumulatedEntry 24 }
+
+osRfc2544ResultsAccumulatedRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osRfc2544ResultsAccumulatedEntry 25 }
+
+osRfc2544ResultsAccumulatedRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544ResultsAccumulatedEntry 26 }
+
+osRfc2544ResultsAccumulatedJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destiantion jitter values."
+    ::= { osRfc2544ResultsAccumulatedEntry 30 }
+
+osRfc2544ResultsAccumulatedJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destiantion jitter values."
+    ::= { osRfc2544ResultsAccumulatedEntry 32 }
+
+osRfc2544ResultsAccumulatedJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destiantion jitter values."
+    ::= { osRfc2544ResultsAccumulatedEntry 33 }
+
+osRfc2544ResultsAccumulatedJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for source-to-destiantion all 
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544ResultsAccumulatedEntry 34 }
+
+osRfc2544ResultsAccumulatedDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destiantion-to-source jitter values."
+    ::= { osRfc2544ResultsAccumulatedEntry 35 }
+
+osRfc2544ResultsAccumulatedDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destiantion-to-source jitter values."
+    ::= { osRfc2544ResultsAccumulatedEntry 36 }
+
+osRfc2544ResultsAccumulatedDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destiantion-to-source jitter values."
+    ::= { osRfc2544ResultsAccumulatedEntry 37 }
+
+osRfc2544ResultsAccumulatedDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for destiantion-to-source all 
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544ResultsAccumulatedEntry 38 }
+
+
+osRfc2544ResultsAccumulatedPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osRfc2544ResultsAccumulatedEntry 40 }
+
+osRfc2544ResultsAccumulatedProbeInterval OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The interval between packets.
+       Objects osRfc2544ResultsAccumulatedProbeInterval and osRfc2544ResultsAccumulatedRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as equal to 0, then agent returns osRfc2544ProbeInterval
+       equal to osRfc2544ResultsAccumulatedProbeInterval.
+       If osRfc2544Rate has been configured as not equal to 0, then agent calculates interval
+       between packets, corresponding to osRfc2544Rate and returns it
+       as osRfc2544ResultsAccumulatedProbeInterval."
+    ::= { osRfc2544ResultsAccumulatedEntry 46 }
+
+osRfc2544ResultsAccumulatedRate OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "Kbits/sec"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The rate of transmition frames in bursts.
+       Objects osRfc2544ResultsAccumulatedProbeInterval and osRfc2544ResultsAccumulatedRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as not equal to 0, then
+       agent returns osRfc2544ResultsAccumulatedRate equal to osRfc2544Rate.
+       If osRfc2544Rate has been configured as equal to 0, then agent calculates
+       rate, corresponding to osRfc2544ProbeInterval and returns it as osRfc2544ResultsAccumulatedRate."
+    ::= { osRfc2544ResultsAccumulatedEntry 47 }
+
+osRfc2544ResultsAccumulatedPacketLength OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "octets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object is equal to corresponding osRfc2544PacketLength."
+    ::= { osRfc2544ResultsAccumulatedEntry 48 }
+
+osRfc2544ResultsAccumulatedPriority OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Priority number."
+    ::= { osRfc2544ResultsAccumulatedEntry 55 }
+
+osRfc2544ResultsAccumulatedDSField OBJECT-TYPE
+    SYNTAX           DSField
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "."
+    REFERENCE
+        "Refer to RFC 2474 and to RFC 1812 Section 5.3.2 for Type of Service (TOS)."
+    ::= { osRfc2544ResultsAccumulatedEntry 57 }
+
+osRfc2544ResultsAccumulatedMdLevel OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Md Level number."
+    ::= { osRfc2544ResultsAccumulatedEntry 58 }
+
+-- ************************************************************
+-- The osRfc2544HistoryAccumulatedTable - history accumulated table
+-- ************************************************************
+osRfc2544HistoryAccumulatedTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRfc2544HistoryAccumulatedEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contain at most last osRfc2544MaxRows samples, all bursts run from single test start accumulated in single entry."
+    ::= { osRfc2544 9 }
+
+osRfc2544HistoryAccumulatedEntry OBJECT-TYPE
+    SYNTAX      OsRfc2544HistoryAccumulatedEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osRfc2544HistoryAccumulatedTable table."
+    INDEX { osRfc2544Owner, osRfc2544Test, osRfc2544HistoryAccumulatedIndex }
+    ::= { osRfc2544HistoryAccumulatedTable 1 }
+
+OsRfc2544HistoryAccumulatedEntry ::= SEQUENCE {
+      osRfc2544HistoryAccumulatedIndex                 Unsigned32,
+      osRfc2544HistoryAccumulatedStarted               DateAndTime,
+      osRfc2544HistoryAccumulatedBurstsNumber          Unsigned32,
+      osRfc2544HistoryAccumulatedTotalDuration         Unsigned32,
+      osRfc2544HistoryAccumulatedTestType              TestType,
+      osRfc2544HistoryAccumulatedRespType              RespType,
+      osRfc2544HistoryAccumulatedProtocol              TestProtocol,
+      osRfc2544HistoryAccumulatedDstMac                MacAddress,
+      osRfc2544HistoryAccumulatedSrcMac                MacAddress,
+      osRfc2544HistoryAccumulatedIpDstType             InetAddressType,
+      osRfc2544HistoryAccumulatedIpDstAddr             InetAddress,
+      osRfc2544HistoryAccumulatedIpSrcType             InetAddressType,
+      osRfc2544HistoryAccumulatedIpSrcAddr             InetAddress,
+      osRfc2544HistoryAccumulatedTxPort                PortIndexOrNone,
+      osRfc2544HistoryAccumulatedVlanId                VlanIdOrNone,
+      osRfc2544HistoryAccumulatedMsgTransmitted        Unsigned32,
+      osRfc2544HistoryAccumulatedMsgReceived           Unsigned32,
+      osRfc2544HistoryAccumulatedRttMin                Unsigned32,
+      osRfc2544HistoryAccumulatedRttMax                Unsigned32,
+      osRfc2544HistoryAccumulatedRttAverage            Unsigned32,
+      osRfc2544HistoryAccumulatedRttSum2               Unsigned32,
+
+      osRfc2544HistoryAccumulatedJittMin               Unsigned32,
+      osRfc2544HistoryAccumulatedJittMax               Unsigned32,
+      osRfc2544HistoryAccumulatedJittAverage           Unsigned32,
+      osRfc2544HistoryAccumulatedJittSum2              Unsigned32,
+
+      osRfc2544HistoryAccumulatedDsJittMin             Unsigned32,
+      osRfc2544HistoryAccumulatedDsJittMax             Unsigned32,
+      osRfc2544HistoryAccumulatedDsJittAverage         Unsigned32,
+      osRfc2544HistoryAccumulatedDsJittSum2            Unsigned32,
+
+      osRfc2544HistoryAccumulatedPcktLoss              Unsigned32,
+
+      osRfc2544HistoryAccumulatedProbeInterval         Unsigned32,
+      osRfc2544HistoryAccumulatedRate                  Unsigned32,
+      osRfc2544HistoryAccumulatedPacketLength          Unsigned32,
+
+      osRfc2544HistoryAccumulatedPriority              Unsigned32,
+      osRfc2544HistoryAccumulatedDSField               DSField,
+      osRfc2544HistoryAccumulatedMdLevel               Unsigned32
+}
+
+osRfc2544HistoryAccumulatedIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An index that uniquely identifies the particular
+        sample this entry represents among all samples
+        associated with the same osRfc2544CtlEntry.
+        This index starts at 1 and increases by one
+        as each new sample is taken."
+    REFERENCE
+       "."
+    ::= { osRfc2544HistoryAccumulatedEntry 3 }
+
+osRfc2544HistoryAccumulatedStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osRfc2544HistoryAccumulatedEntry 4 }
+
+osRfc2544HistoryAccumulatedBurstsNumber OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Number of bursts in accumulated entry."
+    ::= { osRfc2544HistoryAccumulatedEntry 5 }
+
+osRfc2544HistoryAccumulatedTotalDuration OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Total running time of accumulated entry."
+    ::= { osRfc2544HistoryAccumulatedEntry 6 }
+
+osRfc2544HistoryAccumulatedTestType OBJECT-TYPE
+    SYNTAX           TestType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryAccumulatedEntry 7 }
+
+osRfc2544HistoryAccumulatedRespType OBJECT-TYPE
+    SYNTAX           RespType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryAccumulatedEntry 8 }
+
+osRfc2544HistoryAccumulatedProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osRfc2544HistoryAccumulatedEntry 9 }
+
+osRfc2544HistoryAccumulatedDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544DstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osRfc2544HistoryAccumulatedEntry 10 }
+
+osRfc2544HistoryAccumulatedSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544SrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osRfc2544HistoryAccumulatedEntry 11 }
+
+osRfc2544HistoryAccumulatedIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpType."
+    ::= { osRfc2544HistoryAccumulatedEntry 12 }
+
+osRfc2544HistoryAccumulatedIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpAddr."
+    ::= { osRfc2544HistoryAccumulatedEntry 13 }
+
+osRfc2544HistoryAccumulatedIpSrcType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpType."
+    ::= { osRfc2544HistoryAccumulatedEntry 14 }
+
+osRfc2544HistoryAccumulatedIpSrcAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpAddr."
+    ::= { osRfc2544HistoryAccumulatedEntry 15 }
+
+osRfc2544HistoryAccumulatedTxPort  OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryAccumulatedEntry 16 }
+
+osRfc2544HistoryAccumulatedVlanId OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544HistoryAccumulatedEntry 17 }
+
+osRfc2544HistoryAccumulatedMsgTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544HistoryAccumulatedEntry 21 }
+
+osRfc2544HistoryAccumulatedMsgReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544HistoryAccumulatedEntry 22 }
+
+osRfc2544HistoryAccumulatedRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osRfc2544HistoryAccumulatedEntry 23 }
+
+osRfc2544HistoryAccumulatedRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osRfc2544HistoryAccumulatedEntry 24 }
+
+osRfc2544HistoryAccumulatedRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osRfc2544HistoryAccumulatedEntry 25 }
+
+osRfc2544HistoryAccumulatedRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544HistoryAccumulatedEntry 26 }
+
+osRfc2544HistoryAccumulatedJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destination jitter values."
+    ::= { osRfc2544HistoryAccumulatedEntry 30 }
+
+osRfc2544HistoryAccumulatedJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destination jitter values."
+    ::= { osRfc2544HistoryAccumulatedEntry 32 }
+
+osRfc2544HistoryAccumulatedJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destination jitter values."
+    ::= { osRfc2544HistoryAccumulatedEntry 33 }
+
+osRfc2544HistoryAccumulatedJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544HistoryAccumulatedEntry 34 }
+
+osRfc2544HistoryAccumulatedDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destination-to-source jitter values."
+    ::= { osRfc2544HistoryAccumulatedEntry 35 }
+
+osRfc2544HistoryAccumulatedDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destination-to-source jitter values."
+    ::= { osRfc2544HistoryAccumulatedEntry 36 }
+
+osRfc2544HistoryAccumulatedDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destination-to-source jitter values."
+    ::= { osRfc2544HistoryAccumulatedEntry 37 }
+
+osRfc2544HistoryAccumulatedDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544HistoryAccumulatedEntry 38 }
+
+
+osRfc2544HistoryAccumulatedPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osRfc2544HistoryAccumulatedEntry 40 }
+
+osRfc2544HistoryAccumulatedProbeInterval OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The interval between packets.
+       Objects osRfc2544HistoryAccumulatedProbeInterval and osRfc2544HistoryAccumulatedRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as equal to 0, then agent returns osRfc2544ProbeInterval
+       equal to osRfc2544HistoryAccumulatedProbeInterval.
+       If osRfc2544Rate has been configured as not equal to 0, then agent calculates interval
+       between packets, corresponding to osRfc2544Rate and returns it
+       as osRfc2544HistoryAccumulatedProbeInterval."
+    DEFVAL { 0 }
+    ::= { osRfc2544HistoryAccumulatedEntry 46 }
+
+osRfc2544HistoryAccumulatedRate OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "Kbits/sec"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The rate of transmition frames in bursts.
+       Objects osRfc2544HistoryAccumulatedProbeInterval and osRfc2544HistoryAccumulatedRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as not equal to 0, then
+       agent returns osRfc2544HistoryAccumulatedRate equal to osRfc2544Rate.
+       If osRfc2544Rate has been configured as equal to 0, then agent calculates
+       rate, corresponding to osRfc2544ProbeInterval and returns it as osRfc2544HistoryAccumulatedRate."
+    ::= { osRfc2544HistoryAccumulatedEntry 47 }
+
+osRfc2544HistoryAccumulatedPacketLength OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "octets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object is equal to corresponding osRfc2544PacketLength."
+    ::= { osRfc2544HistoryAccumulatedEntry 48 }
+
+osRfc2544HistoryAccumulatedPriority OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Priority number."
+    ::= { osRfc2544HistoryAccumulatedEntry 55 }
+
+osRfc2544HistoryAccumulatedDSField OBJECT-TYPE
+    SYNTAX           DSField
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "."
+    REFERENCE
+        "Refer to RFC 2474 and to RFC 1812 Section 5.3.2 for Type of Service (TOS)."
+    ::= { osRfc2544HistoryAccumulatedEntry 57 }
+
+osRfc2544HistoryAccumulatedMdLevel OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Md Level number."
+    ::= { osRfc2544HistoryAccumulatedEntry 58 }
+
+-- ************************************************************
+ -- Notification Definition section
+-- ************************************************************
+
+osRfc2544BurstComplete NOTIFICATION-TYPE
+      OBJECTS {
+        osRfc2544TestType
+      }
+      STATUS  current
+      DESCRIPTION
+          "Generated when a burst completes and bit burstComplete is set in osRfc2544TrapsGeneration."
+      ::= { osRfc2544Notifications 1 }
+
+osRfc2544BurstFail NOTIFICATION-TYPE
+      OBJECTS {
+        osRfc2544TestType
+      }
+      STATUS  current
+      DESCRIPTION
+          "Generated when a burst completes and bit burstFail is set in osRfc2544TrapsGeneration."
+      ::= { osRfc2544Notifications 2 }
+
+osRfc2544TestComplete NOTIFICATION-TYPE
+      OBJECTS {
+        osRfc2544TestType
+      }
+      STATUS  current
+      DESCRIPTION
+          "Generated when a test completes and bit testComplete is set in osRfc2544TrapsGeneration."
+      ::= { osRfc2544Notifications 3 }
+
+osRfc2544FdAlarm NOTIFICATION-TYPE
+    OBJECTS     { osRfc2544ResultsRttAverage,
+                  osRfc2544TholdReason
+                }
+    STATUS      current
+    DESCRIPTION
+       "Frame delay trap."
+    ::= { osRfc2544Notifications 5 }
+
+osRfc2544JittAlarm NOTIFICATION-TYPE
+    OBJECTS     { osRfc2544ResultsJittAverage,
+                  osRfc2544TholdReason
+                }
+    STATUS      current
+    DESCRIPTION
+       "Jitter trap."
+    ::= { osRfc2544Notifications 6 }
+   
+osRfc2544PcktLossAlarm NOTIFICATION-TYPE
+    OBJECTS     { osRfc2544ResultsPcktLoss,
+                  osRfc2544TholdReason
+                }
+    STATUS      current
+    DESCRIPTION
+       "Packet loss trap."
+    ::= { osRfc2544Notifications 7 }    
+
+-- ******************************************************************
+-- The osRfc2544LengthTable Table - results of throughput and latency
+-- ******************************************************************
+osRfc2544LengthTable   OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsRfc2544LengthEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Rfc2544 service configuration table."
+    ::= { osRfc2544 5 }
+
+osRfc2544LengthEntry   OBJECT-TYPE
+    SYNTAX       OsRfc2544LengthEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osRfc2544Owner, osRfc2544Test, osRfc2544LengthValue }
+    ::= { osRfc2544LengthTable 1 }
+
+
+OsRfc2544LengthEntry ::= SEQUENCE {
+      osRfc2544LengthValue                 Unsigned32,
+
+      osRfc2544LengthStarted               DateAndTime,
+      osRfc2544LengthTestType              TestType,
+      osRfc2544LengthTestRunState          TestRunState,
+      osRfc2544LengthProtocol              TestProtocol,
+      osRfc2544LengthDstMac                MacAddress,
+      osRfc2544LengthSrcMac                MacAddress,
+      osRfc2544LengthIpDstType             InetAddressType,
+      osRfc2544LengthIpDstAddr             InetAddress,
+      osRfc2544LengthIpSrcType             InetAddressType,
+      osRfc2544LengthIpSrcAddr             InetAddress,
+      osRfc2544LengthTxPort                PortIndexOrNone,
+      osRfc2544LengthVlanId                VlanIdOrNone,
+      osRfc2544LengthMsgTransmitted        Unsigned32,
+      osRfc2544LengthMsgReceived           Unsigned32,
+      osRfc2544LengthRttMin                Unsigned32,
+      osRfc2544LengthRttMax                Unsigned32,
+      osRfc2544LengthRttAverage            Unsigned32,
+      osRfc2544LengthRttSum2               Unsigned32,
+
+      osRfc2544LengthJittMin               Unsigned32,
+      osRfc2544LengthJittMax               Unsigned32,
+      osRfc2544LengthJittAverage           Unsigned32,
+      osRfc2544LengthJittSum2              Unsigned32,
+
+      osRfc2544LengthDsJittMin             Unsigned32,
+      osRfc2544LengthDsJittMax             Unsigned32,
+      osRfc2544LengthDsJittAverage         Unsigned32,
+      osRfc2544LengthDsJittSum2            Unsigned32,
+
+      osRfc2544LengthPcktLoss              Unsigned32,
+
+      osRfc2544LengthProbeInterval         Unsigned32,
+      osRfc2544LengthRate                  Unsigned32,
+
+      osRfc2544LengthPriority              Unsigned32,
+      osRfc2544LengthDSField               DSField,
+      osRfc2544LengthMdLevel               Unsigned32,
+
+      osRfc2544LengthAdminStatus           INTEGER
+      }
+
+osRfc2544LengthValue  OBJECT-TYPE 
+    SYNTAX            Unsigned32
+    UNITS             "octets"
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "."
+    ::= { osRfc2544LengthEntry 3 }
+
+osRfc2544LengthStarted OBJECT-TYPE
+    SYNTAX           DateAndTime
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Timestamp, when this test has been started."
+    ::= { osRfc2544LengthEntry 4 }
+
+osRfc2544LengthTestType OBJECT-TYPE
+    SYNTAX           TestType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544LengthEntry 5 }
+
+osRfc2544LengthTestRunState OBJECT-TYPE
+    SYNTAX           TestRunState
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544LengthEntry 7 }
+
+osRfc2544LengthProtocol OBJECT-TYPE
+    SYNTAX           TestProtocol
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "Protocol of a test."
+    ::= { osRfc2544LengthEntry 8 }
+
+osRfc2544LengthDstMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544DstMac, for Layer 3 tests agent may place MAC
+      address of NextHop."
+    ::= { osRfc2544LengthEntry 10 }
+
+osRfc2544LengthSrcMac OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests is equal to osRfc2544SrcMac, for Layer 3 tests agent may place MAC
+      address of source interface."
+    ::= { osRfc2544LengthEntry 11 }
+
+
+
+osRfc2544LengthIpDstType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpType."
+    ::= { osRfc2544LengthEntry 12 }
+
+osRfc2544LengthIpDstAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544DstIpAddr."
+    ::= { osRfc2544LengthEntry 13 }
+
+osRfc2544LengthIpSrcType OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpType."
+    ::= { osRfc2544LengthEntry 14 }
+
+osRfc2544LengthIpSrcAddr OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "For Layer 2 tests this object has no meaning, for Layer 3 it corresponds to osRfc2544SrcIpAddr."
+    ::= { osRfc2544LengthEntry 15 }
+
+osRfc2544LengthTxPort OBJECT-TYPE
+    SYNTAX           PortIndexOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544LengthEntry 16 }
+
+osRfc2544LengthVlanId OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "."
+    ::= { osRfc2544LengthEntry 17 }
+
+osRfc2544LengthMsgTransmitted OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544LengthEntry 21 }
+
+osRfc2544LengthMsgReceived OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544LengthEntry 22 }
+
+osRfc2544LengthRttMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum round-trip-time (RTT) received."
+    ::= { osRfc2544LengthEntry 23 }
+
+osRfc2544LengthRttMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The maximum round-trip-time (RTT) received."
+    ::= { osRfc2544LengthEntry 24 }
+
+osRfc2544LengthRttAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average round-trip-time (RTT) received."
+    ::= { osRfc2544LengthEntry 25 }
+
+osRfc2544LengthRttSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all 
+        round-trip-times (RTT) received.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544LengthEntry 26 }
+
+osRfc2544LengthJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all source-to-destination jitter values."
+    ::= { osRfc2544LengthEntry 30 }
+
+osRfc2544LengthJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all source-to-destination jitter values."
+    ::= { osRfc2544LengthEntry 32 }
+
+osRfc2544LengthJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all source-to-destination jitter values."
+    ::= { osRfc2544LengthEntry 33 }
+
+osRfc2544LengthJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all source-to-destination  
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544LengthEntry 34 }
+
+osRfc2544LengthDsJittMin OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The minimum value of all destination-to-source jitter values."
+    ::= { osRfc2544LengthEntry 35 }
+
+osRfc2544LengthDsJittMax OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The mahimum value of all destination-to-source jitter values."
+    ::= { osRfc2544LengthEntry 36 }
+
+osRfc2544LengthDsJittAverage OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "The average value of all destination-to-source jitter values."
+    ::= { osRfc2544LengthEntry 37 }
+
+osRfc2544LengthDsJittSum2 OBJECT-TYPE
+    SYNTAX           Unsigned32
+    UNITS            "square of microseconds"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "This object contains the sum of the squares for all destination-to-source  
+        jitter values.  Its purpose is to enable standard
+        deviation calculation."
+    ::= { osRfc2544LengthEntry 38 }
+
+osRfc2544LengthPcktLoss OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    ::= { osRfc2544LengthEntry 40 }
+
+osRfc2544LengthProbeInterval OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The interval between packets.
+       Objects osRfc2544LengthProbeInterval and osRfc2544ResultsRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as equal to 0, then agent returns osRfc2544ProbeInterval
+       equal to osRfc2544ResultsProbeInterval.
+       If osRfc2544Rate has been configured as not equal to 0, then agent calculates interval
+       between packets, corresponding to osRfc2544Rate and returns it
+       as osRfc2544ResultsProbeInterval."
+    ::= { osRfc2544LengthEntry 46 }
+
+osRfc2544LengthRate OBJECT-TYPE 
+    SYNTAX      Unsigned32
+    UNITS       "Kbits/sec"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The rate of transmition frames in bursts.
+       Objects osRfc2544ResultsProbeInterval and osRfc2544ResultsRate MUST ALWAYS CORRESPOND 
+       TO EACH OTHER.
+       If osRfc2544Rate has been configured as not equal to 0, then
+       agent returns osRfc2544ResultsRate equal to osRfc2544Rate.
+       If osRfc2544Rate has been configured as equal to 0, then agent calculates
+       rate, corresponding to osRfc2544ProbeInterval and returns it as osRfc2544ResultsRate."
+    ::= { osRfc2544LengthEntry 47 }
+
+osRfc2544LengthPriority OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Priority number."
+    ::= { osRfc2544LengthEntry 55 }
+
+osRfc2544LengthDSField OBJECT-TYPE
+    SYNTAX           DSField
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+       "."
+    REFERENCE
+        "Refer to RFC 2474 and to RFC 1812 Section 5.3.2 for Type of Service (TOS)."
+    ::= { osRfc2544LengthEntry 57 }
+
+osRfc2544LengthMdLevel OBJECT-TYPE
+    SYNTAX           Unsigned32 (0..7)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Md Level number."
+    ::= { osRfc2544LengthEntry 58 }
+
+osRfc2544LengthAdminStatus OBJECT-TYPE
+     SYNTAX           INTEGER { valid(1), invalid(2) }
+     MAX-ACCESS       read-create
+     STATUS           current
+     DESCRIPTION
+       "."
+     ::= { osRfc2544LengthEntry 99 }
+
+
+
+
+-- ************************************************************
+-- The osRfc2544HcResultsTable - last complete result
+-- ************************************************************
+osRfc2544HcResultsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRfc2544HcResultsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This 'High Capacity' table is an extension of osRfc2544ResultsTable."
+    ::= { osRfc2544 6 }
+
+osRfc2544HcResultsEntry OBJECT-TYPE
+    SYNTAX      OsRfc2544HcResultsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osRfc2544HcResultsTable table."
+     -- AUGMENTS { osRfc2544CtlEntry }
+    INDEX { osRfc2544Owner, osRfc2544Test }
+    ::= { osRfc2544HcResultsTable 1 }
+
+OsRfc2544HcResultsEntry ::= SEQUENCE {
+      osRfc2544HcResultsMsgTransmitted        Counter64,
+      osRfc2544HcResultsMsgReceived           Counter64
+}
+
+osRfc2544HcResultsMsgTransmitted OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544HcResultsEntry 21 }
+
+osRfc2544HcResultsMsgReceived OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544HcResultsEntry 22 }
+
+
+
+-- ************************************************************
+-- The osRfc2544HcHistoryTable - history table
+-- ************************************************************
+osRfc2544HcHistoryTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsRfc2544HcHistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This 'High Capacity' table is an extension of osRfc2544HistoryTable."
+    ::= { osRfc2544 7 }
+
+osRfc2544HcHistoryEntry OBJECT-TYPE
+    SYNTAX      OsRfc2544HcHistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the osRfc2544HcHistoryTable table."
+    -- AUGMENTS { osRfc2544HistoryEntry }
+    INDEX { osRfc2544Owner, osRfc2544Test, osRfc2544HistoryIndex }
+    ::= { osRfc2544HcHistoryTable 1 }
+
+OsRfc2544HcHistoryEntry ::= SEQUENCE {
+      osRfc2544HcHistoryMsgTransmitted        Counter64,
+      osRfc2544HcHistoryMsgReceived           Counter64
+}
+
+osRfc2544HcHistoryMsgTransmitted OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544HcHistoryEntry 21 }
+
+osRfc2544HcHistoryMsgReceived OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544HcHistoryEntry 22 }
+
+-- ***********************************************************
+-- The osRfc2544HcLengthTable Table - results of throughput and latency
+-- ******************************************************************
+osRfc2544HcLengthTable   OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsRfc2544HcLengthEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This 'High Capacity' table is an extension of osRfc2544LengthTable."
+    ::= { osRfc2544 8 }
+
+osRfc2544HcLengthEntry   OBJECT-TYPE
+    SYNTAX       OsRfc2544HcLengthEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    -- AUGMENTS { osRfc2544LengthEntry }
+    INDEX { osRfc2544Owner, osRfc2544Test, osRfc2544LengthValue }
+    ::= { osRfc2544HcLengthTable 1 }
+
+
+OsRfc2544HcLengthEntry ::= SEQUENCE {
+      osRfc2544HcLengthMsgTransmitted        Counter64,
+      osRfc2544HcLengthMsgReceived           Counter64
+}
+
+osRfc2544HcLengthMsgTransmitted OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of request packets transmitted the burst."
+    ::= { osRfc2544HcLengthEntry 21 }
+
+osRfc2544HcLengthMsgReceived OBJECT-TYPE
+    SYNTAX           Counter64
+    UNITS            "messages"
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+      "Number of reply packets received in the burst."
+    ::= { osRfc2544HcLengthEntry 22 }
+
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osRfc2544MIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { osRfc2544MandatoryGroup,
+                           osRfc2544NotificationsGroup
+                         }
+
+    ::= { osRfc2544MIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osRfc2544MandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+      osRfc2544ProtocolSupported, osRfc2544TestTypesSupported, osRfc2544IpAddrTypesSupported,
+      osRfc2544MinRate, osRfc2544MaxRate, osRfc2544MaxNumOfLengths, osRfc2544WithConsideringDmms,
+      osRfc2544TholdReason,
+
+      osRfc2544TestType,
+      osRfc2544Descr, osRfc2544DstMac, osRfc2544SrcMac, osRfc2544SrcMacRange, osRfc2544Protocol,
+      osRfc2544DstIpType, osRfc2544DstIpAddr,
+      osRfc2544SrcIpType, osRfc2544SrcIpAddr,
+      osRfc2544TxPort, osRfc2544VlanId, 
+      osRfc2544BurstNumber, osRfc2544BurstInterval,
+      osRfc2544Duration, osRfc2544ProbeNumber, osRfc2544ProbeInterval, osRfc2544Rate, osRfc2544ProbeTimeout,
+      osRfc2544AllwdPcktLoss, osRfc2544MinStep,
+      osRfc2544PacketLength, osRfc2544DataFill,
+      osRfc2544DSField, osRfc2544Ttl, osRfc2544Priority, osRfc2544MdLevel,
+
+      osRfc2544MaxRows,
+      osRfc2544TrapsGeneration,
+      osRfc2544TholdFdRiseThold, osRfc2544TholdFdFallThold,
+      osRfc2544TholdJittRiseThold, osRfc2544TholdJittFallThold,
+      osRfc2544TholdPcktLossRiseThold, osRfc2544TholdPcktLossFallThold,
+      osRfc2544RowStatus,
+
+      osRfc2544ResultsStarted,
+      osRfc2544ResultsTestType, osRfc2544ResultsRespType, osRfc2544ResultsTestRunState, osRfc2544ResultsProtocol,
+      osRfc2544ResultsDstMac, osRfc2544ResultsSrcMac,
+      osRfc2544ResultsIpDstType, osRfc2544ResultsIpDstAddr,
+      osRfc2544ResultsIpSrcType, osRfc2544ResultsIpSrcAddr,
+      osRfc2544ResultsTxPort, osRfc2544ResultsVlanId, osRfc2544ResultsHistIndx,
+      osRfc2544ResultsMsgTransmitted, osRfc2544ResultsMsgReceived,
+      osRfc2544ResultsRttMin, osRfc2544ResultsRttMax, osRfc2544ResultsRttAverage, osRfc2544ResultsRttSum2,
+      osRfc2544ResultsJittMin, osRfc2544ResultsJittMax, osRfc2544ResultsJittAverage, osRfc2544ResultsJittSum2,
+      osRfc2544ResultsDsJittMin, osRfc2544ResultsDsJittMax, osRfc2544ResultsDsJittAverage, osRfc2544ResultsDsJittSum2,
+      osRfc2544ResultsProbeInterval, osRfc2544ResultsRate, osRfc2544ResultsPacketLength, 
+      osRfc2544ResultsPriority, osRfc2544ResultsMdLevel, osRfc2544ResultsDSField, osRfc2544ResultsPcktLoss,
+
+      osRfc2544HistoryStarted, osRfc2544HistoryTestType, osRfc2544HistoryRespType, osRfc2544HistoryProtocol,
+      osRfc2544HistoryDstMac, osRfc2544HistorySrcMac,
+      osRfc2544HistoryIpDstType, osRfc2544HistoryIpDstAddr, osRfc2544HistoryIpSrcType, osRfc2544HistoryIpSrcAddr,
+      osRfc2544HistoryTxPort, osRfc2544HistoryVlanId, osRfc2544HistoryMsgTransmitted,
+      osRfc2544HistoryMsgReceived, osRfc2544HistoryRttMin,
+      osRfc2544HistoryRttMax, osRfc2544HistoryRttAverage, osRfc2544HistoryRttSum2,
+      osRfc2544HistoryJittMin, osRfc2544HistoryJittMax, osRfc2544HistoryJittAverage, osRfc2544HistoryJittSum2,
+      osRfc2544HistoryDsJittMin, osRfc2544HistoryDsJittMax, osRfc2544HistoryDsJittAverage, osRfc2544HistoryDsJittSum2,
+      osRfc2544HistoryPcktLoss, osRfc2544HistoryProbeInterval,
+      osRfc2544HistoryRate, osRfc2544HistoryPacketLength,
+      osRfc2544HistoryPriority, osRfc2544HistoryMdLevel, osRfc2544HistoryDSField,
+      osRfc2544LengthStarted, osRfc2544LengthTestType, osRfc2544LengthTestRunState, osRfc2544LengthProtocol,
+      osRfc2544LengthDstMac, osRfc2544LengthSrcMac,
+      osRfc2544LengthIpDstType, osRfc2544LengthIpDstAddr,
+      osRfc2544LengthIpSrcType, osRfc2544LengthIpSrcAddr,
+      osRfc2544LengthTxPort, osRfc2544LengthVlanId,
+      osRfc2544LengthMsgTransmitted, osRfc2544LengthMsgReceived, osRfc2544LengthRttMin,
+      osRfc2544LengthRttMax, osRfc2544LengthRttAverage, osRfc2544LengthRttSum2,
+      osRfc2544LengthJittMin, osRfc2544LengthJittMax, osRfc2544LengthJittAverage, osRfc2544LengthJittSum2,
+      osRfc2544LengthDsJittMin, osRfc2544LengthDsJittMax, osRfc2544LengthDsJittAverage, osRfc2544LengthDsJittSum2,
+      osRfc2544LengthPcktLoss, 
+      osRfc2544LengthProbeInterval, osRfc2544LengthRate,
+      osRfc2544LengthPriority, osRfc2544LengthMdLevel, osRfc2544LengthDSField,
+      osRfc2544LengthAdminStatus,
+      osRfc2544HcResultsMsgTransmitted, osRfc2544HcResultsMsgReceived,
+      osRfc2544HcHistoryMsgTransmitted, osRfc2544HcHistoryMsgReceived,
+      osRfc2544HcLengthMsgTransmitted, osRfc2544HcLengthMsgReceived,
+      
+      osRfc2544ResultsAccumulatedStarted, osRfc2544ResultsAccumulatedBurstsNumber,
+      osRfc2544ResultsAccumulatedTotalDuration,
+      osRfc2544ResultsAccumulatedTestType, osRfc2544ResultsAccumulatedRespType,
+      osRfc2544ResultsAccumulatedTestRunState, osRfc2544ResultsAccumulatedProtocol,
+      osRfc2544ResultsAccumulatedDstMac, osRfc2544ResultsAccumulatedSrcMac,
+      osRfc2544ResultsAccumulatedIpDstType, osRfc2544ResultsAccumulatedIpDstAddr,
+      osRfc2544ResultsAccumulatedIpSrcType, osRfc2544ResultsAccumulatedIpSrcAddr,
+      osRfc2544ResultsAccumulatedTxPort, osRfc2544ResultsAccumulatedVlanId, osRfc2544ResultsAccumulatedHistIndx,
+      osRfc2544ResultsAccumulatedMsgTransmitted, osRfc2544ResultsAccumulatedMsgReceived,
+      osRfc2544ResultsAccumulatedRttMin, osRfc2544ResultsAccumulatedRttMax, osRfc2544ResultsAccumulatedRttAverage,
+      osRfc2544ResultsAccumulatedRttSum2,
+      osRfc2544ResultsAccumulatedJittMin, osRfc2544ResultsAccumulatedJittMax, osRfc2544ResultsAccumulatedJittAverage,
+      osRfc2544ResultsAccumulatedJittSum2,
+      osRfc2544ResultsAccumulatedDsJittMin, osRfc2544ResultsAccumulatedDsJittMax,
+      osRfc2544ResultsAccumulatedDsJittAverage, osRfc2544ResultsAccumulatedDsJittSum2,
+      osRfc2544ResultsAccumulatedProbeInterval, osRfc2544ResultsAccumulatedRate,
+      osRfc2544ResultsAccumulatedPacketLength, 
+      osRfc2544ResultsAccumulatedPriority, osRfc2544ResultsAccumulatedMdLevel, osRfc2544ResultsAccumulatedDSField,
+      osRfc2544ResultsAccumulatedPcktLoss,
+
+      osRfc2544HistoryAccumulatedStarted,osRfc2544HistoryAccumulatedBurstsNumber,
+      osRfc2544HistoryAccumulatedTotalDuration, osRfc2544HistoryAccumulatedTestType,
+      osRfc2544HistoryAccumulatedRespType,
+      osRfc2544HistoryAccumulatedProtocol,
+      osRfc2544HistoryAccumulatedDstMac, osRfc2544HistoryAccumulatedSrcMac,
+      osRfc2544HistoryAccumulatedIpDstType, osRfc2544HistoryAccumulatedIpDstAddr,
+      osRfc2544HistoryAccumulatedIpSrcType, osRfc2544HistoryAccumulatedIpSrcAddr,
+      osRfc2544HistoryAccumulatedTxPort, osRfc2544HistoryAccumulatedVlanId, osRfc2544HistoryAccumulatedMsgTransmitted,
+      osRfc2544HistoryAccumulatedMsgReceived, osRfc2544HistoryAccumulatedRttMin,
+      osRfc2544HistoryAccumulatedRttMax, osRfc2544HistoryAccumulatedRttAverage, osRfc2544HistoryAccumulatedRttSum2,
+      osRfc2544HistoryAccumulatedJittMin, osRfc2544HistoryAccumulatedJittMax, osRfc2544HistoryAccumulatedJittAverage,
+      osRfc2544HistoryAccumulatedJittSum2,
+      osRfc2544HistoryAccumulatedDsJittMin, osRfc2544HistoryAccumulatedDsJittMax,
+      osRfc2544HistoryAccumulatedDsJittAverage, osRfc2544HistoryAccumulatedDsJittSum2,
+      osRfc2544HistoryAccumulatedPcktLoss, osRfc2544HistoryAccumulatedProbeInterval,
+      osRfc2544HistoryAccumulatedRate, osRfc2544HistoryAccumulatedPacketLength,
+      osRfc2544HistoryAccumulatedPriority, osRfc2544HistoryAccumulatedMdLevel, osRfc2544HistoryAccumulatedDSField
+    }
+    STATUS current 
+    DESCRIPTION 
+        "."
+    ::= { osRfc2544MIBGroups 1 }
+
+osRfc2544NotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+             osRfc2544BurstComplete, osRfc2544BurstFail, osRfc2544TestComplete,
+             osRfc2544FdAlarm, osRfc2544JittAlarm, osRfc2544PcktLossAlarm
+          }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osRfc2544MIBGroups 2 }
+
+
+END

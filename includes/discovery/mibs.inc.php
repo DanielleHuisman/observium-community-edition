@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
+ * @package    observium
+ * @subpackage discovery
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -62,7 +62,7 @@ if (isset($config['os'][$device['os']]['sysorid'])) {
     // EKINOPS-MGNT2-MIB::mgnt2RootOIDInventory.1 = OID: EKINOPS-Pm200frs02-MIB::pm200frs02ri
     // EKINOPS-MGNT2-MIB::mgnt2RootOIDInventory.2 = OID: EKINOPS-PmPassive-MIB::pmpassiveri
 
-    $device_sysORID = snmpwalk_oid_num($device, $config['os'][$device['os']]['sysorid'], [], NULL);
+    $device_sysORID = snmpwalk_oid_num($device, $config['os'][$device['os']]['sysorid'], []);
     print_debug_vars($device_sysORID);
 
     foreach ($device_sysORID as $entry) {
@@ -75,7 +75,25 @@ if (isset($config['os'][$device['os']]['sysorid'])) {
     }
     print_debug_vars($os_identities);
 }
-unset($device_sysORID);
+if (isset($config['os'][$device['os']]['sysordescr'])) {
+    // NetApp example
+    // NETAPP-SWITCHING-MIB::agentSupportedMibName.43 = STRING: "RFC 3635 - Etherlike-MIB"
+    // NETAPP-SWITCHING-MIB::agentSupportedMibName.44 = STRING: "NETAPP-SWITCHING-MIB"
+
+    $device_sysORDescr = snmpwalk_values($device, $config['os'][$device['os']]['sysordescr'], []);
+    print_debug_vars($device_sysORDescr);
+
+    foreach ($device_sysORDescr as $entry) {
+        // Collect founded identities
+        if (str_contains($entry, ' - ')) {
+            $entry = explode(' - ', $entry)[1];
+        }
+        if (!isset($mibs_found[$entry]) && is_alpha($entry)) {
+            $mibs_found[$entry] = [ 'source' => 'OSsysORDescr' ];
+        }
+    }
+}
+unset($device_sysORID, $device_sysORDescr);
 
 $device_mibs    = get_device_mibs($device, FALSE);    // MIBs defined by os/model
 $device_mibs_bl = get_device_mibs_blacklist($device); // MIBs blacklisted for os/model
@@ -137,7 +155,7 @@ foreach ($config['mibs'] as $mib => $mib_def) {
     }
 }
 
-// Just show model specific MIBs
+// Just show model-specific MIBs
 $model = get_model_array($device);
 if (isset($model['mibs'])) {
     //print_vars($model);
@@ -159,7 +177,7 @@ if (safe_count($GLOBALS['table_rows'])) {
 }
 unset($GLOBALS['table_rows']);
 
-/* Detect correct (new) version of FASTPATH mibs */
+/* Detect a correct (new) version of FASTPATH mibs */
 $old_fastpath_mibs = [
   'BROADCOM-POWER-ETHERNET-MIB',
   'FASTPATH-BOXSERVICES-PRIVATE-MIB',
@@ -215,19 +233,22 @@ foreach ($mibs_found as $mib => $entry) {
 
         unset($mibs_found[$mib]);
         continue;
-    } elseif (!isset($config['mibs'][$mib])) {
+    }
+    if (!isset($config['mibs'][$mib])) {
         // MIB is currently unsupported by Observium
         $table_rows[] = [$identity_num, $mib, $entry['source'], 'MIB not used'];
 
         unset($mibs_found[$mib]);
         continue;
-    } elseif (isset($config['mibs'][$mib]['enable']) && !$config['mibs'][$mib]['enable']) {
+    }
+    if (isset($config['mibs'][$mib]['enable']) && !$config['mibs'][$mib]['enable']) {
         // MIB is currently unsupported by Observium
         $table_rows[] = [$identity_num, $mib, $entry['source'], '%rMIB disabled globally%n'];
 
         unset($mibs_found[$mib]);
         continue;
-    } elseif (in_array($mib, $device_mibs)) {
+    }
+    if (in_array($mib, $device_mibs)) {
         // Already mapped
         $table_rows[] = [$identity_num, "%y$mib%n", $entry['source'], '%yMIB already defined%n'];
 
@@ -253,7 +274,7 @@ if (safe_count($mibs_disable) && isset($cache['devices']['mibs_disabled'][$devic
     unset($cache['devices']['mibs_disabled'][$device['device_id']]);
 }
 
-// Additionally filter found identities, just for show that exist but unknown
+// Additionally, filter found identities, just for show that exist but unknown
 $identities = array_diff((array)$identities, (array)$identities_found);
 foreach ($identities as $identity_num) {
     $table_rows[] = [$identity_num, '-', 'sysORID', '%cUnknown Identity%n'];
@@ -276,8 +297,8 @@ if (count($mibs_found)) {
 
         // reset cache
         if (isset($GLOBALS['cache']['devices']['mibs'][$device['device_id']])) {
-            unset($GLOBALS['cache']['devices']['mibs'][$device['device_id']]);
-            unset($GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID']);
+            unset($GLOBALS['cache']['devices']['mibs'][$device['device_id']],
+                  $GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID']);
         }
     } elseif (count($delete_array)) {
         set_entity_attrib('device', $device, 'sysORID', safe_json_encode($sysORID_mibs));
@@ -285,8 +306,8 @@ if (count($mibs_found)) {
 
         // reset cache
         if (isset($GLOBALS['cache']['devices']['mibs'][$device['device_id']])) {
-            unset($GLOBALS['cache']['devices']['mibs'][$device['device_id']]);
-            unset($GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID']);
+            unset($GLOBALS['cache']['devices']['mibs'][$device['device_id']],
+                  $GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID']);
         }
     }
 } else {
@@ -295,8 +316,8 @@ if (count($mibs_found)) {
 
     // reset cache
     if (isset($GLOBALS['cache']['devices']['mibs'][$device['device_id']])) {
-        unset($GLOBALS['cache']['devices']['mibs'][$device['device_id']]);
-        unset($GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID']);
+        unset($GLOBALS['cache']['devices']['mibs'][$device['device_id']],
+              $GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID']);
     }
 }
 

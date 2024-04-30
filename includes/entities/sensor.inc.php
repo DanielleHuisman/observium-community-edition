@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -63,10 +63,7 @@ function discover_sensor_definition($device, $mib, $entry)
     foreach ($sensor_array as $index => $sensor) {
         $options = [];
 
-        $sensor['index'] = $index;            // Index in descr
-        foreach (explode('.', $index) as $k => $i) {
-            $sensor['index' . $k] = $i;           // Index parts
-        }
+        $sensor = array_merge($sensor, entity_index_tags($index));
 
         $dot_index = strlen($index) ? '.' . $index : '';
         $oid_num   = $entry['oid_num'] . $dot_index;
@@ -109,10 +106,14 @@ function discover_sensor_definition($device, $mib, $entry)
             continue;
         }
 
-        // Addition (before scale)
+        // Addition & convert (before scale)
         if (isset($entry['addition'])) {
             // Static unit definition
             $options['sensor_addition'] = $entry['addition'];
+        }
+        if (isset($entry['convert'])) {
+            // Static unit definition
+            $options['sensor_convert'] = $entry['convert'];
         }
 
         // Scale
@@ -214,7 +215,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
     //echo 'MIB:'; print_vars($mib);
 
-    $poller_type = (isset($options['poller_type']) ? $options['poller_type'] : 'snmp');
+    $poller_type = $options['poller_type'] ?? 'snmp';
 
     $sensor_deleted = 0;
 
@@ -252,7 +253,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         $scale = 1;
     }
 
-    // Generate type if it's not provided
+    // Generate a type if it's not provided
     if (safe_empty($type)) {
         $type = $mib . '-' . $object;
     }
@@ -270,24 +271,35 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
     }
 
     if (is_numeric($value)) {
-        $attrib_type = 'sensor_addition';
-        if (isset($options[$attrib_type]) && is_numeric($options[$attrib_type])) {
-            // See in FOUNDRY-POE-MIB
-            $value += $options[$attrib_type];
-        }
+        // $attrib_type = 'sensor_addition';
+        // if (isset($options[$attrib_type]) && is_numeric($options[$attrib_type])) {
+        //     // See in FOUNDRY-POE-MIB
+        //     $value += $options[$attrib_type];
+        // }
+        $value = sensor_addition($device, $value, $options,
+                                 [ 'poller_type' => $poller_type, 'device_id' => $device['device_id'],
+                                   'sensor_class' => $class, 'sensor_index' => $index,
+                                   'sensor_type' => $type, 'sensor_mib' => $mib ]);
+
         $value = scale_value($value, $scale);
         // $value *= $scale; // Scale before unit conversion
         $value = value_to_si($value, $options['sensor_unit'], $class); // Convert if not SI unit
     } else {
         print_debug("Sensor skipped by not numeric value: '$value', '$sensor_descr'");
-        if (strlen($value)) {
+        if (!safe_empty($value)) {
             print_debug("Perhaps this is named sensor, use discover_status() instead.");
         }
         return FALSE;
     }
 
-    $param_limits = ['limit_high' => 'sensor_limit', 'limit_high_warn' => 'sensor_limit_warn',
-                     'limit_low'  => 'sensor_limit_low', 'limit_low_warn' => 'sensor_limit_low_warn'];
+    // Check sensor ignore filters
+    if (entity_descr_check($sensor_descr, 'sensor')) {
+        print_debug("Sensor skipped by ignored description: '$sensor_descr'");
+        return FALSE;
+    }
+
+    $param_limits = [ 'limit_high' => 'sensor_limit', 'limit_high_warn' => 'sensor_limit_warn',
+                      'limit_low'  => 'sensor_limit_low', 'limit_low_warn' => 'sensor_limit_low_warn' ];
     foreach ($param_limits as $key => $column) {
         // Set limits vars and unit convert if required
         if (is_numeric($options[$key])) {
@@ -337,6 +349,11 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
             $limit_low_warn = NULL;
         }
     }
+    if (!is_null($limit_low_warn) && !is_null($limit_high_warn) && ($limit_low_warn > $limit_high_warn)) {
+        print_debug("High/low warning limits swapped.");
+        // Fix high/low thresholds (i.e. on negative numbers)
+        [ $limit_high_warn, $limit_low_warn ] = [ $limit_low_warn, $limit_high_warn ];
+    }
 
     // Init optional
     $param_opt = ['entPhysicalIndex', 'entPhysicalClass', 'entPhysicalIndex_measured',
@@ -347,26 +364,14 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
     print_debug("Discover sensor: [class: $class, device: " . $device['hostname'] . ", oid: $oid, index: $index, type: $type, descr: $sensor_descr, scale: $scale, limits: ($limit_low, $limit_low_warn, $limit_high_warn, $limit_high), CURRENT: $value, $entPhysicalIndex, $entPhysicalClass");
 
-    // Check sensor ignore filters
-    if (entity_descr_check($sensor_descr, 'sensor')) {
-        return FALSE;
-    }
-    //foreach ($config['ignore_sensor'] as $bi)        { if (strcasecmp($bi, $sensor_descr) == 0)   { print_debug("Skipped by equals: $bi, $sensor_descr "); return FALSE; } }
-    //foreach ($config['ignore_sensor_string'] as $bi) { if (stripos($sensor_descr, $bi) !== FALSE) { print_debug("Skipped by strpos: $bi, $sensor_descr "); return FALSE; } }
-    //foreach ($config['ignore_sensor_regexp'] as $bi) { if (preg_match($bi, $sensor_descr) > 0)    { print_debug("Skipped by regexp: $bi, $sensor_descr "); return FALSE; } }
-
-    if (!is_null($limit_low_warn) && !is_null($limit_high_warn) && ($limit_low_warn > $limit_high_warn)) {
-        // Fix high/low thresholds (i.e. on negative numbers)
-        [$limit_high_warn, $limit_low_warn] = [$limit_low_warn, $limit_high_warn];
-    }
-    print_debug_vars($limit_auto);
-    print_debug_vars($limit_high);
-    print_debug_vars($limit_high_warn);
-    print_debug_vars($limit_low_warn);
-    print_debug_vars($limit_low);
+    // print_debug_vars($limit_auto);
+    // print_debug_vars($limit_high);
+    // print_debug_vars($limit_high_warn);
+    // print_debug_vars($limit_low_warn);
+    // print_debug_vars($limit_low);
 
     if (!dbExist('sensors', '`poller_type`= ? AND `sensor_class` = ? AND `device_id` = ? AND `sensor_type` = ? AND `sensor_index` = ?',
-                 [$poller_type, $class, $device['device_id'], $type, $index])) {
+                 [ $poller_type, $class, $device['device_id'], $type, $index ])) {
         if (!is_numeric($limit_high)) {
             $limit_high = sensor_limit_high($class, $value, $limit_auto);
         }
@@ -376,8 +381,20 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
         if (!is_null($limit_low) && !is_null($limit_high) && ($limit_low > $limit_high)) {
             // Fix high/low thresholds (i.e. on negative numbers)
-            [$limit_high, $limit_low] = [$limit_low, $limit_high];
+            [ $limit_high, $limit_low ] = [ $limit_low, $limit_high ];
             print_debug("High/low limits swapped.");
+        }
+
+        if (OBS_DEBUG) {
+            $limit_rows = [];
+            $limit_rows[] = [ 'Value', $value ];
+            $limit_rows[] = [ '-----', '-----' ];
+            $limit_rows[] = [ 'Auto',  $limit_auto ? 'TRUE' : 'FALSE' ];
+            $limit_rows[] = [ 'High',         is_numeric($limit_high) ? $limit_high : '--' ];
+            $limit_rows[] = [ 'High Warning', is_numeric($limit_high_warn) ? $limit_high_warn : '--' ];
+            $limit_rows[] = [ 'Low Warning',  is_numeric($limit_low_warn) ? $limit_low_warn : '--' ];
+            $limit_rows[] = [ 'Low',          is_numeric($limit_low) ? $limit_low : '--' ];
+            print_cli_table($limit_rows, [ 'Limit Param', 'Value' ]);
         }
 
         $sensor_insert = ['poller_type'  => $poller_type, 'sensor_class' => $class, 'device_id' => $device['device_id'],
@@ -405,7 +422,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         $sensor_id = dbInsert($sensor_insert, 'sensors');
 
         // Extra (rare) params
-        foreach (['sensor_addition', 'oid_scale_si'] as $attrib_type) {
+        foreach ([ 'sensor_addition', 'sensor_convert', 'oid_scale_si' ] as $attrib_type) {
             if (isset($options[$attrib_type]) && !safe_empty($options[$attrib_type])) {
                 // Add sensor attrib for use in poller
                 set_entity_attrib('sensor', $sensor_id, $attrib_type, $options[$attrib_type]);
@@ -444,35 +461,41 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
             // Fix high/low thresholds (i.e. on negative numbers)
             if (!is_null($limit_low) && !is_null($limit_high) && ($limit_low > $limit_high)) {
-                [$limit_high, $limit_low] = [$limit_low, $limit_high];
+                [ $limit_high, $limit_low ] = [ $limit_low, $limit_high ];
                 print_debug("High/low limits swapped.");
             }
 
             // Update limits
             $update     = [];
             $update_msg = [];
-            $debug_msg  = 'Current sensor value: "' . $value . '", scale: "' . $scale . '"' . PHP_EOL;
+
+            $limit_rows = [];
+            $limit_rows[] = [ 'Value', $value, '' ];
+            $limit_rows[] = [ 'Scale', $scale, '' ];
+            $limit_rows[] = [ '-----', '-----', '-----' ];
+            $limit_rows[] = [ 'Auto',  $limit_auto ? 'TRUE' : 'FALSE', '' ];
             foreach ($param_limits as $key => $column) {
                 // $key - param name, $$key - param value, $column - column name in DB for $key
-                $debug_msg .= '  ' . $key . ': "' . $sensor_entry[$column] . '" -> "' . $$key . '"' . PHP_EOL;
+                $limit_row = [ $key, is_numeric($$key) ? $$key : '--' ];
+                $debug_msg = '';
                 //convert strings/numbers to identical type (float) or to array('NULL') for correct comparison
-                $$key                  = is_numeric($$key) ? (float)$$key : ['NULL'];
-                $sensor_entry[$column] = is_numeric($sensor_entry[$column]) ? (float)$sensor_entry[$column] : ['NULL'];
-                if (!$limit_auto) {
-                    // Hard passed or device reported limits
-                    if ($$key !== $sensor_entry[$column]) {
-                        $update[$column] = $$key;
-                        $update_msg[]    = $key . ' -> "' . (is_array($$key) ? 'NULL' : $$key) . '"';
-                    }
-                } elseif (float_cmp($$key, $sensor_entry[$column], 0.01) !== 0) {
-                    // Auto generated limits
+                $$key                  = is_numeric($$key) ? (float)$$key : [ 'NULL' ];
+                $sensor_entry[$column] = is_numeric($sensor_entry[$column]) ? (float)$sensor_entry[$column] : [ 'NULL' ];
+                if (float_cmp($$key, $sensor_entry[$column], $limit_auto ? 0.01 : 0.0000001) !== 0) {
+                    // Auto generated limits epsilon 0.01, default is 0.0000001
                     $update[$column] = $$key;
                     $update_msg[]    = $key . ' -> "' . (is_array($$key) ? 'NULL' : $$key) . '"';
+                    $debug_msg       = $limit_auto ? ' (AUTO)' : ' (CHANGED)';
                 }
+                $limit_row[] = (is_numeric($sensor_entry[$column]) ? $sensor_entry[$column] : '--') . $debug_msg;
+                $limit_rows[] = $limit_row;
             }
             if (count($update)) {
                 echo("L");
-                print_debug($debug_msg);
+                //print_debug($debug_msg);
+                if (OBS_DEBUG) {
+                    print_cli_table($limit_rows, [ 'Limit Param', 'Value', 'Previous' ]);
+                }
                 if ($config['sensors']['limits_events']) {
                     log_event('Sensor updated (limits): ' . implode(', ', $update_msg), $device, 'sensor', $sensor_entry['sensor_id']);
                 }
@@ -494,14 +517,15 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         }
 
         // Extra (rare) params
-        foreach (['sensor_addition', 'oid_scale_si'] as $attrib_type) {
-            $attrib = get_entity_attrib('sensor', $sensor_entry['sensor_id'], $attrib_type);
-            if (isset($options[$attrib_type]) && !safe_empty($options[$attrib_type])) {
+        $attribs = get_entity_attribs('sensor', $sensor_entry['sensor_id']);
+        foreach ([ 'sensor_addition', 'sensor_convert', 'oid_scale_si' ] as $attrib_type) {
+            //$attrib = get_entity_attrib('sensor', $sensor_entry['sensor_id'], $attrib_type);
+            if (!safe_empty($options[$attrib_type])) {
                 // Add sensor attrib for use in poller
-                if ($attrib != $options[$attrib_type]) {
+                if ($attribs[$attrib_type] != $options[$attrib_type]) {
                     set_entity_attrib('sensor', $sensor_id, $attrib_type, $options[$attrib_type]);
                 }
-            } elseif (!safe_empty($attrib)) {
+            } elseif (!safe_empty($attribs[$attrib_type])) {
                 del_entity_attrib('sensor', $sensor_entry['sensor_id'], $attrib_type);
             }
         }
@@ -805,7 +829,7 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
             }
 
             if ($sensor_poll['sensor_event'] === 'alert') {
-                $sensor_poll['sensor_status'] = 'Sensor critical thresholds exceeded.';
+
 
                 // Force ignore state if measured entity is in Shutdown state
                 $measured_class = $sensor_db['measured_class'];
@@ -1152,14 +1176,13 @@ function sensor_value_scale($device, $sensor_value, &$sensor_db) {
     // Sensor attribs, by first must be cached
     $attribs = $GLOBALS['cache']['entity_attribs']['sensor'][$sensor_db['sensor_id']] ?? [];
 
-    // Addition & Scale
+    // Addition & Conversion & Scale
     if (is_numeric($sensor_value)) {
-        if (isset($attribs['sensor_addition']) && is_numeric($attribs['sensor_addition'])) {
-            $sensor_value += $attribs['sensor_addition'];
-        }
+        $mib = $sensor_db['sensor_mib'];
+
+        $sensor_value = sensor_addition($device, $sensor_value, $attribs, $sensor_db);
 
         // See BLUECOAT-SG-SENSOR-MIB
-        $mib = $sensor_db['sensor_mib'];
         if (isset($attribs['oid_scale_si']) && !safe_empty($attribs['oid_scale_si'])) {
             if (str_contains($attribs['oid_scale_si'], '.')) {
                 // single oid
@@ -1193,12 +1216,51 @@ function sensor_value_scale($device, $sensor_value, &$sensor_db) {
     return value_to_si($sensor_value, $sensor_db['sensor_unit'], $sensor_db['sensor_class']);
 }
 
+function sensor_addition($device, $sensor_value, $attribs = [], $sensor_db = []) {
+    $mib = $sensor_db['sensor_mib'];
+
+    if (isset($attribs['sensor_convert'])) {
+        switch ($attribs['sensor_convert']) {
+            case 'tmnx_rx_power':
+                $oids = [
+                    'tmnxDDMExtCalRxPower0.' . $sensor_db['sensor_index'],
+                    'tmnxDDMExtCalRxPower1.' . $sensor_db['sensor_index'],
+                    'tmnxDDMExtCalRxPower2.' . $sensor_db['sensor_index'],
+                    'tmnxDDMExtCalRxPower3.' . $sensor_db['sensor_index'],
+                    'tmnxDDMExtCalRxPower4.' . $sensor_db['sensor_index'],
+                ];
+                $entry = snmp_get_multi_oid($device, $oids, [], $mib);
+                $entry = $entry[$sensor_db['sensor_index']];
+                $sensor_value = value_unit_tmnx_rx_power($sensor_value, $entry['tmnxDDMExtCalRxPower0'], $entry['tmnxDDMExtCalRxPower1'],
+                                                         $entry['tmnxDDMExtCalRxPower2'], $entry['tmnxDDMExtCalRxPower3'], $entry['tmnxDDMExtCalRxPower4']);
+                break;
+
+            case 'sysuptime':
+                //r($sensor_value);
+                $sensor_value = timeticks_to_sec(snmp_cache_oid($device, "sysUpTime.0", "SNMPv2-MIB"), TRUE) - $sensor_value;
+                //r($sensor_value);
+                break;
+        }
+    }
+
+    if (isset($attribs['sensor_addition']) && is_numeric($attribs['sensor_addition'])) {
+        $sensor_value += $attribs['sensor_addition'];
+    }
+
+    return $sensor_value;
+}
+
 /**
  * Custom value unit conversion functions for some vendors,
  * who do not know how use snmp float conversions,
  * do not know physics, mathematics and in general badly studied at school
  */
+function value_unit_ieee32float($value)
+{
+    return ieeeint2float($value);
+}
 
+// DEPRECATED. Same as value_unit_ieee32float()
 function value_unit_accuenergy($value)
 {
     return hex2float(dechex($value));
@@ -1227,6 +1289,12 @@ function value_unit_ekinops_dbm2($value)
 {
     //return 10 * log10($value) + 30; // this is how watts converted to dbm
     return 10 * log10($value) - 40; // BUT this how convert it EKINOPS.... WHY??????
+}
+
+// Just quadruple-fucking rage.. to Nokia TimOS
+function value_unit_tmnx_rx_power($rx, $rx0 = 0, $rx1 = 0, $rx2 = 0, $rx3 = 0, $rx4 = 0)
+{
+    return ieeeint2float($rx0) + ieeeint2float($rx1) * $rx**1 + ieeeint2float($rx2) * $rx**2 + ieeeint2float($rx3) * $rx**3 + ieeeint2float($rx4) * $rx**4;
 }
 
 // EOF

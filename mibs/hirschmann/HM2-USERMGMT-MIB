@@ -158,7 +158,9 @@ Hm2UserConfigEntry ::= SEQUENCE {
                  hm2UserPwdPolicyChk				HmEnabledStatus,
                  hm2UserSnmpAuthType                INTEGER,
                  hm2UserSnmpEncType                 INTEGER,
-                 hm2UserStatus                      RowStatus                 
+                 hm2UserStatus                      RowStatus,
+                 hm2UserSnmpAuthPassword			DisplayString,
+                 hm2UserSnmpEncPassword				DisplayString                
              }
     
     hm2UserName OBJECT-TYPE
@@ -283,6 +285,32 @@ Hm2UserConfigEntry ::= SEQUENCE {
 					 createAndWait(5)	- Accept row values and wait.
                      destroy(6) 		- Set to this value to remove this user account."
          ::= { hm2UserConfigEntry 9 }
+         
+    hm2UserSnmpAuthPassword OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..64))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "SNMPv3 user authentication password
+                      This object will always return '********' when read.
+                      The minimum size of the password is defined with the
+                      hm2PwdMgmtMinLength object. The SNMPv3 user authentication 
+                      password can be set while the row is active."
+		 DEFVAL  { "" }
+         ::= { hm2UserConfigEntry 10 }
+         
+    hm2UserSnmpEncPassword OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..64))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "SNMPv3 user encryption password
+                      This object will always return '********' when read.
+                      The minimum size of the password is defined with the
+                      hm2PwdMgmtMinLength object. The SNMPv3 user encryption 
+                      password can be set while the row is active."
+		 DEFVAL  { "" }
+         ::= { hm2UserConfigEntry 11 }
       
 --
 -- ******************************************************************
@@ -306,6 +334,16 @@ hm2UserLastUserDeleted OBJECT-TYPE
 	DESCRIPTION
 				"Name of the last user deleted in hm2UserConfigTable."
 	::= { hm2UserStatusGroup 2 }         
+
+hm2UserForcePasswordStatus OBJECT-TYPE
+	SYNTAX      HmEnabledStatus
+	MAX-ACCESS  read-write
+	STATUS      current
+	DESCRIPTION
+			"If enabled, then the password must be changed on first management access to the device.
+			This value is only set from internal component."
+	DEFVAL  { enable }
+	::= { hm2UserStatusGroup 3 }
 
 --
 --**************************************************************************************
@@ -967,6 +1005,20 @@ hm2UserPwdPolicyChkChangedTrap  NOTIFICATION-TYPE
 	DESCRIPTION 
 				"This notification is send when the password policy for a user is changed."
 	::= { hm2UserMgmtMibNotifications 5 }	
+	
+hm2UserPwdChangedSnmpv3AuthTrap  NOTIFICATION-TYPE
+	OBJECTS		{ hm2UserName }
+	STATUS		current
+	DESCRIPTION 
+				"This notification is send when a SNMPv3 authentication password for an user is changed."
+	::= { hm2UserMgmtMibNotifications 6 }
+	
+hm2UserPwdChangedSnmpv3EncTrap  NOTIFICATION-TYPE
+	OBJECTS		{ hm2UserName }
+	STATUS		current
+	DESCRIPTION 
+				"This notification is send when a SNMPv3 encryption password for an user is changed."
+	::= { hm2UserMgmtMibNotifications 7 }
 
 hm2UserMgmtMibSNMPExtensionGroup 		OBJECT IDENTIFIER ::= { hm2UserMgmtMib 3 }
 
@@ -1015,6 +1067,14 @@ hm2UserMgmtUserSESDeactivate OBJECT-IDENTITY
 				 Be sure that this user is not the last active admin on the device."
            ::= { hm2UserMgmtUserSESGroup 2 }
 
+hm2UserMgmtUserSESActivateExisting OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION
+           		"Indicates that the chosen user entry can not be activated.
+				 Be sure that a user password has been successfully set before.
+                     Also check SNMP notification user table for entries with the same name."
+           ::= { hm2UserMgmtUserSESGroup 3 }
+
 -- ***********************************************************
 -- hm2UserMgmtApplSESGroup
 -- ***********************************************************
@@ -1033,6 +1093,14 @@ hm2UserMgmtApplSESDeactivate OBJECT-IDENTITY
 				 Be sure that this list is not referenced to an authentication list
 				 (hm2UserApplicationListAuthListName has to be set to a zero length string)."
            ::= { hm2UserMgmtApplSESGroup 2 }
+
+hm2UserMgmtApplSESAuthDeactivated OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION 
+           		"Indicates that the chosen entry can not be allocated to authentication list.
+                     Authentication list is deactivated. Application list can not be allocated to
+                     deactivated authentication list."
+           ::= { hm2UserMgmtApplSESGroup 3 }
 
 -- ***********************************************************
 -- hm2UserMgmtAuthSESGroup

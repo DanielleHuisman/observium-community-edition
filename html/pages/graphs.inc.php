@@ -6,12 +6,12 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 unset($vars['page']);
-
+//r($vars);
 // Setup here
 
 //if (isset($_SESSION['widescreen']))
@@ -36,10 +36,10 @@ if (isset($vars['timestamp_to']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['tim
 // Validate rrdtool compatible time string and set to now/day if it's not valid
 if (preg_match(OBS_PATTERN_RRDTIME, $vars['to'])) {
     $to = $vars['to'];
-} // else { $to     = $config['time']['now']; }
+} // else { $to     = get_time(); }
 if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) {
     $from = $vars['from'];
-} // else { $from   = $config['time']['day']; }
+} // else { $from   = get_time('day'); }
 
 preg_match(OBS_PATTERN_GRAPH_TYPE, $vars['type'], $graphtype);
 
@@ -89,7 +89,7 @@ if (isset($graph_array['draw_all'])) {
 }
 
 //$graph_array['legend'] = "no";
-//$graph_array['to']     = $config['time']['now'];
+//$graph_array['to']     = get_time();
 
 $navbar = ['brand' => "Graph", 'class' => "navbar-narrow"];
 
@@ -144,7 +144,10 @@ if ($_SESSION['userlevel'] > 7) {
     // FIXME - widget_exists() dashboard_exists(), widget_permitted(), dashboard_permitted(), etc.
     // FIXME - convert this to ajax call, maybe make the code usable on other pages too
 
-    $valid     = ['id', 'group_id', 'idb', 'idc', 'device', 'c_plugin', 'c_plugin_instance', 'c_type', 'c_type_instance'];
+    $valid     = ['id', 'group_id', 'idb', 'idc', 'device',
+                  'filter', 'counter', 'counter_type', // juniper_firewall
+                  'c_plugin', 'c_plugin_instance', 'c_type', 'c_type_instance' // Munin Plugins
+    ];
     $add_array = ['type' => $vars['type']];
     if (isset($vars['period']) && is_numeric($vars['period'])) {
         $add_array['period'] = $vars['period'];
@@ -396,6 +399,10 @@ $navbar['options']['legend']          = [ 'text' => 'Show Legend', 'inverse' => 
 $navbar['options']['title']           = [ 'text' => 'Show Title' ];
 $navbar['options']['force_autoscale'] = [ 'text' => 'Force Autoscale' ];
 $navbar['options']['previous']        = [ 'text' => 'Graph Previous' ];
+
+if (in_array('alt_y', (array)$graph_return['valid_options'])) {
+    $navbar['options']['alt_y'] = [ 'text' => 'Dynamic Y Grid', 'inverse' => TRUE ];
+}
 
 if (in_array('95th', (array)$graph_return['valid_options'])) {
     $navbar['options']['95th'] = [ 'text' => '95th %ile', 'inverse' => TRUE ];

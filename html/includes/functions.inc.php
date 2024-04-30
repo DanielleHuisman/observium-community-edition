@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -71,13 +71,15 @@ function html_callback($buffer)
 
     // Define template strings for registered CSS/JS links and other elements
     $templates = [
-      'css'    => '  <link href="%%STRING%%' . $version_param . '" rel="stylesheet" type="text/css" />' . PHP_EOL,
-      'style'  => '  <style type="text/css">' . PHP_EOL . '%%STRING%%' . PHP_EOL . '  </style>' . PHP_EOL,
-      'js'     => '  <script type="text/javascript" src="%%STRING%%' . $version_param . '"></script>' . PHP_EOL,
+      'css'    => '    <link href="%%STRING%%' . $version_param . '" rel="stylesheet" type="text/css" />' . PHP_EOL,
+      'style'  => '    <style type="text/css">' . PHP_EOL . '%%STRING%%' . PHP_EOL . '  </style>' . PHP_EOL,
+      'js'     => '    <script type="text/javascript" src="%%STRING%%' . $version_param . '"></script>' . PHP_EOL,
       'script' => '  <script type="text/javascript">' . PHP_EOL .
                   '  <!-- Begin' . PHP_EOL . '%%STRING%%' . PHP_EOL .
                   '  // End -->' . PHP_EOL . '  </script>' . PHP_EOL,
-      'meta'   => '  <meta http-equiv="%%STRING_http-equiv%%" content="%%STRING_content%%" />' . PHP_EOL,
+      // key-value
+      'meta-equiv' => '    <meta http-equiv="%%STRING_name%%" content="%%STRING_content%%" />' . PHP_EOL,
+      'meta'       => '    <meta name="%%STRING_name%%" content="%%STRING_content%%" />' . PHP_EOL,
     ];
 
     // Process and replace resources in the buffer
@@ -85,18 +87,18 @@ function html_callback($buffer)
         $uppercase_type = strtoupper($type);
         if (isset($GLOBALS['cache_html']['resources'][$type])) {
             $resource_string = '<!-- ' . $uppercase_type . ' BEGIN -->' . PHP_EOL;
-            foreach (array_unique($GLOBALS['cache_html']['resources'][$type]) as $content) {
-                if (is_array($content)) {
-                    // For meta tags
-                    foreach ($content as $param => $value) {
-                        $template = str_replace('%%STRING_' . $param . '%%', $value, $template);
-                    }
-                    $resource_string .= $template;
-                } else {
+            if ($type === 'meta-equiv' || $type === 'meta') {
+                foreach ($GLOBALS['cache_html']['resources'][$type] as $name => $content) {
+
+                    //bdump($content);
+                    $resource_string .= str_replace([ '%%STRING_name%%', '%%STRING_content%%' ], [ $name, $content ], $template);
+                }
+            } else {
+                foreach (array_unique($GLOBALS['cache_html']['resources'][$type]) as $content) {
                     $resource_string .= str_replace('%%STRING%%', $content, $template);
                 }
             }
-            $resource_string .= '  <!-- ' . $uppercase_type . ' END -->' . PHP_EOL;
+            $resource_string .= '    <!-- ' . $uppercase_type . ' END -->' . PHP_EOL;
             $buffer = str_replace('<!-- ##' . $uppercase_type . '_CACHE## -->' . PHP_EOL, $resource_string, $buffer);
         } else {
             // Clean template string
@@ -149,6 +151,101 @@ function html_callback_build_title()
     return escape_html(implode($config['page_title_separator'], $cache_html['title']));
 }
 
+/**
+ * Register an HTML resource
+ *
+ * Registers resource for use later (will be re-inserted via output buffer handler)
+ * CSS and JS files default to the css/ and js/ directories respectively.
+ * Scripts are inserted literally as passed in $name.
+ *
+ * @param string $type    Type of resource (css/js/script)
+ * @param string $content Filename or script content or array (for meta)
+ */
+// TESTME needs unit testing
+function register_html_resource($type, $content)
+{
+    // If no path specified, default to subdirectory of resource type (for CSS and JS only)
+    $type = strtolower($type);
+    if (in_array($type, [ 'css', 'js' ]) && !str_contains($content, '/')) {
+        $content = $type . '/' . $content;
+    }
+
+    // Insert into global variable, used in html callback function
+    $GLOBALS['cache_html']['resources'][$type][] = $content;
+}
+
+/**
+ * Register an HTML title section
+ *
+ * Registers title section for use in the html <title> tag.
+ * Calls can be stacked, and will be concatenated later by the HTML callback function.
+ *
+ * @param string $title Section title content
+ */
+// TESTME needs unit testing
+function register_html_title($title)
+{
+    $GLOBALS['cache_html']['title'][] = $title;
+}
+
+function register_html_meta($name, $content, $tag = 'name') {
+    if (safe_empty($content) || !is_alpha($name)) {
+        return;
+    }
+    if ($tag !== 'name') {
+        // http-equiv is multiplied
+        $GLOBALS['cache_html']['resources']['meta-equiv'][$name] = escape_html($content);
+    } else {
+        $GLOBALS['cache_html']['resources']['meta'][$name] = escape_html($content);
+    }
+}
+
+/**
+ * Register an HTML alert block displayed in top of page.
+ *
+ * @param string $text     Alert message
+ * @param string $title    Alert title if passed
+ * @param string $severity Severity in list: info, danger, warning, success, recovery, suppressed, delay, disabled
+ */
+function register_html_alert($text, $title = NULL, $severity = 'info') {
+    if (!$GLOBALS['config']['web_show_notifications']) {
+        // suppress web ui alerts
+        return;
+    }
+
+    // FIXME handle severity parameter with colour or icon?
+    $ui_alerts = '<div width="100%" class="alert alert-' . $severity . '">';
+    if (!safe_empty($title)) {
+        $ui_alerts .= '<h4>' . $title . '</h4>';
+    }
+    $ui_alerts .= $text . '</div>';
+
+    $GLOBALS['cache_html']['ui_alerts'][] = $ui_alerts;
+}
+
+/**
+ * Register an HTML panel section
+ *
+ * Registers left panel section.
+ * Calls can be stacked, and will be concatenated later by the HTML callback function.
+ *
+ * @param string $html Section panel content
+ */
+// TESTME needs unit testing
+function register_html_panel($html = '')
+{
+    if (!isset($GLOBALS['cache_html']['page_panel']) && is_alpha($html) &&
+        is_file($GLOBALS['config']['html_dir'] . "/includes/panels/" . $html . ".inc.php")) {
+
+        $panel_file = $GLOBALS['config']['html_dir'] . "/includes/panels/" . $html . ".inc.php";
+        ob_start();
+        include($panel_file);
+        $html = ob_get_clean();
+    }
+
+    $GLOBALS['cache_html']['page_panel'] = $html;
+}
+
 function http_match_referer($pattern) {
     if ($_SERVER['HTTP_SEC_FETCH_SITE'] !== 'same-origin') {
         return FALSE;
@@ -176,27 +273,15 @@ function http_match_referer($pattern) {
  *
  * @return array array of vars
  */
-function get_vars($vars_order = [], $auth = FALSE)
-{
+function get_vars($vars_order = [], $auth = FALSE) {
     if (is_string($vars_order)) {
         $vars_order = explode(' ', $vars_order);
     } elseif (empty($vars_order) || !is_array($vars_order)) {
-        $vars_order = ['POST', 'URI', 'GET']; // Default order
+        $vars_order = [ 'POST', 'URI', 'GET' ]; // Default order
     }
 
     // Content-Type=>application/x-www-form-urlencoded
-    $content_type = isset($_SERVER['HTTP_CONTENT_TYPE']) ? $_SERVER['HTTP_CONTENT_TYPE'] : $_SERVER['CONTENT_TYPE'];
-
-    // https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection
-    // XSS script regex
-    // <sCrIpT> < / s c r i p t >
-    // javascript:alert("Hello world");/
-    // <svg onload=alert(document.domain)>
-    // <style/onload=alert(document.domain)>
-    $prevent_xss = '!(^\s*(J\s*A\s*V\s*A\s*)?S\s*C\s*R\s*I\s*P\s*T\s*:' .
-                   '|<\s*/?\s*S\s*C\s*R\s*I\s*P\s*T\s*>' .
-                   '|(<\s*\w+.*[\s\/&](o\s*n\s*l\s*o\s*a\s*d|s\s*c\s*r\s*i\s*p\s*t))' .
-                   '|<\s*i\s*m\s*g.*o\s*n\s*e\s*r\s*r\s*o\s*r)!i';
+    $content_type = $_SERVER['HTTP_CONTENT_TYPE'] ?? $_SERVER['CONTENT_TYPE'];
 
     // Allow using var_decode(), this prevents to use potentially unsafe serialize functions
     $auth = $auth || $_SESSION['authenticated'];
@@ -232,7 +317,7 @@ function get_vars($vars_order = [], $auth = FALSE)
 
                     if (!isset($vars[$name])) {
                         $vars[$name] = $auth ? var_decode($value) : $value;
-                        if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
+                        if (is_string($vars[$name]) && preg_match(OBS_PATTERN_XSS, $vars[$name])) {
                             // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                             unset($vars[$name]);
                         }
@@ -245,21 +330,32 @@ function get_vars($vars_order = [], $auth = FALSE)
             case 'URL':
                 // Parse URI into $vars
                 $segments   = explode('/', trim($_SERVER['REQUEST_URI'], '/'));
-                $compressed = $auth && in_array('compressed=1', $segments); // vars can be compressed by str_compress()
+                $compressed = $auth && in_array('compressed=1', $segments, TRUE); // vars can be compressed by str_compress()
 
-                //sr($segments);
+                //r($segments);
                 //r($_SERVER['REQUEST_URI']);
+                $last_var = '';
                 foreach ($segments as $pos => $segment) {
-                    //$segment = urldecode($segment);
-                    if ($pos == "0" && !str_contains($segment, '=')) {
-                        if (!preg_match($prevent_xss, $segment)) {
+                    $name_value = str_contains($segment, '=');
+                    if ($pos === 0 && !$name_value) {
+                        if (!preg_match(OBS_PATTERN_XSS, $segment)) {
                             // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
-                            $segment      = urldecode($segment);
+                            $segment = urldecode($segment);
                             $vars['page'] = $segment;
                         }
+                        $last_var = 'page';
                         //$vars_got['URI'] = 1;
+                    } elseif ($last_var === 'port' && !$name_value) {
+                        // Append segment to previous var
+                        // Correctly parse /port=GigabitEthernet0/1/0.2571
+                        if (!preg_match(OBS_PATTERN_XSS, $segment)) {
+                            // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
+                            $segment = urldecode($segment);
+                            $vars[$last_var] .= '/' . $segment;
+                        }
                     } else {
-                        [$name, $value] = explode('=', $segment, 2);
+                        [ $name, $value ] = explode('=', $segment, 2);
+                        $last_var = $name;
 
                         // Var names sanitize
                         if (!preg_match(OBS_PATTERN_VAR_NAME, $name)) {
@@ -267,7 +363,7 @@ function get_vars($vars_order = [], $auth = FALSE)
                         }
 
                         if (!isset($vars[$name])) {
-                            if (!isset($value) || $value === '') {
+                            if (!$name_value || $value === '') {
                                 $vars[$name] = 'yes';
                             } else {
                                 if ($compressed && $value_uncompress = str_decompress($value)) {
@@ -279,7 +375,7 @@ function get_vars($vars_order = [], $auth = FALSE)
                                     // %05 (ENQ, enquiry) - control char, not defined in HTML 4 standard
                                     $value = str_replace(['%7F', '%05'], ['/', '%'], rawurldecode($value));
                                 }
-                                if (preg_match($prevent_xss, $value)) {
+                                if (preg_match(OBS_PATTERN_XSS, $value)) {
                                     // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                                     continue;
                                 }
@@ -287,7 +383,7 @@ function get_vars($vars_order = [], $auth = FALSE)
                                 // Better to understand quoted vars
                                 $vars[$name] = get_var_csv($value, $auth);
 
-                                if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
+                                if (is_string($vars[$name]) && preg_match(OBS_PATTERN_XSS, $vars[$name])) {
                                     // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                                     unset($vars[$name]);
                                 }
@@ -317,14 +413,14 @@ function get_vars($vars_order = [], $auth = FALSE)
                             // %05 (ENQ, enquiry) - control char, not defined in HTML 4 standard
                             $value = str_replace(['%7F', '%05'], ['/', '%'], rawurldecode($value));
                         }
-                        if (preg_match($prevent_xss, $value)) {
+                        if (preg_match(OBS_PATTERN_XSS, $value)) {
                             // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                             continue;
                         }
 
                         // Better to understand quoted vars
                         $vars[$name] = get_var_csv($value, $auth);
-                        if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
+                        if (is_string($vars[$name]) && preg_match(OBS_PATTERN_XSS, $vars[$name])) {
                             // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                             unset($vars[$name]);
                         }
@@ -342,7 +438,7 @@ function get_vars($vars_order = [], $auth = FALSE)
             // Unset location if is empty string
             unset($vars['location']);
         } elseif (is_array($vars['location'])) {
-            // Additionally decode locations if array entries encoded
+            // Additionally, decode locations if array entries encoded
             foreach ($vars['location'] as $k => $location) {
                 $vars['location'][$k] = $auth ? var_decode($location) : $location;
             }
@@ -355,6 +451,41 @@ function get_vars($vars_order = [], $auth = FALSE)
     return ($vars);
 }
 
+function form_action(&$vars) {
+    global $config;
+
+    if (!isset($vars['action']) || !is_alpha($vars['action'])) {
+        return FALSE;
+    }
+    if ($vars['page'] === 'wmap') {
+        // Weathermap
+        return FALSE;
+    }
+    if ($_SESSION['userlevel'] < 7) {
+        print_error_permission('Action not allowed.');
+    }
+    if (!request_token_valid($vars)) {
+        //r($vars);
+        return FALSE;
+    }
+
+    $limitwrite  = $_SESSION['userlevel'] >= 8;
+    $securewrite = $_SESSION['userlevel'] >= 9;
+    $readwrite   = $_SESSION['userlevel'] >= 10;
+
+    if (is_file($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php")) {
+        return include($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php");
+    }
+
+    $target = explode('_', $vars['action'], 2)[0];
+    if ($target !== $vars['action'] &&
+        is_file($config['html_dir'] . "/includes/actions/" . $target . ".inc.php")) {
+        return include($config['html_dir'] . "/includes/actions/" . $target . ".inc.php");
+    }
+
+    // Unknown action
+    return FALSE;
+}
 
 /**
  * Validate requests by compare session and request tokens.
@@ -434,8 +565,8 @@ function generate_alert_graph($graph_array)
     $vars['height']         = '150';
     $vars['width']          = '400';
     $vars['legend']         = 'no';
-    $vars['from']           = $config['time']['twoday'];
-    $vars['to']             = $config['time']['now'];
+    $vars['from']           = get_time('twoday');
+    $vars['to']             = get_time();
 
     include($config['html_dir'] . '/includes/graphs/graph.inc.php');
 
@@ -587,6 +718,7 @@ function detect_browser($user_agent = NULL)
     if (isset($GLOBALS['config']['devel']) && $GLOBALS['config']['devel']) {
         bdump($GLOBALS['cache']['detect_browser']);
     }
+
     return $GLOBALS['cache']['detect_browser'];
 }
 
@@ -651,7 +783,7 @@ function get_browser_icon($type, $platform) {
 
 function get_browser_screen(&$detect_browser) {
 
-    if (is_graph() || is_api() || is_ajax()) {
+    if (is_graph() || is_api()) {
         return;
     }
 
@@ -662,7 +794,7 @@ function get_browser_screen(&$detect_browser) {
     register_html_resource('js', 'observium-screen.js');
 
     // Additional browser info (screen_ratio, screen_size)
-    $detect_browser['screen_ratio'] = $_COOKIE['observium_screen_ratio'] ?? 1;
+    $detect_browser['screen_ratio'] = $_COOKIE['observium_screen_ratio'] ?? 2;
     if (isset($_COOKIE['observium_screen_resolution'])) {
         $detect_browser['screen_resolution'] = $_COOKIE['observium_screen_resolution'];
         //$detect_browser['screen_size']       = $_COOKIE['observium_screen_size'];
@@ -776,7 +908,7 @@ function pagination(&$vars, $total, $options = [])
     }
     $vars['pageno'] = $page; // Return back current pageno
 
-    if ($options['return_vars'] == TRUE) {
+    if ($options['return_vars']) {
         return '';
     } // Silent exit (needed for detect default pagesize/pageno)
 
@@ -919,9 +1051,8 @@ function pagination(&$vars, $total, $options = [])
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_url($vars, $new_vars = [])
-{
-    $vars = safe_count($vars) ? array_merge($vars, (array)$new_vars) : (array)$new_vars;
+function generate_url($vars, $new_vars = []) {
+    $vars = !safe_empty($vars) ? array_merge($vars, (array)$new_vars) : (array)$new_vars;
 
     $url = !safe_empty($vars['page']) ? urlencode($vars['page']) : '';
     unset($vars['page']);
@@ -936,10 +1067,12 @@ function generate_url($vars, $new_vars = [])
             continue;
         }
         if (is_array($value)) {
-            $url .= urlencode($var) . '=' . var_encode($value) . '/';
-        } elseif (!safe_empty($value) && !is_numeric($var) && !str_contains($var, "opt")) {
+            // Keep a numeric array list as a comma list
+            $value_implode = is_array_numeric($value) ? implode(',', $value) : var_encode($value);
+            $url .= urlencode($var) . '=' . $value_implode . '/';
+        } elseif (!is_numeric($var) && !safe_empty($value) && !str_contains($var, "opt")) {
             // rawurlencode() according change in r12351
-            $url .= urlencode($var) . '=' . rawurlencode(str_replace(['%', '/'], ['%05', '%7F'], $value)) . '/'; // %7F converted back to / in get_vars()
+            $url .= urlencode($var) . '=' . rawurlencode(str_replace([ '%', '/' ], [ '%05', '%7F' ], $value)) . '/'; // %7F converted back to / in get_vars()
         }
     }
 
@@ -953,14 +1086,16 @@ function generate_url($vars, $new_vars = [])
         }
     }
 
-    return ($url);
+    return $url;
 }
 
-function generate_html_attribs($attribs)
-{
+function generate_html_attribs($attribs) {
     if (!is_array($attribs)) {
         return '';
     }
+
+    // Make some common operations with attribs, i.e. confirmation
+    process_html_attribs($attribs);
 
     // Filter attributes (data-*, aria-*, role, style, class)
     //$attrib_pattern = '/^(data\-[_\w\-]+|aria\-[_\w\-]+|role|class|style|onclick)$/';
@@ -984,6 +1119,74 @@ function generate_html_attribs($attribs)
         return implode(' ', $elements);
     }
     return '';
+}
+
+function process_html_attribs(&$attribs) {
+    if (isset($attribs['data-toggle'])) {
+        // Enable item specific JS/CSS/Script
+        switch ($attribs['data-toggle']) {
+            case 'confirm':
+            case 'confirmation':
+                if ($attribs['data-toggle'] === 'confirmation') {
+                    $attribs['data-toggle'] = 'confirm';
+                }
+
+                // Bootstrap-Confirmation
+                register_html_resource('js', 'bootstrap-confirmation.min.js');
+
+                //register_html_resource('script', '$("[data-toggle=\'' . $attribs['data-toggle'] .
+                //                                 '\']").confirmation({rootSelector: \'[data-toggle=' . $attribs['data-toggle'] . ']\',});');
+                //$script_options = [ 'rootSelector: \'[data-toggle=' . $attribs['data-toggle'] . ']\'' ];
+
+                if (!isset($attribs['data-btn-ok-label'])) {
+                    // default "Yes"
+                    //$attribs['data-btn-ok-label'] = 'Yes';
+                }
+                if (!isset($attribs['data-btn-ok-class'])) {
+                    // default "btn btn-xs btn-primary"
+                }
+                if (!isset($attribs['data-btn-ok-icon'])) {
+                    // default "glyphicon glyphicon-ok"
+                    //$attribs['data-btn-ok-icon'] = 'Yes';
+                }
+                if (!isset($attribs['data-btn-cancel-label'])) {
+                    // default "No"
+                    //$attribs['data-btn-cancel-label'] = 'Cheese';
+                }
+                if (!isset($attribs['data-btn-cancel-class'])) {
+                    // default "btn btn-xs btn-default"
+                    //$attribs['data-btn-cancel-class'] = 'btn-small btn-warning';
+                }
+                if (!isset($attribs['data-btn-cancel-icon'])) {
+                    // default "glyphicon glyphicon-remove"
+                    //$attribs['data-btn-cancel-icon'] = 'icon-sort';
+                }
+
+                // migrate from popConfirm
+                if (!isset($attribs['data-title'])) {
+                    $attribs['data-title'] = 'Confirmation';
+                }
+                if (!isset($attribs['data-html'])) {
+                    $attribs['data-html'] = 'true';
+                }
+                if (!isset($attribs['data-singleton'])) {
+                    $attribs['data-singleton'] = 'true';
+                }
+                if (!isset($attribs['data-popout'])) {
+                    $attribs['data-popout'] = 'true';
+                }
+                if (isset($attribs['data-confirm-placement'])) {
+                    $attribs['data-placement'] = $attribs['data-confirm-placement'];
+                    unset($attribs['data-confirm-placement']);
+                }
+                if (isset($attribs['data-confirm-content'])) {
+                    $attribs['data-content'] = $attribs['data-confirm-content'];
+                    unset($attribs['data-confirm-content']);
+                }
+                //register_html_resource('script', '$("[data-toggle=\'' . $attribs['data-toggle'] . '\']").confirmation({' . implode(', ', $script_options) . '});');
+                break;
+        }
+    }
 }
 
 // TESTME needs unit testing
@@ -1045,9 +1248,7 @@ function generate_location_url($location, $vars = [])
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_overlib_content($graph_array, $text = NULL, $escape = TRUE)
-{
-    global $config;
+function generate_overlib_content($graph_array, $text = NULL, $escape = TRUE) {
 
     $graph_array['height'] = "100";
     $graph_array['width']  = "220";
@@ -1065,8 +1266,8 @@ function generate_overlib_content($graph_array, $text = NULL, $escape = TRUE)
   }
   $content = generate_box_open($box_args);
   */
-    foreach (['day', 'week', 'month', 'year'] as $period) {
-        $graph_array['from'] = $config['time'][$period];
+    foreach ([ 'day', 'week', 'month', 'year' ] as $period) {
+        $graph_array['from'] = get_time($period);
         $content             .= generate_graph_tag($graph_array);
     }
     $content .= "</div>";
@@ -1111,7 +1312,7 @@ function get_percentage_colours($percentage)
  * @param string  $type   Popup type, see possible types in html/ajax/entitypopup.php
  * @param string  $text   Text used as link name and ajax data
  * @param array   $vars   Array for generate url
- * @param string Additional css classes for link
+ * @param string  $class  Additional css classes for link
  * @param boolean $escape Escape or not text in url
  *
  * @return string Returns string with link, when hover on this link show popup message based on type
@@ -1133,7 +1334,7 @@ function generate_popup_link($type, $text = NULL, $vars = [], $class = NULL, $es
             $addresses += $matches['ip'];
         }
         //r($addresses);
-        if (count($addresses)) {
+        if (!safe_empty($addresses)) {
             $return = $escape ? escape_html($text) : $text; // escape before replace (ip nets not escaped anyway)
 
             foreach ($addresses as $address) {
@@ -1154,7 +1355,7 @@ function generate_popup_link($type, $text = NULL, $vars = [], $class = NULL, $es
                 $ip_type = get_ip_type($ip);
                 //print_warning("$address : $ip_type");
                 // Do not linkify some types of ip addresses
-                if (in_array($ip_type, [ 'loopback', 'unspecified', 'broadcast', 'private', 'link-local', 'reserved' ])) {
+                if (in_array($ip_type, [ 'loopback', 'unspecified', 'broadcast', 'private', 'cgnat', 'link-local', 'reserved' ])) {
                     if (!safe_empty($class)) {
                         $link   = '<span class="' . $class . '">' . $address_compressed . '</span>';
                         $return = str_replace($address, $link, $return);
@@ -1164,7 +1365,7 @@ function generate_popup_link($type, $text = NULL, $vars = [], $class = NULL, $es
                     continue;
                 }
 
-                $url    = safe_count($vars) ? generate_url($vars) : 'javascript:void(0)'; // If vars empty, set link not clickable
+                $url    = !safe_empty($vars) ? generate_url($vars) : 'javascript:void(0)'; // If vars empty, set link not clickable
                 $link   = '<a href="' . $url . '" class="entity-popup' . ($class ? " $class" : '') . '" data-eid="' . $ip . '" data-etype="' . $type . '">' . $address_compressed . '</a>';
                 $return = str_replace($address, $link, $return);
             }
@@ -1388,13 +1589,14 @@ function generate_menu_link_ng($array, $text = NULL, $escape = TRUE)
             $text = $array['text'];
         }
     }
-    if ($escape) {
+    if ($array['escape'] ?? $escape) {
         $text = escape_html($text);
     }
 
     $output .= $text . '</span>';
 
     // Counter label(s) in navbar menu
+    $extra = '';
     if (isset($array['count_array']) && safe_count($array['count_array'])) {
         // Multiple counts as a group
         $count_items = [];
@@ -1428,19 +1630,23 @@ function generate_menu_link_ng($array, $text = NULL, $escape = TRUE)
         }
 
         //r(get_label_group($count_items));
-        $output .= get_label_group($count_items);
+        $extra .= get_label_group($count_items);
     } else {
         // single counts
         if (isset($array['alert_count']) && is_numeric($array['alert_count'])) {
-            $output .= ' <span class="label label-danger">' . $array['alert_count'] . '</span> ';
+            $extra .= ' <span class="label label-danger">' . $array['alert_count'] . '</span> ';
         }
 
         if (isset($array['count']) && is_numeric($array['count'])) {
-            $output .= ' <span class="' . $array['count_class'] . '">' . $array['count'] . '</span>';
+            $extra .= ' <span class="' . $array['count_class'] . '">' . $array['count'] . '</span>';
         }
     }
+    if (isset($array['extra'])) {
+        // used in refresh menu
+        $extra .= ($array['escape'] ?? $escape) ? escape_html($array['extra']) : $array['extra'];
+    }
 
-    $output .= '</a>';
+    $output .= $extra . '</a>';
 
     return $output;
 }
@@ -1475,13 +1681,13 @@ function generate_graph_popup($graph_array)
     $graph_array['legend'] = "yes";
     $graph_array['height'] = "100";
     $graph_array['width']  = "340";
-    $graph_array['from']   = $config['time']['day'];
+    $graph_array['from']   = get_time('day');
     $content               .= generate_graph_tag($graph_array);
-    $graph_array['from']   = $config['time']['week'];
+    $graph_array['from']   = get_time('week');
     $content               .= generate_graph_tag($graph_array);
-    $graph_array['from']   = $config['time']['month'];
+    $graph_array['from']   = get_time('month');
     $content               .= generate_graph_tag($graph_array);
-    $graph_array['from']   = $config['time']['year'];
+    $graph_array['from']   = get_time('year');
     $content               .= generate_graph_tag($graph_array);
     $content               .= "</div>";
     //$content .= generate_box_close();
@@ -1503,8 +1709,7 @@ function print_graph_popup($graph_array)
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function permissions_cache($user_id)
-{
+function permissions_cache($user_id) {
 
     $cache_key  = 'permissions_' . $GLOBALS['config']['auth_mechanism'] . $user_id;
     $cache_item = get_cache_item($cache_key);
@@ -1516,26 +1721,22 @@ function permissions_cache($user_id)
 
     // Get permissions from user-specific and role tables.
     $permission_where         = '`user_id` = ? AND `auth_mechanism` = ?';
-    $permission_params        = [$user_id, $GLOBALS['config']['auth_mechanism']];
+    $permission_params        = [ $user_id, $GLOBALS['config']['auth_mechanism'] ];
     $entity_permissions       = dbFetchRows("SELECT * FROM `entity_permissions` WHERE " . $permission_where, $permission_params);
     $roles_entity_permissions = dbFetchRows("SELECT * FROM `roles_entity_permissions` LEFT JOIN `roles_users` USING (`role_id`) WHERE " . $permission_where, $permission_params);
     foreach (array_merge((array)$entity_permissions, (array)$roles_entity_permissions) as $entity) {
         // Set access to ro if it's not in the defined list.
-        $access = (in_array($entity['access'], ['ro', 'rw']) ? $entity['access'] : 'ro');
+        $access = (in_array($entity['access'], [ 'ro', 'rw' ]) ? $entity['access'] : 'ro');
 
-        switch ($entity['entity_type']) {
-            case "group": // this is a group, so expand its members into an array
-                $group = get_group_by_id($entity['entity_id']);
-                foreach (get_group_entities($entity['entity_id']) as $group_entity_id) {
-                    $permissions[$group['entity_type']][$group_entity_id] = $access;
-                }
-            //break; // And also store self group permission in cache
-            default:
-                $permissions[$entity['entity_type']][$entity['entity_id']] = $access;
-                break;
+        if ($entity['entity_type'] === 'group') {
+            // this is a group, so expand its members into an array
+            $group = get_group_by_id($entity['entity_id']);
+            foreach (get_group_entities($entity['entity_id']) as $group_entity_id) {
+                $permissions[$group['entity_type']][(int)$group_entity_id] = $access;
+            }
         }
+        $permissions[$entity['entity_type']][(int)$entity['entity_id']] = $access;
     }
-    //r($permissions);
 
     // Cache platform permissions
     foreach (dbFetchRows("SELECT * FROM `roles_permissions` LEFT JOIN `roles_users` USING (`role_id`) WHERE " . $permission_where, $permission_params) as $perm) {
@@ -1551,7 +1752,7 @@ function permissions_cache($user_id)
             $alert[$alert_table_entry['alert_table_id']] = TRUE;
         }
     }
-    if (count($alert)) {
+    if (!safe_empty($alert)) {
         $permissions['alert'] = $alert;
     }
 
@@ -1569,7 +1770,7 @@ function permissions_cache($user_id)
  * In mostly cases (also by default) this is just $_SERVER['REMOTE_ADDR'],
  * but if config options ($config['web_remote_addr_header']) set, this can use specified HTTP headers
  *
- * @param boolean Use or not HTTP header specified in $config['web_remote_addr_header']
+ * @param bool $use_http_header Use or not HTTP header specified in $config['web_remote_addr_header']
  *
  * @return string IP address of remote client
  */
@@ -1607,42 +1808,6 @@ function get_remote_addr($use_http_header = FALSE)
     return $_SERVER['REMOTE_ADDR'];
 }
 
-/**
- * Store cached device/port/etc permitted IDs into $_SESSION['cache']
- *
- * IDs collected in html/includes/cache-data.inc.php
- * This function used mostly in print_search() or print_form(), see html/includes/print/search.inc.php
- * Cached IDs from $_SESSION used in ajax forms by generate_query_permitted()
- *
- * @return null
- */
-function permissions_cache_session()
-{
-    if (!$_SESSION['authenticated']) {
-        return;
-    }
-
-    if (isset($GLOBALS['permissions_cached_session'])) {
-        return;
-    } // skip if this function already run. FIXME?
-
-    @session_start(); // Re-enable write to session
-
-    // Store device IDs in SESSION var for use to check permissions with ajax queries
-    foreach (['permitted', 'disabled', 'ignored'] as $key) {
-        $_SESSION['cache']['devices'][$key] = $GLOBALS['cache']['devices'][$key];
-    }
-
-    // Store port IDs in SESSION var for use to check permissions with ajax queries
-    foreach (['permitted', 'deleted', 'errored', 'ignored', 'poll_disabled', 'device_disabled', 'device_ignored'] as $key) {
-        $_SESSION['cache']['ports'][$key] = $GLOBALS['cache']['ports'][$key];
-    }
-
-    $GLOBALS['permissions_cached_session'] = TRUE;
-
-    session_commit(); // Write and close session
-}
-
 // TESTME needs unit testing
 // DOCME needs phpdoc block
 function bill_permitted($bill_id)
@@ -1658,27 +1823,6 @@ function bill_permitted($bill_id)
     }
 
     return $allowed;
-}
-
-// TESTME needs unit testing
-// DOCME needs phpdoc block
-function port_permitted($port_id, $device_id = NULL)
-{
-    return is_entity_permitted($port_id, 'port', $device_id);
-}
-
-// TESTME needs unit testing
-// DOCME needs phpdoc block
-function port_permitted_array(&$ports)
-{
-    // Strip out the ports the user isn't allowed to see, if they don't have global rights
-    if ($_SESSION['userlevel'] < '7') {
-        foreach ($ports as $key => $port) {
-            if (!port_permitted($port['port_id'], $port['device_id'])) {
-                unset($ports[$key]);
-            }
-        }
-    }
 }
 
 function entity_permitted_array(&$entities, $entity_type)
@@ -1723,32 +1867,6 @@ function application_permitted($app_id, $device_id = NULL)
     return $allowed;
 }
 
-// TESTME needs unit testing
-// DOCME needs phpdoc block
-function device_permitted($device_id)
-{
-    global $permissions;
-
-    // If we've been passed an entity with device_id, just use that.
-    if (is_array($device_id) && isset($device_id['device_id'])) {
-        $device_id = $device_id['device_id'];
-    }
-
-    // If we still don't have a numeric device_id, return false because someone messed up.
-    if (!is_numeric($device_id)) {
-        return $_SESSION['userlevel'] >= 5; // in case when passed a pseudo device (like in OSes page)
-    }
-
-    // Level >5 can see everything.
-    if ($_SESSION['userlevel'] >= 5) {
-        $allowed = TRUE;
-    } elseif (isset($permissions['device'][$device_id])) {
-        $allowed = TRUE;
-    } else {
-        $allowed = FALSE;
-    }
-    return $allowed;
-}
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
@@ -1778,11 +1896,7 @@ function generate_graph_tag($args, $return_array = FALSE)
         unset($args['style']);
     }
 
-    if (isset($args['img_id'])) {
-        $i['img_id'] = $args['img_id'];
-    } else {
-        $i['img_id'] = random_string(8);
-    }
+    $i['img_id'] = $args['img_id'] ?? random_string(8);
 
     // Detect an allowed screen ratio for the current browser
     $ua_info = detect_browser();
@@ -1941,29 +2055,6 @@ function print_percentage_bar($width, $height, $percent, $left_text, $left_colou
     return $output;
 }
 
-// TESTME needs unit testing
-// DOCME needs phpdoc block
-function device_link_class($device)
-{
-    if (isset($device['status']) && $device['status'] == '0') {
-        $class = "red";
-    } else {
-        $class = "";
-    }
-    if ((isset($device['ignore']) && $device['ignore'] == '1')
-        || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > time())) {
-        $class = "grey";
-        if (isset($device['status']) && $device['status'] == '1') {
-            $class = "green";
-        }
-    }
-    if (isset($device['disabled']) && $device['disabled'] == '1') {
-        $class = "grey";
-    }
-
-    return $class;
-}
-
 /**
  * Return cached locations list
  *
@@ -1988,11 +2079,11 @@ function get_locations($filter = [])
             case 'location_city':
                 // Check geo params only when GEO enabled globally
                 if ($GLOBALS['config']['geocoding']['enable']) {
-                    $where_array[$var] = generate_query_values_ng($value, $var);
+                    $where_array[$var] = generate_query_values($value, $var);
                 }
                 break;
             case 'location':
-                $where_array[$var] = generate_query_values_ng($value, $var);
+                $where_array[$var] = generate_query_values($value, $var);
                 break;
         }
     }
@@ -2060,19 +2151,6 @@ function generate_ap_link($args, $text = NULL, $type = NULL, $escape = FALSE)
     return $text;
 }
 
-/**
- * Returns TRUE if the device is marked as ignored in the cache.
- *
- * @param $device_id
- *
- * @return bool
- */
-function device_is_ignored($device_id)
-{
-    return isset($GLOBALS['cache']['devices']['ignored']) && in_array($device_id, $GLOBALS['cache']['devices']['ignored'], TRUE);
-}
-
-
 // TESTME needs unit testing
 // DOCME needs phpdoc block
 function generate_ap_url($ap, $vars = [])
@@ -2110,10 +2188,9 @@ function generate_ap_url($ap, $vars = [])
  * @global string      $GLOBALS    ['vars']['page']
  */
 // TESTME needs unit testing
-function generate_query_permitted_ng($type_array = ['device'], $options = [])
-{
+function generate_query_permitted_ng($type_array = [ 'device' ], $options = []) {
     if (!is_array($type_array)) {
-        $type_array = [$type_array];
+        $type_array = [ $type_array ];
     }
     $user_limited = $_SESSION['userlevel'] < 5;
     $page         = $GLOBALS['vars']['page'];
@@ -2152,34 +2229,29 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
 
                 // Show only permitted devices
                 if ($user_limited) {
-                    if (safe_count($GLOBALS['permissions']['device'])) {
-                        $query_permitted[] = generate_query_values_ng(array_keys($GLOBALS['permissions']['device']), $column);
-                        // $query_permitted[] = " $column IN (".
-                        //                      implode(',', array_keys($GLOBALS['permissions']['device'])).
-                        //                      ')';
-
+                    if (!safe_empty($GLOBALS['permissions']['device'])) {
+                        $query_permitted[] = generate_query_values(array_keys($GLOBALS['permissions']['device']), $column);
                     } else {
-                        // Exclude all entries, because there is no permitted devices
+                        // Exclude all entries, because there are no permitted devices
                         $query_permitted[] = ' 0';
                     }
                 }
 
                 // Also don't show ignored and disabled devices (except on 'device' and 'devices' pages)
                 $devices_excluded = [];
-                if (strpos($page, 'device') !== 0) {
-                    if ($options['hide_ignored'] && safe_count($GLOBALS['cache']['devices']['ignored'])) {
+                if (!str_starts_with($page, 'device')) {
+                    if ($options['hide_ignored'] && !safe_empty($GLOBALS['cache']['devices']['ignored'])) {
                         $devices_excluded = array_merge($devices_excluded, $GLOBALS['cache']['devices']['ignored']);
                     }
-                    if ($options['hide_disabled'] && safe_count($GLOBALS['cache']['devices']['disabled'])) {
+                    if ($options['hide_disabled'] && !safe_empty($GLOBALS['cache']['devices']['disabled'])) {
                         $devices_excluded = array_merge($devices_excluded, $GLOBALS['cache']['devices']['disabled']);
                     }
                 }
                 if (!safe_empty($devices_excluded)) {
+                    //sort($devices_excluded, SORT_NUMERIC);
+                    //r($devices_excluded);
                     // Set query with excluded devices
-                    $query_permitted[] = generate_query_values_ng(array_unique($devices_excluded), $column, '!=');
-                    // $query_permitted[] = " $column NOT IN (".
-                    //                      implode(',', array_unique($devices_excluded)).
-                    //                      ')';
+                    $query_permitted[] = generate_query_values($devices_excluded, $column, '!=');
                 }
 
                 // At the end excluded entries with empty/null device_id (wrong entries)
@@ -2204,8 +2276,8 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
 
                 // Show only permitted ports
                 if ($user_limited) {
-                    if (safe_count($GLOBALS['permissions']['port'])) {
-                        $query_permitted[] = generate_query_values_ng(array_keys($GLOBALS['permissions']['port']), $column);
+                    if (!safe_empty($GLOBALS['permissions']['port'])) {
+                        $query_permitted[] = generate_query_values(array_keys($GLOBALS['permissions']['port']), $column);
                         // $query_permitted[] = " $column IN (" .
                         //                      implode(',', array_keys($GLOBALS['permissions']['port'])) .
                         //                      ')';
@@ -2217,7 +2289,7 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
 
                 $ports_excluded = [];
                 // Don't show ports with disabled polling.
-                if (safe_count($GLOBALS['cache']['ports']['poll_disabled'])) {
+                if (!safe_empty($GLOBALS['cache']['ports']['poll_disabled'])) {
                     $ports_excluded = array_merge($ports_excluded, $GLOBALS['cache']['ports']['poll_disabled']);
                     //foreach ($GLOBALS['cache']['ports']['poll_disabled'] as $entry)
                     //{
@@ -2226,7 +2298,7 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
                     //$ports_excluded = array_unique($ports_excluded);
                 }
                 // Don't show deleted ports (except on 'deleted-ports' page)
-                if ($page !== 'deleted-ports' && safe_count($GLOBALS['cache']['ports']['deleted'])) {
+                if ($page !== 'deleted-ports' && !safe_empty($GLOBALS['cache']['ports']['deleted'])) {
                     $ports_excluded = array_merge($ports_excluded, $GLOBALS['cache']['ports']['deleted']);
                     //foreach ($GLOBALS['cache']['ports']['deleted'] as $entry)
                     //{
@@ -2236,7 +2308,7 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
                 }
                 if ($page !== 'device' && !in_array('device', $type_array)) {
                     // Don't show ports for disabled devices (except on 'device' page or if 'device' permissions already queried)
-                    if ($options['hide_disabled'] && !$user_limited && safe_count($GLOBALS['cache']['ports']['device_disabled'])) {
+                    if ($options['hide_disabled'] && !$user_limited && !safe_empty($GLOBALS['cache']['ports']['device_disabled'])) {
                         $ports_excluded = array_merge($ports_excluded, $GLOBALS['cache']['ports']['device_disabled']);
                         //foreach ($GLOBALS['cache']['ports']['device_disabled'] as $entry)
                         //{
@@ -2245,7 +2317,7 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
                         //$ports_excluded = array_unique($ports_excluded);
                     }
                     // Don't show ports for ignored devices (except on 'device' page)
-                    if ($options['hide_ignored'] && safe_count($GLOBALS['cache']['ports']['device_ignored'])) {
+                    if ($options['hide_ignored'] && !safe_empty($GLOBALS['cache']['ports']['device_ignored'])) {
                         $ports_excluded = array_merge($ports_excluded, $GLOBALS['cache']['ports']['device_ignored']);
                         //foreach ($GLOBALS['cache']['ports']['device_ignored'] as $entry)
                         //{
@@ -2255,7 +2327,7 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
                     }
                 }
                 // Don't show ignored ports (only on some pages!)
-                if (($page === 'overview' || $options['hide_ignored']) && safe_count($GLOBALS['cache']['ports']['ignored'])) {
+                if (($page === 'overview' || $options['hide_ignored']) && !safe_empty($GLOBALS['cache']['ports']['ignored'])) {
                     $ports_excluded = array_merge($ports_excluded, $GLOBALS['cache']['ports']['ignored']);
                     //foreach ($GLOBALS['cache']['ports']['ignored'] as $entry)
                     //{
@@ -2266,10 +2338,7 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
                 unset($entry);
                 if (!safe_empty($ports_excluded)) {
                     // Set query with excluded ports
-                    $query_permitted[] = generate_query_values_ng(array_unique($ports_excluded), $column, '!=');
-                    // $query_permitted[] = $column . " NOT IN (".
-                    //                    implode(',', array_unique($ports_excluded)).
-                    //                    ')';
+                    $query_permitted[] = generate_query_values($ports_excluded, $column, '!=');
 
                 }
 
@@ -2309,11 +2378,8 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
 
                 // Show only permitted entities
                 if ($user_limited) {
-                    if (safe_count($GLOBALS['permissions']['sensor'])) {
-                        $query_permitted = generate_query_values_ng(array_keys((array)$GLOBALS['permissions']['sensor']), $column);
-                        // $query_permitted .= " $column IN (";
-                        // $query_permitted .= implode(',', array_keys($GLOBALS['permissions']['sensor']));
-                        // $query_permitted .= ')';
+                    if (!safe_empty($GLOBALS['permissions']['sensor'])) {
+                        $query_permitted = generate_query_values(array_keys((array)$GLOBALS['permissions']['sensor']), $column);
                     } else {
                         // Exclude all entries, because there are no permitted entities
                         $query_permitted = '0';
@@ -2332,11 +2398,8 @@ function generate_query_permitted_ng($type_array = ['device'], $options = [])
 
                 // Show only permitted entities
                 if ($user_limited) {
-                    if (safe_count($GLOBALS['permissions']['alert'])) {
-                        $query_permitted = generate_query_values_ng(array_keys((array)$GLOBALS['permissions']['alert']), $column);
-                        // $query_permitted .= " $column IN (";
-                        // $query_permitted .= implode(',', array_keys($GLOBALS['permissions']['alert']));
-                        // $query_permitted .= ')';
+                    if (!safe_empty($GLOBALS['permissions']['alert'])) {
+                        $query_permitted = generate_query_values(array_keys((array)$GLOBALS['permissions']['alert']), $column);
                     } else {
                         // Exclude all entries, because there are no permitted entities
                         $query_permitted = '0';
@@ -2756,85 +2819,6 @@ function json_output($status, $message)
 }
 
 /**
- * Register an HTML resource
- *
- * Registers resource for use later (will be re-inserted via output buffer handler)
- * CSS and JS files default to the css/ and js/ directories respectively.
- * Scripts are inserted literally as passed in $name.
- *
- * @param string $type    Type of resource (css/js/script)
- * @param string $content Filename or script content or array (for meta)
- */
-// TESTME needs unit testing
-function register_html_resource($type, $content)
-{
-    // If no path specified, default to subdirectory of resource type (for CSS and JS only)
-    $type = strtolower($type);
-    if (in_array($type, ['css', 'js']) && strpos($content, '/') === FALSE) {
-        $content = $type . '/' . $content;
-    }
-
-    // Insert into global variable, used in html callback function
-    $GLOBALS['cache_html']['resources'][$type][] = $content;
-}
-
-/**
- * Register an HTML title section
- *
- * Registers title section for use in the html <title> tag.
- * Calls can be stacked, and will be concatenated later by the HTML callback function.
- *
- * @param string $title Section title content
- */
-// TESTME needs unit testing
-function register_html_title($title)
-{
-    $GLOBALS['cache_html']['title'][] = $title;
-}
-
-/**
- * Register an HTML alert block displayed in top of page.
- *
- * @param string $text     Alert message
- * @param string $title    Alert title if passed
- * @param string $severity Severity in list: info, danger, warning, success, recovery, suppressed, delay, disabled
- */
-function register_html_alert($text, $title = NULL, $severity = 'info')
-{
-    // FIXME handle severity parameter with colour or icon?
-    $ui_alerts = '<div width="100%" class="alert alert-' . $severity . '">';
-    if (!safe_empty($title)) {
-        $ui_alerts .= '<h4>' . $title . '</h4>';
-    }
-    $ui_alerts .= $text . '</div>';
-
-    $GLOBALS['cache_html']['ui_alerts'][] = $ui_alerts;
-}
-
-/**
- * Register an HTML panel section
- *
- * Registers left panel section.
- * Calls can be stacked, and will be concatenated later by the HTML callback function.
- *
- * @param string $html Section panel content
- */
-// TESTME needs unit testing
-function register_html_panel($html = '')
-{
-    if (!isset($GLOBALS['cache_html']['page_panel']) && is_alpha($html) &&
-        is_file($GLOBALS['config']['html_dir'] . "/includes/panels/" . $html . ".inc.php")) {
-
-        $panel_file = $GLOBALS['config']['html_dir'] . "/includes/panels/" . $html . ".inc.php";
-        ob_start();
-        include($panel_file);
-        $html = ob_get_clean();
-    }
-
-    $GLOBALS['cache_html']['page_panel'] = $html;
-}
-
-/**
  * Redirect to specified URL
  *
  * @param string $url Redirecting URL
@@ -2881,6 +2865,7 @@ function generate_colour_gradient($start_colour, $end_colour, $steps)
     $StepRGB['b'] = ($FromRGB['b'] - $ToRGB['b']) / ($steps - 1);
 
     $GradientColors = [];
+    $GradientColors[] = $start_colour; // Hack because array starts at 0, but we count from 1.
 
     for ($i = 0; $i < $steps; $i++) {
         $RGB['r'] = floor($FromRGB['r'] - ($StepRGB['r'] * $i));
@@ -2894,12 +2879,16 @@ function generate_colour_gradient($start_colour, $end_colour, $steps)
         $GradientColors[] = implode(NULL, $HexRGB);
     }
     $GradientColors = array_filter($GradientColors, "c_len");
+
+    unset($GradientColors[0]); // Remove the placeholder array position 0 because it's not used.
+    //r($GradientColors);
+
     return $GradientColors;
 }
 
 function c_len($val)
 {
-    return (strlen($val) == 6 ? TRUE : FALSE);
+    return strlen($val) === 6;
 }
 
 function adjust_colour_brightness($hex, $steps)
@@ -2909,8 +2898,8 @@ function adjust_colour_brightness($hex, $steps)
 
     // Normalize into a six character long hex string
     $hex = str_replace('#', '', $hex);
-    if (strlen($hex) == 3) {
-        $hex = str_repeat(substr($hex, 0, 1), 2) . str_repeat(substr($hex, 1, 1), 2) . str_repeat(substr($hex, 2, 1), 2);
+    if (strlen($hex) === 3) {
+        $hex = str_repeat($hex[0], 2) . str_repeat($hex[1], 2) . str_repeat($hex[2], 2);
     }
 
     // Split into three parts: R, G and B
@@ -2990,21 +2979,22 @@ function html_highlight($text, $search = [], $replace = '', $words = FALSE)
  *
  * @return string
  */
-function get_type_class($type, $group = "unknown")
-{
-    global $cache;
+function get_type_class($type, $group = "unknown") {
+    global $cache, $config;
+
+    // Short-circuit if hardcoded classes exist for this
+    if (isset($config['type_class'][$group][$type]['class'])) {
+        return $config['type_class'][$group][$type]['class'];
+    }
 
     if (isset($cache['type_class'][$group][$type])) {
         return $cache['type_class'][$group][$type]['class'];
     }
 
-    $classes = ['primary', 'success', 'warning', 'error', 'suppressed'];
+    // Hardcode available classes (perhaps make this somehow configurable per-group for larger groups)
+    $classes = [ 'primary', 'success', 'warning', 'error', 'suppressed' ];
 
-    if (isset($cache['type_class'][$group]['NEXT'])) {
-        $next = $cache['type_class'][$group]['NEXT'];
-    } else {
-        $next = 0;
-    }
+    $next = $cache['type_class'][$group]['NEXT'] ?? 0;
 
     $cache['type_class'][$group][$type]['class'] = $classes[$next];
 
@@ -3026,12 +3016,9 @@ function get_type_class($type, $group = "unknown")
  *
  * @return string
  */
-
-function get_type_class_label($type, $group = "unknown")
-{
+function get_type_class_label($type, $group = "unknown") {
 
     return '<span class="label label-' . get_type_class($type, $group) . '">' . $type . '</span>';
-
 }
 
 /**

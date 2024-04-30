@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -18,7 +18,7 @@
  *   print_navbar(array('brand' => "Apps", 'class' => "navbar-narrow", 'options' => array('mysql' => array('text' => "MySQL", 'url' => generate_url($vars,
  *   'app' => "mysql")))))
  *
- * @param array $vars
+ * @param array $tabbar
  *
  * @return null
  *
@@ -237,6 +237,138 @@ function print_navbar($navbar)
 
 }
 
+function generate_navbar($navbar) {
+    ob_start();
+    print_navbar($navbar);
+
+    return ob_get_clean();
+}
+
+function navbar_alerts_filter(&$navbar, $vars, $extra = []) {
+
+    $statuses = empty($vars['status']) ? [ 'all' ] : (array)$vars['status'];
+    $all      = in_array('all', $statuses, TRUE);
+    $url_all  = generate_url($vars, [ 'page' => 'alerts', 'status' => 'all' ]);
+
+    $navbar['options_right']['filters']['url']  = '#';
+    $navbar['options_right']['filters']['text'] = 'Filter';
+    $navbar['options_right']['filters']['icon'] = 'filter';
+    //$navbar['options_right']['filters']['link_opts'] = 'data-hover="dropdown" data-toggle="dropdown"';
+
+    // All
+    $navbar['options_right']['filters']['suboptions']['all']['text'] = 'All';
+    $navbar['options_right']['filters']['suboptions']['all']['icon'] = 'info';
+    $navbar['options_right']['filters']['suboptions']['all']['url']  = $url_all;
+    if ($all) {
+        //$navbar['options_right']['filters']['class'] = "active";
+        $navbar['options_right']['filters']['suboptions']['all']['class'] = "active";
+        $navbar['options_right']['filters']['text'] .= ' (All)';
+    }
+    $statuses = array_diff($statuses, [ 'all' ]);
+
+    $filters = [
+        'ok' => [
+            'icon'  => 'ok',
+            'text'  => 'Ok'
+        ],
+        'failed' => [
+            'icon'  => 'stop',
+            'text'  => 'Failed'
+        ],
+        'delayed' => [
+            'icon'  => 'important',
+            'text'  => 'Delayed'
+        ],
+        'suppressed' => [
+            'icon'  => 'shutdown',
+            'text'  => 'Suppressed'
+        ]
+    ];
+
+    $filters_text = [];
+    foreach ($filters as $option => $option_array) {
+
+        $navbar['options_right']['filters']['suboptions'][$option]['text'] = $option_array['text'];
+        $navbar['options_right']['filters']['suboptions'][$option]['icon'] = $option_array['icon'];
+
+        $link_statuses = $statuses;
+        if (in_array($option, $statuses, TRUE)) {
+            $navbar['options_right']['filters']['suboptions'][$option]['class'] = "active";
+            if (!$all) {
+                $navbar['options_right']['filters']['class'] = "active";
+            }
+            $link_statuses = array_diff($link_statuses, [ $option ]); // unset status
+            $filters_text[] = $option_array['text'];
+            $navbar['options_right']['filters']['icon'] = $option_array['icon'];
+
+        } else {
+            $link_statuses[] = $option;
+        }
+        $navbar['options_right']['filters']['suboptions'][$option]['url'] = generate_url($vars, [ 'page' => 'alerts', 'status' => implode(',', $link_statuses)]);
+    }
+    if ($filters_text) {
+        $navbar['options_right']['filters']['text'] .= ' (' . implode(', ', $filters_text) . ')';
+    }
+}
+
+function navbar_ports_filter(&$navbar, $vars, $extra = []) {
+    global $config;
+
+    $filters_array = $vars['filters'] ?? [ 'deleted' => TRUE ];
+
+    // List filters
+    $filter_options = [];
+
+    if ($extra) {
+        foreach ((array)$extra as $port_type) {
+            if (isset($config['port_types'][$port_type])) {
+                $filter_options[$port_type] = 'Hide ' . $config['port_types'][$port_type]['name'];
+            }
+        }
+        $filter_options['divider'] = 'divider';
+    }
+
+    $filter_options['up']       = 'Hide UP';
+    $filter_options['down']     = 'Hide DOWN';
+    $filter_options['shutdown'] = 'Hide SHUTDOWN';
+    $filter_options['ignored']  = 'Hide IGNORED';
+    $filter_options['deleted']  = 'Hide DELETED';
+
+    // To be or not to be
+    $filters_array['all'] = TRUE;
+    foreach ($filter_options as $option => $text) {
+        if ($text === 'divider') { continue; }
+        $filters_array['all'] = $filters_array['all'] && $filters_array[$option];
+        $option_all[$option]  = TRUE;
+    }
+    $filter_options['all'] = $filters_array['all'] ? 'Show ALL' : 'Hide ALL';
+
+    // Generate filtered links
+    $navbar['options_right']['filters']['text'] = 'Quick Filters';
+    foreach ($filter_options as $option => $text) {
+        if ($text === 'divider') {
+            $navbar['options_right']['filters']['suboptions'][$option][$text] = $text;
+            continue;
+        }
+        $option_array = array_merge($filters_array, [ $option => TRUE ]);
+        if ($filters_array[$option]) {
+            $text = str_replace('Hide', 'Show', $text);
+            $navbar['options_right']['filters']['class']                       .= ' active';
+            $navbar['options_right']['filters']['suboptions'][$option]['class'] = 'active';
+            if ($option === 'all') {
+                $option_array = ['disabled' => FALSE];
+            } else {
+                $option_array[$option] = FALSE;
+            }
+        } elseif ($option === 'all') {
+            $option_array = $option_all;
+        }
+        $navbar['options_right']['filters']['suboptions'][$option]['text'] = $text;
+        $navbar['options_right']['filters']['suboptions'][$option]['url']  = generate_url($vars, [ 'filters' => $option_array ]);
+    }
+
+    return $filters_array;
+}
 
 // DOCME needs phpdoc block
 function navbar_location_menu($array)
@@ -325,12 +457,10 @@ function navbar_location_menu($array)
 }
 
 // DOCME needs phpdoc block
-function navbar_submenu($entry, $level = 1)
-{
+function navbar_submenu($entry, $level = 1) {
 
     // autoscroll set by navbar-narrow + dropdown-menu, but override max-height
     echo(str_pad('', ($level - 1) * 2) . '                <li class="dropdown-submenu">' .
-         //generate_menu_link($entry['url'], get_icon($entry['icon']) . '&nbsp;' . escape_html($entry['title']), $entry['count'], 'label', NULL, $entry['alert_count']) . PHP_EOL);
          generate_menu_link_ng($entry) . PHP_EOL);
     echo(str_pad('', ($level - 1) * 2) . '                  <ul role="menu" class="dropdown-menu ' .
          ((isset($entry['scrollable']) && $entry['scrollable']) ? 'pre-scrollable' : '') . '" style="max-height: 85vh;">' . PHP_EOL);
@@ -349,19 +479,22 @@ function navbar_submenu($entry, $level = 1)
 
 // DOCME needs phpdoc block
 // FIXME. Move to print navbar
-function navbar_entry($entry, $level = 1)
-{
+function navbar_entry($entry, $level = 1) {
     global $cache;
+
+    if (isset($entry['userlevel'], $_SESSION['userlevel']) && $_SESSION['userlevel'] < $entry['userlevel']) {
+        // skip not permitted menu items
+        return;
+    }
+    if (OBSERVIUM_EDITION === 'community' && isset($entry['community']) && !$entry['community']) {
+        // Skip not exist features on community
+        return;
+    }
 
     if (isset($entry['divider']) && $entry['divider']) {
         echo(str_pad('', ($level - 1) * 2) . '                <li class="divider"></li>' . PHP_EOL);
-    } elseif (isset($entry['userlevel'], $_SESSION['userlevel']) && $_SESSION['userlevel'] < $entry['userlevel']) {
-        // skip not permitted menu items
-        return;
-    } elseif (OBSERVIUM_EDITION === 'community' && isset($entry['community']) && !$entry['community']) {
-        // Skip not exist features on community
-        return;
-    } elseif (isset($entry['locations']) && $entry['locations']) {// Workaround until the menu builder returns an array instead of echo()
+    } elseif (isset($entry['locations']) && $entry['locations']) {
+        // Workaround until the menu builder returns an array instead of echo()
         echo(str_pad('', ($level - 1) * 2) . '                <li class="dropdown-submenu">' . PHP_EOL);
         echo(str_pad('', ($level - 1) * 2) . '                  ' .
              generate_menu_link_ng([ 'url' => generate_url([ 'page' => 'locations' ]), 'icon' => 'location' ], 'Locations') . PHP_EOL);
@@ -439,7 +572,7 @@ function print_navbar_stats_debug() {
 
 function print_navbar_stats() {
     global $gentime, $cache_time, $cache_data_time, $menu_time, $defs_time, $form_time,
-    $db_stats, $cachesize, $defs_mem, $fullsize, $http_stats;
+    $db_stats, $cachesize, $defs_mem, $fullsize, $http_stats, $int_stats;
 
     ?>
                             <li class="dropdown">
@@ -482,7 +615,24 @@ function print_navbar_stats() {
                                     ?>
 
                                 </table>
+                                <?php
+                                if ($_SESSION['userlevel'] >= 10 && !empty($int_stats)) {
+                                    // This is stats from undone generate_query_valuesxxx()
+                                    ?>
                                 <table class="table table-condensed-more table-striped">
+                                    <tr>
+                                        <th colspan=2>Internals</th>
+                                    </tr>
+                                    <tr>
+                                        <th>Gen Query Values</th>
+                                        <td><?php echo(($int_stats['gen_query_values'] + 0) . '/' . round($int_stats['gen_query_values_sec'] + 0, 4) . 's'); ?></td>
+                                    </tr>
+                                </table>
+                                <?php
+                                }
+                                ?>
+
+                                    <table class="table table-condensed-more table-striped">
                                     <tr>
                                         <th colspan=2>MySQL</th>
                                     </tr>

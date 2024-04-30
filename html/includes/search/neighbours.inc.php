@@ -19,7 +19,7 @@
 
 /// SEARCH NEIGHBOURS
 $sql     = "SELECT * FROM `neighbours`" .
-           generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '`active` = ? AND (`remote_hostname` LIKE ? OR `remote_address` LIKE ? OR `remote_platform` LIKE ?)') .
+           generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`active` = ? AND (`remote_hostname` LIKE ? OR `remote_address` LIKE ? OR `remote_platform` LIKE ?)') .
            " ORDER BY `last_change` DESC LIMIT $query_limit";
 $params  = [1, $query_param, $query_param, $query_param];
 $results = dbFetchRows($sql, $params);

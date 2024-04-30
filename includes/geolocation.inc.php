@@ -5,18 +5,48 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage geolocation
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 // This function returns an array of location data when given an address.
 // The open&free geocoding APIs are not very flexible, so addresses must be in standard formats.
 
+function geo_detect($device, $poll_device, $geo_db, &$dns_only) {
+    global $config;
+
+    if (!$config['geocoding']['enable']) {
+        return FALSE;
+    }
+
+    $geo_detect    = FALSE;
+    $geo_frequency = 86400; // Minimum seconds for next GEO api request (default is 1 day)
+    $geo_updated   = get_time() - $geo_db['location_unixtime']; // Seconds since previous GEO update
+
+    // Device coordinates still empty, re-detect no more than 1 time per 1 day ($geo_frequency param)
+    if (!(is_numeric($geo_db['location_lat']) && is_numeric($geo_db['location_lon']))) {
+        // Re-detect geolocation if coordinates still empty, no more frequently than once a day
+        $geo_detect = $geo_updated > $geo_frequency;
+    }
+
+    // sysLocation changed (and not empty!), redetect now
+    $geo_detect = $geo_detect || ($poll_device['sysLocation'] && $device['location'] != $poll_device['sysLocation']);
+    // Geo API changed, force re-detect
+    $geo_detect = $geo_detect || ($geo_db['location_geoapi'] !== strtolower($config['geocoding']['api']));
+
+    // This seems to cause endless geolocation every poll. Disabled.
+    //$geo_detect = $geo_detect || ($geo_db['location_manual'] && (!$geo_db['location_country'] || $geo_db['location_country'] == 'Unknown')); // Manual coordinates passed
+
+    // Detect location by DNS LOC record for hostname, no more than 1 time per 1 day ($geo_frequency param)
+    $dns_only   = !$geo_detect && ($config['geocoding']['dns'] && ($geo_updated > $geo_frequency));
+
+    return $geo_detect;
+}
+
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function get_geolocation($address, $geo_db = [], $dns_only = FALSE)
-{
+function get_geolocation($address, $geo_db = [], $dns_only = FALSE) {
     global $config;
 
     $ok                          = FALSE;
@@ -30,15 +60,6 @@ function get_geolocation($address, $geo_db = [], $dns_only = FALSE)
 
     // Geo definitions
     $geo_def = $config['geo_api'][$location['location_geoapi']];
-
-    // API Rate limit
-    $ratelimit = FALSE;
-    if (!safe_empty($geo_def['key']) && isset($geo_def['ratelimit_key'])) {
-        // Ratelimit if used api key
-        $ratelimit = $geo_def['ratelimit_key'];
-    } elseif (isset($geo_def['ratelimit'])) {
-        $ratelimit = $geo_def['ratelimit'];
-    }
 
     if (isset($config['geocoding']['enable']) && $config['geocoding']['enable']) {
         $geo_type  = 'forward'; // by default forward geocoding
@@ -124,7 +145,7 @@ function get_geolocation($address, $geo_db = [], $dns_only = FALSE)
                     // Return an old array with new status (for later recheck)
                     unset($geo_db['hostname'], $geo_db['location_updated']);
                     $location['location_status']  = $debug_msg;
-                    $location['location_updated'] = format_unixtime($config['time']['now'], 'Y-m-d G:i:s');
+                    $location['location_updated'] = format_unixtime(get_time(), 'Y-m-d G:i:s');
                     //print_vars($location);
                     //print_vars($geo_db);
                     if (safe_empty($address_second)) {
@@ -302,28 +323,22 @@ function get_geo_dnsloc($hostname) {
 }
 
 function get_geo_http_def($geo_def, $geo_type, $tags, &$debug_msg = '') {
-    // API Rate limit
-    $ratelimit = FALSE;
-    if (isset($geo_def['ratelimit_key']) && !safe_empty($geo_def['key'])) {
-        // Ratelimit if used an api key
-        $ratelimit = $geo_def['ratelimit_key'];
-    } elseif (isset($geo_def['ratelimit'])) {
-        $ratelimit = $geo_def['ratelimit'];
-    }
+
+    // Merge Geo forward/reverse definition
+    $geo_def = array_merge($geo_def, $geo_def[$geo_type]);
+    //dump($geo_def);
 
     // Generate context/options with encoded data and geo-specific api headers
-    $options = generate_http_context($geo_def[$geo_type], $tags);
+    $options = generate_http_context($geo_def, $tags);
     $options['ignore_errors'] = TRUE;
 
     // API URL to POST to
-    $url = generate_http_url($geo_def[$geo_type], $tags);
+    $url = generate_http_url($geo_def, $tags);
 
-    // Second request
-    $mapresponse = get_http_request($url, $options, $ratelimit);
+    // First or second request
+    if (process_http_request($geo_def, $url, $options, $mapresponse)) {
 
-    if (test_http_request($geo_def[$geo_type], $mapresponse)) {
-
-        switch ($geo_def[$geo_type]['response_format']) {
+        switch ($geo_def['response_format']) {
             case 'xml':
                 // Hrm, currently unused
                 break;
@@ -381,7 +396,7 @@ function generate_location_alt($address) {
  * @param array  $params   (optional) Array of requested params with key => value entries (used with request method POST)
  * @param string $location (optional) Location string, if passed override location tag
  *
- * @return array           HTTP Context which can used in get_http_request_test() or get_http_request()
+ * @return array           HTTP Context which can used in get_http_request()
  * @global array $config
  */
 function generate_geolocation_tags($api, $tags = [], $params = [], $location = NULL)
@@ -403,8 +418,8 @@ function generate_geolocation_tags($api, $tags = [], $params = [], $location = N
     }
 
     // Commonly used params for geo apis
-    $tags['id']   = OBSERVIUM_PRODUCT . '-' . substr(get_unique_id(), 0, 8);
     $tags['uuid'] = get_unique_id();
+    $tags['id']   = OBSERVIUM_PRODUCT . '-' . substr($tags['uuid'], 0, 8);
 
     // API key if not empty
     if (isset($config['geo_api'][$api]['key']) && !safe_empty($config['geo_api'][$api]['key'])) {

@@ -156,7 +156,7 @@ if (!safe_empty($pkgs_db_id)) {
         log_event('Package removed: ' . $pkg['name'] . ' ' . $pkg['arch'] . ' ' . $pkg['version'] . ($pkg['build'] != '' ? "-" . $pkg['build'] : ''), $device, 'package');
     }
     // Multi delete
-    dbDelete('packages', generate_query_values_ng(array_keys($pkgs_db_id), 'pkg_id'));
+    dbDelete('packages', generate_query_values(array_keys($pkgs_db_id), 'pkg_id'));
 }
 
 echo(PHP_EOL);

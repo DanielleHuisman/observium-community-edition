@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -35,7 +35,7 @@ function process_port_label(&$this_port, $device) {
 
     // Write port_label, port_label_base and port_label_num
 
-    // Here definition override for ifDescr, because Calix switch ifDescr <> ifName since fw 2.2
+    // Here definition overrides for ifDescr, because Calix switches ifDescr <> ifName since fw 2.2
     // Note, only for 'calix' os now
     if ($device['os'] === 'calix') {
         unset($config['os'][$device['os']]['ifname']);
@@ -49,7 +49,7 @@ function process_port_label(&$this_port, $device) {
         }
     }
 
-    // This happen on some liebert UPS devices or when device have memory leak (ie Eaton Powerware)
+    // This happens on some liebert UPS devices or when a device has memory leak (i.e. Eaton Powerware)
     if (isset($config['os'][$device['os']]['ifType_ifDescr']) && $config['os'][$device['os']]['ifType_ifDescr'] && $this_port['ifIndex']) {
         $len  = strlen($this_port['ifDescr']);
         $type = rewrite_iftype($this_port['ifType']);
@@ -116,6 +116,49 @@ function process_port_label(&$this_port, $device) {
     //  );
 
     return TRUE;
+}
+
+function process_port_speed(&$this_port, $device, $port = []) {
+
+    if (isset($port['ifSpeed_custom']) && $port['ifSpeed_custom'] > 0) {
+        // Custom ifSpeed from WebUI
+        $this_port['ifSpeed'] = (int)$port['ifSpeed_custom'];
+        print_debug('Port ifSpeed manually set.');
+    } else {
+        // Detect port speed by ifHighSpeed
+        if (is_numeric($this_port['ifHighSpeed'])) {
+            // Use old ifHighSpeed if current speed '0', seems as some error on device
+            if ($this_port['ifHighSpeed'] == '0' && $port['ifHighSpeed'] > '0') {
+                $this_port['ifHighSpeed'] = $port['ifHighSpeed'];
+                print_debug('Port ifHighSpeed fixed from zero.');
+            }
+
+            if ((int)$this_port['ifHighSpeed'] === (int)$this_port['ifSpeed'] && $this_port['ifHighSpeed'] >= 1000000) {
+                // https://jira.observium.org/browse/OBS-4715
+                // ifSpeed same as ifHighSpeed
+                $this_port['ifHighSpeed'] = (int)($this_port['ifSpeed'] / 1000000);
+                print_debug('Port ifHighSpeed fixed from same ifSpeed.');
+            } else {
+
+                // Maximum possible ifSpeed value is 4294967295
+                // Overwrite ifSpeed with ifHighSpeed if it's over 4G or ifSpeed equals to zero
+                // ifSpeed is more accurate for low speeds (ie: ifSpeed.60 = 1536000, ifHighSpeed.60 = 2)
+                // other case when (incorrect ifSpeed): ifSpeed.6 = 1000, ifHighSpeed.6 = 1000)
+                $ifSpeed_max = max($this_port['ifHighSpeed'] * 1000000, $this_port['ifSpeed']);
+                if ($this_port['ifHighSpeed'] > 0 &&
+                    ($ifSpeed_max > 4000000000 || $this_port['ifSpeed'] == 0 ||
+                        $this_port['ifSpeed'] == $this_port['ifHighSpeed'])) {
+                    // echo("HighSpeed, ");
+                    $this_port['ifSpeed'] = $ifSpeed_max;
+                }
+            }
+        }
+        if ($this_port['ifSpeed'] == '0' && $port['ifSpeed'] > '0') {
+            // Use old ifSpeed if current speed '0', seems as some error on device
+            $this_port['ifSpeed'] = $port['ifSpeed'];
+            print_debug('Port ifSpeed fixed from zero.');
+        }
+    }
 }
 
 function process_port_label_def(&$this_port, $device) {
@@ -1186,7 +1229,7 @@ function delete_port($int_id, $delete_rrd = TRUE)
         }
     }
 
-    $table_status = dbDelete('ports_stack', "`port_id_high` = ? OR `port_id_low` = ?", [$port['ifIndex'], $port['ifIndex']]);
+    $table_status = dbDelete('ports_stack', "`port_id_high` = ? OR `port_id_low` = ?", [$int_id, $int_id]);
     if ($table_status) {
         $deleted_tables[] = 'ports_stack';
     }

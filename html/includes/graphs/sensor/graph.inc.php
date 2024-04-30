@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -19,12 +19,16 @@ switch ($sensor['sensor_class']) {
         $scale_min = "0";
         $scale_max = "100";
         break;
+
     case 'snr':
     case 'attenuation':
     case 'sound':
         $scale_min = "0";
         $scale_max = "60";
         break;
+
+    case 'waterflow':
+        $alt_y = FALSE; // Disable alternative Y grid for waterflow
     default:
         $scale_rigid = FALSE;
 }

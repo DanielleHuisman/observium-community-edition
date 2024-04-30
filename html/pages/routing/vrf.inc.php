@@ -4,16 +4,17 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 if ($_SESSION['userlevel'] < 5) {
     print_error_permission();
     return;
-} elseif (!$config['enable_vrfs']) {
+}
+if (!$config['enable_vrfs']) {
     print_error("VRFs disabled globally.");
     return;
 }
@@ -98,7 +99,7 @@ if (!$vars['vrf']) {
         echo generate_box_open();
 
         echo('<table class="table table-striped  table-condensed">');
-        $x = 1;
+
         foreach ($vrf_devices[$vrf['vrf_rd']] as $device) {
             echo('<tr><td style="width: 150px;"><span class="entity">' . generate_device_link_short($device) . '</span>');
 
@@ -118,8 +119,8 @@ if (!$vars['vrf']) {
                     case 'errors':
                         $port['width']      = "130";
                         $port['height']     = "30";
-                        $port['from']       = $config['time']['day'];
-                        $port['to']         = $config['time']['now'];
+                        $port['from']       = get_time('day');
+                        $port['to']         = get_time();
                         $port['bg']         = "#" . $bg;
                         $port['graph_type'] = "port_" . $vars['graph'];
                         echo '<div class="box box-solid" style="display: block; padding: 3px; margin: 3px; min-width: 135px; max-width:135px; min-height:75px; max-height:75px;
@@ -137,14 +138,11 @@ if (!$vars['vrf']) {
                 }
             }
             echo("</td></tr>");
-            $x++;
         } // End While
 
         echo '</table>';
         echo generate_box_close();
         echo '</td>';
-
-        $i++;
     }
     echo("</table>");
 
@@ -156,7 +154,7 @@ if (!$vars['vrf']) {
 
     echo generate_box_open();
     echo('<table class="table  table-striped">');
-    $vrf = dbFetchRow("SELECT * FROM `vrfs` " . generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`vrf_rd` = ?'), [$vars['vrf']]);
+    $vrf = dbFetchRow("SELECT * FROM `vrfs` " . generate_where_clause('`vrf_rd` = ?', $GLOBALS['cache']['where']['devices_permitted']), [$vars['vrf']]);
     echo('<tr>');
     echo('<td style="width: 200px;" class="entity-title"><a href="' . generate_url($link_array, ['vrf' => $vrf['vrf_rd']]) . '">' . $vrf['vrf_name'] . '</a></td>');
     echo('<td style="width: 100px;" class="small">' . $vrf['vrf_rd'] . '</td>');
@@ -164,7 +162,7 @@ if (!$vars['vrf']) {
     echo('</table>');
     echo generate_box_close();
 
-    $vrf_devices = dbFetchRows("SELECT * FROM `vrfs` LEFT JOIN `devices` USING (`device_id`)" . generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`vrf_rd` = ?'), [$vrf['vrf_rd']]);
+    $vrf_devices = dbFetchRows("SELECT * FROM `vrfs` LEFT JOIN `devices` USING (`device_id`)" . generate_where_clause('`vrf_rd` = ?', $GLOBALS['cache']['where']['devices_permitted']), [$vrf['vrf_rd']]);
     foreach ($vrf_devices as $device) {
         $hostname = $device['hostname'];
         echo generate_box_open();
@@ -176,14 +174,11 @@ if (!$vars['vrf']) {
         echo generate_box_close();
         unset($seperator);
         echo('<div style="margin: 10px;"><table class="table box box-solid table-striped">');
-        $i = 1;
-        foreach (dbFetchRows("SELECT * FROM `ports`" . generate_where_clause($GLOBALS['cache']['where']['ports_permitted'], '`ifVrf` = ? AND `device_id` = ?'), [$device['vrf_id'], $device['device_id']]) as $port) {
-            print_port_row($port);
 
-            $i++;
+        foreach (dbFetchRows("SELECT * FROM `ports`" . generate_where_clause('`ifVrf` = ? AND `device_id` = ?', $GLOBALS['cache']['where']['ports_permitted']), [$device['vrf_id'], $device['device_id']]) as $port) {
+            print_port_row($port);
         }
 
-        $x++;
         echo('</table></div>');
         echo('<div style="height: 10px;"></div>');
     }

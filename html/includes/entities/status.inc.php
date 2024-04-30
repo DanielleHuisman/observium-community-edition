@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -54,8 +54,7 @@ function humanize_status(&$status)
     $status['humanized'] = TRUE;
 }
 
-function generate_status_query($vars, $query_count = FALSE)
-{
+function generate_status_query($vars, $query_count = FALSE) {
 
     if ($query_count) {
         $sql = "SELECT COUNT(*) FROM `status`";
@@ -67,105 +66,120 @@ function generate_status_query($vars, $query_count = FALSE)
         }
     }
 
-    //$sql .= " WHERE 1";
-    $sql .= " WHERE `status_deleted` = 0";
-
     // Build query
+    $where_array = [];
     foreach ($vars as $var => $value) {
         switch ($var) {
             case "group":
             case "group_id":
                 $values = get_group_entities($value, 'status');
-                $sql    .= generate_query_values_and($values, 'status.status_id');
+                $where_array[] = generate_query_values($values, 'status.status_id');
                 break;
+
             case 'device_group_id':
             case 'device_group':
                 $values = get_group_entities($value, 'device');
-                $sql    .= generate_query_values_and($values, 'status.device_id');
+                $where_array[] = generate_query_values($values, 'status.device_id');
                 break;
+
             case "device":
             case "device_id":
-                $sql .= generate_query_values_and($value, 'status.device_id');
+                $where_array[] = generate_query_values($value, 'status.device_id');
                 break;
+
             case "id":
             case 'status_id':
-                $sql .= generate_query_values_and($value, 'status.status_id');
+                $where_array[] = generate_query_values($value, 'status.status_id');
                 break;
+
             case "entity_id":
-                $sql .= generate_query_values_and($value, 'measured_entity');
+                $where_array[] = generate_query_values($value, 'measured_entity');
                 break;
+
             case "entity_type":
-                $sql .= generate_query_values_and($value, 'measured_class');
+                $where_array[] = generate_query_values($value, 'measured_class');
                 break;
+
             case 'entity_state':
             case "measured_state":
-                $sql .= build_entity_measured_where('status', ['measured_state' => $value]);
+                $where_array[] = generate_query_entity_measured('status', [ 'measured_state' => $value ]);
                 break;
+
             case "class":
             case 'entPhysicalClass':
-                $sql .= generate_query_values_and($value, 'entPhysicalClass');
+                $where_array[] = generate_query_values($value, 'entPhysicalClass');
                 break;
+
             case "event":
             case "status_event":
-                $sql .= generate_query_values_and($value, 'status_event');
+                $where_array[] = generate_query_values($value, 'status_event');
                 break;
+
             case "status":
             case "status_name":
-                $sql .= generate_query_values_and($value, 'status_name');
+                $where_array[] = generate_query_values($value, 'status_name');
                 break;
+
             case "descr":
             case "status_descr":
-                $sql .= generate_query_values_and($value, 'status_descr', '%LIKE%');
+                $where_array[] = generate_query_values($value, 'status_descr', '%LIKE%');
                 break;
+
             case 'type':
             case "status_type":
-                $sql .= generate_query_values_and($value, 'status_type', '%LIKE%');
+                $where_array[] = generate_query_values($value, 'status_type', '%LIKE%');
                 break;
         }
     }
-    //$sql .= $GLOBALS['cache']['where']['devices_permitted'];
-    $sql .= generate_query_permitted(['device', 'status']);
+    $where_array[] = '`status_deleted` = 0';
+
+    $sql .= generate_where_clause($where_array, generate_query_permitted_ng([ 'device', 'status' ]));
 
     // If need count, just return sql without sorting
     if ($query_count) {
         return $sql;
     }
 
-    switch ($vars['sort_order']) {
-        case 'desc':
-            $sort_order = 'DESC';
-            $sort_neg   = 'ASC';
-            break;
-        case 'reset':
-            unset($vars['sort'], $vars['sort_order']);
-        // no break here
-        default:
-            $sort_order = 'ASC';
-            $sort_neg   = 'DESC';
+    if (isset($vars['sort'])) {
+        switch ($vars['sort']) {
+            case 'device':
+                $sql .= generate_query_sort('hostname', get_sort_order($vars));
+                break;
+
+            case 'descr':
+                $sql .= generate_query_sort('status_descr', get_sort_order($vars));
+                break;
+
+            case 'class':
+            case 'entPhysicalClass':
+                $sql .= generate_query_sort('entPhysicalClass', get_sort_order($vars));
+                break;
+
+            case 'event':
+                $sql .= generate_query_sort('status_event', get_sort_order($vars));
+                break;
+
+            case 'status':
+                $sql .= generate_query_sort('status_name', get_sort_order($vars));
+                break;
+
+            case 'last_change':
+                $sql .= generate_query_sort('status_last_change', get_sort_order($vars, TRUE));
+                break;
+
+            case 'mib':
+                $sql .= generate_query_sort([ 'status_mib', 'status_object', 'status_type', 'status_index:integer' ], get_sort_order($vars));
+                break;
+
+            default:
+                $sql .= generate_query_sort([ 'measured_entity_label', 'status_descr' ], get_sort_order($vars));
+        }
+    } else {
+        $sql .= generate_query_sort([ 'measured_entity_label', 'status_descr' ]);
     }
 
-
-    switch ($vars['sort']) {
-        case 'device':
-            $sql .= ' ORDER BY `hostname` ' . $sort_order;
-            break;
-        case 'descr':
-            $sql .= ' ORDER BY `status_descr` ' . $sort_order;
-            break;
-        case 'class':
-            $sql .= ' ORDER BY `entPhysicalClass` ' . $sort_order;
-            break;
-        case 'event':
-            $sql .= ' ORDER BY `status_event` ' . $sort_order;
-            break;
-        case 'status':
-            $sql .= ' ORDER BY `status_name` ' . $sort_order;
-            break;
-        case 'last_change':
-            $sql .= ' ORDER BY `status_last_change` ' . $sort_neg;
-            break;
-        default:
-            $sql .= ' ORDER BY `measured_entity_label`, `status_descr` ' . $sort_order;
+    if (isset($vars['pageno'])) {
+        //$sql .= generate_query_limit($vars);
     }
 
     return $sql;
@@ -228,7 +242,7 @@ function print_status_table_header($vars)
       //array(NULL, 'class="no-width"'), // Measure entity link
       'descr'       => ['Description'],
       'mib'         => ['MIB::Object'],
-      'class'       => ['Physical&nbsp;Class', 'style="width: 100px;"'],
+      'entPhysicalClass'       => ['Phys&nbsp;Class', 'style="width: 100px;"'],
       ['History', 'style="width: 90px;"'],
       'last_change' => ['Last&nbsp;changed', 'style="width: 80px;"'],
       'event'       => ['Event', 'style="width: 60px; text-align: right;"'],
@@ -307,15 +321,14 @@ function generate_status_row($status, $vars)
 
     // FIXME -- Generify this. It's not just for sensors.
     if ($vars['page'] === "device" && $vars['tab'] !== "overview") {
-        $row .= '        <td>' . (!safe_empty($status['status_mib']) ? '<a href="' . OBSERVIUM_MIBS_URL . '/' . $status['status_mib'] . '/" target="_blank">' . nicecase($status['status_mib']) . '</a>' : '') .
-                ((!safe_empty($status['status_mib']) && !safe_empty($status['status_object'])) ? '::' : '') .
-                (!safe_empty($status['status_mib']) ? '<a href="' . OBSERVIUM_MIBS_URL . '/' . $status['status_mib'] . '/#' . $status['status_object'] . '" target="_blank">' . $status['status_object'] . '</a>' : '') .
-                '.' . $status['status_index'] . '</td>' . PHP_EOL;
+        $row .= '      <td><span class="label-group">' . (!safe_empty($status['status_mib']) ? '<span class="label label-primary"><a href="' . OBSERVIUM_MIBS_URL . '/' . $status['status_mib'] . '/" target="_blank">' . nicecase($status['status_mib']) . '</a></span>' : '') .
+            (!safe_empty($status['status_mib']) ? '<span class="label label-success"><a href="' . OBSERVIUM_MIBS_URL . '/' . $status['status_mib'] . '/#' . $status['status_object'] . '" target="_blank">' . $status['status_object'] . '</a></span>' : '') .
+            '<span class="label label-delayed">' . $status['status_index'] . '</span></span></td>' . PHP_EOL;
         $table_cols++;
     }
 
     if ($vars['tab'] !== "overview") {
-        $row .= '<td><span class="label">' . $status['entPhysicalClass'] . '</span></td>';
+        $row .= '<td>' . get_type_class_label($status['entPhysicalClass'], 'physicalclass') . '</td>';
         $table_cols++;
     }
     $row .= '<td style="width: 90px; text-align: right;">' . generate_entity_link('status', $status, $mini_graph, NULL, FALSE) . '</td>';

@@ -4,28 +4,25 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 switch ($device['os']) {
     case 'aix':
-        [$hardware, , $os_detail,] = explode("\n", $poll_device['sysDescr']);
+        [ $hardware, , $os_detail, ] = explode("\n", $poll_device['sysDescr']);
         if (preg_match('/: 0*(\d+\.)0*(\d+\.)0*(\d+\.)(\d+)/', $os_detail, $matches)) {
             // Base Operating System Runtime AIX version: 05.03.0012.0001
             $version = $matches[1] . $matches[2] . $matches[3] . $matches[4];
         }
 
-        $hardware_model = snmp_get_oid($device, 'aixSeMachineType.0', 'IBM-AIX-MIB');
-        if ($hardware_model) {
-            [, $hardware_model] = explode(',', $hardware_model);
+        if ($hw = snmp_get_oid($device, 'aixSeMachineType.0', 'IBM-AIX-MIB')) {
+            $hw = explode(',', $hw)[1];
+            $hardware .= " ($hw)";
 
-            $serial = snmp_get_oid($device, 'aixSeSerialNumber.0', 'IBM-AIX-MIB');
-            [, $serial] = explode(',', $serial);
-
-            $hardware .= " ($hardware_model)";
+            $serial = explode(',', snmp_get_oid($device, 'aixSeSerialNumber.0', 'IBM-AIX-MIB'))[1];
         }
         break;
 
@@ -33,18 +30,18 @@ switch ($device['os']) {
         if (preg_match('/FreeBSD ([\d\.]+\-[\w\-]+)/i', $poll_device['sysDescr'], $matches)) {
             $kernel = $matches[1];
         }
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'dragonfly':
         [, , $version, , , $features] = explode(' ', $poll_device['sysDescr']);
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'netbsd':
         [, , $version, , , $features] = explode(' ', $poll_device['sysDescr']);
         $features = str_replace(['(', ')'], '', $features);
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'openbsd':
@@ -52,7 +49,7 @@ switch ($device['os']) {
     case 'opensolaris':
         [, , $version, $features] = explode(' ', $poll_device['sysDescr']);
         $features = str_replace(['(', ')'], '', $features);
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'monowall':
@@ -61,7 +58,7 @@ switch ($device['os']) {
             [, , $version, , , $kernel] = explode(' ', $poll_device['sysDescr']);
         }
         $distro   = $device['os'];
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'truenas':
@@ -69,7 +66,7 @@ switch ($device['os']) {
             // 21.08-BETA.1. Hardware: x86_64 AMD Ryzen 5 1600 Six-Core Processor. Software: Linux 5.10.42+truenas (revision #1 SMP Mon Aug 30 21:54:59 UTC 2021)
             $version = $matches['version'];
         }
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'freenas':
@@ -83,22 +80,21 @@ switch ($device['os']) {
             // Hardware: amd64 Intel(R) Xeon(R) CPU E5520 @ 2.27GHz running at 2266 Software: FreeBSD 11.1-STABLE (revision 199506)
             $version = $matches[1];
         }
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        //$hardware = rewrite_unix_hardware($poll_device['sysDescr']);
         break;
 
     case 'opnsense':
         // Detect detailed version, see:
         // https://jira.observium.org/browse/OBS-3745
         // https://github.com/opnsense/plugins/pull/1684
-        if (is_device_mib($device, 'NET-SNMP-EXTEND-MIB')) {
+        if (is_device_mib($device, 'NET-SNMP-EXTEND-MIB') &&
+            $os_data = snmp_get_oid($device, '.1.3.6.1.4.1.8072.1.3.2.3.1.2.7.118.101.114.115.105.111.110', 'NET-SNMP-EXTEND-MIB')) {
             // NET-SNMP-EXTEND-MIB::nsExtendOutputFull."version" = STRING: OPNsense 20.7.8_4 (amd64/OpenSSL)
-            if ($os_data = snmp_get_oid($device, '.1.3.6.1.4.1.8072.1.3.2.3.1.2.7.118.101.114.115.105.111.110', 'NET-SNMP-EXTEND-MIB')) {
-                [, $version] = explode(' ', $os_data);
-            }
+            $version = explode(' ', $os_data)[1];
         }
-        if (!$hardware) {
-            $hardware = rewrite_unix_hardware($poll_device['sysDescr'], $hw);
-        }
+        // if (!$hardware) {
+        //     $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
+        // }
         break;
 
     case 'ipso':
@@ -111,8 +107,8 @@ switch ($device['os']) {
         $data = snmp_get_multi_oid($device, 'ipsoChassisMBType.0 ipsoChassisMBRevNumber.0', [], 'NOKIA-IPSO-SYSTEM-MIB');
         if (isset($data[0])) {
             $hw = $data[0]['ipsoChassisMBType'] . ' rev ' . $data[0]['ipsoChassisMBRevNumber'];
+            $hardware = rewrite_unix_hardware($poll_device['sysDescr'], $hw);
         }
-        $hardware = rewrite_unix_hardware($poll_device['sysDescr'], $hw);
         break;
 
     case 'sofaware':
@@ -122,7 +118,7 @@ switch ($device['os']) {
         // EMBEDDED-NGX-MIB::swFirmwareRunning.0 = "8.2.26x"
         $data = snmp_get_multi_oid($device, 'swHardwareVersion.0 swHardwareType.0 swLicenseProductName.0 swFirmwareRunning.0', [], 'EMBEDDED-NGX-MIB');
         if (isset($data[0])) {
-            [$hw] = explode(',', $data[0]['swLicenseProductName']);
+            $hw = explode(',', $data[0]['swLicenseProductName'])[0];
             $hardware = $hw . ' ' . $data[0]['swHardwareType'] . ' ' . $data[0]['swHardwareVersion'];
             $version  = $data[0]['swFirmwareRunning'];
         }
@@ -251,9 +247,12 @@ switch ($device['os']) {
     // case 'ddwrt':
     default:
         // Kernel/Version
-        if (str_starts($poll_device['sysDescr'], 'Linux')) {
-            [, , $version] = explode(' ', $poll_device['sysDescr']);
-            $kernel = $version;
+        if (str_starts_with($poll_device['sysDescr'], 'Linux')) {
+            $kernel = explode(' ', $poll_device['sysDescr'])[2];
+            if (!$version) {
+                // do not override MIB defined versions
+                $version = $kernel;
+            }
         }
 
         // detect os version by installed packages (ie proxmox & ucs)
@@ -261,45 +260,49 @@ switch ($device['os']) {
             include($config['install_dir'] . "/includes/polling/os/packages.inc.php");
         }
 
-        // Use agent DMI data if available
-        if (isset($agent_data['dmi'])) {
-            if ($agent_data['dmi']['system-product-name']) {
-                $hw = $agent_data['dmi']['system-product-name'];
-            }
-            if ($agent_data['dmi']['system-manufacturer']) {
-                // Cleanup Vendor name
-                $vendor = rewrite_vendor($agent_data['dmi']['system-manufacturer']);
-            }
-
-            // If these exclude lists grow any further we should move them to definitions...
-            if (isset($agent_data['dmi']['system-serial-number']) &&
-                is_valid_param($agent_data['dmi']['system-serial-number'], 'serial')) {
-
-                $serial = $agent_data['dmi']['system-serial-number'];
-            }
-
-            if (isset($agent_data['dmi']['chassis-asset-tag']) &&
-                is_valid_param($agent_data['dmi']['chassis-asset-tag'], 'serial')) {
-
-                $asset_tag = $agent_data['dmi']['chassis-asset-tag'];
-            } elseif (isset($agent_data['dmi']['baseboard-asset-tag']) &&
-                      is_valid_param($agent_data['dmi']['baseboard-asset-tag'], 'serial')) {
-
-                $asset_tag = $agent_data['dmi']['baseboard-asset-tag'];
-            }
-        }
-
-        if (!$hardware) {
-            $hardware = rewrite_unix_hardware($poll_device['sysDescr'], $hw);
-        }
         break;
 }
 
+// Use agent DMI data if available
+if (isset($agent_data['dmi'])) {
+    if ($agent_data['dmi']['system-product-name']) {
+        $hw = $agent_data['dmi']['system-product-name'];
+    }
+
+    if (!$vendor && $agent_data['dmi']['system-manufacturer']) {
+        // Cleanup Vendor name
+        $vendor = rewrite_vendor($agent_data['dmi']['system-manufacturer']);
+    }
+
+    // If these exclude lists grow any further we should move them to definitions...
+    if (!$serial && isset($agent_data['dmi']['system-serial-number']) &&
+        is_valid_param($agent_data['dmi']['system-serial-number'], 'serial')) {
+
+        $serial = $agent_data['dmi']['system-serial-number'];
+    }
+
+    if (!$asset_tag) {
+        if (isset($agent_data['dmi']['chassis-asset-tag']) &&
+            is_valid_param($agent_data['dmi']['chassis-asset-tag'], 'serial')) {
+
+            $asset_tag = $agent_data['dmi']['chassis-asset-tag'];
+        } elseif (isset($agent_data['dmi']['baseboard-asset-tag']) &&
+            is_valid_param($agent_data['dmi']['baseboard-asset-tag'], 'serial')) {
+
+            $asset_tag = $agent_data['dmi']['baseboard-asset-tag'];
+        }
+    }
+}
+
+if (!$hardware) {
+    $hardware = rewrite_unix_hardware($poll_device['sysDescr'], $hw);
+}
+
 // Has 'distro' script data already been returned via the agent?
-if (isset($agent_data['distro']) && isset($agent_data['distro']['SCRIPTVER'])) {
+if (isset($agent_data['distro']['SCRIPTVER'])) {
     $distro = $agent_data['distro']['DISTRO'];
     // Older version of the script used DISTROVER, newer ones use VERSION :-(
-    $distro_ver = (isset($agent_data['distro']['DISTROVER']) ? $agent_data['distro']['DISTROVER'] : $agent_data['distro']['VERSION']);
+    $distro_ver = $agent_data['distro']['DISTROVER'] ?? $agent_data['distro']['VERSION'];
     $kernel     = $agent_data['distro']['KERNEL'];
     $arch       = $agent_data['distro']['ARCH'];
     $virt       = $agent_data['distro']['VIRT'];
@@ -332,19 +335,19 @@ if (isset($agent_data['distro']) && isset($agent_data['distro']['SCRIPTVER'])) {
         // distro version 1.2 and above: "Linux|4.4.0-53-generic|amd64|Ubuntu|16.04|kvm"
         // distro version 2.0 and above: "Linux|4.4.0-116-generic|amd64|Ubuntu|16.04|kvm|"
         //                               "Linux|4.4.0|amd64|Ubuntu|16.04||openvz"
-        [$osname, $kernel, $arch, $distro, $distro_ver, $virt, $cont] = explode('|', $os_data);
+        [ $osname, $kernel, $arch, $distro, $distro_ver, $virt, $cont ] = explode('|', $os_data);
         if (empty($virt) && strlen($cont)) {
             $virt = $cont;
         }
     } else {
         // Very old distro, not supported now: "Ubuntu 12.04"
-        [$distro, $distro_ver] = explode(' ', $os_data);
+        [ $distro, $distro_ver ] = explode(' ', $os_data);
     }
 }
 
 // Detect some distro by kernel strings
 if (!isset($distro)) {
-    if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.10' && str_starts($poll_device['sysDescr'], 'Linux ')) {
+    if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.10' && str_starts_with($poll_device['sysDescr'], 'Linux ')) {
         if (preg_match('/ \d[\.\d]+(\-\d+)?(\-[a-z]+)? #(\d+\-Ubuntu|\d{12}) /', $poll_device['sysDescr'])) {
             // * Ubuntu (old):
             // Linux hostname 3.11.0-13-generic #20-Ubuntu SMP Wed Oct 23 07:38:26 UTC 2013 x86_64
@@ -379,6 +382,7 @@ if (!isset($distro)) {
             // * Raspbian (Debian)
             // Linux hostname 5.10.17-v7+ #1403 SMP Mon Feb 22 11:29:51 GMT 2021 armv7l
             // Linux hostname 5.4.51-v7l+ #1333 SMP Mon Aug 10 16:51:40 BST 2020 armv7l
+            // Linux hostname 4.19.97-v7l+ #1294 SMP Thu Jan 30 13:21:14 GMT 2020 armv7l
             // Linux hostname 4.19.66-v7+ #1253 SMP Thu Aug 15 11:49:46 BST 2019 armv7l
             // Linux hostname 4.14.43+ #1115 Fri May 25 13:54:20 BST 2018 armv6l
             // Linux hostname 4.9.35-v7+ #1014 SMP Fri Jun 30 14:47:43 BST 2017 armv7l
@@ -477,7 +481,7 @@ if (!isset($distro)) {
         // Linux hostname 2.6.21.5-smp #2 SMP Tue Jun 19 14:58:11 CDT 2007 i686
     } elseif ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.8' && str_starts($poll_device['sysDescr'], 'FreeBSD ')) {
         // * HardenedBSD
-        if (preg_match('/\-HBSD /', $poll_device['sysDescr'], $matches)) {
+        if (str_contains($poll_device['sysDescr'], '-HBSD ')) {
             $distro = 'HardenedBSD';
         }
     }

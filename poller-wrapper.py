@@ -6,7 +6,7 @@
 
  @package    observium
  @subpackage poller
- @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2023 Observium Limited
+ @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2024 Observium Limited
 """
 
 """
@@ -20,35 +20,18 @@
  Usage:         This program accepts process name as first command line argument,
                 that should run simultaneously. For other options see help -h
 
-                In /etc/cron.d/observium replace this (or the equivalent) poller entry:
-                */5 *  * * *   root /opt/observium/poller.php -h all >> /dev/null 2>&1
-                with something like this:
+                In /etc/cron.d/observium set this poller entry:
                 */5 *  * * *   root /opt/observium/observium-wrapper poller >> /dev/null 2>&1
 
-                In /etc/cron.d/observium replace this (or the equivalent) discovery entries:
-                34 */6 * * *   root /opt/observium/discovery.php -h all >> /dev/null 2>&1
-                */5 *  * * *   root /opt/observium/discovery.php -h new >> /dev/null 2>&1
-                with something like this:
+                In /etc/cron.d/observium set this discovery entries:
                 34 */6 * * *   root /opt/observium/observium-wrapper discovery >> /dev/null 2>&1
                 */5 *  * * *   root /opt/observium/observium-wrapper discovery --host new >> /dev/null 2>&1
 
-                In /etc/cron.d/observium replace this (or the equivalent) billing entries:
-                */5 *  * * *   root /opt/observium/poll-billing.php >> /dev/null 2>&1
-                with something like this:
+                In /etc/cron.d/observium set this billing entries (if billing used):
                 */5 *  * * *   root /opt/observium/observium-wrapper billing >> /dev/null 2>&1
 
- Ubuntu Linux:  apt-get install python-mysqldb
- New Ubuntu:    sudo apt install python3-pymysql
- RHEL/CentOS:   yum install MySQL-python (Requires the EPEL repo!)
- FreeBSD:       cd /usr/ports/*/py-MySQLdb && make install clean
-
- Tested on:     Python 2.7.3  / PHP 5.3.10-1ubuntu3.4 / Ubuntu 12.04 LTS
-                Python 3.2.3  / PHP 5.3.27-1ubuntu3.6 / Ubuntu 12.04 LTS
-                Python 2.7.6  / PHP 5.5.9-1ubuntu4.14 / Ubuntu 14.04 LTS
-                Python 3.4.3  / PHP 5.5.9-1ubuntu4.14 / Ubuntu 14.04 LTS
-                Python 2.7.12 / PHP 7.0.13            / Ubuntu 16.04 LTS
-                Python 3.5.2  / PHP 7.0.13            / Ubuntu 16.04 LTS
-                Python 3.6.6  / PHP 7.2.10            / Ubuntu 18.04 LTS
+ Ubuntu/Debian: sudo apt install python3-pymysql
+ Other:         Read: https://pypi.org/project/pymysql/
 
 """
 
@@ -74,6 +57,7 @@ try:
     import os
     import json
     import stat
+    # import traceback
 except ImportError:
     print("ERROR: missing one or more of the following python modules:")
     print("threading, sys, subprocess, os, json, stat")
@@ -304,6 +288,7 @@ def get_config_data():
     config_cmd = ['/usr/bin/env', 'php', '%s/config_to_json.php' % ob_install_dir]
     # limit requested options only required (skip huge definitions)
     config_options = ['db_user', 'db_pass', 'db_host', 'db_name', 'db_port', 'db_socket',
+                      'db_ssl', 'db_ssl_verify', 'db_ssl_key', 'db_ssl_cert', 'db_ssl_ca', 'db_ssl_ca_path', 'db_ssl_ciphers',
                       'install_dir', 'rrd_dir', 'temp_dir', 'log_dir', 'mib_dir',
                       'rrdcached', 'rrdtool', 'rrd',
                       'poller-wrapper', 'poller_id', 'poller_name']
@@ -333,10 +318,14 @@ except:
 if test:
     print(config)
 
+# observium edition pro/community
+edition = config['observium_edition']
+
 db_username = config['db_user']
 db_password = config['db_pass']
 db_server = config['db_host']
 db_dbname = config['db_name']
+db_ssl = config['db_ssl']
 
 try:
     db_port = int(config['db_port'])
@@ -470,6 +459,8 @@ if entity == 'device' and python_version >= (3, 3):
     elif int(config['poller-wrapper'][process + '_timeout']) >= 90:
         # hard limit can't be less than 90s (prevent use random numbers as timeout)
         timeout = int(config['poller-wrapper'][process + '_timeout'])
+if test:
+    print("Timeout for kill process: %ss" % timeout)
 
 # partitioned poller
 poller_arg = False  # pass poller id to requested script
@@ -479,13 +470,13 @@ if poller_id < 0:
         poller_id = int(config['poller_id'])
     except:
         poller_id = 0
+elif edition == 'community':
+    poller_id = 0
 else:
     # poller_arg = args.poller_id > 0
     poller_arg = True
     # poller_id = args.poller_id
 
-if test:
-    print("Timeout: %ss" % timeout)
 
 """
     Check mibs dir for stale .index files
@@ -536,15 +527,25 @@ try:
     if "pymysql" in db_version:
         # enable autocommit for pymysql lib
         db_params['autocommit'] = True
+        # enable ssl options
+        if db_ssl:
+            db_params['ssl_ca'] = config['db_ssl_ca']
+            db_params['ssl_verify_cert'] = config['db_ssl_verify']
+            # FIXME. all options:
+            #  ssl_ca, ssl_cert, ssl_disabled, ssl_key, ssl_key_password, ssl_verify_cert, ssl_verify_identity
+
 
     db = MySQLdb.connect(**db_params)
     if "MySQLdb" in db_version:
         # enable autocommit for MySQLdb lib
         db.autocommit(True)
     cursor = db.cursor()
-except:
-    print("ERROR: Could not connect to MySQL database!")
-    logfile("ERROR: Could not connect to MySQL database!")
+except Exception as e:
+    msg = str(e).strip("()")
+    # if test:
+    #     traceback.print_exc()
+    print("ERROR: %s" % msg)
+    logfile("ERROR: %s" % msg)
     sys.exit(2)
 
 """ 
@@ -558,24 +559,24 @@ except:
 """
 
 stop_script = False  # trigger for stop execute script inside try
-where_devices = "WHERE disabled != 1"  # Filter disabled devices by default
+where_devices = "WHERE `disabled` != 1"  # Filter disabled devices by default
 
 # Use include device groups
 if args.include_groups is not None:
     # Fetch device_id from selected groups
-    query = "SELECT entity_id FROM group_table WHERE entity_type = 'device' AND entity_id > 0 AND group_id IN (%s)"
+    query = "SELECT `entity_id` FROM `group_table` WHERE `entity_type` = 'device' AND `entity_id` > 0 AND `group_id` IN (%s)"
     cursor.execute(query % ",".join(map(str, args.include_groups)))
     include_devices = []
     for row in cursor.fetchall():
         include_devices.append(row[0])
     # print(map(str, include_devices))
     # print(query % ",".join(map(str, args.include_groups)))
-    where_devices += " AND device_id IN (%s)" % ",".join(map(str, include_devices))
+    where_devices += " AND `device_id` IN (%s)" % ",".join(map(str, include_devices))
 
 # Use exclude device groups
 if args.exclude_groups is not None:
     # Fetch device_id from selected groups
-    query = "SELECT entity_id FROM group_table WHERE entity_type = 'device' AND entity_id > 0 AND group_id IN (%s)"
+    query = "SELECT `entity_id` FROM `group_table` WHERE `entity_type` = 'device' AND `entity_id` > 0 AND `group_id` IN (%s)"
     cursor.execute(query % ",".join(map(str, args.exclude_groups)))
     exclude_devices = []
     for row in cursor.fetchall():
@@ -583,19 +584,48 @@ if args.exclude_groups is not None:
     # print(map(str, exclude_devices))
     # print(query % ",".join(map(str, args.include_groups)))
 
-    where_devices += " AND device_id NOT IN (%s)" % ",".join(map(str, exclude_devices))
+    where_devices += " AND `device_id` NOT IN (%s)" % ",".join(map(str, exclude_devices))
 
+# partitioned pollers
 if poller_id > 0:
+    poller_default = False  # this is partitioned poller
+
     print(Colors.OKBLUE + 'INFO: This is poller_id (' + str(poller_id) + ') using poller-restricted devices list' +
           Colors.ENDC)
+
+    # Update remote poller timestamp at start of poller, for checks remote poller availability
+    if process == 'poller':
+
+        # poller table entry must be created at first run of remote poller
+        cursor.execute(
+            "SELECT UNIX_TIMESTAMP() - UNIX_TIMESTAMP(`timestamp`) AS `lasttime` FROM `pollers` WHERE `poller_id` = %s",
+            (poller_id,))
+        row = cursor.fetchone()
+        poller_db_last = int(row[0])  # poller entry exist, last updated seconds
+
+        poller_query = 'UPDATE `pollers` SET `timestamp` = NOW() WHERE `poller_id` = %s' % (poller_id, )
+        if test:
+            print(poller_query)
+            print(poller_db_last)
+        elif poller_db_last >= 60:
+            if poller_db_last >= 14400:
+                # before update, check if poller was down for long time (force discovery)
+                print("WARNING: Poller was unavailable for long time, need force discovery devices")
+                cursor.execute("UPDATE `devices` SET `force_discovery` = 1 WHERE `poller_id` = %s",
+                               (poller_id, ))
+
+            cursor.execute(poller_query)
+
 else:
+    poller_default = True  # this is default poller
     print(Colors.OKBLUE + 'This is the default poller. Will only poll devices with no specified poller set.' +
           Colors.ENDC)
     # Set default value of 0 for process tables and the like
     poller_id = 0
 
+
 # Always select devices by poller_id
-where_devices += " AND poller_id = '" + str(poller_id) + "'"
+where_devices += " AND `poller_id` = %s" % (poller_id, )
 
 if test:
     print(where_devices)
@@ -604,21 +634,21 @@ if instances_count > 1 and instance_number >= 0 and (instance_number < instances
     # Use distributed wrapper
     if process == 'billing':
         # billing
-        query = """SELECT bill_id FROM (SELECT @rownum :=0) r,
+        query = """SELECT `bill_id` FROM (SELECT @rownum :=0) r,
                    (
                       SELECT @rownum := @rownum +1 AS rownum, bill_id
-                      FROM bills
-                      ORDER BY bill_id ASC
+                      FROM `bills`
+                      ORDER BY `bill_id` ASC
                   ) temp
                 WHERE MOD(temp.rownum, %s) = %s""" % (instances_count, instance_number)
     else:
         # poller or discovery
-        query = """SELECT device_id FROM (SELECT @rownum :=0) r,
+        query = """SELECT `device_id` FROM (SELECT @rownum :=0) r,
                    (
                       SELECT @rownum := @rownum +1 AS rownum, device_id
-                      FROM devices
+                      FROM `devices`
                       %s
-                      ORDER BY device_id ASC
+                      ORDER BY `device_id` ASC
                   ) temp
                 WHERE MOD(temp.rownum, %s) = %s""" % (where_devices, instances_count, instance_number)
 
@@ -636,9 +666,9 @@ else:
 
     if process == 'billing':
         # Normal billing poll
-        query = """SELECT   bill_id
-                   FROM     bills"""
-        order = " ORDER BY bill_id ASC"
+        query = """SELECT `bill_id`
+                   FROM   `bills`"""
+        order = " ORDER BY `bill_id` ASC"
         query = query + order
         if test:
             print(query)
@@ -646,17 +676,17 @@ else:
 
     else:
         # Normal poller/discovery
-        query = """SELECT   device_id
-                   FROM     devices
-                   %s""" % (where_devices,)
+        query = """SELECT `device_id`
+                   FROM   `devices`
+                   %s""" % (where_devices, )
         if process == 'discovery':
-            order = " ORDER BY last_discovered_timetaken DESC"
+            order = " ORDER BY `last_discovered_timetaken` DESC"
         else:
-            order = " ORDER BY last_polled_timetaken DESC"
+            order = " ORDER BY `last_polled_timetaken` DESC"
 
         # skip down devices in discovery
         if process == 'discovery':
-            query = query + " AND status = '1'"
+            query = query + " AND `status` = 1"
 
         try:
             # Query with hosts specified
@@ -665,26 +695,8 @@ else:
             # expand process name for do not calculate count inside main processes
             processname = processname + ' --host ' + host_wildcard
 
-            # new devices discovery just pass ./discovery.php -h new, do not spawn processes
-            if process == 'discovery' and host_wildcard == 'new':
-                if debug:
-                    command_options = '-d -h ' + host_wildcard
-                else:
-                    command_options = '-q -h ' + host_wildcard
-                # append poller id arg when requested
-                if poller_arg:
-                    command_options = '-p %s %s' % (poller_id, command_options)
-                print("INFO: starting %s for %s on poller id %s" % (process, host_wildcard, poller_id))
-                # print("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
-                os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
-                print("INFO: finished %s for %s on poller id %s" % (process, host_wildcard, poller_id))
-                # sys.exit(0) # this not worked inside try,
-                # see: https://stackoverflow.com/questions/7709411/why-finally-block-is-executing-after-calling-sys-exit0-in-except-block
-                stop_script = True
-                # wc_query = query + " AND (last_discovered IS NULL OR last_discovered = '0000-00-00 00:00:00' OR force_discovery = '1')"
-                # cursor.execute(wc_query)
-            else:
-                wc_query = query + " AND hostname LIKE %s " + order
+            if host_wildcard != 'new':
+                wc_query = query + " AND `hostname` LIKE %s " + order
                 cursor.execute(wc_query, (host_wildcard,))
                 if test:
                     print(wc_query)
@@ -695,12 +707,98 @@ else:
                 print(query)
             cursor.execute(query)
 
+
+"""
+   Common functions
+"""
+
+# Open dev null handle
+if not test:
+    FNULL = open(os.devnull, 'w')
+
+
+def defined(var):
+    return var in vars() or var in globals()
+
+
+def external_php(path, host='', extra=None, stdout=None, tmout=timeout):
+    command_args = ['/usr/bin/env', 'php', path]
+
+    if debug:
+        command_args.append('-d')
+    else:
+        # always quiet
+        command_args.append('-q')
+
+    if extra is not None:
+        command_args.extend(extra)
+
+    if host:
+        command_args.append('-h')
+        command_args.append(host)
+
+    if test:
+        # debug
+        print(' '.join(command_args))
+        return 0
+
+    if stdout is None and defined('FNULL'):
+        stdout = FNULL
+
+    start = time.time()
+    if tmout > 0:
+        # append timeout param for python 3.3+ and when option set
+        try:
+            subprocess.check_call(map(str, command_args),
+                                  stdout=stdout, stderr=subprocess.STDOUT, timeout=tmout)
+        except subprocess.TimeoutExpired:
+            print("WARNING: %s for host %s ran too long, stopped by timeout (%ss)." % (process, host, tmout))
+            logfile("WARNING: %s for host %s ran too long, stopped by timeout (%ss)." % (process, host, tmout))
+    else:
+        subprocess.check_call(map(str, command_args), stdout=stdout, stderr=subprocess.STDOUT)
+
+    return time.time() - start
+
+
+"""
+    Do initial operations before main poller/discovery
+"""
+if process == 'discovery' and instance_number == 0:
+    if not defined('host_wildcard'):
+        """
+            Since ./discovery -h all additionally do db schema update,
+            also do this here before wrap discovery processes.
+            Check if this is first process instance and --host parameter not passed
+        """
+        print("INFO: starting discovery.php for update")
+        # os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
+        runtime = external_php(discovery_path, extra=['-u', '-a'], tmout=0)
+        print("INFO: finished discovery.php after %.3fs for update" % (runtime, ))
+    elif host_wildcard == 'new':
+        # new devices discovery just pass ./discovery.php -h new, do not spawn processes
+        print("INFO: starting %s for %s on poller id %s" % (process, host_wildcard, poller_id))
+        # print("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
+        # os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
+        if poller_arg:
+            # append poller id arg when requested
+            runtime = external_php(discovery_path, host_wildcard, extra=['-p', poller_id], tmout=0)
+        else:
+            runtime = external_php(discovery_path, host_wildcard, tmout=0)
+        print("INFO: finished %s after %.3fs for %s on poller id %s" % (process, runtime, host_wildcard, poller_id))
+
+        stop_script = True  # exit other discovery
+
+if process == 'poller' and instance_number == 0 and poller_default and config['distributed']:
+    print("INFO: starting poller.php for external pollers")
+    runtime = external_php(poller_path, 'pollers', tmout=0)
+    print("INFO: finished poller.php after %.3fs for external pollers" % (runtime,))
+
+
 # stop script execute after try
 if stop_script:
     sys.exit(0)
 
-devices = cursor.fetchall()
-for row in devices:
+for row in cursor.fetchall():
     devices_list.append(int(row[0]))
 
 if test:
@@ -721,7 +819,7 @@ except:
     command = scriptname
 
 """
-    Search if same poller wrapper proccesses running
+    Search if same poller wrapper processes running
     Protect from race condition
 """
 
@@ -800,34 +898,15 @@ except:
     process_id = None
     pass
 
+
 if test:
     print("Already running %s processes: %s, load average (5min) %.2f" % (processname, ps_count, la[1]))
-    # print(process_id)
     # time.sleep(30) # delays for 30 seconds
     if process_id is not None:
         p_query = """DELETE FROM `observium_processes` WHERE `process_id` = %s"""
         cursor.execute(p_query, (process_id,))
         # db.commit()
     sys.exit(2)
-
-# Open dev null handle
-FNULL = open(os.devnull, 'w')
-
-"""
-    Since ./discovery -h all additionally do db schema update,
-    also do this here before wrap discovery processes.
-    Check if this is first process instance and --host parameter not passed
-"""
-if process == 'discovery' and instance_number == 0 and 'host_wildcard' not in globals():
-    # print("/usr/bin/env php %s -q -u >> /dev/null 2>&1" % (discovery_path))
-    if debug:
-        command_options = '-d -u -a'
-    else:
-        command_options = '-q -u -a'
-
-    print("INFO: starting discovery.php for update")
-    os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
-    print("INFO: finished discovery.php for update")
 
 
 def update_wrapper_times(rrd_file, count, runtime, workers):
@@ -907,9 +986,9 @@ def printworker():
         per_device_duration[device_id] = elapsed_time
 
         if elapsed_time < 300:
-            print("INFO: worker %s finished %s %s in %s seconds" % (worker_id, entity, device_id, elapsed_time))
+            print("INFO: worker %s finished %s %s in %.2f seconds" % (worker_id, entity, device_id, elapsed_time))
         else:
-            print("WARNING: worker %s finished %s %s in %s seconds" % (worker_id, entity, device_id, elapsed_time))
+            print("WARNING: worker %s finished %s %s in %.2f seconds" % (worker_id, entity, device_id, elapsed_time))
         print_queue.task_done()
 
 
@@ -926,64 +1005,38 @@ def process_worker():
     }
     process_path = command_paths[process]
 
-    command_list = []
     command_out = FNULL  # set non-debug output to /dev/null
-    if process == 'billing':
-        # billing use -b [bill_id]
-        command_list.append('-b')
-    else:
-        # poller/discovery us -h [device_id]
-        if poller_arg:
-            # add poller id arg
-            command_list.append('-p')
-            command_list.append(poller_id)
-
-        command_list.append('-h')
-
-    if debug:
-        command_list.insert(0, '-d')
-    else:
-        command_list.insert(0, '-q')
 
     while True:
-        device_id = process_queue.get()
+        entity_id = process_queue.get()
         try:
-            start_time = time.time()
-            command_args = ['/usr/bin/env', 'php', process_path]
-            command_args.extend(command_list)
-            command_args.append(device_id)
             if debug:
-                command_out = open(temp_path + '/observium_' + process + '_' + str(device_id) + '.debug', 'w')
+                command_out = open(temp_path + '/observium_' + process + '_' + str(entity_id) + '.debug', 'a')
             # print(command_args) #debug
-
-            if timeout > 0:
-                # append timeout param for python 3.3+ and when option set
-                try:
-                    subprocess.check_call(map(str, command_args),
-                                          stdout=command_out, stderr=subprocess.STDOUT, timeout=timeout)
-                except subprocess.TimeoutExpired:
-                    print("WARNING: %s for device_id %s ran too long, stopped by timeout." % (process, device_id))
-                    logfile("WARNING: %s for device_id %s ran too long, stopped by timeout." % (process, device_id))
+            if process == 'billing':
+                # billing use -b [bill_id]
+                pruntime = external_php(process_path, extra=['-b', entity_id], stdout=command_out, tmout=timeout)
+            elif poller_arg:
+                # add poller id arg
+                pruntime = external_php(process_path, entity_id, extra=['-p', poller_id], stdout=command_out,
+                                       tmout=timeout)
             else:
-                subprocess.check_call(map(str, command_args), stdout=command_out, stderr=subprocess.STDOUT)
+                # poller/discovery us -h [entity_id]
+                pruntime = external_php(process_path, entity_id, stdout=command_out, tmout=timeout)
 
             if debug:
                 command_out.close()
 
             # additional alerter process only after poller process
             if process == 'poller' and alerting:
-                print("INFO: starting alerter.php for %s" % device_id)
-                command_args = ['/usr/bin/env', 'php', alerter_path]
-                command_args.extend(command_list)
-                command_args.append(device_id)
-                if debug:
-                    command_out = temp_path + '/observium_alerter_' + str(device_id) + '.debug'
+                print("INFO: starting alerter.php for %s" % entity_id)
+                # if debug:
+                #     command_out = temp_path + '/observium_alerter_' + str(entity_id) + '.debug'
                 # print(command_args) #debug
-                subprocess.check_call(map(str, command_args), stdout=FNULL, stderr=subprocess.STDOUT)
-                print("INFO: finished alerter.php for %s" % device_id)
+                aruntime = external_php(alerter_path, entity_id)
+                print("INFO: finished alerter.php after %.3fs for %s" % (aruntime, entity_id))
 
-            elapsed_time = int(time.time() - start_time)
-            print_queue.put([threading.current_thread().name, device_id, elapsed_time])
+            print_queue.put([threading.current_thread().name, entity_id, pruntime])
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
@@ -999,8 +1052,8 @@ if debug:
     print("WARNING: DEBUG enabled, each %s %s store output to %s/observium_%s_id.debug (where id is %s_id)" % (
         entity, process, temp_path, process, entity))
 
-for device_id in devices_list:
-    process_queue.put(device_id)
+for dev_id in devices_list:
+    process_queue.put(dev_id)
 
 for i in range(amount_of_workers):
     t = threading.Thread(target=process_worker)
@@ -1020,7 +1073,7 @@ except (KeyboardInterrupt, SystemExit):
 total_time = time.time() - s_time
 
 la = os.getloadavg()  # get new load average after polling
-msg = "processed %s %ss in %.2f seconds with %s threads, load average (5min) %.2f" % \
+msg = "processed %s %ss in %.3f seconds with %s threads, load average (5min) %.2f" % \
       (len(devices_list), entity, total_time, amount_of_workers, la[1])
 print("INFO: %s %s\n" % (processname, msg))
 logfile(msg)
@@ -1039,48 +1092,59 @@ if process != 'discovery' and total_time > 300:
         print("ERROR: Some devices are taking more than 300 seconds, the script cannot recommend you what to do.")
     else:
         print("WARNING: Consider setting a minimum of %d threads. (This does not constitute professional advice!)" %
-              recommend)
+              (recommend,))
     exit_code = 1
 
 """
     Get and update poller wrapper stats
 """
-if process == 'poller' and stats:
-    import socket
-
-    localhost = socket.getfqdn()
-    if localhost.find('.') == 0:
-        localhost_t = subprocess.check_output(["/bin/hostname", "-f"], universal_newlines=True).strip()
-        if localhost_t.find('.') > 0:
-            localhost = localhost_t
-
+if process == 'poller':
+    # poller stats (always filled)
     poller_stats = {
-        'instances_count': instances_count,
-        'wrapper_count': ps_count
-    }
-    instance_stats = {
-        'hostname': localhost,
-        'instances_count': instances_count,  # this is need for check in calculate average
         'workers_count': amount_of_workers,
-        'devices_count': len(devices_list),
-        'devices_ids': devices_list,
-        'last_starttime': '%.3f' % s_time,
-        'last_runtime': '%.3f' % total_time,
-        'last_status': exit_code,
-        # 'last_message':    msg
+        'instances_count': instances_count,
+        'wrapper_processes': ps_count
     }
+
+    # instances specific stats
+    if stats:
+        import socket
+
+        localhost = socket.getfqdn()
+        if localhost.find('.') == 0:
+            localhost_t = subprocess.check_output(["/bin/hostname", "-f"], universal_newlines=True).strip()
+            if localhost_t.find('.') > 0:
+                localhost = localhost_t
+
+        instance_stats = {
+            'hostname': localhost,
+            'instances_count': instances_count,  # this is need for check in calculate average
+            'workers_count': amount_of_workers,
+            'devices_count': len(devices_list),
+            'devices_ids': devices_list,
+            'last_starttime': '%.3f' % (s_time,),
+            'last_runtime': '%.3f' % (total_time,),
+            'last_status': exit_code,
+            # 'last_message':    msg
+        }
 
     instances_clean = []
     instances_total_time = total_time
     instances_total_devices = len(devices_list)
     i = 1
 
-    query = """SELECT attrib_type, attrib_value FROM observium_attribs WHERE attrib_type LIKE 'poller_wrapper_instance_%'"""
+    if poller_default:
+        poller_instance_base = 'poller_wrapper_instance_'
+    else:
+        poller_instance_base = 'poller_%s_instance_' % (poller_id, )
+
+
+    query = "SELECT `attrib_type`, `attrib_value` FROM `observium_attribs` WHERE `attrib_type` LIKE '%s'" % (poller_instance_base + '%', )
     cursor.execute(query)
 
     for row in cursor.fetchall():
         # print(row)
-        n = int(row[0].replace('poller_wrapper_instance_', ''))  # get stat for instance number n
+        n = int(row[0].replace(poller_instance_base, ''))  # get stat for instance number n
         if n >= instances_count:
             # seems as old stats, instances count reduced
             instances_clean.append(row[0])
@@ -1107,42 +1171,51 @@ if process == 'poller' and stats:
     # print(instances_clean)
 
     # write instance and total stats into db
-    cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
-                   ('poller_wrapper_instance_' + str(instance_number),))
-    row = cursor.fetchone()
-    if int(row[0]) > 0:
-        cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
-                       (json.dumps(instance_stats), 'poller_wrapper_instance_' + str(instance_number)))
-        # db.commit()
-        # print("Number of rows updated: %d" % cursor.rowcount)
-    else:
-        cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
-                       (json.dumps(instance_stats), 'poller_wrapper_instance_' + str(instance_number)))
-        # db.commit()
+    if stats:
+        cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
+                       (poller_instance_base + str(instance_number),))
+        row = cursor.fetchone()
+        if int(row[0]) > 0:
+            cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
+                           (json.dumps(instance_stats), poller_instance_base + str(instance_number)))
+            # db.commit()
+            # print("Number of rows updated: %d" % cursor.rowcount)
+        else:
+            cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
+                           (json.dumps(instance_stats), poller_instance_base + str(instance_number)))
+            # db.commit()
 
-    cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
-                   ('poller_wrapper_stats',))
-    row = cursor.fetchone()
-    if int(row[0]) > 0:
-        cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
-                       (json.dumps(poller_stats), 'poller_wrapper_stats'))
-        # db.commit()
-        # print("Number of rows updated: %d" % cursor.rowcount)
-    else:
-        cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
-                       (json.dumps(poller_stats), 'poller_wrapper_stats'))
-        # db.commit()
-
-    # clean stale instance stats
-    for row in instances_clean:
-        cursor.execute("DELETE FROM `observium_attribs` WHERE `attrib_type` = %s", (row,))
-        # db.commit()
+        # clean stale instance stats
+        for row in instances_clean:
+            cursor.execute("DELETE FROM `observium_attribs` WHERE `attrib_type` = %s", (row,))
+            # db.commit()
 
     # Write poller statistics to RRD
-    if poller_id > 0:
+    if not poller_default:
+        # update partitioned poller stats
+        if poller_db_last >= 0:
+            cursor.execute("UPDATE `pollers` SET `poller_stats` = %s WHERE `poller_id` = %s",
+                           (json.dumps(poller_stats), poller_id))
+            # db.commit()
+            # print("Number of rows updated: %d" % cursor.rowcount)
+
         # partitioned poller wrapper
         rrd_name_base = 'poller-wrapper-id' + str(poller_id)
     else:
+        # update main poller 0 stats
+        cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
+                       ('poller_wrapper_stats',))
+        row = cursor.fetchone()
+        if int(row[0]) > 0:
+            cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
+                           (json.dumps(poller_stats), 'poller_wrapper_stats'))
+            # db.commit()
+            # print("Number of rows updated: %d" % cursor.rowcount)
+        else:
+            cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
+                           (json.dumps(poller_stats), 'poller_wrapper_stats'))
+            # db.commit()
+
         # default poller wrapper
         rrd_name_base = 'poller-wrapper'
 
@@ -1151,13 +1224,14 @@ if process == 'poller' and stats:
 
     update_wrapper_times(rrd_path_total, poller_stats['total_devices_count'], poller_stats['average_runtime'],
                          amount_of_workers)
-    update_wrapper_count(rrd_path_count, poller_stats['wrapper_count'])
+    update_wrapper_count(rrd_path_count, poller_stats['wrapper_processes'])
 
     # Additionally per instance statistics
     if instances_count > 1:
         rrd_path_instance = rrd_name_base + '_' + str(instances_count) + '_' + str(instance_number) + '.rrd'
         update_wrapper_times(rrd_path_instance, instance_stats['devices_count'], instance_stats['last_runtime'],
                              amount_of_workers)
+
 
 # Remove process info from DB
 p_query = """DELETE FROM `observium_processes` WHERE `process_id` = %s"""

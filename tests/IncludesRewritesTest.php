@@ -583,7 +583,7 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
                             [ 'port_label' => 'vether1', 'port_label_num' => '1', 'port_label_base' => 'vether', 'port_label_short' => 'vether1' ] ],
       [ 'generic',          [ 'ifDescr' => 'veth1bbfdc5', 'ifName' => 'veth1bbfdc5', 'ifAlias' => '' ],
                             [ 'port_label' => 'veth1bbfdc5', 'port_label_num' => '1bbfdc5', 'port_label_base' => 'veth', 'port_label_short' => 'veth1bbfdc5' ] ],
-      [ 'generic',          [ 'ifDescr' => 'vethfd3fe3c0', 'ifName' => 'vethfd3fe3c0', 'ifAlias' => '' ],
+      [ 'nutanix',          [ 'ifDescr' => 'vethfd3fe3c0', 'ifName' => 'vethfd3fe3c0', 'ifAlias' => '' ],
                             [ 'port_label' => 'vethfd3fe3c0', 'port_label_num' => 'fd3fe3c0', 'port_label_base' => 'veth', 'port_label_short' => 'vethfd3fe3c0' ] ],
 
       // port_label os definitions

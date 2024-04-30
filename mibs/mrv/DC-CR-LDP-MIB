@@ -1,0 +1,1022 @@
+DC-CR-LDP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        enterprises, Unsigned32, Integer32               FROM SNMPv2-SMI
+        MODULE-COMPLIANCE, OBJECT-GROUP     FROM SNMPv2-CONF
+        TEXTUAL-CONVENTION, TruthValue, RowStatus
+                                            FROM SNMPv2-TC
+        InterfaceIndexOrZero
+                                            FROM IF-MIB;
+
+dccrldp MODULE-IDENTITY
+        LAST-UPDATED "201412210000Z"  -- December 21, 2014
+        ORGANIZATION "MRV Communications."
+        CONTACT-INFO
+         "For technical support, please contact your service channel"
+   DESCRIPTION
+      "The MIB module for management of the DC-CR-LDP product"
+    -- Revision history
+      REVISION     "201412210000Z"  -- December 21, 2014
+      DESCRIPTION
+        "Initial edition."
+      ::= { opx 15 }
+
+nbase                      OBJECT IDENTIFIER ::= { enterprises 629 }
+opx                      OBJECT IDENTIFIER ::= { nbase 10 }
+
+  dccrldpObjects               OBJECT IDENTIFIER ::= { dccrldp 1 } -- tables
+
+--  Textual Conventions.
+
+    DcCrldpAdminStatus ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+            "The value determines the desired administrative
+            status of a DC-CR-LDP table entry.
+            The up and down states indicate that the traffic
+            flow is enabled or disabled respectively for the
+            protocol."
+        SYNTAX      INTEGER {
+                           up(1),     -- ready to pass packets
+                           down(2)
+        }
+
+    DcCrldpOperStatus ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+            "The value determines the operational status of a
+            DC-CR-LDP table entry. The up and down states indicate
+            that the traffic flow is enabled or disabled respectively."
+        SYNTAX      INTEGER {
+                           up(1),          -- active
+                           down(2),        -- inactive
+                           goingUp(3),     -- activating
+                           goingDown(4),   -- deactivating
+                           actFailed(5)    -- activation failed
+        }
+
+    DcCrldpIndex ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+            "A general purpose SNMP index into the dcHafEntity table."
+        SYNTAX      Unsigned32
+
+-- End of textual conventions
+
+--  The DC-CR-LDP Signaling MIB. This table is used to create an
+--  instance of DC-CR-LDP Signaling, and to change its operational state.
+
+    dccrldpSigTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF DccrldpSigEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The table of active instances of DC-CR-LDP Signaling."
+
+       ::= { dccrldpObjects 1 }
+
+    dccrldpSigEntry OBJECT-TYPE
+        SYNTAX      DccrldpSigEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each of these entries represents an instance of
+            DC-CR-LDP Signaling running in the HAF.  Some of these instances
+            will be the primary, and others may be backups."
+        INDEX { dccrldpSigIndex }
+       ::= { dccrldpSigTable 1 }
+
+    DccrldpSigEntry ::= SEQUENCE {
+            dccrldpSigIndex                    DcCrldpIndex,
+            dccrldpSigPathManagerIndex         DcCrldpIndex,
+            dccrldpSigLsrIndex                 Unsigned32,
+            dccrldpSigSocketIfIndex            InterfaceIndexOrZero,
+            dccrldpSigSessionBufPoolSize       Integer32,
+            dccrldpSigEMBufPoolSize            Integer32,
+            dccrldpSigAMBufPoolSize            Integer32,
+            dccrldpSigAdminStatus              DcCrldpAdminStatus,
+            dccrldpSigOperStatus               DcCrldpOperStatus,
+            dccrldpSigRowStatus                RowStatus,
+            dccrldpSigUseI3Interface           TruthValue,
+            dccrldpSigConformanceFlags         BITS,
+            dccrldpSigUseIPv6Transport         TruthValue,
+            dccrldpSigSessStatusTrapEnable     TruthValue,
+            dccrldpSigSessThreshTrapEnable     TruthValue,
+            dccrldpSigPathVecLimitTrapEnable   TruthValue,
+            dccrldpSigBfdProviderIndex         Integer32
+        }
+
+    dccrldpSigIndex OBJECT-TYPE
+        SYNTAX      DcCrldpIndex
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The index of this dccrldpSigEntry.  This is the
+            HAF entity index passed on the product create
+            parameters."
+       ::= { dccrldpSigEntry 1 }
+
+    dccrldpSigPathManagerIndex OBJECT-TYPE
+        SYNTAX      DcCrldpIndex
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The index of the Path Manager instance to which this
+            instance of Signaling is to join.  See dccrldpPmTable."
+        DEFVAL { 0 }
+       ::= { dccrldpSigEntry 2 }
+
+    dccrldpSigLsrIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The index of the DC-LMGR product instance to which this
+            DC-CR-LDP Signaling is to join as its LDB interface provider.
+            See dclmgrLsrEntityTable."
+        DEFVAL { 0 }
+       ::= { dccrldpSigEntry 3 }
+
+    dccrldpSigSocketIfIndex OBJECT-TYPE
+        SYNTAX      InterfaceIndexOrZero
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Management assigned interface identifier for the IP Sockets
+            component interface to DC-CR-LDP Signalling."
+        DEFVAL { 0 }
+       ::= { dccrldpSigEntry 4 }
+
+    dccrldpSigSessionBufPoolSize OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "The number of pre-reserved buffers available for sending
+          sockets and LDI messages for each LDP session. This is used
+          to pace the sockets and LDI data flows for each LDP session."
+        DEFVAL { 8 }
+       ::= { dccrldpSigEntry 5 }
+
+    dccrldpSigEMBufPoolSize OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "The number of pre-reserved buffers available for sending
+          sockets, LDBI, NHR and I3 messages within Entity Manager
+          This is used to pace Entity Manager's sockets, LDBI, NHR
+          and I3 data flows."
+        DEFVAL { 8 }
+       ::= { dccrldpSigEntry 6 }
+
+    dccrldpSigAMBufPoolSize OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "The number of pre-reserved buffers available for sending
+          sockets messages within Adjacency Manager. This is used
+          to pace Adjacency Manager's sockets data flows."
+        DEFVAL { 8 }
+       ::= { dccrldpSigEntry 7 }
+
+    dccrldpSigAdminStatus OBJECT-TYPE
+        SYNTAX      DcCrldpAdminStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "This object is used to activate the DC-CR-LDP Signaling instance."
+        DEFVAL { up }
+       ::= { dccrldpSigEntry 8 }
+
+    dccrldpSigOperStatus OBJECT-TYPE
+        SYNTAX      DcCrldpOperStatus
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+         "The current operational status of this instance of
+         DC-CR-LDP Signaling."
+       ::= { dccrldpSigEntry 9 }
+
+    dccrldpSigRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "Used to create and delete a DC-CR-LDP Signaling Table entry.
+         When this object is set to 'active', only the
+         dccrldpSigAdminStatus object in the row may be modified."
+       ::= { dccrldpSigEntry 10 }
+
+    dccrldpSigUseI3Interface OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "Used to indicate whether this DC-CR-LDP Signaling instance
+         should use the I3 interface or the IPR interface to determine
+         information regarding local interface configuration.  Use of
+         the IPR interface is deprecated, but nevertheless this field
+         defaults to its use for back-compatibility reasons."
+        DEFVAL { false }
+       ::= { dccrldpSigEntry 11 }
+
+    dccrldpSigConformanceFlags OBJECT-TYPE
+        SYNTAX      BITS {
+                      maxPduLen (0)
+                    }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "Flags specifying how DC-LDP Session Controller should
+         behave in situations either where the interpretation of
+         strict conformance is debatable, or where strictly
+         conformant behavior contradicts the general IETF principle
+         of being liberal on receipt.
+
+         maxPduLen  If set, this flag means that DC-LDP should
+         abort session initialization if the peer (in the passive
+         role) proposes a max PDU length that is larger than
+         DC-LDP's proposed value.  The interpretation here is that
+         the passive peer's value should be the already negotiated
+         value, not its raw value."
+        DEFVAL { {} }
+       ::= { dccrldpSigEntry 12 }
+
+    dccrldpSigUseIPv6Transport OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "Used to indicate whether the DC-CR-LDP signaling is to use
+         IPv6 transport where possible.
+
+         Note that if DC-LDP is configured with an IPv4 transport
+         address, IPv4 transport will be used for multicast and
+         IPv6 sockets using a IPv4 mapped IPv6 address will be used
+         for unicast when this field is set to True."
+
+        DEFVAL { false }
+       ::= { dccrldpSigEntry 13 }
+
+    dccrldpSigSessStatusTrapEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "If this object is true, then it enables the generation of
+         mplsLdpSessionUp and mplsLdpSessionDown traps, otherwise
+         these traps are not generated."
+
+        DEFVAL { false }
+       ::= { dccrldpSigEntry 14 }
+
+    dccrldpSigSessThreshTrapEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "If this object is true, then it enables the generation of
+         mplsLdpInitSessionThresholdExceeded traps, otherwise these
+         traps are not generated."
+
+        DEFVAL { false }
+       ::= { dccrldpSigEntry 15 }
+
+    dccrldpSigPathVecLimitTrapEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "If this object is true, then it enables the generation of
+         mplsLdpPathVectorLimitMismatch traps, otherwise these
+         traps are not generated."
+
+        DEFVAL { false }
+       ::= { dccrldpSigEntry 16 }
+
+    dccrldpSigBfdProviderIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "The index of the BFDI provider instance to which this
+          DC-LDP Signaling is to join as its BFD interface provider.
+          See bfdEntityTable.
+
+          Zero indicates that no BFDI provider is available, or that
+          DC-LDP Signaling should not join to any BFDI provider."
+
+        DEFVAL { 0 }
+       ::= { dccrldpSigEntry 17 }
+
+--  The DC-CR-LDP Path Manager MIB. This table is used to create an
+--  instance of DC-CR-LDP Path Manager, and to change its operational state.
+
+    dccrldpPmTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF DccrldpPmEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The table of active instances of DC-CR-LDP Path Manager."
+
+       ::= { dccrldpObjects 2 }
+
+    dccrldpPmEntry OBJECT-TYPE
+        SYNTAX      DccrldpPmEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each of these entries represents an instance of
+            DC-CR-LDP Path Manager running in the HAF.  Some of these instances
+            will be the primary, and others may be backups."
+        INDEX { dccrldpPmIndex }
+       ::= { dccrldpPmTable 1 }
+
+    DccrldpPmEntry ::= SEQUENCE {
+            dccrldpPmIndex                      DcCrldpIndex,
+            dccrldpPmLsrIndex                   Unsigned32,
+            dccrldpPmLdpEntityAutoCreate        TruthValue,
+            dccrldpPmLdpEntityAutoStart         TruthValue,
+            dccrldpPmLdpEntityReuse             TruthValue,
+            dccrldpPmLdpVersion                 INTEGER,
+            dccrldpPmUseLdpFt                   TruthValue,
+            dccrldpPmAsNumber                   Integer32,
+            dccrldpPmIprBufPoolSize             Integer32,
+            dccrldpPmLdpSupported               TruthValue,
+            dccrldpPmCrLdpSupported             TruthValue,
+            dccrldpPmQueryFECSupported          TruthValue,
+            dccrldpPmAdminStatus                DcCrldpAdminStatus,
+            dccrldpPmOperStatus                 DcCrldpOperStatus,
+            dccrldpPmRowStatus                  RowStatus,
+            dccrldpPmRestartCapable             TruthValue,
+            dccrldpPmReconnectTime              Integer32,
+            dccrldpPmRecoveryTime               Integer32,
+            dccrldpPmMaxPeerReconnect           Integer32,
+            dccrldpPmMaxPeerRecovery            Integer32,
+            dccrldpPmAdjDwnHoldTime             Integer32,
+            dccrldpPmOutSegProgOrder            INTEGER,
+            dccrldpPmSupportIpv6                TruthValue,
+            dccrldpPmPolicySupportFlags         BITS,
+            dccrldpPmCheckOutSegIntfaceStat     TruthValue,
+            dccrldpPmLdpEntityCreateNhrLdb      TruthValue,
+            dccrldpPmLdpEntityCreatePsiJoin     TruthValue,
+            dccrldpPmRedundancySwitchIntvl      Integer32,
+            dccrldpPmLabelWithdrawDelay         Integer32,
+            dccrldpPmImplicitXcVcFecs           TruthValue,
+            dccrldpPmWthdrwDownstreamLbl        TruthValue,
+            dccrldpPmIngressReleaseDelay        TruthValue,
+            dccrldpPmPwFastUpstreamRelease      TruthValue
+        }
+
+    dccrldpPmIndex OBJECT-TYPE
+        SYNTAX      DcCrldpIndex
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The index of this dccrldpPmEntry.  This is the
+            HAF entity index passed on the product create
+            parameters."
+       ::= { dccrldpPmEntry 1 }
+
+    dccrldpPmLsrIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The index of the DC-LMGR product instance to which this
+            DC-CR-LDP Path Manager is to join as its LDB interface provider.
+            See dclmgrLsrEntityTable."
+        DEFVAL { 0 }
+       ::= { dccrldpPmEntry 2 }
+
+    dccrldpPmLdpEntityAutoCreate OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', the Entity Manager component of DC-CR-LDP
+            creates Entities automatically based on interfaces known to
+            Entity Manager.  When set to 'false' Entities are not
+            automatically created."
+        DEFVAL { true }
+       ::= { dccrldpPmEntry 3 }
+
+    dccrldpPmLdpEntityAutoStart OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', the Entity Manager component of DC-CR-LDP
+            automatically starts Entities.  Both configured and automatically
+            created Entities are automatically started.  When set to 'false'
+            Entities are not automatically started."
+        DEFVAL { true }
+       ::= { dccrldpPmEntry 4 }
+
+    dccrldpPmLdpEntityReuse OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', the same Entity can be used for multiple
+            interfaces.  That is, the per-platform label space behaves as
+            a per-interface label space.  When set to 'false', the same
+            entity cannot be used for multiple interfaces."
+        DEFVAL { true }
+       ::= { dccrldpPmEntry 5 }
+
+    dccrldpPmLdpVersion OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             version1(1)
+                    }
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+            "An indication of the LDP version supported."
+        DEFVAL { 1 }
+       ::= { dccrldpPmEntry 6 }
+
+    dccrldpPmUseLdpFt OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', DC-CR-LDP implements fault tolerance
+            procedures for LDP and CR-LDP.  When set to 'false', fault
+            tolerance procedures are not used."
+        DEFVAL { false }
+       ::= { dccrldpPmEntry 7 }
+
+    dccrldpPmAsNumber OBJECT-TYPE
+        SYNTAX       Integer32(0..65535)
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+            "The number identifying the autonomous system (AS) to which
+            this node belongs."
+       ::= { dccrldpPmEntry 8 }
+
+    dccrldpPmIprBufPoolSize OBJECT-TYPE
+        SYNTAX       Integer32
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+            "The size of the buffer pool used for sending either
+            (deprecated) IPRI messages or for sending NHR and I3
+            messages.  This is used to pace IPR/NHR+I3 data flows from
+            PM."
+        DEFVAL { 8 }
+       ::= { dccrldpPmEntry 9 }
+
+    dccrldpPmLdpSupported OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', DC-CR-LDP implements LDP
+            functionality.  When set to 'false' received LDP requests
+            are rejected.
+            Note that at least one of dccrldpPmLdpSupported and
+            dccrldpPmCrLdpSupported must be set to 'true' before
+            activating a dccrldpPmTable row.  Both dccrldpPmLdpSupported
+            and dccrldpPmCrLdpSupported may be set to 'true'."
+        DEFVAL { false }
+       ::= { dccrldpPmEntry 10 }
+
+    dccrldpPmCrLdpSupported OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', DC-CR-LDP implements CR-LDP
+            functionality.  When set to 'false' received CR-LDP requests
+            are rejected.
+            Note that at least one of dccrldpPmLdpSupported and
+            dccrldpPmCrLdpSupported must be set to 'true' before
+            activating a dccrldpPmTable row.  Both dccrldpPmLdpSupported
+            and dccrldpPmCrLdpSupported may be set to 'true'."
+        DEFVAL { false }
+       ::= { dccrldpPmEntry 11 }
+
+    dccrldpPmQueryFECSupported OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When set to 'true', DC-CR-LDP queries the routing stub
+             when a label mapping for an unrecognized FEC is received
+             to determine whether the FEC should be recognized and the
+             corresponding switch programming performed or not.  If set
+             to 'false' DC-CR-LDP creates a dummy FEC for the mapping
+             and retains or releases the mapping based on the label
+             retention policy for the session."
+        DEFVAL { false }
+       ::= { dccrldpPmEntry 12 }
+
+    dccrldpPmAdminStatus OBJECT-TYPE
+        SYNTAX      DcCrldpAdminStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "This object is used to activate the DC-CR-LDP Path Manager instance."
+        DEFVAL { up }
+       ::= { dccrldpPmEntry 13 }
+
+    dccrldpPmOperStatus OBJECT-TYPE
+        SYNTAX      DcCrldpOperStatus
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+         "The current operational status of this instance of
+         DC-CR-LDP Path Manager."
+       ::= { dccrldpPmEntry 14 }
+
+    dccrldpPmRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "Used to create and delete a DC-CR-LDP Path Manager Table entry.
+         When this object is set to 'active', only the
+         dccrldpPmAdminStatus object in the row may be modified."
+       ::= { dccrldpPmEntry 15 }
+
+    dccrldpPmRestartCapable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+         "A flag to indicate whether the local node should advertise
+         itself as LDP restart capable if the Label Switch
+         Controller or Label Data Forwarder is capable of
+         supporting the required procedures."
+        DEFVAL { false }
+       ::= { dccrldpPmEntry 16 }
+
+    dccrldpPmReconnectTime OBJECT-TYPE
+        SYNTAX       Integer32(0..2147483647)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "The time that the local node takes to restart LDP and bring up
+         the LDP sessions. This is advertised to neighbors in the FT
+         Session TLV in Initialization messages.
+
+         The value chosen should be large enough for LDP to be
+         terminated and restarted.
+
+         Only used if dccrldpPmRestartCapable is set to true."
+        DEFVAL { 60000 }
+       ::= { dccrldpPmEntry 17 }
+
+    dccrldpPmRecoveryTime OBJECT-TYPE
+        SYNTAX       Integer32(0..2147483647)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "The period of time that the local node is willing to retain its
+         MPLS forwarding state, if any, that it preserved across the
+         restart.
+
+         The time is from the end of the restart time configured
+         above.
+
+         This field is used to calculate the Recovery Time for both
+         Control Plane and Control Channel restarts.  It is used to
+         calculate the Recovery Time advertised in the FT Session
+         TLV in the Initialization message sent to the neighbor.
+
+         Only used if dccrldpPmRestartCapable is set to true."
+        DEFVAL { 180000 }
+       ::= { dccrldpPmEntry 18 }
+
+    dccrldpPmMaxPeerReconnect OBJECT-TYPE
+        SYNTAX       Integer32(0..2147483647)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "The maximum period of time that LDP should wait for a restart
+         capable neighbor to restore an LDP session.
+
+         LDP waits for the minimum of this time and the
+         Reconnect Timeout advertised in the FT Session TLV in
+         the Initialization message from the neighbor.
+
+         Only used if dccrldpPmRestartCapable is set to true."
+        DEFVAL { 180000 }
+       ::= { dccrldpPmEntry 19 }
+
+    dccrldpPmMaxPeerRecovery OBJECT-TYPE
+        SYNTAX       Integer32(0..2147483647)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "The maximum period of time that LDP should wait for a restart
+         capable neighbor to refresh Label Mappings previously received
+         from that neighbor before deleting the stale bindings.
+
+         LDP waits for the minimum of this time and the
+         Recovery Time advertised in the FT Session TLV in
+         the Initialization message from the neighbor.
+
+         This value is not used to set the Recovery Time advertised
+         in the FT Session TLV in the Initialization message sent
+         to the neighbor.
+
+         Only used if dccrldpPmRestartCapable is set to true."
+        DEFVAL { 240000 }
+       ::= { dccrldpPmEntry 20 }
+
+    dccrldpPmAdjDwnHoldTime OBJECT-TYPE
+        SYNTAX       Integer32(0..2147483647)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "The time to hold a failed LDP Hello adjacency to distinguish
+         between LDP peer failure and interface failure.
+
+         This field is used to ensure that LDP retains adjacency
+         multi-link LSPs during peer restart recovery when the peer
+         restarts and an LDP Hello adjacency goes down before the
+         LDP session.
+
+         When an LDP Hello adjacency fails, Path Manager waits
+         until the adjacency holding timer expires before tearing
+         down any LSP out segments associated with the adjacency.
+
+         If the LDP session fails before the adjacency holding
+         timer expires, Path Manager performs peer restart recovery
+         instead of tearing down any LSP out segments.
+
+         If the adjacency holding timer expires and the LDP session
+         is still active then Path Manager assumes that the
+         interface has failed but the peer is still active.  In
+         this case Path Manager tears down LSP out segments
+         associated with the adjacency.
+
+         The value chosen should be large enough for the LDP
+         session to fail if the LDP peer has failed.
+
+         Only used if _restart_capable_ is set to AMB_TRUE, and
+         cannot be modified when the _row_status_ is ACTIVE."
+        DEFVAL { 3000 }
+       ::= {dccrldpPmEntry 21 }
+
+    dccrldpPmOutSegProgOrder OBJECT-TYPE
+        SYNTAX       INTEGER {
+                             default(0),
+                             connFirst(1)
+        }
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "This determines the order in which LDP connects and
+         releases out segments.
+
+         default: This will release all out-segments on a session
+         before programming new out-segments on the same session.
+         No ordering for out-segments across different sessions is
+         enforced when ECMP is in use.
+
+         connFirst: This mode forces all the out-segments for an
+         LSP to be programmed before any out-segments are released.
+         This ordering is only supported if the LSC stub supports
+         implicit XCs."
+        DEFVAL { default }
+       ::= {dccrldpPmEntry 22 }
+
+    dccrldpPmSupportIpv6 OBJECT-TYPE
+        SYNTAX       TruthValue
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "This field indicates whether LDP Path Manager supports
+         IPv6 addresses, FECs and routes.
+
+         If this field is set to false then no IPv6 addresses will
+         be accepted over the NHR and I3 interfaces and all LDP
+         protocol messages for IPv6 addresses or FECs will be
+         returned to the peer as an LDP status code of 'Unsupported
+         Address Family'."
+        DEFVAL { false }
+       ::= {dccrldpPmEntry 23 }
+
+    dccrldpPmPolicySupportFlags OBJECT-TYPE
+        SYNTAX       BITS {
+                          policySupported(0),
+                          perFecOptimizationSupported(1),
+                          suppressAddressPolicy(2),
+                          policyForVCFECs(3)
+        }
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "This field contains bit flags which indicate whether
+         DC-LDP supports LDP Policy and if per FEC policy
+         optimization is to be used.
+
+         The supported bit flags are
+            - policySupported
+            - perFecOptimizationSupported
+            - suppressAddressPolicy
+            - policyForVCFECs.
+
+         The policySupported flag indicates that DC-LDP will
+         enforce policy decisions made by the user through a number
+         of user exits.  If this flag is not set DC-LDP will not
+         call policy user exits.
+
+         The perFecOptimizationSupported flag indicates that DC-LDP
+         provides policy on a per FEC basis as opposed to a per FEC
+         per session basis.  This results in policy user exits only
+         being called once per FEC.  This field is only significant
+         if the policySupported flag is set.  This feature is used
+         to reduce the number of calls to the Policy User Exits
+         particularly when a change in Policy is being implemented.
+
+         If the perFecOptimizationSupported flag is not set then
+         DC-LDP Path Manager enforces policy on a per FEC per peer
+         basis.
+
+         If this flag is set policy is enforced on a per FEC basis
+         and the same policy decision is assumed to apply for all
+         peers.
+
+         The suppressAddressPolicy flag if set prevents DC-LDP from
+         performing any Policy processing on receipt of a Address
+         or Address Withdraw message from a peer.
+
+         If this field is not set then its default value is
+         determined by the RCP_USER_DO_POLICY compile time flag.
+
+         The policyForVCFECs flag indicates that DC-LDP should call
+         the policy user exits for VC-FECs.  The default behavior
+         is not to call the policy user exits for VC-FECs.
+
+         Changes to the value of policy_support_flags are not
+         permitted whilst the MIB row is active."
+
+       ::= {dccrldpPmEntry 24 }
+
+dccrldpPmCheckOutSegIntfaceStat OBJECT-TYPE
+        SYNTAX       TruthValue
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+         "This field indicates whether LDP Path Manager makes the
+          programming of each out segment conditional on the status
+          of the interface where the out segment is programmed.
+
+          When set to false, LDP Path Manager assumes that the
+          availability of interfaces for programming is reflected in
+          the adjacency and session information that it receives
+          from LDP Session Controller, and in the routing
+          information that it receives from the NHR stub.
+
+          When set to true, LDP Path Manager tracks interface
+          status itself and uses this in addition to input from LDP
+          Session Controller and the NHR stub to decide whether an
+          out segment should be programmed on a particular
+          interface.  If the other inputs indicate 'yes', but the
+          relevant interface is (or goes) down, LDP Path Manager
+          will not program that out segment (or will remove the
+          existing out segment on that interface).
+
+          This field cannot be changed when the row is active."
+        DEFVAL { false }
+       ::= {dccrldpPmEntry 25 }
+
+    dccrldpPmLdpEntityCreateNhrLdb OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+          "When set to 'true', LDP Path Manager creates joins to the
+           NHR stub and Label Manager as part of activation.
+
+          This field cannot be changed when the row is active."
+        DEFVAL { true }
+       ::= { dccrldpPmEntry 26 }
+
+    dccrldpPmLdpEntityCreatePsiJoin OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+          "When set to 'true', LDP Path Manager creates a PSI join to an
+           instance of DC-TPM as part of activation.
+
+          This field cannot be changed when the row is active."
+        DEFVAL { false }
+       ::= { dccrldpPmEntry 27 }
+
+    dccrldpPmRedundancySwitchIntvl OBJECT-TYPE
+        SYNTAX      Integer32(1..2147483647)
+        UNITS      "milliseconds"
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The time interval that DC-MPLS will use in pseudowire
+            redundancy when attempting a switchover, before it determines
+            that switchover has failed."
+        DEFVAL { 20000 }
+        ::= { dccrldpPmEntry 28 }
+
+    dccrldpPmLabelWithdrawDelay OBJECT-TYPE
+        SYNTAX      Integer32(0..200000)
+        UNITS      "seconds"
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The time interval during which Label Withdraws
+              will not be sent upstream after an event occurs that would
+              otherwise cause Label Withdraws to be sent.
+
+              The only events to which this does not apply are
+              - FEC deletion
+              - receipt of a Label Withdraw from downstream withdrawing
+                the last downstream label for a FEC
+              - any event triggered by the LDP policy user exits.
+
+              The interval does not apply for
+              - PW FECs, or CR-LDP LSPs
+              - downstream sessions using Downstream-on-Demand mode
+              - nodes using  independent control."
+        DEFVAL { 0 }
+        ::= { dccrldpPmEntry 29 }
+
+    dccrldpPmImplicitXcVcFecs OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Whether to use implicit XCs for VC FECs.  This feature is
+             deprecated.
+
+             Implicit XCs are required for ECMP FECs, and are enabled
+             automatically if support for them is advertised over the
+             LDBI, which is dependent on the LSI stub
+             advertising equivalent support.
+
+             Implicit XCs do not provide any functional benefit for VC
+             FECs, and it is recommended that the explicit XCs are
+             used for them.  However if implicit XC support is desired for all
+             FECs then this field can be used to enable it for VC FECs.
+
+             This field will have no effect if implicit XCs are not
+             supported over the LDBI, or if there is no LDBI join.
+
+             This field cannot be changed when the row is active."
+        DEFVAL { false }
+        ::= { dccrldpPmEntry 30 }
+
+    dccrldpPmWthdrwDownstreamLbl OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "DC-LDP sends label mappings to all upstream peers.
+             Sometimes, due to a change of next hop from IP Routing or
+             a new address from the peer, a peer may change from being
+             upstream to being a downstream peer.  This results in the
+             label we sent to the peer no longer being necessary.
+
+             When set to 'false', these labels are retained (if liberal
+             retention) or released (if conservative retention) by the
+             peer.  This is generally desirable, since it has no impact
+             on the data plane and reduces the work for the control
+             plane when a new peer is created.
+
+             When set to 'true', these labels will be withdrawn when
+             DC-LDP detects the condition.  This is sometimes desirable
+             when a network operator requires consistency between
+             labels distributed and labels programmed to the data
+             plane, but cannot use conservative retention mode.
+
+             This field can be changed at any time, but if changed to
+             'true' it will only apply to new sessions."
+        DEFVAL { false }
+        ::= { dccrldpPmEntry 31 }
+
+    dccrldpPmIngressReleaseDelay OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Whether to use the dccrldpPmLabelWithdrawDelay timer to
+             also prevent immediate switch deprogramming at ingress."
+        DEFVAL { false }
+        ::= { dccrldpPmEntry 32 }
+
+    dccrldpPmPwFastUpstreamRelease OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Whether to release upstream programmed PW state
+             immediately when DC-LDP sends a Label Withdraw, instead of
+             waiting for a Label Release / session-down event."
+        DEFVAL { false }
+        ::= { dccrldpPmEntry 33 }
+
+-- Module compliance.
+
+-- Conformance Information.
+
+  dccrldpConformance   OBJECT IDENTIFIER ::= { dccrldp 2 }
+
+  dccrldpCompliances OBJECT IDENTIFIER ::= { dccrldpConformance 1 }
+  dccrldpGroups      OBJECT IDENTIFIER ::= { dccrldpConformance 2 }
+
+  dccrldpMibCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The compliance statement for the DC-TEMIB product."
+    MODULE
+
+    MANDATORY-GROUPS { dccrldpMandatoryGroup }
+
+    GROUP dccrldpOptionalGroup
+    DESCRIPTION
+        "Optional TeMib objects."
+
+    ::= { dccrldpCompliances 1 }
+
+
+-- Units of conformance.
+
+dccrldpMandatoryGroup OBJECT-GROUP
+   OBJECTS {
+      dccrldpSigPathManagerIndex,
+      dccrldpSigLsrIndex,
+      dccrldpSigSocketIfIndex,
+      dccrldpSigRowStatus,
+      dccrldpPmLsrIndex,
+      dccrldpPmRowStatus
+   }
+   STATUS  current
+   DESCRIPTION
+        "Mandatory Objects."
+   ::= { dccrldpGroups 2 }
+
+dccrldpOptionalGroup OBJECT-GROUP
+   OBJECTS {
+      dccrldpSigSessionBufPoolSize,
+      dccrldpSigEMBufPoolSize,
+      dccrldpSigAMBufPoolSize,
+      dccrldpSigAdminStatus,
+      dccrldpSigOperStatus,
+      dccrldpSigRowStatus,
+      dccrldpSigUseI3Interface,
+      dccrldpSigConformanceFlags,
+      dccrldpSigUseIPv6Transport,
+      dccrldpSigSessStatusTrapEnable,
+      dccrldpSigSessThreshTrapEnable,
+      dccrldpSigPathVecLimitTrapEnable,
+      dccrldpSigBfdProviderIndex,
+      dccrldpPmLdpEntityAutoCreate,
+      dccrldpPmLdpEntityAutoStart,
+      dccrldpPmLdpEntityReuse,
+      dccrldpPmLdpVersion,
+      dccrldpPmUseLdpFt,
+      dccrldpPmAsNumber,
+      dccrldpPmIprBufPoolSize,
+      dccrldpPmLdpSupported,
+      dccrldpPmCrLdpSupported,
+      dccrldpPmQueryFECSupported,
+      dccrldpPmAdminStatus,
+      dccrldpPmOperStatus,
+      dccrldpPmRowStatus,
+      dccrldpPmRestartCapable,
+      dccrldpPmReconnectTime,
+      dccrldpPmRecoveryTime,
+      dccrldpPmMaxPeerReconnect,
+      dccrldpPmMaxPeerRecovery,
+      dccrldpPmAdjDwnHoldTime,
+      dccrldpPmOutSegProgOrder,
+      dccrldpPmSupportIpv6,
+      dccrldpPmPolicySupportFlags,
+      dccrldpPmCheckOutSegIntfaceStat,
+      dccrldpPmLdpEntityCreateNhrLdb,
+      dccrldpPmLdpEntityCreatePsiJoin,
+      dccrldpPmRedundancySwitchIntvl,
+      dccrldpPmLabelWithdrawDelay,
+      dccrldpPmImplicitXcVcFecs,
+      dccrldpPmWthdrwDownstreamLbl,
+      dccrldpPmIngressReleaseDelay,
+      dccrldpPmPwFastUpstreamRelease
+   }
+   STATUS  current
+   DESCRIPTION
+        "Optional Objects."
+   ::= { dccrldpGroups 3 }
+
+END

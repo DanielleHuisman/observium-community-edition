@@ -1,0 +1,380 @@
+-- QLOGIC-MIB.my:  QLogic Object Identifier Assignments
+--
+-- Copyright (c) 1994-2009 QLogic Corporation.
+-- All Rights Reserved
+
+QLOGIC-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+        enterprises, Integer32, Counter32, Unsigned32
+        FROM SNMPv2-SMI
+        connUnitId
+        FROM FCMGMT-MIB
+        ancorOidTree
+        FROM QLOGIC-SMI
+        TEXTUAL-CONVENTION FROM SNMPv2-TC;
+
+        ancorPortModule MODULE-IDENTITY
+        LAST-UPDATED "200909290000Z" -- September 29, 2009
+        ORGANIZATION "QLOGIC Corporation"
+        CONTACT-INFO "QLOGIC Technical Support
+              Postal: QLogic Corporation
+                      6321 Bury Drive
+                      Eden Prairie, MN 55346
+                      US
+                 Tel: +1 952 932 4040
+                 Fax: +1 952 932 4018
+              E-mail: support@QLogic.com"
+     DESCRIPTION
+        "This table replaces the fcFxPortPhysTable module
+         defined in FIBRE-CHANNEL-FE-MIB.  It defines volatile
+         control objects for ports in a QLogic SANbox switch."
+
+     REVISION      "200909290000Z" -- September 29, 2009
+     DESCRIPTION
+        "The syntax and semantics errors reported by the
+         smilint program were resolved."
+
+     REVISION      "200610110000Z" -- October 11, 2006
+     DESCRIPTION
+        "Changed module identity from qlogic to ancor to remove conflicts
+        with existing definitions in the QLOGIC-SMI.
+        Commented out duplicate definitions of fcQxPortOperMode and
+        fcQxPortAdminMode that overlap with fcQxQuailPortOperMode
+        and fcQxQuailPortAdminMode."
+
+       ::= { ancorOidTree 3 }
+
+   qlSB2PortControl      OBJECT IDENTIFIER ::= { ancorPortModule 10 }
+   qlSB2PortStatus       OBJECT IDENTIFIER ::= { ancorPortModule 11 }
+
+
+  FcQlModuleIndex ::= TEXTUAL-CONVENTION
+    STATUS         current
+    DESCRIPTION    "Represents the module index within a conceptual table."
+    SYNTAX         Unsigned32
+
+  FcQxPortIndex ::= TEXTUAL-CONVENTION
+    STATUS         current
+    DESCRIPTION    "Represents the Port index within a conceptual table."
+    SYNTAX         Unsigned32
+
+------------------------------------------------------------------------------
+
+     --  Port Control group
+
+  -- the QxPort Physical Level table
+  -- This table contains, one entry for each QxPort in the
+  -- Fabric Element, the physical level status and parameters
+  -- of the QxPorts.
+
+  fcQxPortPhysTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FcQxPortPhysEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "A table that contains, one entry for each QxPort in the
+          Fabric Element, physical level status and parameters of the
+          QxPorts."
+  ::= { qlSB2PortControl 1 }
+
+  fcQxPortPhysEntry OBJECT-TYPE
+      SYNTAX      FcQxPortPhysEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "An entry containing physical level status and parameters of
+          a QxPort."
+      INDEX { fcQxPortPhysModule, fcQxPortPhysIndex }
+  ::= { fcQxPortPhysTable 1 }
+
+  FcQxPortPhysEntry ::=
+
+      SEQUENCE {
+          fcQxPortPhysModule
+              FcQlModuleIndex,
+          fcQxPortPhysIndex
+              FcQxPortIndex,
+          fcQxPortPhysAdminStatus
+              INTEGER,
+          fcQxPortPhysOperStatus
+              INTEGER,
+          fcQxQuailPortPhysAdminStatus
+              INTEGER,
+          fcQxQuailPortPhysOperStatus
+              INTEGER,
+          fcQxQuailPortPhysReasonCode
+              INTEGER
+      }
+
+  fcQxPortPhysModule OBJECT-TYPE
+      SYNTAX      FcQlModuleIndex
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "This object identifies the module within the Fabric Element
+          for which this entry contains information. This value is
+          never greater than fcFeModuleCapacity."
+  ::= { fcQxPortPhysEntry 1 }
+
+  fcQxPortPhysIndex OBJECT-TYPE
+      SYNTAX      FcQxPortIndex
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "This object identifies the QxPort within the module.  This
+          number ranges from 1 to the value of fcFeModulePortCapacity
+          for the associated module. The value remains constant for
+          the identified QxPort until the module is re-initialized."
+  ::= { fcQxPortPhysEntry 2 }
+
+  fcQxPortPhysAdminStatus OBJECT-TYPE
+      SYNTAX      INTEGER {
+                      online  (1),  -- place port online
+                      offline (2),  -- take port offline
+                      testing (3)   -- initiate test procedures
+                  }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+         "The desired state of the QxPort.  A management station may
+          place the QxPort in a desired state by setting this object
+          accordingly.  The testing(3) state indicates that no
+          operational frames can be passed.  When a Fabric Element
+          initializes, all QxPorts start with fcQxPortPhysAdminStatus
+          in the offline(2) state.  As the result of either explicit
+          management action or per configuration information
+          accessible by the Fabric Element, fcQxPortPhysAdminStatus
+          is then changed to either the online(1) or testing(3)
+          states, or remains in the offline state."
+  ::= { fcQxPortPhysEntry 3 }
+
+  fcQxPortPhysOperStatus   OBJECT-TYPE
+      SYNTAX      INTEGER {
+          online       (1), -- Login may proceed
+          offline      (2), -- Login cannot proceed
+          testing      (3), -- port is under test
+          linkFailure  (4)  -- failure after online/testing
+      }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+         "The current operational status of the QxPort.  The
+          testing(3) indicates that no operational frames can be
+          passed.  If fcQxPortPhysAdminStatus is offline(2) then
+          fcQxPortPhysOperStatus should be offline(2). If
+          fcQxPortPhysAdminStatus is changed to online(1) then
+          fcQxPortPhysOperStatus should change to online(1) if the
+          QxPort is ready to accept Fabric Login request from the
+          attached NxPort; it should proceed and remain in the link-
+          failure(4) state if and only if there is a fault that
+          prevents it from going to the online(1) state."
+  ::= { fcQxPortPhysEntry 4 }
+
+
+  fcQxQuailPortPhysAdminStatus OBJECT-TYPE
+      SYNTAX      INTEGER {
+                      up  (1),   -- place port online
+                      down (2)   -- take port offline
+                  }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+         "The desired state of the port."
+  ::= { fcQxPortPhysEntry 5 }
+
+  fcQxQuailPortPhysOperStatus   OBJECT-TYPE
+      SYNTAX      INTEGER {
+          up       (1),  -- online
+          down     (2)   -- offline
+      }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+         "The current operational status of the QxPort."
+  ::= { fcQxPortPhysEntry 6 }
+
+  fcQxQuailPortPhysReasonCode   OBJECT-TYPE
+      SYNTAX      INTEGER {
+                      unknown          (1),  -- Unknown
+                      up               (2),  -- None
+                      down             (3),  -- Administratively down
+                      notConnected     (4),  -- Link failure or not connected
+                      sfpAbsent        (5),  -- SFP not present
+                      sfpUnsupported   (6),  -- Unknown SFP
+                      hardwareFailure  (7),  -- Hardware failure
+                      isolated         (8)   -- Isolated
+                  }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+         "The reason for the current operational status of the port.
+          If the status is 'up', this will be 'up'. If the status is
+          'down', the reason code will indicate the reason, e.g.
+          'isolated', 'sfpAbsent', etc."
+  ::= { fcQxPortPhysEntry 7 }
+
+
+------------------------------------------------------------------------------
+
+  -- the Status group
+
+  -- This group consists of tables that contains operational
+  -- status and established service parameters for the Fabric
+  -- Element and the attached NxPorts.
+
+  -- The QxPort Status table
+  -- This table contains, one entry for each QxPort,
+  -- the operational status and parameters of the FxPorts.
+
+  fcQxPortStatusTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FcQxPortStatusEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "A table that contains, one entry for each QxPort in the
+          Fabric Element, operational status and parameters of the
+          QxPorts."
+  ::= { qlSB2PortStatus 1 }
+
+  fcQxPortStatusEntry OBJECT-TYPE
+      SYNTAX      FcQxPortStatusEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "An entry containing operational status and parameters of a
+          QxPort."
+      INDEX { fcQxPortStatusModule, fcQxPortStatusIndex }
+  ::= { fcQxPortStatusTable 1 }
+
+  FcQxPortStatusEntry ::=
+      SEQUENCE {
+          fcQxPortStatusModule
+              FcQlModuleIndex,
+          fcQxPortStatusIndex
+              FcQxPortIndex,
+--          fcQxPortOperMode
+--              INTEGER,
+--          fcQxPortAdminMode
+--              INTEGER
+          fcQxQuailPortOperMode
+              INTEGER,
+          fcQxQuailPortAdminMode
+              INTEGER
+      }
+
+  fcQxPortStatusModule OBJECT-TYPE
+      SYNTAX      FcQlModuleIndex
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "This object identifies the module within the Fabric Element
+          for which this entry contains information. This value is
+          never greater than fcFeModuleCapacity."
+  ::= { fcQxPortStatusEntry 1 }
+
+  fcQxPortStatusIndex OBJECT-TYPE
+      SYNTAX      FcQxPortIndex
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "This object identifies the QxPort within the module.  This
+          number ranges from 1 to the value of fcFeModulePortCapacity
+          for the associated module. The value remains constant for
+          the identified QxPort until the module is re-initialized."
+  ::= { fcQxPortStatusEntry 2 }
+
+--  fcQxPortOperMode    OBJECT-TYPE
+--      SYNTAX      INTEGER {
+--          glPort    (1),
+--          fPort     (2),
+--          lPort     (3),
+--          ePort     (4),
+--          flPort    (6)
+--      }
+--      MAX-ACCESS          read-only
+--      STATUS              current
+--      DESCRIPTION
+--         "The current operational mode of the FxPort."
+--  ::= { fcQxPortStatusEntry 3 }
+
+--  fcQxPortAdminMode   OBJECT-TYPE
+--      SYNTAX      INTEGER {
+--          glPort    (1),
+--          fPort     (2),
+--          lPort     (3),
+--          ePort     (4),
+--          flPort    (6)
+--      }
+--      MAX-ACCESS          read-write
+--      STATUS              current
+--      DESCRIPTION
+--         "The desired operational mode of the FxPort."
+--  ::= { fcQxPortStatusEntry 4 }
+
+  fcQxQuailPortOperMode    OBJECT-TYPE
+      SYNTAX      INTEGER {
+          auto      (1),
+          fPort     (2),
+          flPort    (3),
+          ePort     (4),
+          fxPort    (6)
+      }
+      MAX-ACCESS          read-only
+      STATUS              current
+      DESCRIPTION
+         "The current operational mode of the FxPort."
+  ::= { fcQxPortStatusEntry 3 }
+
+  fcQxQuailPortAdminMode   OBJECT-TYPE
+      SYNTAX      INTEGER {
+          auto      (1),
+          fPort     (2),
+          flPort    (3),
+          ePort     (4),
+          fxPort    (6)
+      }
+      MAX-ACCESS          read-write
+      STATUS              current
+      DESCRIPTION
+         "The desired operational mode of the FxPort."
+  ::= { fcQxPortStatusEntry 4 }
+
+------------------------------------------------------------------------------
+
+-- Related traps 
+
+    qlSB2PortLinkDown NOTIFICATION-TYPE 
+        OBJECTS { fcQxPortPhysAdminStatus, fcQxPortPhysOperStatus } 
+        STATUS  current
+        DESCRIPTION 
+            "A linkDown trap signifies that the SNMP entity, acting in
+            an agent role, has detected that the fcQxPortPhysOperStatus
+            object for one of its communication links has left the online
+            state and transitioned to some other state.  The current state
+            is indicated by the included value of fcQxPortPhysOperStatus."
+        ::= { ancorPortModule 0 10 }
+
+    qlSB2PortLinkUp NOTIFICATION-TYPE 
+        OBJECTS { fcQxPortPhysAdminStatus, fcQxPortPhysOperStatus } 
+        STATUS  current
+        DESCRIPTION 
+            "A linkUp trap signifies that the SNMP entity, acting in
+            an agent role, has detected that the fcQxPortPhysOperStatus
+            object for one of its communication links has entered the online
+            state from some other state.  The current state is indicated by
+            the included value of fcQxPortPhysOperStatus."
+        ::= { ancorPortModule 0 11 }
+
+    qlconnUnitAddedTrap NOTIFICATION-TYPE 
+        OBJECTS { connUnitId } 
+        STATUS  current
+        DESCRIPTION
+            "A connUnit has been added to this agent.
+            This is a suppliment to the FCMGMT-MIB which only defines a
+            connUnitDeletedTrap"
+        ::= { ancorPortModule 0 12 }
+END
+
+-- End of Object Definitions

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     ajax
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage ajax
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -42,27 +42,31 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
     //echo safe_json_encode(array('options' => $_SESSION['cache'][$cache_key]));
     //$options = $_SESSION['cache'][$cache_key];
 } else {
+    $where  = [];
     $params = [];
     //print_vars($vars);
     switch ($vars['field']) {
         case 'ipv4_network':
         case 'ipv6_network':
-            [$ip_version] = explode('_', $vars['field']);
-            $query_permitted   = generate_query_permitted('ports');
-            $network_permitted = dbFetchColumn('SELECT DISTINCT(`' . $ip_version . '_network_id`) FROM `' . $ip_version . '_addresses` WHERE 1' . $query_permitted);
-            $query             = 'SELECT `' . $ip_version . '_network` FROM `' . $ip_version . '_networks` WHERE 1 ' . generate_query_values_and($network_permitted, $ip_version . '_network_id');
+            $ip_version        = explode('_', $vars['field'])[0];
+            $query_permitted   = generate_query_permitted_ng('ports');
+            $network_permitted = dbFetchColumn('SELECT DISTINCT(`' . $ip_version . '_network_id`) FROM `' . $ip_version . '_addresses` WHERE ' . $query_permitted);
+            $where[]           = generate_query_values($network_permitted, $ip_version . '_network_id');
             if (!safe_empty($vars['query'])) {
                 //$query .= ' AND `' . $ip_version . '_network` LIKE ?';
                 //$params[] = '%' . $vars['query'] . '%';
-                $query .= generate_query_values_and($vars['query'], $vars['field'], '%LIKE%');
+                $where[] = generate_query_values($vars['query'], $vars['field'], '%LIKE%');
             }
+            $query  = 'SELECT `' . $ip_version . '_network` FROM `' . $ip_version . '_networks` ';
+            $query .= generate_where_clause($where);
             $query .= ' ORDER BY `' . $ip_version . '_network`;';
             //print_vars($query);
             break;
 
         case 'ifspeed':
             $query_permitted = generate_query_permitted('ports');
-            $query           = 'SELECT `ifSpeed`, COUNT(`ifSpeed`) as `count` FROM `ports` WHERE `ifSpeed` > 0 ' . $query_permitted . ' GROUP BY ifSpeed ORDER BY `count` DESC';
+            $query           = 'SELECT `ifSpeed`, COUNT(`ifSpeed`) as `count` FROM `ports` WHERE `ifSpeed` > 0 ' .
+                               $query_permitted . ' GROUP BY ifSpeed ORDER BY `count` DESC';
             $call_function   = 'formatRates';
             $call_params     = [4, 4];
             break;
@@ -71,7 +75,7 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
             //$query_permitted   = generate_query_permitted();
             $query = 'SELECT DISTINCT `program` FROM `syslog`';
             if (is_intnum($vars['device_id'])) {
-                $query .= ' WHERE ' . generate_query_values_ng($vars['device_id'], 'device_id');
+                $query .= ' WHERE ' . generate_query_values($vars['device_id'], 'device_id');
             }
             $array_filter = TRUE; // Search query string in array instead sql query (when this faster)
             break;
@@ -97,18 +101,18 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
                                 'peer_ip'  => 'bgpPeerRemoteAddr'];
             $param           = str_replace('bgp_', '', $vars['field']);
             $column          = $columns[$param];
-            $query_permitted = generate_query_permitted('devices');
-            $query           = 'SELECT DISTINCT `' . $column . '` FROM `bgpPeers` WHERE 1 ' . $query_permitted;
             if (!safe_empty($vars['query'])) {
-                $query .= generate_query_values_and($vars['query'], $column, '%LIKE%');
+                $where[] = generate_query_values($vars['query'], $column, '%LIKE%');
             }
+            $query           = 'SELECT DISTINCT `' . $column . '` FROM `bgpPeers`';
+            $query          .= generate_where_clause($where, generate_query_permitted_ng('devices'));
             break;
 
         default:
             json_output('error', 'Search type unknown');
     }
 
-    if (strlen($query)) {
+    if (!safe_empty($query)) {
         $options = dbFetchColumn($query, $params);
         if (safe_count($options)) {
             if (isset($call_function)) {

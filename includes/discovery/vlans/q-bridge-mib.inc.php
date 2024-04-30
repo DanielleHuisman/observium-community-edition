@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -64,19 +64,18 @@ if ($use_baseports)
 $binary_debug = []; // DEBUG
 foreach ($dot1q_ports as $vlan_num => $vlan) {
     $vlan['ifIndex'] = $vlan_num;
-    // FTOS vlan fix
+
     if ($device['os'] === 'ftos') {
+        // FTOS vlan fix
         // Q-BRIDGE-MIB::dot1qVlanStaticEgressPorts.1107787777, where 1107787777 is ifIndex for Vlan interface
         //IF-MIB::ifDescr.1107787777 = STRING: Vlan 1
         //IF-MIB::ifDescr.1107787998 = STRING: Vlan 222
         $vlan_num = rewrite_ftos_vlanid($device, $vlan_num);
         if (!is_numeric($vlan_num)) {
-            continue;
-        } // Skip unknown
-    }
-
-    // JunOS Vlan fix
-    if (isset($vlan['jnxExVlanTag'])) {
+            continue; // Skip unknown
+        }
+    } elseif (isset($vlan['jnxExVlanTag'])) {
+        // JunOS Vlan fix
         $vlan_num = $vlan['jnxExVlanTag'];
     }
 
@@ -98,7 +97,7 @@ foreach ($dot1q_ports as $vlan_num => $vlan) {
     $binary = hex2binmap($vlan['dot1qVlanStaticEgressPorts']);
 
 
-    if ($device['os'] === 'ftos') { // FTOS specific
+    if ($device['os'] === 'ftos') {
         // FTOS devices use harder way for detect VLANs and associate ports
         // See: https://www.force10networks.com/CSPortal20/TechTips/0041B_displaying_vlan_ports.aspx
         // Port associations based on slot/port, each 12 hex pair (96 bin) is slot

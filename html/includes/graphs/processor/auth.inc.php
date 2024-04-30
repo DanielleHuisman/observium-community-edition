@@ -18,7 +18,7 @@ $proc = get_entity_by_id_cache('processor', $vars['id']);
 
 if (is_numeric($proc['device_id']) && ($auth || device_permitted($proc['device_id']))) {
     $device       = device_by_id_cache($proc['device_id']);
-    $rrd_filename = get_rrd_path($device, "processor-" . $proc['processor_type'] . "-" . $proc['processor_index'] . ".rrd");
+    $rrd_filename = get_rrd_path($device, get_processor_rrd($device, $proc));
 
     $title_array   = [];
     $title_array[] = [ 'text' => $device['hostname'],

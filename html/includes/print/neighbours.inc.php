@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -91,11 +91,15 @@ function print_neighbours($vars)
 
             //$string  .= "<td></td><td></td>";
 
-            // r($entry['remote_port_id']); r($entry['remote_port']);
+            //r($entry); //r($entry['remote_port']);
 
-            if (isset($entry['remote_port_id']) && is_numeric($entry['remote_port_id'])) {
-                $remote_port   = get_port_by_id_cache($entry['remote_port_id']);
-                $remote_device = device_by_id_cache($remote_port['device_id']);
+            if (is_intnum($entry['remote_device_id']) || is_intnum($entry['remote_port_id'])) {
+                $remote_port = $entry['remote_port_id'] ? get_port_by_id_cache($entry['remote_port_id']) : [];
+                if ($entry['remote_device_id']) {
+                    $remote_device = device_by_id_cache($entry['remote_device_id']);
+                } else {
+                    $remote_device = device_by_id_cache($remote_port['device_id']);
+                }
                 $remote_info   = !safe_empty($remote_device['hardware']) ? '<br />' . escape_html($remote_device['hardware']) : '';
                 if (!safe_empty($remote_device['version'])) {
                     $remote_info .= '<br /><small><i>' . $GLOBALS['config']['os'][$remote_device['os']]['text'] . '&nbsp;' .
@@ -108,7 +112,11 @@ function print_neighbours($vars)
                     }
                 }
                 $string .= '    <td><span class="entity">' . generate_device_link($remote_device) . '</span>' . $remote_info . '</td>' . PHP_EOL;
-                $string .= '    <td><span class="entity">' . generate_port_link($remote_port) . '</span><br />' . escape_html($remote_port['ifAlias']) . '</td>' . PHP_EOL;
+                if ($remote_port) {
+                    $string .= '    <td><span class="entity">' . generate_port_link($remote_port) . '</span><br />' . escape_html($remote_port['ifAlias']) . '</td>' . PHP_EOL;
+                } else {
+                    $string .= '    <td><span class="entity">' . escape_html($entry['remote_port']) . '</span></td>' . PHP_EOL;
+                }
             } else {
                 $remote_ip      = !safe_empty($entry['remote_address']) ? ' (' . generate_popup_link('ip', $entry['remote_address']) . ')' : '';
                 $remote_version = !safe_empty($entry['remote_version']) ? ' <br /><small><i>' . escape_html(truncate($entry['remote_version'], 150)) . '</i></small>' : '';
@@ -157,7 +165,7 @@ function get_neighbours_array($vars)
     $array = [];
 
     // With pagination? (display page numbers in header)
-    $array['pagination'] = (isset($vars['pagination']) && $vars['pagination']);
+    $array['pagination'] = isset($vars['pagination']) && $vars['pagination'];
     pagination($vars, 0, TRUE); // Get default pagesize/pageno
     $array['pageno']   = $vars['pageno'];
     $array['pagesize'] = $vars['pagesize'];
@@ -174,43 +182,45 @@ function get_neighbours_array($vars)
     // Begin query generate
     $param = [];
     $where = ' WHERE 1 ';
+    $where_array = [];
     foreach ($vars as $var => $value) {
-        if ($value != '') {
+        if (!safe_empty($value)) {
             switch ($var) {
                 case 'device':
                 case 'device_id':
                 case 'device_a':
-                    $where .= generate_query_values_and($value, 'device_id');
+                    $where_array[] = generate_query_values($value, 'device_id');
                     break;
                 case 'port':
                 case 'port_id':
                 case 'port_a':
-                    $where .= generate_query_values_and($value, 'port_id');
+                    $where_array[] = generate_query_values($value, 'port_id');
                     break;
+                case 'remote':
                 case 'device_b':
-                    $where .= generate_query_values_and($value, 'remote_hostname');
+                    $where_array[] = generate_query_values($value, 'remote_hostname');
                     break;
                 case 'port_b':
-                    $where .= generate_query_values_and($value, 'remote_port');
+                    $where_array[] = generate_query_values($value, 'remote_port');
                     break;
                 case 'protocol':
-                    $where .= generate_query_values_and($value, 'protocol');
+                    $where_array[] = generate_query_values($value, 'protocol');
                     break;
                 case 'platform':
-                    $where .= generate_query_values_and($value, 'remote_platform');
+                    $where_array[] = generate_query_values($value, 'remote_platform');
                     break;
                 case 'version':
-                    $where .= generate_query_values_and($value, 'remote_version');
+                    $where_array[] = generate_query_values($value, 'remote_version');
                     break;
                 case 'active':
-                    $value = !get_var_false($value, 'no') ? '1' : '0';
-                    $where .= generate_query_values_and($value, 'active');
+                    $value = !get_var_false($value, 'no') ? 1 : 0;
+                    $where_array[] = generate_query_values($value, 'active');
                     break;
-                case 'remote_port_id':
+                case 'known':
                     if ($value === 'NULL' || $value == 0) {
-                        $where .= ' AND isnull(`remote_port_id`)';
+                        $where_array[] = 'ISNULL(`remote_port_id`)';
                     } else {
-                        $where .= ' AND !isnull(`remote_port_id`)';
+                        $where_array[] = '!ISNULL(`remote_port_id`)';
                     }
                     break;
             }
@@ -219,7 +229,7 @@ function get_neighbours_array($vars)
 
     // Show neighbours only for permitted devices and ports
     //$query_permitted = $GLOBALS['cache']['where']['ports_permitted'];
-    $query_permitted = generate_query_permitted(['ports', 'devices']);
+    $query_permitted = generate_query_permitted_ng([ 'ports', 'devices' ]);
 
     if ($vars['sort'] === 'port_a') {
         $query = 'SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime`, `ports`.`port_label` ';
@@ -229,7 +239,7 @@ function get_neighbours_array($vars)
         $query .= 'FROM `neighbours` ';
     }
 
-    $query .= $where . ' ' . $query_permitted;
+    $query .= generate_where_clause($where_array, $query_permitted);
 
     // Query neighbours
     $array['entries'] = dbFetchRows($query, $param);

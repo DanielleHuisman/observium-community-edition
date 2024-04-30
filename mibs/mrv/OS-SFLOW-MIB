@@ -1,0 +1,341 @@
+--  =======================================================================
+--  File        : osSFlow
+--  Description : Private MIB to support sFlow
+--  By          : Gur Stavi
+
+-- Copyright (c) 2013 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-SFLOW-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32,
+    Unsigned32, Counter64                     FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION                        FROM SNMPv2-TC
+    oaOptiSwitch, EntryValidator, PortList    FROM OS-COMMON-TC-MIB
+    MODULE-COMPLIANCE, OBJECT-GROUP           FROM SNMPv2-CONF;
+
+osSFlow     MODULE-IDENTITY
+            LAST-UPDATED "201305080000Z" -- 8 May 2013
+            ORGANIZATION "MRV Communications, Inc."
+            CONTACT-INFO
+               "Gur Stavi
+                MRV Communication, Inc
+                http://www.mrv.com
+                Email: gstavi@mrv.com"
+            DESCRIPTION
+                "sFlow sampling technology."
+                REVISION     "201305080000Z" -- 8 May 2013
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 25 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osSFlowAgent             OBJECT IDENTIFIER ::= { osSFlow 1 }
+osSFlowConformance       OBJECT IDENTIFIER ::= { osSFlow 100 }
+osSFlowMIBCompliances    OBJECT IDENTIFIER ::= { osSFlowConformance 1 }
+osSFlowMIBGroups         OBJECT IDENTIFIER ::= { osSFlowConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+OsRcvrOperStatus ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION "Indicates whether a receiver is configured properly and can be
+        used to transmit samples of Flow Samplers or Counter Pollers
+        that are bound to it."
+    SYNTAX INTEGER {
+        unknown   (1),
+        notReady  (2),
+        ready     (3)
+        }
+
+-- ************************************************************
+-- osSFlowAgent
+-- ************************************************************
+osSFlowAgentAddress OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0|4|16))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "IP address of the agent. This IP address is added to the data section of
+         every sample but it does not affect the IP address in the IP header of
+         samples"
+    ::= { osSFlowAgent 1 }
+
+osSFlowDefaultTruncateSize    OBJECT-TYPE
+    SYNTAX          Integer32 (128..65536)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Maximal number of packet bytes that are added to flow samples as
+       'packet header'. Sampled packets that are larger than this value are
+       truncated."
+    DEFVAL { 65536 }
+    ::= { osSFlowAgent 2 }
+
+osSFlowSamplesRateLimit OBJECT-TYPE
+    SYNTAX          Integer32 (5..200)
+    UNITS           "Samples per Second"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Maximal allowed number of flow samples per second accumulated from all
+       active samplers. Samples beyond this rate are dropped. This is a
+       mechanism to protect the CPU from being overloaded with sFlow activity."
+    DEFVAL { 100 }
+    ::= { osSFlowAgent 3 }
+
+osSFlowSamplesDroppedByRateLimit OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "Number of samples that were dropped due to osSFlowSamplesRateLimit."
+    ::= { osSFlowAgent 4 }
+
+-- ************************************************************
+-- The osSFlowRcvrTable Table
+-- ************************************************************
+osSFlowRcvrTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsSFlowRcvrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains sFlow receivers."
+    ::= { osSFlow 2 }
+
+osSFlowRcvrEntry  OBJECT-TYPE
+    SYNTAX      OsSFlowRcvrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osSFlowRcvrIndex }
+    ::= { osSFlowRcvrTable 1 }
+
+OsSFlowRcvrEntry ::= SEQUENCE {
+    osSFlowRcvrIndex        Integer32,
+    osSFlowRcvrOwner        OCTET STRING,
+    osSFlowRcvrAddress      OCTET STRING,
+    osSFlowRcvrPort         Integer32,
+    osSFlowRcvrAdminStatus  EntryValidator,
+    osSFlowRcvrOperStatus   OsRcvrOperStatus
+}
+
+osSFlowRcvrIndex    OBJECT-TYPE
+    SYNTAX          Integer32 (1..9999)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Index of the receiver"
+    ::= { osSFlowRcvrEntry 1 }
+
+osSFlowRcvrOwner  OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (0..47))
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Name of the owner of the receiver."
+    ::= { osSFlowRcvrEntry 2 }
+
+osSFlowRcvrAddress OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0|4|16))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the collector."
+    ::= { osSFlowRcvrEntry 6 }
+
+osSFlowRcvrPort OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The UDP port for sFlow datagrams."
+    DEFVAL { 6343 }
+    ::= { osSFlowRcvrEntry 7 }
+
+osSFlowRcvrAdminStatus  OBJECT-TYPE
+    SYNTAX          EntryValidator
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Allows to create new rows or delete old rows."
+    ::= { osSFlowRcvrEntry 98 }
+
+osSFlowRcvrOperStatus   OBJECT-TYPE
+    SYNTAX          OsRcvrOperStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "Indicates readiness of the receiver."
+    ::= { osSFlowRcvrEntry 99 }
+
+-- ************************************************************
+-- The osSFlowCpTable Table
+-- ************************************************************
+osSFlowCpTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsSFlowCpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains sFlow receivers."
+    ::= { osSFlow 3 }
+
+osSFlowCpEntry  OBJECT-TYPE
+    SYNTAX      OsSFlowCpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osSFlowCpName }
+    ::= { osSFlowCpTable 1 }
+
+OsSFlowCpEntry ::= SEQUENCE {
+    osSFlowCpName           OCTET STRING,
+    osSflowCpRcvrIndex      Integer32,
+    osSflowCpRate           Integer32,
+    osSflowCpPorts          PortList,
+    osSflowCpActiveTime     Unsigned32,
+    osSflowCpSampleCount    Counter64,
+    osSFlowCpAdminStatus    EntryValidator,
+    osSFlowCpOperStatus     INTEGER
+}
+
+osSFlowCpName       OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (0..79))
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "Index of the Counter Poller (CP)"
+    ::= { osSFlowCpEntry 1 }
+
+osSflowCpRcvrIndex  OBJECT-TYPE
+    SYNTAX          Integer32 (0|1..9999)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Index of an entry from osSFlowRcvrTable. Represents the receiver to
+        which this CP is bound."
+    ::= { osSFlowCpEntry 2 }
+
+osSflowCpRate       OBJECT-TYPE
+    SYNTAX          Integer32 (0|1..3600)
+    UNITS           "Seconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The polling rate of the CP."
+    ::= { osSFlowCpEntry 3 }
+
+osSflowCpPorts      OBJECT-TYPE
+    SYNTAX          PortList
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The set of ports that their statistics should be polled by this CP."
+    ::= { osSFlowCpEntry 4 }
+
+osSflowCpActiveTime OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "Seconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Elapsed time since the CP was activated."
+    ::= { osSFlowCpEntry 5 }
+
+osSflowCpSampleCount OBJECT-TYPE
+    SYNTAX          Counter64
+    UNITS           "Seconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Number of sample records that were sent by this CP."
+    ::= { osSFlowCpEntry 6 }
+
+osSFlowCpAdminStatus  OBJECT-TYPE
+    SYNTAX          EntryValidator
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Allows to create new rows or delete old rows."
+    ::= { osSFlowCpEntry 98 }
+
+osSFlowCpOperStatus OBJECT-TYPE
+    SYNTAX          INTEGER {
+        notActive (1),
+        active    (2)
+    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "Indicates whether the CP is active and sends samples to a collector."
+    ::= { osSFlowCpEntry 99 }
+
+-- *******************************************************************
+--  Conformance Information
+-- *******************************************************************
+
+osSFlowMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+      "The core compliance statement for all the implementations."
+    MODULE -- this module
+        MANDATORY-GROUPS {
+            osSFlowMandatoryGroup
+            }
+
+    ::= { osSFlowMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups
+-- ...................................................................
+
+osSFlowMandatoryGroup  OBJECT-GROUP
+    OBJECTS {
+        osSFlowAgentAddress, osSFlowDefaultTruncateSize,
+        osSFlowSamplesRateLimit, osSFlowSamplesDroppedByRateLimit,
+
+        osSFlowRcvrOwner, osSFlowRcvrAddress, osSFlowRcvrPort,
+        osSFlowRcvrAdminStatus, osSFlowRcvrOperStatus,
+
+        osSflowCpRcvrIndex, osSflowCpRate, osSflowCpPorts, osSflowCpActiveTime,
+        osSflowCpSampleCount, osSFlowCpAdminStatus, osSFlowCpOperStatus
+        }
+    STATUS current
+    DESCRIPTION
+      "."
+    ::= { osSFlowMIBGroups 1 }
+
+
+END
+

@@ -1,0 +1,2123 @@
+-- Copyright (C) 2008-2016 Aricent. All Rights Reserved
+
+-- $Id: fs6374.mib,v 1.3 2017/01/12 12:55:38 siva Exp $
+-- fs6374 Proprietary MIB Definition
+
+   ARICENT-fs6374-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+      MODULE-IDENTITY,
+      OBJECT-TYPE,
+      enterprises,Unsigned32,Integer32   FROM SNMPv2-SMI
+
+      TEXTUAL-CONVENTION,
+      TruthValue,RowStatus                          FROM SNMPv2-TC;
+      
+      fs6374MIB MODULE-IDENTITY
+         LAST-UPDATED "201209050000Z"
+         ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+         CONTACT-INFO "support@aricent.com"
+         DESCRIPTION
+              "The Proprietary MIB for Loss and Delay measurement based on IETF RFC6374"
+         REVISION "201209050000Z"
+         DESCRIPTION
+              "The Proprietary MIB for Loss and Delay measurement based on IETF RFC6374"
+      ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 107 }
+
+
+-- ******************************************************************
+-- Textual conventions
+-- ******************************************************************
+
+FS6374Traps ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates the Traps :
+        none(0)                                     Dummy Bit
+        bTrapUnsupportedVersion(1)                  Protocol version not supported
+        bTrapUnsupportedControlCode(2)              Control Code not supported
+        bTrapUnsupportedDataFormat(3)          Data format specified in query 
+					       not supported        
+        bTrapConnectionMismatch(4)             Session Identifier in response 
+					       does not match the one sent in 
+					       the Query Message     
+        bTrapUnsupportedMandatoryTLVObject(5)  TLV received other than the 
+					       supported
+        bTrapUnsupportedTimeStamp(6)                Timestamp format not supported
+        bTrapResponseTimeout(7)                     Response Timeout
+        bTrapResourceUnavailable(8)            MPLS down, BFD session not 
+				               working or mismatch in traffic 
+					       class wrt BFD
+        bTrapTestAbort(9)                      On-demand/ Pro-active test aborted
+					       explicitly by administrator or by
+					       LSP/PW down
+        bTrapProactiveTestRestart(10)          Pro-active test restarted for loss/
+                                               delay/combined Loss-Delay when LSP/PW 
+					       comes up
+        bTrapUnsupportedQueryInterval(11)      Querier has received response with
+                                               Unsupported Query Interval"
+         
+    SYNTAX      BITS{
+                        none (0),
+                        bTrapUnsupportedVersion (1),
+                        bTrapUnsupportedControlCode (2),
+                        bTrapUnsupportedDataFormat (3),
+                        bTrapConnectionMismatch (4),
+                        bTrapUnsupportedMandatoryTLVObject (5),
+                        bTrapUnsupportedTimeStamp (6),
+                        bTrapResponseTimeout (7),
+                        bTrapResourceUnavailable (8),
+                        bTrapTestAbort(9),
+                        bTrapProactiveTestRestart(10),
+                        bTrapUnsupportedQueryInterval(11)
+                     }
+   
+FS6374TimeStampFormat ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "An enumerated value indicates the timestamp format used for loss and 
+	delay.
+        TimeStampFormatNull(0)        Indicates that timestamp field does not
+				      contain a meaningful timestamp.
+        TimeStampFormatSequence(1)    Indicates that the timestamp field is to
+				      be viewed as a simple 64-bit sequence 
+				      number.
+        TimeStampFormatNTP(2)         This format consists of a 32-bit seconds 
+				      field followed by a 32-bit 
+				      fractional seconds field, so that it can be
+				      regarded as a fixed-point 64-bit quantity.
+        TimeStampFormatIEEE1588(3)    This truncated format consists of a 32-bit 
+				      seconds field followed by a 32-bit 
+				      nanoseconds field, and is the same as 
+				      IEEE 1588v1 timestamp format."
+
+    SYNTAX         INTEGER{
+		     timeStampFormatNull         (0),
+		     timeStampFormatSequence     (1),
+		     timeStampFormatNTP          (2),
+		     timeStampFormatIEEE1588     (3)
+	}
+
+
+Fs6374TransmitStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "An enumerated value indicates whether particular transmission can be
+       initiated.
+
+        start(1)       To initiate the transmission.
+        stop(2)        To stop the transmission.
+        ready(3)       Indicates transmission can be initiated.
+        notReady(4)    Indicates transmission can not be initiated."
+
+    SYNTAX      INTEGER {
+                  start                   (1),
+                  stop                    (2),
+                  ready                   (3),
+                  notReady                (4)
+                } 
+
+FS6374TimeRepresentation ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "4d:4d"
+    STATUS      current
+    DESCRIPTION
+       "A specification used to represent time stamp.
+
+        field  octets  contents                range
+        -----  ------  --------                -----
+        1      1-4     seconds                 0..4294967295
+        2      5-8     nanoseconds/picoseconds             0..0..4294967295 "
+
+    SYNTAX     OCTET STRING (SIZE (8)) 
+
+FS6374SuppTimeStampFormat ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+    "This object specifies the Timestamp formats supported by the system. 
+     tsFormatNTP(1)       This format consists of a 32-bit seconds 
+                          field followed by a 32-bit fractional seconds 
+			  (picoseconds) field, so that it can be regarded 
+		          as a fixed-point 64-bit quantity. 
+     tsFormatIEEE1588(2)  This truncated format consists of a 32-bit 
+                          seconds field followed by a 32-bit 
+                          nanoseconds field, and is the same as 
+                          IEEE 1588v1 timestamp format." 
+ SYNTAX         INTEGER{ 
+                  tsFormatNTP          (1), 
+                  tsFormatIEEE1588     (2) 
+                  } 
+---------------------------------------------------
+-- Top level components of this MIB module.
+---------------------------------------------------
+-- Service Config Table --
+    fs6374ServiceConfig         		OBJECT IDENTIFIER ::= { fs6374MIB 1 }
+
+
+-- Configuration Table for LM/DM --
+    fs6374ParamsConfig          		OBJECT IDENTIFIER ::= { fs6374MIB 2 }
+    
+-- Buffers for storing the LM and DM calculations --
+    fs6374LMBuffer            			OBJECT IDENTIFIER ::= { fs6374MIB 3 }
+    fs6374DMBuffer           			OBJECT IDENTIFIER ::= { fs6374MIB 4 }
+
+-- Statistics for storing the summary of LM and DM calculations --
+    fs6374LMStats             			OBJECT IDENTIFIER ::= { fs6374MIB 5 }
+    fs6374DMStats            			OBJECT IDENTIFIER ::= { fs6374MIB 6 }
+
+-- Statistics Table for 6374 --
+    fs6374Stats                          OBJECT IDENTIFIER ::= { fs6374MIB 7 }
+
+
+-- System Level Config Table -- 
+    fs6374SystemConfig          		OBJECT IDENTIFIER ::= { fs6374MIB 8 }
+
+-- Traps --
+    fs6374Notifications         		OBJECT IDENTIFIER ::= { fs6374MIB 9 }
+
+--------------------------------------------------------------------------------------
+--Start of Service Config Table
+--------------------------------------------------------------------------------------
+ fs6374ServiceConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374ServiceConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies a table that holds the service configurations."
+       
+    ::= { fs6374ServiceConfig 1 }
+
+  fs6374ServiceConfigEntry OBJECT-TYPE
+    SYNTAX      Fs6374ServiceConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This object specifies Service Config Entry."
+    INDEX { fs6374ContextId,
+            fs6374ServiceName  }
+    ::= { fs6374ServiceConfigTable 1 }
+
+  Fs6374ServiceConfigEntry ::= SEQUENCE {
+      fs6374ContextId	           		Unsigned32,
+      fs6374ServiceName 	    		OCTET STRING,
+      fs6374MplsPathType  			    INTEGER,
+      fs6374FwdTnlIdOrPwId    			Unsigned32,
+      fs6374RevTnlId 	   			    Unsigned32,
+      fs6374SrcIpAddr   			    OCTET STRING,
+      fs6374DestIpAddr  		    	OCTET STRING,
+      fs6374EncapType     			    INTEGER,
+      fs6374TrafficClass                INTEGER,
+      fs6374RowStatus       			RowStatus,
+      fs6374DyadicMeasurement                   INTEGER,
+      fs6374TSFNegotiation                      INTEGER,
+      fs6374TSNegotiatedFormat                  Unsigned32,
+      fs6374DyadicProactiveRole                 INTEGER,
+      fs6374QueryTransmitRetryCount             Unsigned32,
+      fs6374SessionIntervalQueryStatus          INTEGER,
+      fs6374MinReceptionIntervalInMilliseconds  Unsigned32 
+     }
+
+  fs6374ContextId OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+          "This object specifies the unique identifier to identifies the 
+	   virtual router context.Currently, the implementation supports 
+	   only a single virtual instance of the router."
+        ::= { fs6374ServiceConfigEntry 1 }
+
+  fs6374ServiceName OBJECT-TYPE
+        SYNTAX       OCTET STRING(SIZE (0..40)) 
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+          "This object specifies the unique name of the LSP/PW Service."
+        ::= { fs6374ServiceConfigEntry 2 }
+
+   fs6374MplsPathType OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the Mpls type which could be Tunnel/LSP or PW."  
+	
+        ::= { fs6374ServiceConfigEntry 3 }
+  
+  fs6374FwdTnlIdOrPwId OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the ID which could be Tunnel Id for 
+           unidirectional in forward direction or PW Id based on Mpls type."
+        ::= { fs6374ServiceConfigEntry 4 }
+
+  fs6374RevTnlId OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the ID which is the Tunnel Id for 
+           unidirectional in reverse direction."
+        ::= { fs6374ServiceConfigEntry 5 }
+
+  fs6374SrcIpAddr OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE (0..40))
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the originating IP Address of the 
+           unidirectional Tunnel or PW."
+        ::= { fs6374ServiceConfigEntry 6 }
+  
+  fs6374DestIpAddr OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE (0..40))
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the terminating IP Address of the 
+           unidirectional Tunnel or PW."
+        ::= { fs6374ServiceConfigEntry 7 }
+
+  fs6374EncapType  OBJECT-TYPE
+     SYNTAX      INTEGER{
+                         withGALHEADER    (1),
+                         withoutGALHEADER (2)
+                         }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the header type."
+       DEFVAL { withGALHEADER }
+    ::= { fs6374ServiceConfigEntry 8 }
+
+  fs6374TrafficClass OBJECT-TYPE
+        SYNTAX      Integer32(0..7)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+          "This object specifies the traffic class."
+       DEFVAL {0}
+       ::= { fs6374ServiceConfigEntry 9 }
+
+  fs6374RowStatus OBJECT-TYPE
+        SYNTAX         RowStatus
+                        
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the status of service configuration row.
+
+        The writable columns in a row can be changed even if the row
+        is active but writable columns cannot be changed if either of 
+	loss/delay/combined loss-delay test is in-progress.
+           Applicable values are CREATE_AND_GO, ACTIVE and DESTROY."
+        ::= { fs6374ServiceConfigEntry 10 }
+
+  fs6374DyadicMeasurement OBJECT-TYPE
+        SYNTAX      INTEGER {
+                          enable   (1),
+                          disable  (2)
+                          }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Dyadic Measurement status as 
+            enabled or disabled."
+        DEFVAL { disable }
+        ::= { fs6374ServiceConfigEntry 11 }
+
+   fs6374TSFNegotiation OBJECT-TYPE 
+        SYNTAX      INTEGER { 
+                             enabled    (1), 
+                             disabled   (2) 
+                            } 
+         MAX-ACCESS  read-write 
+         STATUS      current 
+         DESCRIPTION 
+            "This object specifies the Timestamp Format Negotiation status as 
+             enabled or disabled.
+             This configuration is applicable only for Non-dyadic Two-way DM 
+             and Combined LMDM and value should be configured at querier end. 
+             When it is enabled, if the QTF and RTF are different, the 
+	     responder will fill Preferred Timestamp format based on the 
+             supported timestamp 'fs6374TSFormatSupported' and Timestamp format 
+             configured for DM/combined LMDM, the querier will change the  
+             format if responder's format is supported by querier."  
+           DEFVAL { disabled } 
+        ::= { fs6374ServiceConfigEntry 12 } 
+      
+   fs6374TSNegotiatedFormat OBJECT-TYPE 
+        SYNTAX      Unsigned32 
+        MAX-ACCESS  read-only 
+        STATUS      current 
+        DESCRIPTION 
+           "This object specifies the Negotiated Time Stamp Format of the 
+	    querier. This negotiated format is applicable only for
+            Non-dyadic Two-way DM and Combined LMDM.
+            The negotiated timestamp format can be either     
+		 timeStampFormatNTP          (2) or
+                 timeStampFormatIEEE1588     (3). 
+            The negotiated Timestamp format will be used as the timestamp for 
+	    delay measurement process in both querier and responder. 
+            This object displays the negotiated format only if 
+	    `fs6374TSFNegotiation` is enabled or else timeStampFormatIEEE1588 
+	    will be displayed as negotiated format."
+        ::= { fs6374ServiceConfigEntry 13 } 
+
+  fs6374DyadicProactiveRole OBJECT-TYPE
+        SYNTAX      INTEGER {
+                          active   (1),
+                          passive  (2)
+                          }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Dyadic Measurement Proactive Role 
+            status as active or passive.
+            If configured as passive, dyadic will initiated only after 
+	    initiated from active on peer end.
+            If configured as active, dyadic will be initiated."
+        DEFVAL { passive }
+        ::= { fs6374ServiceConfigEntry 14 }
+
+  fs6374QueryTransmitRetryCount OBJECT-TYPE
+        SYNTAX       Unsigned32(3..100)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the maximum number of retries of queries by a session
+           when querier is not getting response from the responder.
+           This object is used for congestion control at querier for outgoing packets."
+        DEFVAL { 25 }
+        ::= { fs6374ServiceConfigEntry 15 }
+
+  fs6374SessionIntervalQueryStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                          enable   (1),
+                          disable  (2)
+                          }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Session Interval Query status as 
+            enabled or disabled. This is applicable only for sending SQI TLV.
+            Whereas for responding to SQI TLV this is not mandatory to be enabled."
+        DEFVAL { enable }
+        ::= { fs6374ServiceConfigEntry 16 }
+
+
+  fs6374MinReceptionIntervalInMilliseconds OBJECT-TYPE
+        SYNTAX       Unsigned32(100..10000)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the minimum time interval between two query
+	   packets at which the service is ready to receive the packets.
+           This object is used for congestion control and rate limit the incoming 
+           queries at responder. This will be different from Transmit query interval 
+           time of a service. By default both transmit query interval and 
+           receive query interval are same. This has a granularity of 10 milliseconds."
+        DEFVAL { 100 }
+        ::= { fs6374ServiceConfigEntry 17 }
+--------------------------------------------------------------------------------------
+--End of Service Config Table
+--------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+--Start of Configuration Table for LM/DM
+--------------------------------------------------------------------------------------
+    fs6374ParamsConfigTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF Fs6374ParamsConfigTableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+          "This object specifies all the configurations related to LM and DM 
+           as per virtual context of the router."
+        ::= {  fs6374ParamsConfig 1 }
+
+    fs6374ParamsConfigTableEntry OBJECT-TYPE
+        SYNTAX      Fs6374ParamsConfigTableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+          "This object specifies per virtual context LM and DM configuration parameters.
+           An entry in this table is created when a virtual context
+           is created."
+        INDEX { fs6374ContextId,
+                fs6374ServiceName }
+        ::= { fs6374ParamsConfigTable 1 }
+
+    Fs6374ParamsConfigTableEntry ::= SEQUENCE {
+        fs6374LMType                      	INTEGER,
+        fs6374LMMethod                    	INTEGER,
+        fs6374LMMode                      	INTEGER,
+        fs6374LMNoOfMessages              	Unsigned32,
+        fs6374LMTimeIntervalInMilliseconds  Unsigned32,
+        fs6374LMTimeStampFormat           	FS6374TimeStampFormat,
+        fs6374LMTransmitStatus            	Fs6374TransmitStatus,
+        fs6374DMType                      	INTEGER,
+        fs6374DMMode                    	INTEGER,
+        fs6374DMTimeIntervalInMilliseconds  Unsigned32,
+        fs6374DMNoOfMessages              	Unsigned32,
+        fs6374DMTimeStampFormat           	FS6374TimeStampFormat,
+        fs6374DMTransmitStatus            	Fs6374TransmitStatus,
+        fs6374CmbLMDMType                       INTEGER,
+        fs6374CmbLMDMMethod                     INTEGER,
+        fs6374CmbLMDMMode                       INTEGER, 
+        fs6374CmbLMDMNoOfMessages               Unsigned32,
+        fs6374CmbLMDMTimeIntervalInMilliseconds Unsigned32,
+        fs6374CmbLMDMTimeStampFormat            FS6374TimeStampFormat,
+        fs6374CmbLMDMTransmitStatus             Fs6374TransmitStatus,
+        fs6374DMPaddingSize                     Unsigned32,
+        fs6374CmbLMDMPaddingSize                Unsigned32
+    }
+
+      fs6374LMType OBJECT-TYPE
+        SYNTAX         INTEGER{
+                              oneway  (1),
+                              twoway  (2)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the type of LM calculation.
+
+           oneway(1)         Indicates that calculation of LM will be in one way.
+           twoway(2)   Indicates that calculation of LM will be in two way.
+           This object cannot be modified when fs6374LMTransmitStatus
+           is `notReady`."
+        DEFVAL { twoway }
+        ::= { fs6374ParamsConfigTableEntry 1 }     
+     
+     fs6374LMMethod OBJECT-TYPE
+        SYNTAX         INTEGER{
+                              direct          (1),
+                              inferred        (2)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the mode in which LM feature will work.
+
+           direct(1)       Indicates that the LM feature will work in 
+	 	           Direct Method.
+           inferred(2)     Indicates that LM feature will work in 
+			   Inferred Method.
+           This object cannot be modified when fs6374LMTransmitStatus
+           is `notReady`."
+
+        DEFVAL { inferred }
+        ::= { fs6374ParamsConfigTableEntry 2 }     
+
+      fs6374LMMode OBJECT-TYPE
+        SYNTAX         INTEGER{
+                              onDemand           (1),
+                              proActive          (2)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the method of LM calculation.
+
+           onDemand(1)      Indicates that calculation of LM will be 
+			    done based on user request.
+           proActive(2)     Indicates that calculation of LM will be 
+			    done proactively.
+          when this object is set as pro-active and based on the object 
+          fs6374LMType and fs6374LMTransmitStatus test will be started
+          immediately."
+        DEFVAL { onDemand }
+        ::= { fs6374ParamsConfigTableEntry 3 }     
+
+     
+        fs6374LMNoOfMessages OBJECT-TYPE
+        SYNTAX       Unsigned32 (1..1000)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the number of queries to be sent in a session 
+           when method for LM calculation is Ondemand.
+           This object cannot be modified when fs6374LMTransmitStatus
+           is `notReady`."
+        DEFVAL { 10 }
+        ::= { fs6374ParamsConfigTableEntry 4 }
+
+       fs6374LMTimeIntervalInMilliseconds OBJECT-TYPE
+        SYNTAX       Unsigned32(100..10000)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the time interval between two query packets 
+	   for LM with the granularity of 10milliseconds.
+           This object cannot be modified when fs6374LMTransmitStatus
+           is `notReady`."
+        DEFVAL { 1000 }
+        ::= { fs6374ParamsConfigTableEntry 5 }
+
+
+      fs6374LMTimeStampFormat OBJECT-TYPE
+        SYNTAX         FS6374TimeStampFormat
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the preferred timestamp format 
+           which will be used for LM.
+           The below specified timestamp formats are supported for 
+	   Loss Measurement but now, time stamp format NTP is not support.
+              timeStampFormatNull         (0), 
+              timeStampFormatSequence     (1), 
+              timeStampFormatNTP          (2), 
+              timeStampFormatIEEE1588     (3).
+           This object cannot be modified if fs6374LMMTransmitStatus
+           is `notReady`."
+            
+        DEFVAL { timeStampFormatIEEE1588 }
+        ::= { fs6374ParamsConfigTableEntry 6 }     
+
+        fs6374LMTransmitStatus OBJECT-TYPE
+        SYNTAX       Fs6374TransmitStatus
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the status of loss transmit."
+        DEFVAL { ready }
+        ::= { fs6374ParamsConfigTableEntry 7 }
+
+      
+      fs6374DMType OBJECT-TYPE
+        SYNTAX         INTEGER{
+                  	      oneway           (1),
+            	          twoway           (2)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the type of DM calculation.
+
+           oneway(1)          Indicates that calculation of DM will be one-way.
+           twoway(2)    Indicates that calculation of DM will be two-way.
+           This object cannot be modified when fs6374DMTransmitStatus
+           is `notReady`."
+        DEFVAL { twoway }
+        ::= { fs6374ParamsConfigTableEntry 8 }    
+ 
+    
+      fs6374DMMode OBJECT-TYPE
+        SYNTAX         INTEGER{
+           	             onDemand           (1),
+                	     proActive          (2)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the method of DM calculation.
+
+           onDemand(1)    Indicates that calculation of DM will be done 
+			  based on user request.
+           proActive(2)   Indicates that calculation of DM will be done 
+			  proactively.
+          when this object is set as proactive and based on the object 
+          fs6374DMType and fs6374DMTransmitStatus test will be started
+          immediately."
+        DEFVAL { onDemand }
+        ::= { fs6374ParamsConfigTableEntry 9 }     
+ 
+    
+       fs6374DMTimeIntervalInMilliseconds OBJECT-TYPE
+        SYNTAX       Unsigned32(100..10000)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the time interval between two query packets 
+           for DM  with the granularity of 10milliseconds.
+           This object cannot be modified when fs6374DMTransmitStatus
+           is `notReady`."
+        DEFVAL { 1000 }
+        ::= { fs6374ParamsConfigTableEntry 10 }
+        
+        fs6374DMNoOfMessages OBJECT-TYPE
+        SYNTAX       Unsigned32 (1..1000)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the number of queries to be sent in a session
+           when method for LM calculation is Ondemand.
+           This object cannot be modified when fs6374DMTransmitStatus
+           is `notReady`."
+        DEFVAL { 10 }
+        ::= { fs6374ParamsConfigTableEntry 11 }
+        
+      fs6374DMTimeStampFormat OBJECT-TYPE
+        SYNTAX         FS6374TimeStampFormat
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the preferred timestamp format 
+	   which will be used for delay measurement calculation.
+           The below specified timestamp formats are supported for 
+	   Delay Measurement but now, time stamp format NTP is not support.
+              timeStampFormatNTP          (2), 
+              timeStampFormatIEEE1588     (3).
+           This object cannot be modified when fs6374DMTransmitStatus
+           is `notReady`."
+        DEFVAL { timeStampFormatIEEE1588 }
+        ::= { fs6374ParamsConfigTableEntry 12 }     
+        
+        fs6374DMTransmitStatus OBJECT-TYPE
+        SYNTAX       Fs6374TransmitStatus
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the status of delay transmit and 
+           an Enumerated value set to 'start' to initiate 1DM or
+           DMM transmission and 'stop' to stop 1DM or DMM transmission.
+           The values 'ready' and 'notReady' indicate whether 
+	   1DM or DMM can be initiated or not.
+
+           Note: User can not set to 'ready' or 'notReady'."
+        DEFVAL { ready }
+        ::= { fs6374ParamsConfigTableEntry 13 }
+
+      fs6374CmbLMDMType OBJECT-TYPE
+        SYNTAX         INTEGER { oneway(1), twoway(2) }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the combined LMDM calculation type
+	   provided by the service. The following two types are 
+           possible:
+              oneway - Indicates that calculation of combined LMDM will be 
+		       in one way.
+              twoway - Indicates that calculation of combined LMDM will be 
+	               in two way.
+           The combined LMDM calculation type cannot be modified when the
+           fs6374CmbLMDMTransmitStatus is `notReady`."
+        DEFVAL { twoway }
+        ::= { fs6374ParamsConfigTableEntry 14 }     
+     
+      fs6374CmbLMDMMethod   OBJECT-TYPE
+        SYNTAX         INTEGER { direct(1), inferred(2) }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the combined LMDM calculation method 
+	   provided by the service. The following two methods are
+           possible:
+              direct   - Indicates that the combined LMDM feature will work 
+                         in Direct Method.
+              inferred - Indicates that the combined LMDM feature will work 
+			 in Inferred Method.
+           The combined LMDM calculation method cannot be modified when the
+           fs6374CmbLMDMTransmitStatus is `notReady`."
+        DEFVAL { inferred }
+        ::= { fs6374ParamsConfigTableEntry 15 }     
+
+      fs6374CmbLMDMMode OBJECT-TYPE
+        SYNTAX         INTEGER { onDemand(1), proActive(2) }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the combined LMDM calculation mode
+           provided by the service. The following two modes are
+	   possible:
+              onDemand  - Indicates that calculation of combined LMDM will 
+		          be done based on user request.
+              proActive - Indicates that calculation of combined LMDM will 
+		          be done proactively.
+
+           when this object is set as pro-active mode and based on the object 
+           fs6374CmbLMDMType and fs6374CmbLMDMTransmitStatus test will be 
+	   started immediately.
+
+           The combined LMDM calculation mode cannot be modified when the
+           fs6374CmbLMDMTransmitStatus is `notReady`."
+        DEFVAL { onDemand }
+        ::= { fs6374ParamsConfigTableEntry 16 }     
+
+      fs6374CmbLMDMNoOfMessages  OBJECT-TYPE
+        SYNTAX       Unsigned32 (1..1000)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the number of combined LMDM queries to be 
+           sent in a session when method for LM calculation is `Ondemand`.
+           This object cannot be modified when the fs6374CmbLMDMTransmitStatus
+	   is `notReady`."
+        DEFVAL { 10 }
+        ::= { fs6374ParamsConfigTableEntry 17 }
+
+      fs6374CmbLMDMTimeIntervalInMilliseconds   OBJECT-TYPE
+        SYNTAX       Unsigned32(100..10000)
+        UNITS        "milliseconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the time interval between two combined 
+           LMDM query packets for LM with the granularity of 10 milliseconds. 
+           This object cannot be modified when fs6374CmbLMDMTransmitStatus
+           is `notReady`."
+        DEFVAL { 1000 }
+        ::= { fs6374ParamsConfigTableEntry 18 }
+
+      fs6374CmbLMDMTimeStampFormat  OBJECT-TYPE
+        SYNTAX         FS6374TimeStampFormat
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the preferred timestamp format 
+	   which will be used for combined LMDM calculation.
+           The below specified timestamp formats are supported for 
+	   Combined loss and delay Measurement but now, time stamp 
+	   format NTP is not support.
+              timeStampFormatNTP          (2), 
+              timeStampFormatIEEE1588     (3).
+           This object cannot be modified when fs6374CmbLMDMTransmitStatus
+           is `notReady`."
+        DEFVAL { timeStampFormatIEEE1588 }
+        ::= { fs6374ParamsConfigTableEntry 19 }     
+
+      fs6374CmbLMDMTransmitStatus OBJECT-TYPE
+        SYNTAX       Fs6374TransmitStatus
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies combined LMDM calculation transmission 
+	   status. The following two values are possible to set by
+           administrator:
+              start - To initiate combined LMDM transmission.
+              stop  - To stop the combined LMDM transmission.
+           The values 'ready' and 'notReady' indicate whether combined LMDM 
+           can be initiated or not.
+           The value `notReady` specifies that particular transmission is 
+	   already On-going for that service.
+           The Value `ready` specifies that particular transmission can be
+           initiated for the service.
+
+           Note: User can not set to 'ready' or 'notReady'."
+        DEFVAL { ready }
+        ::= { fs6374ParamsConfigTableEntry 20 }
+
+      fs6374DMPaddingSize   OBJECT-TYPE
+        SYNTAX       Unsigned32(0..9000)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the size of the pattern to be included in 
+           the Padding TLV of DM message.
+
+           This configuration is applicable only for Non-dyadic DM
+           Measurement.
+
+           Maximum frame size suggested by RFC6374 for Padding TLV is 
+           9000 bytes. Based on the interface MTU, the maximum frame size
+           of DM padding TLV size can be chosen. 
+
+           The TLV value field in PaddingTLV will have maximum of 255 bytes. 
+	   When the fs6374DMPaddingSize is configured with more than 
+	   255 bytes then total size will be split across multiple TLVs.
+
+           Default value of padding pattern is updated as zero for the 
+	   size specified by this object. If the object is configured 
+	   with the value as `zero` then padding TLV will not be included.
+ 
+           There are two types of padding TLV are specified in RFC6374 
+	   section 3.5 but the padding TLV type 0 - Copy in response 
+	   is supported.
+	   
+           This object cannot be modified when fs6374DMTransmitStatus
+           is `notReady`."
+        DEFVAL { 0 }
+        ::= { fs6374ParamsConfigTableEntry 21 }
+
+      fs6374CmbLMDMPaddingSize   OBJECT-TYPE
+        SYNTAX       Unsigned32(0..9000)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+          "This object specifies the size of the pattern to be included in 
+           the Padding TLV of Combined LMDM message.
+
+           This configuration is applicable only for Non-dyadic 
+           Combined LMDM Measurement.
+
+           Maximum frame size suggested by RFC6374 for Padding TLV is 
+           9000 bytes. Based on the interface MTU, the maximum frame size
+           of Combined LMDM padding TLV size can be chosen. 
+
+           The TLV value field in PaddingTLV will have maximum of 255 bytes. 
+	   When the fs6374CmbLMDMPaddingSize is configured with more than 
+	   255 bytes then total size will be split across multiple TLVs.
+
+           Default value of padding pattern is updated as zero for the 
+	   size specified by this object. If the object is configured 
+	   with the value as `zero` then padding TLV will not be included.
+
+           There are two types of padding TLV are specified in RFC6374 
+	   section 3.5 but the padding TLV type 0 - Copy in 
+	   response is supported.
+
+           This object cannot be modified when fs6374CmbLMDMTransmitStatus
+           is `notReady`."
+        DEFVAL { 0 }
+        ::= { fs6374ParamsConfigTableEntry 22 }
+
+--------------------------------------------------------------------------------------
+-- End of Configuration Table for LM/DM
+--------------------------------------------------------------------------------------
+  
+--------------------------------------------------------------------------------------
+-- Start of Buffers for storing the LM calculations
+--------------------------------------------------------------------------------------
+  fs6374LMTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374LMTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This object specifies the table that holds the detailed buffer 
+	information for Loss measurement measured at various time 
+	intervals."
+    ::= { fs6374LMBuffer 1 }
+
+  fs6374LMTableEntry OBJECT-TYPE
+    SYNTAX      Fs6374LMTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the Loss statistics table entry."
+    INDEX { fs6374ContextId,
+            fs6374ServiceName,
+            fs6374LMSessionId,
+            fs6374LMSeqNum
+          }
+    ::= { fs6374LMTable 1 }
+
+  Fs6374LMTableEntry ::= SEQUENCE {
+      fs6374LMSessionId                       		Unsigned32,
+      fs6374LMSeqNum                          		Unsigned32,
+      fs6374LMTxLossAtSenderEnd	            		Unsigned32,
+      fs6374LMRxLossAtSenderEnd	            		Unsigned32,
+      fs6374LMRxLossAtReceiverEnd            		Unsigned32,
+      fs6374LMMeasurementTimeTakenInMilliseconds        FS6374TimeRepresentation,
+      fs6374LMTransmitResultOK			    	TruthValue,
+      fs6374LMTestPktsCount			        Unsigned32
+    }
+
+  fs6374LMSessionId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the Loss measurement session id."
+    ::= { fs6374LMTableEntry 1 }
+
+  fs6374LMSeqNum OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the locally maintained sequence number of
+	loss Entries."
+    ::= { fs6374LMTableEntry 2 }
+
+   fs6374LMTxLossAtSenderEnd OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the transmit loss value which is calculated at 
+        sender end.This value is populated for Two-way measurement."
+    ::= { fs6374LMTableEntry 3 }
+
+   fs6374LMRxLossAtSenderEnd OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the receiver loss value which is calculated at 
+        sender end. This value is populated for Two-way measurement."
+    ::= { fs6374LMTableEntry 4 }
+
+   fs6374LMRxLossAtReceiverEnd OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the receiver loss value which is calculated at 
+        sender end. This value is populated for one-way measurement."
+    ::= { fs6374LMTableEntry 5 }
+  
+    fs6374LMMeasurementTimeTakenInMilliseconds  OBJECT-TYPE
+      SYNTAX      FS6374TimeRepresentation
+      UNITS       "milliseconds"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This object specifies the time taken to measure loss."
+     ::= { fs6374LMTableEntry 6 } 
+
+   fs6374LMTransmitResultOK OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the result of the operation:
+        - true    The Loss measurement Message (1LM or LMM) will be
+                  (or has been) sent.
+       - false   The Loss measurement Message (1LM  or LMM) will not be 
+		 sent."
+    DEFVAL { true }
+    ::= { fs6374LMTableEntry 7 }
+
+   fs6374LMTestPktsCount OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the total number of test PDUs transmitted at sender end for each transaction. This value is populated for measurement.
+       "
+    ::= { fs6374LMTableEntry 8 }
+
+
+--------------------------------------------------------------------------------------
+--End of Buffers for storing the LM calculations
+--------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------
+--Start of Buffers for storing the DM calculations
+--------------------------------------------------------------------------------------
+  fs6374DMTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374DMTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the table that contains the detailed buffer 
+       information for delay measured at various times."
+    ::= { fs6374DMBuffer 1 }
+
+  fs6374DMTableEntry OBJECT-TYPE
+    SYNTAX      Fs6374DMTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "The object specifies the detailed delay buffer table entry."
+    INDEX { fs6374ContextId,
+            fs6374ServiceName,
+            fs6374DMSessionId,
+            fs6374DMSeqNum
+          }
+    ::= { fs6374DMTable 1 }
+
+  Fs6374DMTableEntry ::= SEQUENCE {
+      fs6374DMSessionId                             Unsigned32,
+      fs6374DMSeqNum                                Unsigned32,
+      fs6374DMDelayValue	        	    FS6374TimeRepresentation,
+      fs6374DMRTDelayValue		            FS6374TimeRepresentation,
+      fs6374DMIPDV                                  FS6374TimeRepresentation,
+      fs6374DMPDV                                   FS6374TimeRepresentation,
+      fs6374DMTransmitResultOK			            TruthValue
+    }
+
+  fs6374DMSessionId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the delay measurement session id."
+    ::= { fs6374DMTableEntry 1 }
+
+  fs6374DMSeqNum OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the locally maintained sequence number of 
+	delay entries."
+    ::= { fs6374DMTableEntry 2 }
+
+   fs6374DMDelayValue OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the measured delay value."
+    ::= { fs6374DMTableEntry 3 }
+
+   fs6374DMRTDelayValue OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the measured round trip delay value."
+    ::= { fs6374DMTableEntry 4 }
+  
+     fs6374DMIPDV  OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the Inter frame delay variation (IFDV), 
+	calculated with respect to current transaction."
+    ::= { fs6374DMTableEntry 5 }
+
+    fs6374DMPDV  OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the Frame delay variation (IFDV), calculated 
+        with respect to current transaction."
+    ::= { fs6374DMTableEntry 6 }
+
+   fs6374DMTransmitResultOK OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the result of the operation:
+
+        - true    The Delay measurement Message (1DM or DMM) will be
+                  (or has been) sent.
+       - false   The Delay measurement Message (1DM  or DMM) will not 
+                 be sent."
+    DEFVAL { true }
+    ::= { fs6374DMTableEntry 7 }
+
+--------------------------------------------------------------------------------------
+--End of Buffers for storing the DM calculations
+--------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+--Start of Buffers for storing the summary of LM calculations
+--------------------------------------------------------------------------------------
+ fs6374LMStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374LMStatsTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the table that contains the summary of Loss 
+       information based on Service name and Session Id."
+    ::= { fs6374LMStats 1 }
+
+  fs6374LMStatsTableEntry OBJECT-TYPE
+    SYNTAX      Fs6374LMStatsTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The object specifies the loss Statistics table entry."
+    INDEX { fs6374ContextId,
+            fs6374ServiceName,
+            fs6374LMSessionId
+          }
+    ::= { fs6374LMStatsTable 1 }
+
+  Fs6374LMStatsTableEntry ::= SEQUENCE {
+      fs6374LMStatsMplsType		       INTEGER,
+      fs6374LMStatsFwdTnlIdOrPwId      Unsigned32,
+      fs6374LMStatsRevTnlId     	   Unsigned32,
+      fs6374LMStatsSrcIpAddr 	   	   OCTET STRING,
+      fs6374LMStatsDestIpAddr 	       OCTET STRING,
+      fs6374LMStatsTrafficClass  	   INTEGER,
+      fs6374LMStatsMode          	   INTEGER,
+      fs6374LMStatsMethod        	   INTEGER,
+      fs6374LMStatsType          	   INTEGER,
+      fs6374LMStatsTimeStampFormat     FS6374TimeStampFormat,
+      fs6374LMStatsStartTime           Unsigned32,
+      fs6374LMStatsFarEndLossMin       Unsigned32,
+      fs6374LMStatsFarEndLossMax       Unsigned32,
+      fs6374LMStatsFarEndLossAvg       Unsigned32,
+      fs6374LMStatsNearEndLossMin      Unsigned32,
+      fs6374LMStatsNearEndLossMax      Unsigned32,
+      fs6374LMStatsNearEndLossAvg      Unsigned32,
+      fs6374LMStatsTxPktCount    	   Unsigned32,
+      fs6374LMStatsRxPktCount    	   Unsigned32,
+      fs6374LMStatsThroughputpercent   OCTET STRING,
+      fs6374LMStatsResponseErrors      Unsigned32,
+      fs6374LMStatsResponseTimeout     Unsigned32,
+      fs6374LMStatsMeasurementOnGoing  INTEGER,
+      fs6374LMDyadicMeasurement        INTEGER,
+      fs6374LMRemoteSessionId          Unsigned32,
+      fs6374LMDyadicProactiveRole      INTEGER,
+      fs6374IsLMBufferSQIEnabled       TruthValue
+     }
+
+  fs6374LMStatsMplsType OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the Mpls type which could be Tunnel/Lsp 
+           or PW."
+        ::= { fs6374LMStatsTableEntry 1 }
+
+  fs6374LMStatsFwdTnlIdOrPwId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the Tunnel Id for unidirectional in forward 
+        direction or PW Id based on Mpls type."
+    ::= { fs6374LMStatsTableEntry  2 }
+
+  fs6374LMStatsRevTnlId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the Tunnel Id for unidirectional in 
+        reverse direction."
+    ::= { fs6374LMStatsTableEntry  3 }
+
+   fs6374LMStatsSrcIpAddr OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE (0..40))
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the source IP Address."
+        ::= { fs6374LMStatsTableEntry 4 }
+   
+    fs6374LMStatsDestIpAddr OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE (0..40))
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+          "This object specifies the destination IP Address."
+        ::= { fs6374LMStatsTableEntry 5 }
+
+  fs6374LMStatsTrafficClass OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the traffic class."
+    ::= { fs6374LMStatsTableEntry 6 }
+ 
+
+  fs6374LMStatsMode OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the method (ondemand or proactive) used for LM.
+        This is not applicable for one-way type."
+    ::= { fs6374LMStatsTableEntry 7 }
+ 
+  fs6374LMStatsMethod OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the method (inferred or direct) used for LM."
+    ::= { fs6374LMStatsTableEntry 8 }
+
+  fs6374LMStatsType OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the type (oneWay or twoWay) used for LM."
+    ::= { fs6374LMStatsTableEntry 9 }
+
+  fs6374LMStatsTimeStampFormat  OBJECT-TYPE
+     SYNTAX      FS6374TimeStampFormat
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the value of timestamp format for the LM."
+     ::= { fs6374LMStatsTableEntry 10 }
+
+  fs6374LMStatsStartTime OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the time at which loss measurement starts."
+     ::= { fs6374LMStatsTableEntry 11 }
+  
+  fs6374LMStatsFarEndLossMin OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the minimum value of far-end loss."
+    ::= { fs6374LMStatsTableEntry 12 }
+
+  fs6374LMStatsFarEndLossMax OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the maxmium value of far-end loss."
+    ::= { fs6374LMStatsTableEntry 13 }
+
+  fs6374LMStatsFarEndLossAvg OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the average of the far-end loss measured 
+        for a transaction."
+    ::= { fs6374LMStatsTableEntry 14 }
+
+  fs6374LMStatsNearEndLossMin OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the minimum value of near-end loss."
+    ::= { fs6374LMStatsTableEntry 15 }
+
+  fs6374LMStatsNearEndLossMax OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the maxmium value of near-end loss."
+    ::= { fs6374LMStatsTableEntry 16 }
+
+  fs6374LMStatsNearEndLossAvg OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the average of the near-end loss measured 
+	for a transaction."
+    ::= { fs6374LMStatsTableEntry 17 }
+
+  fs6374LMStatsTxPktCount OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the number of frames with loss information 
+	sent for a transaction."
+    ::= { fs6374LMStatsTableEntry 18 }
+
+  fs6374LMStatsRxPktCount OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the number of frames with loss information 
+	received for a transaction."
+    ::= { fs6374LMStatsTableEntry 19 }
+
+  fs6374LMStatsThroughputpercent OBJECT-TYPE
+     SYNTAX      OCTET STRING
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the throughput loss value for a transaction."
+    ::= { fs6374LMStatsTableEntry 20 }
+
+    fs6374LMStatsResponseErrors OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the number of responses dropped due to 
+        errors."
+        DEFVAL {0}
+        ::= { fs6374LMStatsTableEntry 21 }
+
+   fs6374LMStatsResponseTimeout OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the number of queries Timedout."
+        DEFVAL {0}
+        ::= { fs6374LMStatsTableEntry 22 }
+   
+   fs6374LMStatsMeasurementOnGoing OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies whether for the particular session, 
+        measurement is ongoing or not.
+        Complete(0)       Indicates measurement is ongoing.
+        OnGoing(1)        Indicates measurement has been completed.
+        Aborted(2)        Indicates if the measurement is Stop by user or 
+                          if the measurement is aborted due to MPLS path Down"
+        DEFVAL {0}
+        ::= { fs6374LMStatsTableEntry 23 }
+
+   fs6374LMDyadicMeasurement OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Loss Calculation done over 
+             dyadic Measurement
+             enable(1)          Indicates that Loss over Dyadic
+             disable(2)         Indicates normal loss measurement."
+        DEFVAL {2}
+        ::= { fs6374LMStatsTableEntry 24 } 
+
+   fs6374LMRemoteSessionId OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies Remote Session ID for the Loss/Comb LMDM 
+            calculation done over dyadic Measurement."
+        ::= { fs6374LMStatsTableEntry 25 }
+
+   fs6374LMDyadicProactiveRole OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Loss Calculation done 
+            for which Dyadic proactive role."
+        ::= { fs6374LMStatsTableEntry 26 }
+
+   fs6374IsLMBufferSQIEnabled OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies whether the SQI was enabled or disabled
+             for the corresponding session when the LM buffer was created. 
+	     A value of 'true' indicates that SQI was enabled for that service 
+	     during that particular session. A value of 'false' indicates that 
+             SQI was disabled for that service during that particular session."
+       DEFVAL { false }
+    ::= { fs6374LMStatsTableEntry 27 }
+--------------------------------------------------------------------------------------
+--End of Buffers for storing the summary of LM calculations
+--------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+--Start of Buffers for storing the summary of DM calculations
+--------------------------------------------------------------------------------------
+  fs6374DMStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374DMStatsTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the table which holds the summary of delay 
+       information based on Service name and Session Id."
+    ::= { fs6374DMStats 1 }
+
+  fs6374DMStatsTableEntry OBJECT-TYPE
+    SYNTAX      Fs6374DMStatsTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the delay Statistics table entry."
+    INDEX { fs6374ContextId,
+            fs6374ServiceName,
+            fs6374DMSessionId
+          }
+    ::= { fs6374DMStatsTable 1 }
+
+  Fs6374DMStatsTableEntry ::= SEQUENCE {
+      fs6374DMStatsMplsType      		INTEGER,
+      fs6374DMStatsFwdTnlIdOrPwId     	Unsigned32,
+      fs6374DMStatsRevTnlId     	   	Unsigned32,
+      fs6374DMStatsSrcIpAddr 	   	   	OCTET STRING,
+      fs6374DMStatsDestIpAddr 	        OCTET STRING,
+      fs6374DMStatsTrafficClass     	INTEGER,
+      fs6374DMStatsMode                	INTEGER,
+      fs6374DMStatsType             	INTEGER,
+      fs6374DMStatsTimeStampFormat      FS6374TimeStampFormat,
+      fs6374DMStatsStartTime            Unsigned32,
+      fs6374DMStatsMinDelay	        FS6374TimeRepresentation,
+      fs6374DMStatsMaxDelay	        FS6374TimeRepresentation,
+      fs6374DMStatsAvgDelay     	FS6374TimeRepresentation,
+      fs6374DMStatsMinRTDelay       	FS6374TimeRepresentation,
+      fs6374DMStatsMaxRTDelay       	FS6374TimeRepresentation,
+      fs6374DMStatsAvgRTDelay		FS6374TimeRepresentation,
+      fs6374DMStatsMinIPDV	        FS6374TimeRepresentation,
+      fs6374DMStatsMaxIPDV	        FS6374TimeRepresentation,
+      fs6374DMStatsAvgIPDV      	FS6374TimeRepresentation,
+      fs6374DMStatsMinPDV           	FS6374TimeRepresentation,
+      fs6374DMStatsMaxPDV           	FS6374TimeRepresentation,
+      fs6374DMStatsAvgPDV   		FS6374TimeRepresentation,
+      fs6374DMStatsTxPktCount       	Unsigned32,
+      fs6374DMStatsRxPktCount       	Unsigned32,
+      fs6374DMStatsResponseErrors       Unsigned32,
+      fs6374DMStatsResponseTimeout      Unsigned32,
+      fs6374DMStatsMeasurementOnGoing	INTEGER,
+      fs6374DMDyadicMeasurement         INTEGER,
+      fs6374DMRemoteSessionId           Unsigned32,
+      fs6374DMDyadicProactiveRole       INTEGER,
+      fs6374DMStatsPaddingSize          Unsigned32,
+      fs6374IsDMBufferSQIEnabled        TruthValue
+     }
+
+  fs6374DMStatsMplsType OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the MPLS type which could be Tunnel/LSP 
+	or PW."
+        ::= { fs6374DMStatsTableEntry 1 }
+
+  fs6374DMStatsFwdTnlIdOrPwId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the tunnel Id for unidirectional in forward 
+	direction or PW Id based on Mpls type."
+    ::= { fs6374DMStatsTableEntry  2 }
+
+  fs6374DMStatsRevTnlId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the tunnel Id for unidirectional in reverse 
+	direction."
+    ::= { fs6374DMStatsTableEntry  3 }
+
+   fs6374DMStatsSrcIpAddr OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE (0..40))
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the source IP Address."
+        ::= { fs6374DMStatsTableEntry 4 }
+
+   fs6374DMStatsDestIpAddr OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE (0..40))
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the destination IP Address."
+        ::= { fs6374DMStatsTableEntry 5 }
+
+  fs6374DMStatsTrafficClass OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the traffic class."
+    ::= { fs6374DMStatsTableEntry 6 }
+
+  fs6374DMStatsMode OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the method (ondemand or proactive) used for DM.
+        This is not applicable for one-way type."
+    ::= { fs6374DMStatsTableEntry 7 }
+
+  fs6374DMStatsType OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies type (oneWay or twoWay) used for DM."
+    ::= { fs6374DMStatsTableEntry 8 }
+
+  fs6374DMStatsTimeStampFormat  OBJECT-TYPE
+     SYNTAX      FS6374TimeStampFormat
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the value of timestamp format for the DM."
+     ::= { fs6374DMStatsTableEntry 9 }
+
+  fs6374DMStatsStartTime OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the time at which delay measurement starts."
+     ::= { fs6374DMStatsTableEntry 10 }
+
+  fs6374DMStatsMinDelay OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the minimum value of delay."
+    ::= { fs6374DMStatsTableEntry 11 }
+
+  fs6374DMStatsMaxDelay OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the maximum value of frame-delay."
+    ::= { fs6374DMStatsTableEntry 12 }
+
+  fs6374DMStatsAvgDelay OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the average delay measured for a one-way or 
+        two-way delay measurement for a transaction."
+    ::= { fs6374DMStatsTableEntry 13 }
+
+  fs6374DMStatsMinRTDelay OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the minimum value of round trip delay."
+    ::= { fs6374DMStatsTableEntry 14 }
+
+  fs6374DMStatsMaxRTDelay OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the maximum value of round trip delay."
+    ::= { fs6374DMStatsTableEntry 15 }
+
+  fs6374DMStatsAvgRTDelay OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the average delay measured for a round trip 
+	delay measurement for a transaction."
+    ::= { fs6374DMStatsTableEntry 16 }
+
+  fs6374DMStatsMinIPDV OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the minimum value of IPDV."
+    ::= { fs6374DMStatsTableEntry 17 }
+
+  fs6374DMStatsMaxIPDV OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the maximum value of IPDV."
+    ::= { fs6374DMStatsTableEntry 18 }
+
+  fs6374DMStatsAvgIPDV OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the average delay measured for a IPDV."
+    ::= { fs6374DMStatsTableEntry 19 }
+
+  fs6374DMStatsMinPDV OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the minimum value of PDV."
+    ::= { fs6374DMStatsTableEntry 20 }
+
+  fs6374DMStatsMaxPDV OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the maximum value of PDV."
+    ::= { fs6374DMStatsTableEntry 21 }
+
+  fs6374DMStatsAvgPDV OBJECT-TYPE
+     SYNTAX      FS6374TimeRepresentation
+     UNITS       "milliseconds"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the average delay measured for a PDV."
+    ::= { fs6374DMStatsTableEntry 22 }
+
+  fs6374DMStatsTxPktCount OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the count of transmitted DM packets."
+    ::= { fs6374DMStatsTableEntry 23 }
+
+  fs6374DMStatsRxPktCount OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the count of received DM packets."
+    ::= { fs6374DMStatsTableEntry 24 }
+
+    fs6374DMStatsResponseErrors OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the number of Responses dropped due to errors." 
+        DEFVAL {0}
+        ::= { fs6374DMStatsTableEntry 25 }
+
+   fs6374DMStatsResponseTimeout OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies the number of queries timedout."
+        DEFVAL {0}
+        ::= { fs6374DMStatsTableEntry 26 }
+
+   fs6374DMStatsMeasurementOnGoing OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+       "This object specifies whether for the particular session, 
+	measurement is ongoing or not.
+        Complete(0)       Indicates measurement is ongoing.
+        OnGoing(1)        Indicates measurement has been completed.
+        Aborted(2)        Indicates if the measurement is Stop by user or
+                          if the measurement is aborted due to MPLS path Down"
+        DEFVAL {0}
+   ::= { fs6374DMStatsTableEntry 27 }
+
+   fs6374DMDyadicMeasurement OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Delay Calculation done over
+             dyadic Measurement
+             enable(1)          Indicates that Delay over Dyadic
+             disable(2)         Indicates normal Delay measurement."
+        DEFVAL {2}
+        ::= { fs6374DMStatsTableEntry 28 }
+
+   fs6374DMRemoteSessionId OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies Remote Session ID for the Delay/Comb LMDM
+            calculation done over dyadic Measurement."
+        ::= { fs6374DMStatsTableEntry 29 }
+
+   fs6374DMDyadicProactiveRole OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Delay Calculation done
+             for which Dyadic proactive role."
+        ::= { fs6374DMStatsTableEntry 30 }
+   fs6374DMStatsPaddingSize OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "This object specifies the Delay Calculation done
+             for which Padding size."
+        ::= { fs6374DMStatsTableEntry 31 }
+
+   fs6374IsDMBufferSQIEnabled OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies whether the SQI was enabled or disabled
+             for the corresponding session when the DM buffer was created. 
+	     A value of 'true' indicates that SQI was enabled for that service 
+	     during that particular session. A value of 'false' indicates that 
+             SQI was disabled for that service during that particular session."
+       DEFVAL { false }
+    ::= { fs6374DMStatsTableEntry 32 }
+
+--------------------------------------------------------------------------------------
+--End of Buffers for storing the summary of DM calculations
+--------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+--Start of 6374 per context statistics table
+--------------------------------------------------------------------------------------
+fs6374StatsTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF Fs6374StatsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+      "This object specifies the list of per virtual context 6374 Module Statistics."
+    ::= { fs6374Stats 1 }
+
+fs6374StatsTableEntry OBJECT-TYPE
+    SYNTAX       Fs6374StatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This object specifies the Per virtual context 6374 Module Statistics."
+
+   INDEX { fs6374ContextId,
+            fs6374ServiceName }
+
+    ::= { fs6374StatsTable 1 }
+
+Fs6374StatsEntry ::= SEQUENCE {
+      fs6374StatsLmmOut                  Unsigned32,
+      fs6374StatsLmmIn                   Unsigned32,
+      fs6374StatsLmrOut                  Unsigned32,
+      fs6374StatsLmrIn                   Unsigned32,
+      fs6374Stats1LmOut                  Unsigned32,
+      fs6374Stats1LmIn                   Unsigned32,
+      fs6374Stats1DmOut                  Unsigned32,
+      fs6374Stats1DmIn                   Unsigned32,
+      fs6374StatsDmmOut                  Unsigned32,
+      fs6374StatsDmmIn                   Unsigned32,
+      fs6374StatsDmrOut                  Unsigned32,
+      fs6374StatsDmrIn                   Unsigned32,
+      fs6374StatsCmb1LmDmOut             Unsigned32,
+      fs6374StatsCmb1LmDmIn              Unsigned32,
+      fs6374StatsCmbLmmDmmOut            Unsigned32,
+      fs6374StatsCmbLmmDmmIn             Unsigned32,
+      fs6374StatsCmbLmrDmrOut            Unsigned32,
+      fs6374StatsCmbLmrDmrIn             Unsigned32
+
+      }
+
+fs6374StatsLmmOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of LMM PDUs transmitted."
+    ::= { fs6374StatsTableEntry 1 }
+
+fs6374StatsLmmIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of LMM PDUs received."
+    ::= { fs6374StatsTableEntry 2 }
+
+fs6374StatsLmrOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of LMR PDUs transmitted."
+    ::= { fs6374StatsTableEntry 3 }
+
+fs6374StatsLmrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of LMR PDUs received."
+    ::= { fs6374StatsTableEntry 4 }
+
+fs6374Stats1LmOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of 1LM PDUs transmitted."
+    ::= { fs6374StatsTableEntry 5 }
+
+fs6374Stats1LmIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of 1LM PDUs received."
+    ::= { fs6374StatsTableEntry 6 }
+
+fs6374Stats1DmOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of 1DM PDUs transmitted."
+    ::= { fs6374StatsTableEntry 7 }
+
+fs6374Stats1DmIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of 1DM PDUs received."
+    ::= { fs6374StatsTableEntry 8 }
+
+fs6374StatsDmmOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of DMM PDUs transmitted."
+    ::= { fs6374StatsTableEntry 9 }
+
+fs6374StatsDmmIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of DMM PDUs received."
+    ::= { fs6374StatsTableEntry 10 }
+
+fs6374StatsDmrOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of DMR PDUs transmitted."
+    ::= { fs6374StatsTableEntry 11 }
+
+fs6374StatsDmrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of DMR PDUs received."
+    ::= { fs6374StatsTableEntry 12 }
+
+fs6374StatsCmb1LmDmOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of combined LMDM one way PDUs
+       transmitted."
+    ::= { fs6374StatsTableEntry 13 }
+
+fs6374StatsCmb1LmDmIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of combined LMDM one way PDUs 
+       received."
+    ::= { fs6374StatsTableEntry 14 }
+
+fs6374StatsCmbLmmDmmOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of combined LMDM two way PDUs 
+       transmitted."
+    ::= { fs6374StatsTableEntry 15 }
+
+fs6374StatsCmbLmmDmmIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of combined LMDM two way PDUs 
+       received."
+    ::= { fs6374StatsTableEntry 16 }
+
+fs6374StatsCmbLmrDmrOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of combined LMR DMR two way PDUs 
+       transmitted."
+    ::= { fs6374StatsTableEntry 17 }
+
+fs6374StatsCmbLmrDmrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the number of combined LMR DMR two ways PDUs 
+       received."
+    ::= { fs6374StatsTableEntry 18 }
+
+
+--------------------------------------------------------------------------------------
+--End of 6374 per context statistics table
+--------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------
+--Start of System level config table 
+--------------------------------------------------------------------------------------
+    fs6374SystemConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374SystemConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the table that contains system level 
+       information."
+    ::= { fs6374SystemConfig 1 }
+
+  fs6374SystemConfigEntry OBJECT-TYPE
+    SYNTAX      Fs6374SystemConfigEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the SystemConfig entry."
+    INDEX { fs6374ContextId      
+          }
+    ::= { fs6374SystemConfigTable 1 }
+
+  Fs6374SystemConfigEntry ::= SEQUENCE {
+      	fs6374SystemControl 		INTEGER,
+        fs6374ModuleStatus  		INTEGER,
+        fs6374DMBufferClear	        TruthValue,
+        fs6374LMBufferClear	        TruthValue,
+        fs6374DebugLevel    		Unsigned32,
+        fs6374TSFormatSupported         FS6374SuppTimeStampFormat
+     }
+
+   fs6374SystemControl OBJECT-TYPE
+     SYNTAX      INTEGER  {
+                           start	(1),
+                           shutdown	(2)
+                         }
+
+     MAX-ACCESS  read-write
+     STATUS      current
+    DESCRIPTION
+       "This object specifies the administrative system control status of 
+	6374 module.
+           The value 'start' (1) indicates that all
+           resources required by the module should be allocated
+           and 6374 should be supported in the device on all ports.
+           The value 'shutdown' (2) indicates that 6374 should be
+           shutdown in the device on all ports and all allocated
+           memory must be released."
+       DEFVAL { start }
+    ::= { fs6374SystemConfigEntry 1 }
+
+   fs6374ModuleStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                         enabled	(1),
+                         disabled	(2)
+                        }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the administrative module status of 6374 module. 
+	   This enables or disables 6374 in the system.
+	   A value of 'enabled' (1) indicates that 6374 is 
+	   enabled in the device. A value of 'disabled'
+           (2) indicates that 6374 is disabled in the device."
+       DEFVAL { enabled }
+    ::= { fs6374SystemConfigEntry 2 }
+
+    fs6374DMBufferClear OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the trigger to remove the contents of Buffer 
+	maintained for storing delay measured at various times.
+        Note: Get operation value should be ignored."
+     ::= { fs6374SystemConfigEntry 3 }
+
+    fs6374LMBufferClear OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+       "This object specifies the trigger to remove the contents of Buffer 
+	maintained for storing loss measured at various times.
+
+        Note: Get operation value should be ignored."
+     ::= { fs6374SystemConfigEntry 4 }
+
+   fs6374DebugLevel  OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+       "This object is used to enable the tracing in the selected submodule. 
+	A 32 bit integer is used to store the Tracing level in the specified 
+        module.
+       Different Tracing Levels -
+         BIT 0 - Initialisation and Shutdown Trace.
+         BIT 1 - Management trace.
+         BIT 2 - Critical trace.
+         BIT 3 - Control plane.
+         BIT 4 - Packet Dump.
+         BIT 5 - OS Resource trace.
+         BIT 6 - All Failure trace (All failures including Packet Validation).
+         BIT 7 - Function Entry.
+         BIT 8 - Function Exit.
+       Note : BIT0 is the least significant bit and BIT31 is the most
+       significant bit.
+
+       By default, critical trace(bit 3) is set."
+
+      DEFVAL  { '00000003'H }
+    ::= { fs6374SystemConfigEntry 5 }
+
+   fs6374TSFormatSupported OBJECT-TYPE
+     SYNTAX         FS6374SuppTimeStampFormat
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+       "This object specifies the timestamp format supported in the system.
+        The below specified timestamp formats are supported in the system.
+		     timeStampFormatNTP          (2),
+		     timeStampFormatIEEE1588     (3)
+        When the object 'fs6374TSFNegotiation' is enabled in the service, 
+	the supported timestamp formats will be used for negotiation process."
+     ::= { fs6374SystemConfigEntry 6 }
+--------------------------------------------------------------------------------------
+--End of System level config table 
+--------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------
+--Start of Traps 
+--------------------------------------------------------------------------------------
+    fs6374NotificationsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Fs6374NotificationsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the list of Traps supported in 6374."
+    ::= { fs6374Notifications 1 }
+
+    fs6374NotificationsEntry OBJECT-TYPE
+    SYNTAX      Fs6374NotificationsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This object specifies the notification entry."
+    INDEX { fs6374ContextId }
+    ::= { fs6374NotificationsTable 1 }
+ 
+    Fs6374NotificationsEntry ::= SEQUENCE {
+        fs6374LMDMTrapControl     FS6374Traps
+      }
+
+
+   fs6374LMDMTrapControl OBJECT-TYPE
+     SYNTAX      FS6374Traps
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+       "This object specifies a vector of Boolean notification types, 
+	used to enable or disable the LM&DM Traps:
+                        bTrapUnsupportedVersion (1),
+                        bTrapUnsupportedControlCode (2),
+                        bTrapUnsupportedDataFormat (3),
+                        bTrapConnectionMismatch (4),
+                        bTrapUnsupportedMandatoryTLVObject (5),
+                        bTrapUnsupportedTimeStamp (6),
+                        bTrapResponseTimeout (7),
+                        bTrapResourceUnavailable (8),
+                        bTrapTestAbort (9),
+                        bTrapProactiveTestRestart(10),
+                        bTrapUnsupportedQueryInterval(11)
+       "
+     ::= { fs6374NotificationsEntry 1 }
+
+END

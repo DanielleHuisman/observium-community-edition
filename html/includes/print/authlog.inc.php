@@ -30,17 +30,16 @@ function print_authlog($vars)
         // Entries have been returned. Print the table.
         $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">' . PHP_EOL;
         $cols   = [
-            //'NONE'     => NULL,
-            'date' => ['Date', 'style="width: 150px;"'],
-            'user' => 'User',
-            'from' => 'From',
-            'ua'   => ['User-Agent', 'style="width: 200px;"'],
-            'NONE' => 'Action',
+            [ 'date' => 'Date', 'style' => 'width: 150px;' ],
+            'user' => [ 'user' => 'User' ],
+            [ 'from' => 'From' ],
+            [ 'ua'   => 'User-Agent', 'style' => 'width: 200px;' ],
+            [ 'Action' ],
         ];
         if ($vars['page'] == 'preferences') {
             unset($cols['user']);
         }
-        $string .= get_table_header($cols); //, $vars); // Currently sorting is not available
+        $string .= generate_table_header($cols); //, $vars); // Currently sorting is not available
         $string .= '<tbody>' . PHP_EOL;
 
         foreach ($authlog['entries'] as $entry) {

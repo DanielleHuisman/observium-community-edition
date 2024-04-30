@@ -94,7 +94,11 @@ function print_bgp_peer_table($vars)
         } else {
             $peer_name = $peer['reverse_dns'];
         }
+
         $peer_ip        = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
+
+        $peer_ip        = generate_link($peer['human_remoteip'], ['page' => 'routing' , 'proto' => 'bgp', 'peer_ip' => $peer['human_remoteip'], 'view' => 'graphs', 'graph' => 'updates']);
+
         $peer_afis      = &$entries['afisafi'][$peer['device_id']][$peer['bgpPeer_id']];
         $peer_afis_html = [];
 
@@ -143,7 +147,10 @@ function print_bgp_peer_table($vars)
         $string .= '</td>' . PHP_EOL;
         $string .= '     <td><span class="text-success"><i class="glyphicon glyphicon-arrow-right"></i></span></td>' . PHP_EOL;
         $string .= '     <td style="white-space: nowrap" class="entity">' . $peer_ip . '<br />' . $peer_name . '</td>' . PHP_EOL;
-        $string .= '     <td><strong>' . $peer_as . '</strong><br />' . $peer['astext'] . '</td>' . PHP_EOL;
+        $string .= '     <td><a href="'.generate_url(['page' => 'routing' , 'proto' => 'bgp', 'peer_as' => $peer['human_remote_as'], 'view' => 'graphs', 'graph' => 'updates']).'">
+                           <span class="label label-' . $peer['peer_type_class'] . '">' . $peer_as . '</span>
+                           </a>
+                           <br /><small>' . $peer['astext'] . '</small></td>' . PHP_EOL;
         $string .= '     <td><span class="label label-' . $peer['peer_type_class'] . '">' . $peer['peer_type'] . '</span></td>' . PHP_EOL;
         $string .= '     <td>' . implode('<br />', $peer_afis_html) . '</td>' . PHP_EOL;
         $string .= '     <td><strong><span class=" label label-' . $peer['admin_class'] . '">' . $peer['bgpPeerAdminStatus'] . '</span><br /><span class="label label-' . $peer['state_class'] . '">' . $peer['bgpPeerState'] . '</span></strong></td>' . PHP_EOL;
@@ -293,30 +300,30 @@ function get_bgp_array($vars)
                 case "group":
                 case "group_id":
                     $values  = get_group_entities($value);
-                    $where[] = generate_query_values_ng($values, 'bgpPeer_id');
+                    $where[] = generate_query_values($values, 'bgpPeer_id');
                     break;
 
                 case 'device':
                 case 'device_id':
-                    $where[]       = generate_query_values_ng($value, 'device_id');
+                    $where[]       = generate_query_values($value, 'device_id');
                     $single_device = $vars['page'] === 'device' && device_permitted($value);
                     break;
 
                 case 'peer':
                 case 'peer_id':
-                    $where[] = generate_query_values_ng($value, 'peer_device_id');
+                    $where[] = generate_query_values($value, 'peer_device_id');
                     break;
 
                 case 'local_ip':
-                    $where[] = generate_query_values_ng(ip_uncompress($value), 'bgpPeerLocalAddr');
+                    $where[] = generate_query_values(ip_uncompress($value), 'bgpPeerLocalAddr');
                     break;
 
                 case 'peer_ip':
-                    $where[] = generate_query_values_ng(ip_uncompress($value), 'bgpPeerRemoteAddr');
+                    $where[] = generate_query_values(ip_uncompress($value), 'bgpPeerRemoteAddr');
                     break;
 
                 case 'local_as':
-                    $where[] = generate_query_values_ng(bgp_asdot_to_asplain($value), 'local_as');
+                    $where[] = generate_query_values(bgp_asdot_to_asplain($value), 'local_as');
                     break;
 
                 case 'peer_as':
@@ -324,30 +331,30 @@ function get_bgp_array($vars)
                         //r($matches);
                         $value = $matches['as'];
                     }
-                    $where[] = generate_query_values_ng(bgp_asdot_to_asplain($value), 'bgpPeerRemoteAs');
+                    $where[] = generate_query_values(bgp_asdot_to_asplain($value), 'bgpPeerRemoteAs');
                     break;
 
                 case 'type':
                     if ($value === 'external' || $value === 'ebgp') {
-                        $where[] = generate_query_values_ng($cache_bgp['external'], 'bgpPeer_id');
+                        $where[] = generate_query_values($cache_bgp['external'], 'bgpPeer_id');
                     } elseif ($value === 'internal' || $value === 'ibgp') {
-                        $where[] = generate_query_values_ng($cache_bgp['internal'], 'bgpPeer_id');
+                        $where[] = generate_query_values($cache_bgp['internal'], 'bgpPeer_id');
                     }
                     break;
 
                 case 'adminstatus':
                     if ($value === 'stop') {
-                        $where[] = generate_query_values_ng($cache_bgp['start'], 'bgpPeer_id', '!='); // NOT IN
+                        $where[] = generate_query_values($cache_bgp['start'], 'bgpPeer_id', '!='); // NOT IN
                     } elseif ($value === 'start') {
-                        $where[] = generate_query_values_ng($cache_bgp['start'], 'bgpPeer_id');
+                        $where[] = generate_query_values($cache_bgp['start'], 'bgpPeer_id');
                     }
                     break;
 
                 case 'state':
                     if ($value === 'down') {
-                        $where[] = generate_query_values_ng($cache_bgp['up'], 'bgpPeer_id', '!='); // NOT IN
+                        $where[] = generate_query_values($cache_bgp['up'], 'bgpPeer_id', '!='); // NOT IN
                     } elseif ($value === 'up') {
-                        $where[] = generate_query_values_ng($cache_bgp['up'], 'bgpPeer_id');
+                        $where[] = generate_query_values($cache_bgp['up'], 'bgpPeer_id');
                     }
                     break;
             }

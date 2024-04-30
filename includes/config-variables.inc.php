@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage definitions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -720,14 +720,6 @@ $config_variable[$setting]['useredit']   = TRUE;
 $config_variable[$setting]['type']       = 'enum|10|20|50|100|500|1000|10000|50000';
 $config_variable[$setting]['shortdesc']  = 'The default number of items per page used by the web UI when paginating large tables. Default is 100.';
 
-$setting                                 = "web_porttype_legend_limit";
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Port-type page legend port limit';
-$config_variable[$setting]['useredit']   = TRUE;
-$config_variable[$setting]['type']       = 'enum|1|5|10|15|20|100';
-$config_variable[$setting]['shortdesc']  = 'The number of ports permitted to be displayed on the legend of the graph at the top of the port type (transit, peering, etc) page before the legend is disabled.';
-
 $setting                                 = 'web_iframe';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
@@ -750,6 +742,14 @@ $config_variable[$setting]['name']       = 'Mouseover popups on Mobile phones/ta
 $config_variable[$setting]['useredit']   = TRUE;
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Allow display of mouseover popups on Mobile devices.';
+
+$setting                                 = 'web_show_notifications';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Notifications';
+$config_variable[$setting]['useredit']   = TRUE;
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Show or not notifications on top of Web UI. I.e. old version or remote poller down.';
 
 $setting                                            = 'web_device_name';
 $config_variable[$setting]['section']               = $section;
@@ -1016,6 +1016,22 @@ $config_variable[$setting]['name']       = 'Always draw "Max" area on graphs';
 $config_variable[$setting]['useredit']   = TRUE;
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Always draw the Max RRA on graphs. By default this is suppressed for graphs of one week or shorter.';
+
+$setting                                 = "web_porttype_legend_limit";
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Port-type page legend port limit';
+$config_variable[$setting]['useredit']   = TRUE;
+$config_variable[$setting]['type']       = 'enum|1|5|10|15|20|100';
+$config_variable[$setting]['shortdesc']  = 'The number of ports permitted to be displayed on the legend of the graph at the top of the port type (transit, peering, etc) page before the legend is disabled.';
+
+$setting                                 = "web_group_legend_limit";
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Group aggregate graph legend entity limit';
+$config_variable[$setting]['useredit']   = TRUE;
+$config_variable[$setting]['type']       = 'enum|1|5|10|15|20|100';
+$config_variable[$setting]['shortdesc']  = 'The number of entities permitted to be displayed on the legend of a group aggregate graph before the legend is disabled.';
 
 /// Entities
 
@@ -1393,6 +1409,69 @@ $config_variable[$setting]['name']       = 'Recursive group lookup maximum depth
 $config_variable[$setting]['type']       = 'int';
 $config_variable[$setting]['shortdesc']  = 'Maximum depth of group membership lookups.';
 
+$setting                                 = 'auth_ad_server';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Server list';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['shortdesc']  = 'List of AD servers to authenticate against, in order. Note this is meant as redundancy, and not as a way to specify multiple AD realms. Failover to the next server will happen when it is unreachable, not when authentication fails. Leaving this empty will retrieve the server list from DNS.';
+
+$setting                                 = 'auth_ad_tls';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Use TLS';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Use immediate TLS for AD security (usually when using port 636).';
+
+$setting                                 = 'auth_ad_starttls';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Use STARTTLS';
+$config_variable[$setting]['type']       = 'enum|no|optional|require';
+$config_variable[$setting]['shortdesc']  = 'Use STARTTLS for AD security: No (Stay in plain text), Optional (Try but not require), Require (Abort connection when failing).';
+
+$setting                                 = 'auth_ad_validatecert';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Certificate validation';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Validate the certificate of the domain controller.';
+
+$setting                                 = 'auth_ad_port';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Server port';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the AD servers (usually 389 or 636).';
+
+$setting                                 = 'auth_ad_domain';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Domain name';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'FQDN form of the AD domain (e.g. contoso.com).';
+
+$setting                                 = 'auth_ad_basedn';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Base DN';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Base DN of your AD tree (e.g. DC=contoso,DC=com). Optional if auth_ad_domain is set.';
+
+$setting                                 = 'auth_ad_binddn';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Bind user';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'User for Observium to authenticate against AD, can be in short (e.g. observium@contoso.com) or DN (e.g CN=observium,CN=users,DC=contoso,DC=com) form.';
+
+$setting                                 = 'auth_ad_bindpw';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Active Directory';
+$config_variable[$setting]['name']       = 'Bind password';
+$config_variable[$setting]['type']       = 'password';
+$config_variable[$setting]['shortdesc']  = 'Password for the bind user to authenticate against AD.';
+
 $setting                                 = 'auth_radius_server';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RADIUS';
@@ -1764,6 +1843,7 @@ $config_variable[$setting]['set_attrib']       = 'syslog_config_changed';
 $setting                                 = 'syslog|fifo';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['locked']     = TRUE; // Do not allow this option to be edited to prevent users set it from the web.
 $config_variable[$setting]['name']       = 'FIFO file';
 $config_variable[$setting]['type']       = 'string';
 $config_variable[$setting]['shortdesc']  = 'Set this to a FIFO to take input from FIFO. Default: php://stdin';
@@ -1807,14 +1887,12 @@ $config_sections['integration']['text'] = 'Integration';
 
 $section = 'integration';
 
-/*
-$setting = 'weathermap_enable';
+$setting                                 = 'weathermap|enable';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Weathermap';
 $config_variable[$setting]['name']       = 'Enable Built-in PHP Weathermap';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enables the built-in php weathermap feature';
-*/
+$config_variable[$setting]['shortdesc']  = 'Enables the built-in PHP Weathermap functionality. Note that the PHP Weathermap code is very, very old and may introduce bugs or security issues.';
 
 $setting                                 = 'rancid_configs';
 $config_variable[$setting]['section']    = $section;
@@ -1848,7 +1926,7 @@ $config_variable[$setting]['params']['3.10'] = [ 'name' => '3.10+' ];
 $config_variable[$setting]['params']['3.11'] = [ 'name' => '3.11+' ];
 $config_variable[$setting]['params']['3.12'] = [ 'name' => '3.12+' ];
 $config_variable[$setting]['params']['3.13'] = [ 'name' => '3.13+' ];
-$config_variable[$setting]['shortdesc']      = 'Depending on the RANCID version, a different delimiter is used in the RANCID configuration files (: vs ;).';
+$config_variable[$setting]['shortdesc']      = 'Depending on the RANCID version, a different delimiter is used in the RANCID configuration files ":" for 2.x and ";" for 3.x.';
 
 $setting                                 = 'rancid_revisions';
 $config_variable[$setting]['section']    = $section;

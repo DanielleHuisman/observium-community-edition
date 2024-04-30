@@ -4,7 +4,7 @@
 //define('OBS_QUIET', TRUE); // Disable any additional output from tests
 ini_set('opcache.enable', 0);
 
-include(dirname(__FILE__) . '/../includes/observium.inc.php');
+include(__DIR__ . '/../includes/observium.inc.php');
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');
@@ -25,8 +25,8 @@ include(dirname(__FILE__) . '/../includes/observium.inc.php');
  */
 
 // SNMPsim tests
-$snmpsimd_ip   = isset($config['tests']['snmpsim_ip']) ? $config['tests']['snmpsim_ip'] : '127.0.0.1';
-$snmpsimd_port = isset($config['tests']['snmpsim_port']) ? $config['tests']['snmpsim_port'] : 16111;
+$snmpsimd_ip   = $config['tests']['snmpsim_ip'] ?? '127.0.0.1';
+$snmpsimd_port = $config['tests']['snmpsim_port'] ?? 16111;
 $snmpsimd_data = $config['tests']['snmpsim_dir'] . '/full';
 if (is_dir($snmpsimd_data))
 {

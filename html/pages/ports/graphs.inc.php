@@ -4,44 +4,35 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
-echo '<div class="row">';
-
+// Pagination
+//echo(pagination($vars, $ports_count));
 
 // Populate ports array (much faster for large systems)
-$port_ids = [];
-foreach ($ports as $p) {
-    $port_ids[] = $p['port_id'];
-}
-$where = ' WHERE `ports`.`port_id` IN (' . implode(',', $port_ids) . ') ';
-
 //r($port_ids);
+$where = generate_where_clause(generate_query_values($ports_ids, 'ports.port_id'));
 
 $select = "`ports`.*, `ports`.`port_id` AS `port_id`";
-#$select = "*,`ports`.`port_id` as `port_id`";
 
 include($config['html_dir'] . "/includes/port-sort-select.inc.php");
 
 $sql = "SELECT " . $select;
 $sql .= " FROM `ports`";
 $sql .= " INNER JOIN `devices` USING (`device_id`)";
-$sql .= " " . $where;
+$sql .= " " . $where . generate_port_sort($vars); // . generate_query_limit($vars);
 
 unset($ports);
 
-$ports = dbFetchRows($sql);
-
-// Re-sort because the DB doesn't do that.
-include($config['html_dir'] . "/includes/port-sort.inc.php");
-
 // End populating ports array
 
-foreach ($ports as $port) {
+echo '<div class="row">';
+
+foreach (dbFetchRows($sql) as $port) {
 
     $speed = humanspeed($port['ifSpeed']);
     $type  = rewrite_iftype($port['ifType']);
@@ -96,8 +87,8 @@ foreach ($ports as $port) {
         $graph_array['from'] = $vars['from'];
         $graph_array['to']   = $vars['to'];
     } else {
-        $graph_array['from'] = $config['time']['day'];
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['from'] = get_time('day');
+        $graph_array['to']   = get_time();
     }
 
     $graph_array['height'] = 100;
@@ -111,7 +102,7 @@ foreach ($ports as $port) {
     unset($link_array['height'], $link_array['width'], $link_array['legend']);
     $link                  = generate_url($link_array);
     $overlib_content       = generate_overlib_content($graph_array, $port['hostname'] . ' - ' . $port['port_label']);
-    $graph_array['title']  = "yes";
+    //$graph_array['title']  = "yes";
     $graph_array['width']  = $width;
     $graph_array['height'] = $height;
     $graph                 = generate_graph_tag($graph_array);

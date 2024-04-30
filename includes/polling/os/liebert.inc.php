@@ -1,20 +1,19 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 $lgpAgentDeviceId = snmp_get_oid($device, 'lgpAgentDeviceId.1', 'LIEBERT-GP-AGENT-MIB');
-[, $lgpAgentDeviceId] = explode('::', $lgpAgentDeviceId); // LIEBERT-GP-REGISTRATION-MIB::lgpNX
 
 if (snmp_status()) {
+    $lgpAgentDeviceId = explode('::', $lgpAgentDeviceId)[1]; // LIEBERT-GP-REGISTRATION-MIB::lgpNX
     $hardware = rewrite_liebert_hardware($lgpAgentDeviceId);
 
     //var_dump($GLOBALS['rewrite_liebert_hardware'][$lgpAgentDeviceId]);

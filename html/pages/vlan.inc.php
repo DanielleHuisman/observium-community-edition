@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -198,7 +198,7 @@ if (!isset($vars['vlan_id'])) {
 
         case "devices":
         default:
-            $devices = dbFetchRows("SELECT * FROM `vlans` LEFT JOIN `devices` ON vlans.device_id = devices.device_id WHERE `vlan_vlan` = ? ORDER BY devices.hostname", [$vars['vlan_id']]);
+            $devices = dbFetchRows("SELECT * FROM `vlans` LEFT JOIN `devices` USING (`device_id`) WHERE `vlan_vlan` = ? ORDER BY `hostname`", [ $vars['vlan_id'] ]);
 
             echo generate_box_open();
             echo '<table class="table table-striped table-hover">';
@@ -211,13 +211,11 @@ if (!isset($vars['vlan_id'])) {
             echo '<th>Uptime</th>';
             echo '</tr>';
 
-
             foreach ($devices as $device) {
                 //$device = device_by_id_cache($device_id);
-                print_device_row($device, [], ['tab' => 'vlans']);
+                print_device_row($device, [], [ 'tab' => 'vlans' ]);
 
             }
-
 
             echo '</table>';
 

@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     cache
+ * @package    observium
+ * @subpackage cache
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -24,6 +24,15 @@
  */
 
 /**
+ * @param string $key
+ * @return string
+ */
+function safe_cache_key($key) {
+    // https://github.com/PHPSocialNetwork/phpfastcache/wiki/%5BV6%CB%96%5D-Unsupported-characters-in-key-identifiers
+    return str_replace([ '{', '}', '(', ')', '/', '\\', '@', ':' ], '_', $key);
+}
+
+/**
  * Prepend cache key with username/level
  *
  * @param string  $key    Identificator name
@@ -33,8 +42,7 @@
  */
 function get_cache_key($key, $global = FALSE)
 {
-    // https://github.com/PHPSocialNetwork/phpfastcache/wiki/%5BV6%CB%96%5D-Unsupported-characters-in-key-identifiers
-    $key = str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $key);
+    $key = safe_cache_key($key);
 
     if ($global || is_cli()) {
         return $key;
@@ -46,8 +54,8 @@ function get_cache_key($key, $global = FALSE)
             $key = '__admin|' . $key;
         } else {
             // All other users use unique keys!
-            $user_key = str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $_SESSION['username']);
-            $key      = $_SESSION['auth_mechanism'] . '|' . $user_key . '|' . $_SESSION['userlevel'] . '|' . $key;
+            $key      = $_SESSION['auth_mechanism'] . '|' . safe_cache_key($_SESSION['username']) . '|' .
+                        $_SESSION['userlevel'] . '|' . $key;
         }
     } else {
         // Just "protect" anonymous requests from read/write to global cache
@@ -125,7 +133,7 @@ function get_cache_data($item)
 
     $start      = microtime(TRUE);
     $data       = $item->get();
-    $cache_time = microtime(TRUE) - $start;
+    $cache_time = elapsed_time($start);
 
     if (OBS_DEBUG || OBS_CACHE_DEBUG) {
         print_warning('<span class="text-success">READ FROM CACHE</span> // TTL: ' . $item->getTtl() . 's // Expiration: <strong>' .
@@ -167,7 +175,7 @@ function set_cache_item($item, $data, $params = [])
             if ($_SESSION['userlevel'] >= 10) {
                 $tags[] = '__admin';
             } else {
-                $tags[] = '__username=' . str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $_SESSION['username']);
+                $tags[] = '__username=' . safe_cache_key($_SESSION['username']);
             }
         } else {
             $tags[] = '__anonymous';
@@ -176,7 +184,7 @@ function set_cache_item($item, $data, $params = [])
 
     if (isset($params['tags'])) {
         foreach ((array)$params['tags'] as $tag) {
-            $tags[] = str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $tag);
+            $tags[] = safe_cache_key($tag);
         }
     }
 
@@ -203,7 +211,7 @@ function set_cache_item($item, $data, $params = [])
     } catch (\Phpfastcache\Exceptions\PhpfastcacheInvalidArgumentException $e) {
         $observium_cache -> clear();
     }
-    $cache_time = microtime(TRUE) - $start;
+    $cache_time = elapsed_time($start);
 
     if (OBS_DEBUG || OBS_CACHE_DEBUG) {
         //print_vars($save);

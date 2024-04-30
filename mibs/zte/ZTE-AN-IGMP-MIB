@@ -1,0 +1,1911 @@
+--------------------------------------------------------------------------------
+-- File Name : ZTE-AN-IGMP-MIB.mib
+-- Date      : 2006-09-05
+-- Author    : ZTE Nms dept.
+
+--
+-- Zte IGMP Mib for Access Node
+--
+--
+--------------------------------------------------------------------------------
+
+
+ZTE-AN-IGMP-MIB DEFINITIONS ::= BEGIN
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,NOTIFICATION-TYPE,
+        Integer32,IpAddress,Gauge32,Counter32
+                                                       FROM SNMPv2-SMI
+        DisplayString,TruthValue,RowStatus             FROM SNMPv2-TC   
+        InetAddress,InetAddressType                    FROM INET-ADDRESS-MIB
+        ZxAnIfindex,ZxAnPortList,ZxAnIdList,zxAn       FROM ZTE-AN-TC-MIB;
+
+
+zxAnIgmpMib MODULE-IDENTITY
+    LAST-UPDATED    "200609051500Z"
+    ORGANIZATION "ZTE Corporation"
+    CONTACT-INFO "ZTE NMS dept.
+                  Su Chunshan   68896292,
+                  Zeng Nanxi    68896250,
+                  Ma Jian       68896249       "
+    DESCRIPTION  "This MIB defines Description of zte igmp service managed 
+                  objects. "
+    ::= {zxAn 31}
+
+
+zxAnIgmpObjects        OBJECT IDENTIFIER ::= {zxAnIgmpMib 1}
+zxAnIgmpTrapObjects    OBJECT IDENTIFIER ::= {zxAnIgmpMib 2}
+
+zxAnIgmp               OBJECT IDENTIFIER ::= {zxAnIgmpObjects 1}
+zxAnIgmpGlobal         OBJECT IDENTIFIER ::= {zxAnIgmp 1}
+zxAnIgmpPMGlobal       OBJECT IDENTIFIER ::= {zxAnIgmp 30}
+zxAnIgmpVplsMulticastObjects  OBJECT IDENTIFIER ::= {zxAnIgmp 50}
+zxAnMulticastStatsObjects     OBJECT IDENTIFIER ::= {zxAnIgmp 51}
+
+
+--------------------------------------------------------------------------------
+-- Following objects are defined.
+-- 1.zxAnIgmp global mgmt objects
+-- 2.zxAnIgmpPortTable
+-- 3.zxAnIgmpMvlanTable
+-- 4.zxAnIgmpMvlanPortListTable
+-- 5.zxAnIgmpGroupTable
+-- 6.zxAnIgmpGroupPortListTable
+-- 7.zxAnIgmpParamListCmdTable
+-- 8.zxAnIgmpCounterTable
+-- 9.zxAnMVlanTranslateTable(F820)
+-- 10.zxAnIgmpPortActiveGroupTable
+-- 11.zxAnIgmpPMGlobal
+-- 12.zxAnIgmpIfMulticastStatsTable
+-- 13.zxAnIgmpMgmtMVlanRecvIfTable
+-- 14.zxAnIgmpMgmtGroupUserTable
+-- 15.zxAnIgmpMgmtStaticGroupUserTable
+-- 16.zxAnIgmpVplsMulticastObjects
+-- 17.zxAnMulticastStatsObjects
+-- 18.zxAnIgmp Trap
+--------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+--  zxAnIgmp global mgmt objects
+------------------------------------------------------------------------------
+    zxAnIgmpEnable   OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                enable(1),
+        disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "The administrative status of global igmp service."
+        DEFVAL { enable }
+        ::= { zxAnIgmpGlobal 1 }
+
+
+    zxAnIgmpSnoopingAgingTime  OBJECT-TYPE
+        SYNTAX          Integer32 (30..3600)
+        UNITS           "seconds"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "The timeout period in seconds for aging out Multicast Groups
+             dynamically learned with IGMP.  Note that aging operates
+             on a per interface per VLAN per multicast group basis.
+             The value is 0  means that no igmp aging."
+        DEFVAL { 300 }
+        ::= { zxAnIgmpGlobal 2 }
+
+
+    zxAnIgmpWorkingMode  OBJECT-TYPE
+        SYNTAX          INTEGER
+                        {
+                            proxy(1),
+                            routing(2),
+                            snooping(3)
+                        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "IGMP working mode, igmp entity can work as a igmp proxy,igmp 
+             routing or igmp snooping. "
+        DEFVAL { proxy }
+        ::= { zxAnIgmpGlobal 3 }
+
+
+    zxAnIgmpSpanVlanEnable  OBJECT-TYPE
+        SYNTAX      INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            " enable(1): multicast forward data in all vlans.
+              disable(2): multicast play role in their vlans only "
+        DEFVAL { enable }
+        ::= { zxAnIgmpGlobal 4 }
+
+
+    zxAnIgmpDefaultMvlan OBJECT-TYPE
+        SYNTAX      Integer32(0..4095)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Default multicast vlan ID.
+            It is used to auto config (add or delete) multicast group to this
+            default Mvlan.That is if this varible is set then all the operation
+            ( add or delete) about a group will not need to operate mvlan 
+            manually again to add or delete group to (from) a mvlan.
+            The agent should add or delete a group to (from) the default mvlan
+            automatically.
+            0 means no default multicast vlan.
+            "
+        DEFVAL { 1 }
+        ::= { zxAnIgmpGlobal 5 }
+
+    zxAnIgmpAutoConfigGrpToDefaultMvlan OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Enable/disable auto add or delete grp to default mvlan.If it is
+             enable(1),zxAnIgmpDefaultMvlan must be set a non zero value at 
+             first."
+        DEFVAL { enable }
+        ::= { zxAnIgmpGlobal 6 }
+
+    zxAnIgmpFastQureyBasedIpPool  OBJECT-TYPE
+        SYNTAX      INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "unused,
+             enable(1): enable fast qurey funciton based on user's Ip log pool.
+             This function helps to speed up the query in case of multi users 
+             in same port.
+             disable(2): disable fast qurey funciton."
+        DEFVAL { disable }
+        ::= { zxAnIgmpGlobal 7 }
+
+
+    zxAnIgmpGeneralLeaveEnable  OBJECT-TYPE
+        SYNTAX      INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "unused, 
+             enable(1): enable handling general leave msg.
+             disable(2): disablehandling general leave msg. "
+        DEFVAL { disable }
+        ::= { zxAnIgmpGlobal 8 }
+
+
+    zxAnIgmpUserSideRoutingIp  OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The routing ip for user side when the device is looked as a igmp 
+             router."
+        ::= { zxAnIgmpGlobal 9 }
+
+    zxAnIgmpMVlanIgmpV1OperMode  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                    accept(1),
+                ignore(2),
+                drop(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The administrative status of IGMP v1 packet."
+        DEFVAL { accept }
+        ::= { zxAnIgmpGlobal 10 }
+
+    zxAnIgmpMVlanIgmpV2OperMode  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                accept(1),
+                ignore(2),
+                drop(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The administrative status of IGMP v2 packet."
+        DEFVAL { accept }
+        ::= { zxAnIgmpGlobal 11 }
+
+    zxAnIgmpMVlanIgmpV3OperMode  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                accept(1),
+                ignore(2),
+                drop(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The administrative status of IGMP v3 packet."
+        DEFVAL { accept }
+        ::= { zxAnIgmpGlobal 12 }
+
+    zxAnIgmpBandwidthCtrlEnable OBJECT-TYPE
+        SYNTAX          INTEGER{
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "Adminstrative status of bandwidth traffic control for multicast 
+             service.  "
+        DEFVAL { disable }
+         ::= { zxAnIgmpGlobal 13 }
+         
+    zxAnIgmpRobustnessVariable  OBJECT-TYPE
+        SYNTAX          Integer32 (2..5)
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy robustness variable."
+        DEFVAL { 2 }
+        ::= { zxAnIgmpGlobal 14 }
+
+    zxAnIgmpQryInterval  OBJECT-TYPE
+        SYNTAX          Integer32 (10..300)
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy general query interval."
+        DEFVAL { 125 }
+        ::= { zxAnIgmpGlobal 15 }
+
+    zxAnIgmpQryRespInterval  OBJECT-TYPE
+        SYNTAX          Integer32 (10..250)
+        UNITS           "0.1second"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy query max response time."
+        DEFVAL { 100 }
+        ::= { zxAnIgmpGlobal 16 }
+
+    zxAnIgmpLastMemberQryInterval  OBJECT-TYPE
+        SYNTAX          Integer32 (1..255)
+        UNITS           "0.1second"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy last member query interval."
+        DEFVAL { 10 }
+        ::= { zxAnIgmpGlobal 17 }  
+
+    zxAnIgmpLastMemberQryCount  OBJECT-TYPE
+        SYNTAX          Integer32 (2..5)
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy last member query count."
+        DEFVAL { 2 }
+        ::= { zxAnIgmpGlobal 18 }  
+
+    zxAnIgmpV1QuerierTimeout  OBJECT-TYPE
+        SYNTAX          Integer32 (60..3600)
+        UNITS           "0.1second"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy version 1 router present timeout."
+        DEFVAL { 400 }
+        ::= { zxAnIgmpGlobal 19 }  
+                                              
+    zxAnIgmpUnsolicitReportInterval  OBJECT-TYPE
+        SYNTAX          Integer32 (1..300)
+        UNITS           "seconds"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP proxy unsolicited report interval."
+        DEFVAL { 10 }
+        ::= { zxAnIgmpGlobal 20 }
+        
+    zxAnIgmpNetworkSideHostIp  OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "The host ip when working on proxy mode."        
+        ::= { zxAnIgmpGlobal 21 }                   
+        
+    zxAnIgmpForwCvlanOnOff   OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+            enable(1),
+            disable(2)
+        }
+    MAX-ACCESS      read-write
+    STATUS current
+    DESCRIPTION
+        "IGMP cvlan status."
+    DEFVAL { disable }
+    ::= { zxAnIgmpGlobal 22 }
+        
+    zxAnIgmpHostTrackEnable   OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+        enable(1),
+        disable(2)
+    }
+    MAX-ACCESS      read-write
+    STATUS current
+    DESCRIPTION
+        "IGMP host tracking status."
+    DEFVAL { disable }
+    ::= { zxAnIgmpGlobal 23 }
+
+    zxAnIgmpNonMatchGroup   OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+        forward(1),
+        drop(2)
+    }
+    MAX-ACCESS      read-write
+    STATUS current
+    DESCRIPTION
+        "IGMP non match group status."
+    DEFVAL { drop }
+    ::= { zxAnIgmpGlobal 24 }
+        
+    zxAnIgmpStartUpQryInterval    OBJECT-TYPE
+        SYNTAX          Integer32 (1..30)
+        UNITS           "seconds"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "unused,
+             IGMP proxy strartup query interval."
+        DEFVAL { 10 }
+        ::= { zxAnIgmpGlobal 25 }
+        
+    zxAnIgmpStartUpQryCount    OBJECT-TYPE
+        SYNTAX          Integer32 (0..10)
+        UNITS           "seconds"
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "unused,
+             IGMP proxy startup query count."
+        DEFVAL { 0 }
+        ::= { zxAnIgmpGlobal 26 }
+                
+    zxAnIgmpRouterAlert  OBJECT-TYPE 
+        SYNTAX          INTEGER
+            {
+                enable(1),
+            disable(2)
+            }
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "The igmp router alter ."
+        DEFVAL { disable }
+        ::= { zxAnIgmpGlobal 27 }
+                
+    zxAnIgmpGeneralLeaveGrpIp  OBJECT-TYPE 
+        SYNTAX IpAddress
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "The IP of general leave group addr."
+        ::= { zxAnIgmpGlobal 28 }        
+                     
+    zxAnIgmpLogEnable   OBJECT-TYPE
+        SYNTAX          INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "IGMP log status."
+        DEFVAL { disable }
+        ::= { zxAnIgmpGlobal 29 } 
+        
+    zxAnIgmpGroupThreshold   OBJECT-TYPE
+        SYNTAX          Integer32 (0..10000)
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "Max group threshold"
+        DEFVAL { 10000 }
+        ::= { zxAnIgmpGlobal 30 }
+        
+    zxAnIgmpMVlanIgmpSsmCtrlModel   OBJECT-TYPE
+        SYNTAX          INTEGER
+        {
+            asm(1),
+            ssm(2),
+            asmAndSsm(3)
+        }
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "This object indicates the IP multicast service model,
+            its values are as follow:
+            asm(1) --- ASM(Any-Source Multicast),defined in RFC 1112;
+            ssm(2) --- SSM(Source-Specific Multicast),defined in RFC 3569;
+            asmAndSsm(3) --- asm(1) + ssm(2)."
+        DEFVAL { asm }
+        ::= { zxAnIgmpGlobal 31 }
+        
+    zxAnIgmpCapabilities  OBJECT-TYPE
+        SYNTAX      BITS    {
+            supportIgmpPacketCos(0),
+            supportIgmpSignalingVid(1),
+            supportIgmpMaxBandwidth(2),
+            supportIgmpMVlanRecvIfTable(3)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The IGMP capabilities of this equipment. 
+             0  supportIgmpPacketCos  Support 
+                zxAnIgmpPortQueryPacketCos and zxAnMvlanReportAndLeavePacketCos.
+             1  supportIgmpSignalingVid support zxAnIgmpMVlanIgmpMessageVid.
+             2  supportIgmpMaxBandwidth support zxAnIgmpMVlanMaxBandwidth.
+             3  support zxAnIgmpMgmtMVlanRecvIfTable,zxAnIgmpMgmtGroupUserTable,
+                zxAnIgmpMgmtStaticGroupUserTable.
+             NOTE: No recommended to display it in NMS.             
+            "
+        ::= { zxAnIgmpGlobal 32 }                             
+                                 
+------------------------------------------------------------------------------
+--    Table of Igmp port
+------------------------------------------------------------------------------
+    zxAnIgmpPortTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpPortEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "A table that contains all IGMP informations of a logical port."
+        ::= { zxAnIgmp 21 }
+
+    zxAnIgmpPortEntry  OBJECT-TYPE
+        SYNTAX     ZxAnIgmpPortEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "A list of  entries of all IGMP interface (logical port)
+            information."
+        INDEX  { zxAnIgmpIfIndex }
+        ::= { zxAnIgmpPortTable 1 }
+
+    ZxAnIgmpPortEntry ::= SEQUENCE {
+        zxAnIgmpIfIndex                  ZxAnIfindex,
+        zxAnIgmpIfAdminStatus            INTEGER,
+        zxAnIgmpIfProtoVersion           INTEGER,
+        zxAnIgmpIfFastLeaveEnable        TruthValue,
+        zxAnIgmpPortUsage                INTEGER,
+        zxAnIgmpDataPort                 ZxAnIfindex,
+        zxAnIgmpIfProxyIpAddr            IpAddress,
+        zxAnIgmpPortPacketLimit          Integer32,
+        zxAnIgmpPortMaxBandwidth         Integer32,
+        zxAnIgmpIfMaxConcurrentGroups    Integer32,
+        zxAnIgmpIfCurrActGroups          Gauge32,
+        zxAnIgmpIfQryInterval            Integer32,
+        zxAnIgmpIfLastMemberQryInterval  Integer32,
+        zxAnIgmpIfQryResponseInterval    Integer32,
+        zxAnIgmpPortEtherPriority        Integer32,
+        zxAnIgmpIfRobustnessVariable     Integer32,
+        zxAnIgmpMvlanAutoTranslateEnable INTEGER,
+        zxAnIgmpPortQueryPacketCos       Integer32
+        }
+
+    zxAnIgmpIfIndex            OBJECT-TYPE
+        SYNTAX         ZxAnIfindex
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION
+            "The logical port No,ie. layer 2 bridge port."
+        ::= { zxAnIgmpPortEntry 1}
+
+    zxAnIgmpIfAdminStatus  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                enable(1),
+                disable(2),
+                drop(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The administrative status of port's igmp service."
+        DEFVAL { enable }
+        ::= { zxAnIgmpPortEntry 2 }
+
+     zxAnIgmpIfProtoVersion  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                igmpv1(1),
+                igmpv2(2),
+                igmpv3(3)
+            }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The version of IGMP protocol which is running on this port."
+        DEFVAL { igmpv2 }
+        ::= { zxAnIgmpPortEntry 3 }
+
+    zxAnIgmpIfFastLeaveEnable  OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The status of fast-leave property,
+            true:enable fast leave;    false: disable fast leave."
+        DEFVAL { true }
+        ::= { zxAnIgmpPortEntry 4 }
+
+    zxAnIgmpPortUsage OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            all(1),
+            igmp(2),
+            data(3)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "unused.
+             The usage of the igmp port,igmp signalling only,data only or
+             both signalling and data."
+        DEFVAL { all }
+        ::= { zxAnIgmpPortEntry 5 }
+
+    zxAnIgmpDataPort  OBJECT-TYPE
+        SYNTAX         ZxAnIfindex
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "unused.
+             If the logical port indicated by zxAnIgmpIfIndex is used as igmp 
+             signaling transporting,ie. zxAnIgmpPortUsage is data(2),
+             zxAnIgmpDataPort must be configured to indicate which port will 
+             recieve the igmp data.
+             If the zxAnIgmpPortUsage is All(1), zxAnIgmpDataPort is same as
+             the zxAnIgmpIfIndex."
+        ::= { zxAnIgmpPortEntry 6}
+
+    zxAnIgmpIfProxyIpAddr  OBJECT-TYPE
+        SYNTAX         IpAddress
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "zxAnIgmpIfProxyIpAddr is the ip of igmp proxy when 
+             zxAnIgmpWorkingMode is igmp_proxy(1)."
+        ::= { zxAnIgmpPortEntry 7}
+
+    zxAnIgmpPortPacketLimit  OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "The maxium IGMP packet num can be processed in 1 second on this 
+             port,exceeding packets will be discarded."
+        ::= { zxAnIgmpPortEntry 8}
+
+    zxAnIgmpPortMaxBandwidth     OBJECT-TYPE
+        SYNTAX         Integer32
+        UNITS           "kbps"
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "The maximum permitted traffic in this logical port."
+         DEFVAL { 2048 }
+         ::= { zxAnIgmpPortEntry 9}
+
+    zxAnIgmpIfMaxConcurrentGroups OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The max multicast groups supported by this port concurrently."
+        DEFVAL { 1 }
+        ::= { zxAnIgmpPortEntry 10 }
+
+    zxAnIgmpIfCurrActGroups OBJECT-TYPE
+        SYNTAX Gauge32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The active multicast groups on this port currentlly."
+         ::= { zxAnIgmpPortEntry 11 }
+
+    zxAnIgmpIfQryInterval  OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            ""
+        DEFVAL { 125 }
+        ::= { zxAnIgmpPortEntry 12}
+
+    zxAnIgmpIfLastMemberQryInterval  OBJECT-TYPE
+        SYNTAX         Integer32 (0..255)
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            ""
+         DEFVAL { 10 }
+        ::= { zxAnIgmpPortEntry 13 }
+
+    zxAnIgmpIfQryResponseInterval  OBJECT-TYPE
+        SYNTAX         Integer32 (0..255)
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            ""
+         DEFVAL { 100 }
+        ::= { zxAnIgmpPortEntry 14}
+
+    zxAnIgmpPortEtherPriority  OBJECT-TYPE
+        SYNTAX         Integer32 (0..7)
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "Ether priority assigned to the upstream IGMP packet on the port. "
+        ::= { zxAnIgmpPortEntry 15}
+        
+    zxAnIgmpIfRobustnessVariable OBJECT-TYPE
+        SYNTAX     Integer32 (1..255)
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "The Robustness Variable allows tuning for the expected
+            packet loss on a subnet.  If a subnet is expected to be
+            lossy, the Robustness Variable may be increased.  IGMP is
+            robust to (Robustness Variable-1) packet losses."
+        DEFVAL     { 2 }
+    ::= { zxAnIgmpPortEntry 16 }        
+
+    zxAnIgmpMvlanAutoTranslateEnable OBJECT-TYPE
+        SYNTAX     INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Enable or disable the auto translating between mvlan and cvlan."
+        DEFVAL     { disable }
+    ::= { zxAnIgmpPortEntry 17 }      
+    
+    zxAnIgmpPortQueryPacketCos OBJECT-TYPE
+        SYNTAX     Integer32 (0..7)
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION "The CoS value assigned to an IGMP query packet."
+        DEFVAL     { 0 }
+        ::= { zxAnIgmpPortEntry 18 }
+   
+------------------------------------------------------------------------------
+--    Table of Mvlan
+------------------------------------------------------------------------------
+    zxAnIgmpMvlanTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnIgmpMvlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table that contains Multicast VLAN informations."
+    ::= { zxAnIgmp 22 }
+
+    zxAnIgmpMvlanEntry OBJECT-TYPE
+        SYNTAX      ZxAnIgmpMvlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of  entries of all Multicast VLAN information."
+        INDEX { zxAnIgmpMVid  }
+        ::= { zxAnIgmpMvlanTable 1 }
+
+    ZxAnIgmpMvlanEntry ::= SEQUENCE {
+        zxAnIgmpMVid                      Integer32,
+        zxAnIgmpMVlanIgmpAdminStatus      INTEGER,
+        zxAnIgmpMVlanIgmpWorkMode         INTEGER,
+        zxAnIgmpMVlanHostIpAddr           IpAddress,
+        zxAnIgmpMVlanGroupPreConfEnable   TruthValue,
+        zxAnIgmpMVlanMaxConcurrentGroups  Integer32,
+        zxAnIgmpMVlanCurrActGroups        Gauge32,
+        zxAnIgmpMVlanIgmpPacketPriority   Integer32,
+        zxAnIgmpMVlanHostVersion          INTEGER,         
+        zxAnMvlanActHosts                 Gauge32, 
+        zxAnIgmpMVlanCVid                 INTEGER,
+        zxAnMvlanReportAndLeavePacketCos  Integer32,
+        zxAnIgmpMVlanIgmpMessageVid       Integer32,
+        zxAnIgmpMVlanMaxBandwidth         Integer32,
+        zxAnIgmpMgmtMVlanRowStatus        RowStatus
+    }
+
+    zxAnIgmpMVid OBJECT-TYPE
+        SYNTAX      Integer32(1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Multicast vlan ID."
+        ::= { zxAnIgmpMvlanEntry 1 }
+
+     zxAnIgmpMVlanIgmpAdminStatus  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                enable(1),
+                disable(2),
+                drop(3)
+            }
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "The administrative status of IGMP packet on this MVLAN."
+        DEFVAL { enable }
+        ::= { zxAnIgmpMvlanEntry 2 }
+
+     zxAnIgmpMVlanIgmpWorkMode  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                snooping(1),
+                router(2),
+                proxy(3)
+            }
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "The IGMP woke mode of this MVLAN."
+        DEFVAL { proxy }
+        ::= { zxAnIgmpMvlanEntry 3 }
+
+     zxAnIgmpMVlanHostIpAddr  OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "The host ip of this MVLAN when working on proxy mode."
+        ::= { zxAnIgmpMvlanEntry 4 }
+
+    zxAnIgmpMVlanGroupPreConfEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "."
+        ::= { zxAnIgmpMvlanEntry 5 }
+
+    zxAnIgmpMVlanMaxConcurrentGroups OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Max groups in mvlan,the value lies on the device's ability.
+             Dsl8000 is 255, dsl9000 is 512,9800 is 1024.
+            "
+        DEFVAL { 512 }
+        ::= { zxAnIgmpMvlanEntry 6 }
+
+    zxAnIgmpMVlanCurrActGroups OBJECT-TYPE
+        SYNTAX      Gauge32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Current active groups in mvlan"
+        ::= { zxAnIgmpMvlanEntry 7 }
+
+    zxAnIgmpMVlanIgmpPacketPriority OBJECT-TYPE
+        SYNTAX      Integer32(0..7)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "IGMP protocol packet's priority in proxy/router mode."
+        DEFVAL { 0 }
+        ::= { zxAnIgmpMvlanEntry 8 }
+             
+     zxAnIgmpMVlanHostVersion  OBJECT-TYPE
+        SYNTAX          INTEGER
+            {
+                auto(1),
+                igmpv2(2),
+                igmpv3(3)
+            }
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "Igmp version of host on proxy mode."
+        DEFVAL { igmpv2 }
+        ::= { zxAnIgmpMvlanEntry 9 }                   
+
+    zxAnMvlanActHosts OBJECT-TYPE
+        SYNTAX          Gauge32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Current User in this Multicast VLAN."
+         ::= { zxAnIgmpMvlanEntry 10 } 
+         
+    zxAnIgmpMVlanCVid  OBJECT-TYPE
+        SYNTAX          INTEGER(0..4095)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "CVLAN Id of this Multicast VLAN."
+        DEFVAL { 0 }
+        ::= { zxAnIgmpMvlanEntry 11 }
+        
+    zxAnMvlanReportAndLeavePacketCos  OBJECT-TYPE
+        SYNTAX          Integer32(0..7)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "The CoS value assigned to an IGMP report packet or leave packet."
+        DEFVAL { 0 }
+        ::= { zxAnIgmpMvlanEntry 12 }
+        
+    zxAnIgmpMVlanIgmpMessageVid  OBJECT-TYPE
+        SYNTAX          Integer32(1..4094)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "IGMP message VLAN ID."
+        ::= { zxAnIgmpMvlanEntry 13 }
+        
+    zxAnIgmpMVlanMaxBandwidth  OBJECT-TYPE
+        SYNTAX          Integer32(1..1048576000)
+        UNITS           "kpbs"
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "The maximum permitted traffic in this MVLAN."
+        DEFVAL  { 1048576000 }
+        ::= { zxAnIgmpMvlanEntry 14 }
+                  
+    zxAnIgmpMgmtMVlanRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "RowStatus"
+        ::= { zxAnIgmpMvlanEntry 20 }
+
+
+------------------------------------------------------------------------------
+--    Table of Mvlan Portlist in a card
+------------------------------------------------------------------------------
+    zxAnIgmpMvlanPortListTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnIgmpMvlanPortListEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table that contains information about ports in a mvlan."
+    ::= { zxAnIgmp 23 }
+
+    zxAnIgmpMvlanPortListEntry OBJECT-TYPE
+        SYNTAX      ZxAnIgmpMvlanPortListEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of  entries of information about ports in a mvlan."
+        INDEX { zxAnIgmpMVid,zxAnIgmpMVlanPortListShelf,
+                zxAnIgmpMVlanPortListSlot }
+        ::= { zxAnIgmpMvlanPortListTable 1 }
+
+    ZxAnIgmpMvlanPortListEntry ::= SEQUENCE {
+        zxAnIgmpMVlanPortListShelf          Integer32,
+        zxAnIgmpMVlanPortListSlot           Integer32,
+        zxAnIgmpMVlanSrcPortList            ZxAnPortList,
+        zxAnIgmpMVlanRecvPortList           ZxAnPortList
+    }
+
+
+    zxAnIgmpMVlanPortListShelf  OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "The shelf that contains the logical port list."
+        ::= { zxAnIgmpMvlanPortListEntry 1 }
+
+    zxAnIgmpMVlanPortListSlot   OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "The card that contains the logical port list."
+        ::= { zxAnIgmpMvlanPortListEntry 2 }
+
+    zxAnIgmpMVlanSrcPortList OBJECT-TYPE
+        SYNTAX      ZxAnPortList
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Source port in mvlan"
+        ::= { zxAnIgmpMvlanPortListEntry 3 }
+
+    zxAnIgmpMVlanRecvPortList OBJECT-TYPE
+        SYNTAX      ZxAnPortList
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Recieving port in mvlan"
+        ::= { zxAnIgmpMvlanPortListEntry 4 }
+
+
+------------------------------------------------------------------------------
+--    Table of Group in a Mvlan
+------------------------------------------------------------------------------
+    zxAnIgmpGroupTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table that contains multicast group."
+         ::= { zxAnIgmp 24 }
+
+    zxAnIgmpGroupEntry OBJECT-TYPE
+        SYNTAX ZxAnIgmpGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of entries of all multicast group info.
+             "
+        INDEX { zxAnIgmpMVid,zxAnIgmpSourceIpAddr,zxAnIgmpGroupIpAddr }
+         ::= { zxAnIgmpGroupTable 1 }
+
+    ZxAnIgmpGroupEntry  ::= SEQUENCE {
+        zxAnIgmpSourceIpAddr        IpAddress,
+        zxAnIgmpGroupIpAddr         IpAddress,
+        zxAnIgmpGroupBandwidthCost  Integer32,
+        zxAnIgmpGroupPrejoinEnable  TruthValue,
+        zxAnIgmpGroupMaxHosts       Integer32,
+        zxAnIgmpGroupCurrActHosts   Integer32,           
+        zxAnIgmpGroupV3SrcIp        IpAddress,
+        zxAnIgmpGroupHostState      INTEGER,        
+        zxAnIgmpMgmtGroupRowStatus  RowStatus
+    }
+
+
+    zxAnIgmpSourceIpAddr     OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Multicast source IpAddress in IGMPv3.If the device can't support 
+             IGMPv3,this object is 0.0.0.0 "
+         ::= { zxAnIgmpGroupEntry 1 }
+
+    zxAnIgmpGroupIpAddr     OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Multicast group IpAddress."
+         ::= { zxAnIgmpGroupEntry 2 }
+
+    zxAnIgmpGroupBandwidthCost OBJECT-TYPE
+        SYNTAX          Integer32
+        UNITS           "kbps"
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "Estimated Bandwidth cost by this group,it is used as a traffic
+            and bandwidth control parameter."
+         DEFVAL { 2048 }
+         ::= { zxAnIgmpGroupEntry 3 }
+
+    zxAnIgmpGroupPrejoinEnable OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "."
+         DEFVAL { false }
+         ::= { zxAnIgmpGroupEntry 4 }
+         
+    zxAnIgmpGroupMaxHosts OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "Max User in this Multicast Group."
+         ::= { zxAnIgmpGroupEntry 5 }
+
+    zxAnIgmpGroupCurrActHosts OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Current User in this Multicast Group."
+         ::= { zxAnIgmpGroupEntry 6 }
+         
+    zxAnIgmpGroupV3SrcIp OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "igmp v3 source ip."
+         ::= { zxAnIgmpGroupEntry 7 }
+         
+    zxAnIgmpGroupHostState OBJECT-TYPE
+        SYNTAX          INTEGER
+        {
+            nonMember(1),
+            idleMember(2),
+            delayingMember(3)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "host state in this Multicast Group."
+        ::= { zxAnIgmpGroupEntry 8 }
+         
+    zxAnIgmpMgmtGroupRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "RowStatus of this row."
+         ::= { zxAnIgmpGroupEntry 15 }
+
+
+------------------------------------------------------------------------------
+--    Table of Static and dynamic Portlist in a group
+------------------------------------------------------------------------------
+    zxAnIgmpGroupPortListTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpGroupPortListEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table that contains static and dynamic portlist in a mvlan 
+             group."
+         ::= { zxAnIgmp 25 }
+
+    zxAnIgmpGroupPortListEntry OBJECT-TYPE
+        SYNTAX ZxAnIgmpGroupPortListEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of entries of all group portlist info.
+             "
+        INDEX {zxAnIgmpMVid, zxAnIgmpSourceIpAddr,zxAnIgmpGroupIpAddr,
+                zxAnIgmpMVlanPortListShelf,zxAnIgmpMVlanPortListSlot }
+         ::= { zxAnIgmpGroupPortListTable 1 }
+
+    ZxAnIgmpGroupPortListEntry  ::= SEQUENCE {
+        zxAnIgmpGroupStaticPortList      ZxAnPortList,
+        zxAnIgmpGroupDynamicPortList     ZxAnPortList
+    }
+
+    zxAnIgmpGroupStaticPortList OBJECT-TYPE
+        SYNTAX      ZxAnPortList
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "RowStatus of this row."
+         ::= { zxAnIgmpGroupPortListEntry 1 }
+
+    zxAnIgmpGroupDynamicPortList OBJECT-TYPE
+        SYNTAX      ZxAnPortList
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "RowStatus of this row."
+         ::= { zxAnIgmpGroupPortListEntry 2 }
+
+
+------------------------------------------------------------------------------
+--    Table of IGMP Command
+------------------------------------------------------------------------------
+    zxAnIgmpParamListCmdTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpParamListCmdEntry 
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Operation command table for multicast port configuration like 
+            param list,such as zxAnIgmpMVlanSrcPortList,
+            zxAnIgmpMVlanRecvPortList and zxAnMvlanGroupStaticPortList.
+            A single object such as mvlan will be added or removed to/from 
+            zxAnIgmpMVlanSrcPortList
+            through this table.
+            "
+         ::= { zxAnIgmp 26 }
+
+    zxAnIgmpParamListCmdEntry  OBJECT-TYPE
+        SYNTAX     ZxAnIgmpParamListCmdEntry 
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "A list of  entries of zxAnMvlanPortParamListCmdEntry."
+        INDEX  { zxAnIgmpParamListCmd }
+         ::= { zxAnIgmpParamListCmdTable 1 }
+         
+    ZxAnIgmpParamListCmdEntry  ::= SEQUENCE {
+        zxAnIgmpParamListCmd      INTEGER,
+        zxAnIgmpParamObject      OBJECT IDENTIFIER     
+    }
+    
+    zxAnIgmpParamListCmd OBJECT-TYPE
+        SYNTAX INTEGER
+                {
+                    addSrcPortToMvlan(1),
+                    delSrcPortFromMvlan(2),
+                    addRecPortToMvlan(3),
+                    delRecPortFromMvlan(4),
+                    addStaticGroup(5),
+                    delStaticGroup(6)            
+                }
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            " The command to operate param list of zxAnMvlanGroupPortListTable.
+            Each command is related to each meaming of 
+            zxAnMvlanGroupStaticPortList.
+              
+        command           meaning of                     operation                                
+                          zxAnMcastPortParamObjName         
+        --------------------------------------------------------------------
+        addSrcPortToMvlan(1)       Bind source port with mvlan  
+        delSrcPortFromMvlan(2)     unbind source Port with mvlan
+        addRecPortToMvlan(3)       bind recievingPort with mvlan
+        delRecPortFromMvlan(4)    unbind recievingPort with mvlan    
+        addStaticGroup(5)  Bind port with Static Multicast
+        delStaticGroup(6)  unbind port with Static Multicast               
+            "
+         ::= { zxAnIgmpParamListCmdEntry 1 }            
+    
+    zxAnIgmpParamObject OBJECT-TYPE
+        SYNTAX OBJECT IDENTIFIER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            " The value of object ID in param list,eg.
+        addSrcPortToMvlan(1)       zxAnIgmpParamObject is 'mvid.ifid'
+        delSrcPortFromMvlan(2)     zxAnIgmpParamObject is 'mvid.ifid'
+        addRecPortToMvlan(3)       zxAnIgmpParamObject is 'mvid.ifid'
+        delRecPortFromMvlan(4)     zxAnIgmpParamObject is 'mvid.ifid'
+        addStaticGroup(5)          zxAnIgmpParamObject is 'mvid.srcip.gpip.ifid'
+        delStaticGroup(6)          zxAnIgmpParamObject is 'mvid.srcip.gpip.ifid'      
+            "
+         ::= { zxAnIgmpParamListCmdEntry 2 }  
+
+------------------------------------------------------------------------------
+--  zxAnIgmpCounterTable
+------------------------------------------------------------------------------
+    zxAnIgmpCounterTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpCounterEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "IGMP Counter table."
+        ::= { zxAnIgmp 27 }
+
+    zxAnIgmpCounterEntry  OBJECT-TYPE
+        SYNTAX     ZxAnIgmpCounterEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "zxAnIgmpMVid=0 and zxAnIgmpIfIndex=0,Performance of Global.
+             zxAnIgmpMVid=1 and zxAnIgmpIfIndex=0,Performance of specifued 
+             MVLAN.
+             zxAnIgmpMVid=0 and zxAnIgmpIfIndex=1,Performance of interface.
+            "                    
+        INDEX  { zxAnIgmpMVid, zxAnIgmpIfIndex }
+        ::= { zxAnIgmpCounterTable 1 }
+
+    ZxAnIgmpCounterEntry ::= SEQUENCE {
+        zxAnIgmpCounterReset            Integer32,
+        zxAnIgmpCounterRxCommQuery      Counter32,
+        zxAnIgmpCounterRxSpecialQuery   Counter32,
+        zxAnIgmpCounterRxV1Report       Counter32,
+        zxAnIgmpCounterRxV2Report       Counter32,
+        zxAnIgmpCounterRxV3Report       Counter32,
+        zxAnIgmpCounterRxLeave          Counter32,
+        zxAnIgmpCounterRxError          Counter32,
+        zxAnIgmpCounterRxUnknown        Counter32,
+        zxAnIgmpCounterTxCommQuery      Counter32,
+        zxAnIgmpCounterTxSpecialQuery   Counter32,
+        zxAnIgmpCounterTxV1Report       Counter32,
+        zxAnIgmpCounterTxV2Report       Counter32,
+        zxAnIgmpCounterTxV3Report       Counter32,
+        zxAnIgmpCounterTxLeave          Counter32,
+        zxAnIgmpCounterDropRxCommQuery  Counter32,
+        zxAnIgmpCounterDropRxSpecialQuery   Counter32,
+        zxAnIgmpCounterDropRxV1Report   Counter32,
+        zxAnIgmpCounterDropRxV2Report   Counter32,
+        zxAnIgmpCounterDropRxV3Report   Counter32,
+        zxAnIgmpCounterDropRxLeave      Counter32,
+        zxAnIgmpCounterDropRxUnknown    Counter32,
+        zxAnIgmpCounterJoinSuccess      Counter32,
+        zxAnIgmpCounterJoinFailure      Counter32
+    }
+
+
+    zxAnIgmpCounterReset OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS current
+        DESCRIPTION
+            " Reset IGMP counter when it is set to '1'."
+         ::= { zxAnIgmpCounterEntry 1 }
+
+    zxAnIgmpCounterRxCommQuery OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 2 }
+
+    zxAnIgmpCounterRxSpecialQuery OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 3 }
+
+    zxAnIgmpCounterRxV1Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 4 }
+
+    zxAnIgmpCounterRxV2Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 5 }
+
+    zxAnIgmpCounterRxV3Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 6 }
+
+    zxAnIgmpCounterRxLeave OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 7 }
+
+    zxAnIgmpCounterRxError OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 8 }
+
+    zxAnIgmpCounterRxUnknown OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 9 }
+
+    zxAnIgmpCounterTxCommQuery OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 10 }
+
+    zxAnIgmpCounterTxSpecialQuery OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 11 }
+
+    zxAnIgmpCounterTxV1Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 12 }
+
+    zxAnIgmpCounterTxV2Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 13 }
+
+    zxAnIgmpCounterTxV3Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 14 }
+
+    zxAnIgmpCounterTxLeave OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 15 }
+
+    zxAnIgmpCounterDropRxCommQuery OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 16 }
+
+    zxAnIgmpCounterDropRxSpecialQuery OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 17 }
+
+    zxAnIgmpCounterDropRxV1Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 18 }
+
+    zxAnIgmpCounterDropRxV2Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 19 }
+
+    zxAnIgmpCounterDropRxV3Report OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 20 }
+
+    zxAnIgmpCounterDropRxLeave OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 21 }
+
+    zxAnIgmpCounterDropRxUnknown OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 22 }
+
+    zxAnIgmpCounterJoinSuccess OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 23 }
+
+    zxAnIgmpCounterJoinFailure OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            ""
+         ::= { zxAnIgmpCounterEntry 24 }
+
+         
+               
+------------------------------------------------------------------------------
+--  9.zxAnMVlanTranslateTable
+------------------------------------------------------------------------------
+    zxAnMVlanTranslateTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnMVlanTranslateEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            ""
+        ::= { zxAnIgmp 28 }
+    
+    zxAnMVlanTranslateEntry OBJECT-TYPE
+        SYNTAX      ZxAnMVlanTranslateEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "  "
+        INDEX   {zxAnMVlanTranslatePortIndex }
+        ::= { zxAnMVlanTranslateTable 1 }
+    
+    ZxAnMVlanTranslateEntry ::= SEQUENCE {
+        zxAnMVlanTranslatePortIndex    ZxAnIfindex,
+        zxAnMVlanTranslateEn           INTEGER,
+        zxAnMVlanTranslateCVlan        INTEGER
+    }
+    
+    zxAnMVlanTranslatePortIndex OBJECT-TYPE
+        SYNTAX      ZxAnIfindex 
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "An index for MDU Port."
+        ::= { zxAnMVlanTranslateEntry 1 }      
+        
+    zxAnMVlanTranslateEn OBJECT-TYPE
+        SYNTAX   INTEGER {
+                 enable(1),
+                 disable(2)            
+                 }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "MVLAN Translate Enabled"
+        ::= { zxAnMVlanTranslateEntry 2 }
+        
+    zxAnMVlanTranslateCVlan OBJECT-TYPE
+        SYNTAX   INTEGER (0..4094)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "CVLAN"
+        ::= { zxAnMVlanTranslateEntry 3 }        
+        
+------------------------------------------------------------------------------
+--  10.zxAnIgmpPortActiveGroupTable
+------------------------------------------------------------------------------        
+    zxAnIgmpPortActiveGroupTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpPortActiveGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "show igmp interface dynamic group list"
+        ::= { zxAnIgmp 29 }
+
+    zxAnIgmpPortActiveGroupEntry OBJECT-TYPE
+        SYNTAX ZxAnIgmpPortActiveGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of  entries of all groups information by interface."
+            INDEX {zxAnIgmpIfIndex,zxAnIgmpMVid,zxAnIgmpGroupIpAddr}
+        ::= { zxAnIgmpPortActiveGroupTable 1 }
+
+    ZxAnIgmpPortActiveGroupEntry ::= SEQUENCE {
+        zxAnIgmpPortTypeInGroup   INTEGER
+    } 
+
+    zxAnIgmpPortTypeInGroup     OBJECT-TYPE
+        SYNTAX         INTEGER{
+            static(1),
+            dynamic(2)
+        }
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            ""
+        ::= { zxAnIgmpPortActiveGroupEntry 1}   
+  
+--------------------------------------------------------------------------------
+-- 11.zxAnIgmpPMGlobal
+--------------------------------------------------------------------------------          
+    zxAnIgmpGlobalCounterReset OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS current
+        DESCRIPTION
+            "Reset IGMP global counter(zxAnIgmpCounterTable) when it is 
+             set to '1'.
+            "
+        REFERENCE
+            "Only Used by MAP."                
+        ::= { zxAnIgmpPMGlobal 1 }               
+        
+    zxAnMvlanCounterReset OBJECT-TYPE
+        SYNTAX         INTEGER(1..4094)
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+            "Reset MVLAN counter(zxAnIgmpCounterTable) when it is set to MVlan
+             Id.
+            "
+        REFERENCE
+            "Only Used by MAP."            
+        ::= { zxAnIgmpPMGlobal 2 }   
+
+--------------------------------------------------------------------------------
+-- 12.zxAnIgmpIfMulticastStatsTable
+--------------------------------------------------------------------------------          
+
+    zxAnIgmpIfMulticastStatsTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnIgmpIfMulticastStatsEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Show IGMP port multicast statistics."
+        ::= { zxAnIgmp 31 }
+
+    zxAnIgmpIfMulticastStatsEntry OBJECT-TYPE
+        SYNTAX ZxAnIgmpIfMulticastStatsEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of entries of IGMP port multicast statistics."
+        INDEX {zxAnIgmpIfIndex}
+        ::= { zxAnIgmpIfMulticastStatsTable 1 }
+
+    ZxAnIgmpIfMulticastStatsEntry ::= SEQUENCE {
+        zxAnIgmpIfMulticastTxPktRate   Integer32
+    } 
+
+    zxAnIgmpIfMulticastTxPktRate     OBJECT-TYPE
+        SYNTAX         Integer32
+        UNITS          "pps"
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "IGMP port multicast transmitted packet rate."
+        ::= { zxAnIgmpIfMulticastStatsEntry 1}
+              
+------------------------------------------------------------------------------       
+-- 13.zxAnIgmpMgmtMVlanRecvIfTable
+------------------------------------------------------------------------------
+    zxAnIgmpMgmtMVlanRecvIfTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnIgmpMgmtMVlanRecvIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A Table used to add or delete receive port in a MVLAN."
+        ::= { zxAnIgmp 32 }
+
+    zxAnIgmpMgmtMVlanRecvIfEntry OBJECT-TYPE
+        SYNTAX      ZxAnIgmpMgmtMVlanRecvIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of entries of zxAnIgmpMgmtMVlanRecvIfTable."
+        INDEX { zxAnIgmpMVid, zxAnIgmpIfIndex }
+        ::= { zxAnIgmpMgmtMVlanRecvIfTable 1 }
+
+    ZxAnIgmpMgmtMVlanRecvIfEntry ::=
+        SEQUENCE {
+            zxAnIgmpMgmtMVlanRecvIfRowStatus         RowStatus
+        }
+
+    zxAnIgmpMgmtMVlanRecvIfRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The status of this conceptual row.
+
+            The action of this conceptual row only support
+            'createAndGo' and 'destroy'.
+
+            To create a row in this table, a manager must
+            set this object to createAndGo(4).
+
+            To delete a row in this table, a manager must
+            set this object to destroy(6).
+
+            To query this object, the agent always return active(1)."
+        ::= { zxAnIgmpMgmtMVlanRecvIfEntry 50 }
+        
+------------------------------------------------------------------------------
+-- 14.zxAnIgmpMgmtGroupUserTable
+------------------------------------------------------------------------------
+    zxAnIgmpMgmtGroupUserTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnIgmpMgmtGroupUserEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table that contains group user information."
+        ::= { zxAnIgmp 33 }
+
+    zxAnIgmpMgmtGroupUserEntry OBJECT-TYPE
+        SYNTAX      ZxAnIgmpMgmtGroupUserEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of entries of zxAnIgmpMgmtGroupUserTable."
+        INDEX { zxAnIgmpMVid, zxAnIgmpGroupIpAddr, zxAnIgmpIfIndex,
+                zxAnIgmpUserIpAddr, zxAnIgmpSourceIpAddr }
+        ::= { zxAnIgmpMgmtGroupUserTable 1 }
+
+    ZxAnIgmpMgmtGroupUserEntry ::=
+        SEQUENCE {
+            zxAnIgmpUserIpAddr                IpAddress,
+            zxAnIgmpGrpUserSrcFilterMode      INTEGER
+        }
+
+    zxAnIgmpUserIpAddr OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The user IP address which is tracked from the IGMP request
+            packets sent by user device.
+            Note that zxAnIgmpHostTrackEnable must be set to enable firstly, 
+            otherwise the user IP address will be ALL-ZERO."
+        ::= { zxAnIgmpMgmtGroupUserEntry 1 }
+
+    zxAnIgmpGrpUserSrcFilterMode OBJECT-TYPE
+        SYNTAX      INTEGER {
+                        include(1),
+                        exclude(2)
+                    }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "IGMPv3 source filter mode of the group user."
+        ::= { zxAnIgmpMgmtGroupUserEntry 2 }
+
+------------------------------------------------------------------------------
+-- 15.zxAnIgmpMgmtStaticGroupUserTable
+------------------------------------------------------------------------------
+    zxAnIgmpMgmtStaticGroupUserTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnIgmpMgmtStaticGroupUserEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table that contains group static user information."
+        ::= { zxAnIgmp 34 }
+
+    zxAnIgmpMgmtStaticGroupUserEntry OBJECT-TYPE
+        SYNTAX      ZxAnIgmpMgmtStaticGroupUserEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of entries of zxAnIgmpMgmtStaticGroupUserTable."
+        INDEX { zxAnIgmpMVid, zxAnIgmpGroupIpAddr, zxAnIgmpIfIndex,
+                zxAnIgmpSourceIpAddr }
+        ::= { zxAnIgmpMgmtStaticGroupUserTable 1 }
+
+    ZxAnIgmpMgmtStaticGroupUserEntry ::=
+        SEQUENCE {
+            zxAnIgmpStaticGrpUserRowStatus         RowStatus
+        }
+
+    zxAnIgmpStaticGrpUserRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The status of this conceptual row.
+
+            The action of this conceptual row only support
+            'createAndGo' and 'destroy'.
+
+            To create a row in this table, a manager must
+            set this object to createAndGo(4).
+
+            To delete a row in this table, a manager must
+            set this object to destroy(6).
+
+            To query this object, the agent always return active(1)."
+        ::= { zxAnIgmpMgmtStaticGroupUserEntry 50 }              
+
+--------------------------------------------------------------------------------
+-- 16.zxAnIgmpMulticastStatsObjects
+-------------------------------------------------------------------------------- 
+    
+    zxAnIgmpVplsMvlanSrcPwTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnIgmpVplsMvlanSrcPwEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table that contains information about source pseudo wire in a 
+            mvlan."
+    ::= { zxAnIgmpVplsMulticastObjects 1 }
+          
+    zxAnIgmpVplsMvlanSrcPwEntry OBJECT-TYPE
+        SYNTAX      ZxAnIgmpVplsMvlanSrcPwEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "An entry for zxAnIgmpVplsMvlanSrcPwTable."
+        INDEX { zxAnIgmpMVid,zxAnIgmpVplsMVlanSrcPwName}
+        ::= { zxAnIgmpVplsMvlanSrcPwTable 1 }   
+        
+    ZxAnIgmpVplsMvlanSrcPwEntry ::= SEQUENCE {
+        zxAnIgmpVplsMVlanSrcPwName       DisplayString,    
+        zxAnIgmpVplsMVlanSrcPwRowStatus  RowStatus
+    }
+    
+    zxAnIgmpVplsMVlanSrcPwName  OBJECT-TYPE
+        SYNTAX          DisplayString(SIZE(1..63))
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Source pseudo wire name."
+        ::= { zxAnIgmpVplsMvlanSrcPwEntry 1 }      
+    
+    zxAnIgmpVplsMVlanSrcPwRowStatus   OBJECT-TYPE
+        SYNTAX         RowStatus
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION
+            "Row status of the Table."
+        ::= { zxAnIgmpVplsMvlanSrcPwEntry 20 }
+        
+--------------------------------------------------------------------------------
+-- 17.zxAnMulticastStatsObjects
+--------------------------------------------------------------------------------
+
+    zxAnMulticastGroupStatsTable  OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnMulticastGroupStatsEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Multicast group statistics table."
+        ::= { zxAnMulticastStatsObjects 2 }
+
+    zxAnMulticastGroupStatsEntry OBJECT-TYPE
+        SYNTAX      ZxAnMulticastGroupStatsEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Multicast group statistics entry."
+        INDEX 
+        { 
+            zxAnMCastGrpStatsMVid,
+            zxAnMCastGrpStatsGroupIpType,
+            zxAnMCastGrpStatsGroupIpAddr
+        }
+        ::= { zxAnMulticastGroupStatsTable 1 }
+        
+    ZxAnMulticastGroupStatsEntry ::= SEQUENCE {
+        zxAnMCastGrpStatsMVid                Integer32,
+        zxAnMCastGrpStatsGroupIpType         InetAddressType,
+        zxAnMCastGrpStatsGroupIpAddr         InetAddress,
+        zxAnMCastGrpStatsBandwidth           Integer32,
+        zxAnMCastGrpStatsBandwidthUnit       INTEGER,
+        zxAnMCastGrpStatsRowStatus           RowStatus
+    }
+    
+    zxAnMCastGrpStatsMVid   OBJECT-TYPE
+        SYNTAX      Integer32(1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION 
+            "Multicast VLAN ID."
+        ::= { zxAnMulticastGroupStatsEntry 1 }
+    
+    zxAnMCastGrpStatsGroupIpType   OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION 
+            "Multicast group IP address type."
+        ::= { zxAnMulticastGroupStatsEntry 2 }
+        
+    zxAnMCastGrpStatsGroupIpAddr   OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION 
+            "Multicast group IP address."
+        ::= { zxAnMulticastGroupStatsEntry 3 }  
+
+    zxAnMCastGrpStatsBandwidth OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The bandwidth of multicast traffic."
+        ::= { zxAnMulticastGroupStatsEntry 4 }
+
+    zxAnMCastGrpStatsBandwidthUnit OBJECT-TYPE
+        SYNTAX      INTEGER 
+        {
+            pps(1),
+            kbps(2)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The unit of zxAnMCastGrpStatsBandwidth.
+             pps(1)   - Packet per second
+             kbps(2)  - Kilo bit per second.
+            "
+        ::= { zxAnMulticastGroupStatsEntry 5 }
+    
+    zxAnMCastGrpStatsRowStatus   OBJECT-TYPE
+        SYNTAX         RowStatus
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION
+            "The status of this conceptual row.
+            
+            The supported actions of this conceptual row only include:
+            'createAndGo' and 'destroy'.
+
+            To create a row in this table, a manager must set this object to 
+            createAndGo(4), and must comply with the multi-variables binding 
+            rule described in zxAnMulticastGroupStatsEntry.
+    
+            To delete a row in this table, a manager must set this object to 
+            destroy(6). 
+             
+            To get this object, the agent always returns active(1)."
+        ::= { zxAnMulticastGroupStatsEntry 50 }
+    
+--------------------------------------------------------------------------------
+-- 18.zxAnIgmp Trap
+--------------------------------------------------------------------------------
+    zxAnIgmpGroupThreshExceeded NOTIFICATION-TYPE
+        OBJECTS { zxAnIgmpGroupThreshold }
+        STATUS             current
+        DESCRIPTION
+           "If Igmp group number is up to threshold,system will raise this 
+            trap."
+       ::= { zxAnIgmpTrapObjects 1 }
+
+    zxAnIgmpGroupThreshExceededCleared NOTIFICATION-TYPE
+        OBJECTS { zxAnIgmpGroupThreshold }
+        STATUS             current
+        DESCRIPTION
+           "This trap is to restore  zxAnIgmpGroupThreshExceeded trap."
+       ::= { zxAnIgmpTrapObjects 2 }
+   
+    zxAnIgmpPktRateLimitExceededAlm NOTIFICATION-TYPE
+        OBJECTS 
+        { 
+            zxAnIgmpPortPacketLimit
+        }
+        STATUS             current
+        DESCRIPTION
+           "A zxAnIgmpPktRateLimitExceededAlm trap is sent when IGMP packet rate
+            is above zxAnIgmpPortPacketLimit."
+       ::= { zxAnIgmpTrapObjects 3 }
+       
+    zxAnIgmpPktRateLimitExceededClr NOTIFICATION-TYPE
+        OBJECTS 
+        { 
+            zxAnIgmpPortPacketLimit
+        }
+        STATUS             current
+        DESCRIPTION
+           "A zxAnIgmpPktRateLimitExceededClr trap is sent when IGMP packet rate
+            is below zxAnIgmpPortPacketLimit."
+       ::= { zxAnIgmpTrapObjects 4 }
+             
+END

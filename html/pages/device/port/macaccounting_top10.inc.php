@@ -1,12 +1,11 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -19,8 +18,8 @@ if (!isset($vars['period'])) {
 }
 $graph_width = 949;
 $thumb_width = 120;
-$from        = "-" . $vars['period'];
-$from        = $config['time'][$vars['period']];
+//$from        = "-" . $vars['period'];
+$from        = get_time($vars['period']);
 
 echo '<div class="row">';
 echo '  <div class="col-md-2">';
@@ -32,15 +31,16 @@ $graph_array['sort']   = $vars['sort'];
 $graph_array['height'] = "60";
 $graph_array['width']  = 170;
 $graph_array['legend'] = "no";
-$graph_array['to']     = $config['time']['now'];
-$graph_array['from']   = $config['time'][$vars['period']];
+$graph_array['to']     = get_time();
+$graph_array['from']   = $from;
 
-$variants = ['Bits'          => ['stat' => 'bits', sort => $vars['sort']],
-             'Packets'       => ['stat' => 'pkts', sort => $vars['sort']],
-             'Top Input'     => ['stat' => $vars['stat'], sort => 'in'],
-             'Top Output'    => ['stat' => $vars['stat'], sort => 'out'],
-             'Top Aggregate' => ['stat' => $vars['stat'], sort => 'both']];
-
+$variants = [
+    'Bits'          => [ 'stat' => 'bits', 'sort' => $vars['sort'] ],
+    'Packets'       => [ 'stat' => 'pkts', 'sort' => $vars['sort'] ],
+    'Top Input'     => [ 'stat' => $vars['stat'], 'sort' => 'in' ],
+    'Top Output'    => [ 'stat' => $vars['stat'], 'sort' => 'out' ],
+    'Top Aggregate' => [ 'stat' => $vars['stat'], 'sort' => 'both' ]
+];
 
 foreach ($variants as $text => $variant) {
 
@@ -84,14 +84,14 @@ $graph_array['stat']   = $vars['stat'];
 $graph_array['height'] = "60";
 $graph_array['width']  = $thumb_width;
 $graph_array['legend'] = "no";
-$graph_array['to']     = $config['time']['now'];
+$graph_array['to']     = get_time();
 $graph_array['sort']   = $vars['sort'];
 
 
 echo('<table style="width: 100%; background: transparent;"><tr>');
 
 foreach ($thumb_array as $period => $text) {
-    $graph_array['from'] = $config['time'][$period];
+    $graph_array['from'] = get_time($period);
 
     $link_array           = $vars;
     $link_array['period'] = $period;
@@ -119,8 +119,8 @@ $graph_array['width']  = $graph_width;
 $graph_array['type']   = 'port_mac_acc_total';
 $graph_array['stat']   = $vars['stat'];
 $graph_array['sort']   = $vars['sort'];
-$graph_array['from']   = $config['time'][$vars['period']];
-$graph_array['to']     = $config['time']['now'];
+$graph_array['from']   = $from;
+$graph_array['to']     = get_time();
 
 echo '  <div class="col-md-10">';
 echo '    <div class="box box-solid">';

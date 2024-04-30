@@ -1,0 +1,1057 @@
+-- Copyright (C) 2006-2012 Aricent Group . All Rights Reserved
+
+--    $Id: fsl2tp.mib,v 1.3 2016/07/08 07:41:06 siva Exp $
+--    L2tp Proprietary MIB Definition
+
+
+-- This document explains the proprietary MIB implemented for FutureL2tp
+-- product.
+
+-- The FS proprietary MIB definitions, which mostly contains extra
+-- statistic objects and objects that can enable or disable certain features
+-- of a protocol or the protocol itself. The various groups that are present
+-- in the proprietary MIB are :
+--
+-- L2tp
+-- This group contains all the scalar objects and tables that are need for
+-- configuring FutureL2tp. All the scalar objects are listed under the table
+-- L2tpGlobalInfo.
+-- Information on various groups.
+--
+-- l2tpGlobalInfo         : It contains scalar objects used to configure FutureL2tp.
+-- l2tpPort Group         : This group specifies the l2tp enable/disable status on a particular port.
+-- l2tpPseudowire Group   : This group specifies information on the active tunnels configured .
+--          		        This table is used for configuring static tunnels between two LCCEs.
+-- 			                This table has information about the configured pwclass name , loopback interface ip
+--			                encapsulation type (l2tp/mpls) and the protocol used (IP / UDP).
+-- l2tpSession Group      : This group specifies information on the active sessions configured between the tunnels.
+-- 			                This table is used for configuring static sessions between the tunnels.
+-- 			                This table has information about the configured session ID, peer session ID, encapsulation type,
+-- 	 	                    cookie type, local cookie, remote cookie configured, remote end Id and sequence mode details .
+-- l2tpXconnect Group     : This group specifies information on the active attachment circuits(AC) configured.
+-- 			                This table is used for configuring static AC to connect the pseudo wire to the respective sessions.
+-- 			                This table has information about the peer destination IP, Remote End Id of the session,PWclass name,
+--            		        and encap type (port based / port,vlan / QinQ /QinAny).
+-- l2tpSessionStats Group : This griup specifies information about the statistics of the active sessions .
+--  	     		        This table has the information about the total Tx & Rx packets, total packets encapsulated,
+--  			            total packets decapsulated, total invalid packets received . 
+-- l2tpPortStats Group    : This table specifies information about the statistics of a particular port.
+--           		        This table contains port based packet drops information.
+-- l2tpNotifications Group: This group contains different types of traps used for L2TP.
+------------------------------------------------------------------------------------------------------------------------------------
+
+FutureL2tp-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+   MODULE-IDENTITY, OBJECT-TYPE, 
+   Integer32, Unsigned32, Counter32, enterprises,
+   IpAddress, NOTIFICATION-TYPE,
+   TimeTicks               FROM SNMPv2-SMI
+   RowStatus, MacAddress, TruthValue, DisplayString, RowPointer,
+   TimeStamp, TEXTUAL-CONVENTION   FROM SNMPv2-TC
+   InetAddress, InetAddressType,
+   InetAddressPrefixLength FROM INET-ADDRESS-MIB;
+
+
+--enterprises	 OBJECT IDENTIFIER ::= { private 1 }
+--futuresoftware OBJECT IDENTIFIER ::= { enterprises 2076 }
+
+futureL2tpMIB MODULE-IDENTITY
+   LAST-UPDATED "201209050000Z"
+   ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+   CONTACT-INFO "support@aricent.com"
+   DESCRIPTION "The MIB module to describe the L2tp."
+   REVISION "201209050000Z"	
+   DESCRIPTION "The MIB module to describe the L2tp."
+   ::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 108}
+
+
+l2tp OBJECT IDENTIFIER ::= { futureL2tpMIB 1 }
+
+--l2tp	GROUP
+
+-- The Status is an integer value which specificies each feature enable
+
+EnabledStatus	::= TEXTUAL-CONVENTION
+   STATUS    current
+   DESCRIPTION
+      "The status of each feature of Futurel2tp i.e. whether it is enabled or
+       disabled"
+   SYNTAX    INTEGER {
+                        enabled(1),
+    	                disabled(2)
+	                 }
+
+------------------------------------------------------------------------------
+-- groups in the MIB 
+------------------------------------------------------------------------------
+
+    l2tpGlobalInfo          OBJECT IDENTIFIER  ::= { l2tp 1 }
+    l2tpPort    	        OBJECT IDENTIFIER  ::= { l2tp 2 }
+    l2tpPseudowire          OBJECT IDENTIFIER  ::= { l2tp 3 }
+    l2tpSession             OBJECT IDENTIFIER  ::= { l2tp 4 }
+    l2tpXconnect            OBJECT IDENTIFIER  ::= { l2tp 5 }
+    l2tpSessionStats        OBJECT IDENTIFIER  ::= { l2tp 6 }
+    l2tpPortStats           OBJECT IDENTIFIER  ::= { l2tp 7 }
+    l2tpNotifications       OBJECT IDENTIFIER  ::= { l2tp 8 }
+
+------------------------------------------------------------------------------
+-- L2TP global group 
+
+-- It contains scalar objects used to configure FutureL2tp.
+------------------------------------------------------------------------------
+
+l2tpSystemControl OBJECT-TYPE
+   SYNTAX	      INTEGER { 
+                            start(1),
+                            shutdown(2)
+                          }
+   MAX-ACCESS	  read-write
+   STATUS	      current
+   DESCRIPTION
+	  "This object specifies the admin status of L2tp in the system.
+        
+       When set as 'start',resources required by L2tp module are
+       allocated and the module starts running.
+
+       When shutdown, all the pools used by L2tp module will be
+       released to the system."
+
+   ::=	{ l2tpGlobalInfo 1 }
+
+l2tpGlobalEnable OBJECT-TYPE
+   SYNTAX        EnabledStatus
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION
+      "This object sets the L2TP status as enabled or disabled globally.
+   when this object is set to enabled, the l2tp session 
+   will be operationally down.
+   when this object is set to be disabled, the l2tp sessions
+   will be made UP based on the reachability of tunnels"
+
+   DEFVAL  { disabled }
+   ::=  { l2tpGlobalInfo 2 }
+
+l2tpVersion    OBJECT-TYPE
+   SYNTAX      INTEGER {
+                          version3(1)
+                       }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the version of L2TP supported. The default value is version 3."
+   DEFVAL  { version3 }
+   ::= { l2tpGlobalInfo 3 }
+
+l2tpTotalConfiguredPw OBJECT-TYPE
+   SYNTAX             Counter32
+   MAX-ACCESS         read-only
+   STATUS             current
+   DESCRIPTION
+       "This object specifies  the total number of pesudowires created by the administrator."
+   ::= { l2tpGlobalInfo 4 }
+
+l2tpTotalConfiguredSessions OBJECT-TYPE
+   SYNTAX                   Counter32
+   MAX-ACCESS               read-only
+   STATUS                   current
+   DESCRIPTION
+       "This object specifies the total number of sessions created by the administrator."
+   ::= { l2tpGlobalInfo 5 }
+
+l2tpTotalActiveSessions OBJECT-TYPE
+   SYNTAX               Counter32
+   MAX-ACCESS           read-only
+   STATUS               current
+   DESCRIPTION
+       "This object specifies the total number of active sessions among the configured sessions.
+        The session is considered active when the next hop is up and reachable"
+   ::= { l2tpGlobalInfo 6 }
+
+l2tpClearGlobalStats OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+       "This object clear the statistics of l2tpv3 module.
+        - True   - Clear L2TPv3 statistics.
+        - False  - Doesn’t clear the statistics. By default it is set as ‘False’"
+
+   ::= { l2tpGlobalInfo 7 }
+l2tpClearSessionStats OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+       "This object clear the statistics of a particular session."
+
+   ::= { l2tpGlobalInfo 8 }
+
+
+l2tpInvalidEncapInfoDrop OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the total number of packets dropped for which no encapsulation info 
+        associated ."
+
+   ::= { l2tpGlobalInfo 9 }
+
+l2tpInvalidDecapInfoDrop OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the total number of packets dropped for which no decapsulation info 
+        associated ."
+        
+   ::= { l2tpGlobalInfo 10 }
+
+l2tpInvalidSessionStatsInfoDrop OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the total number of packets dropped for which no Session stats info 
+        associated ."
+        
+   ::= { l2tpGlobalInfo 11 }
+
+l2tpInvalidL2tpPacketDrop OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the total number of packets dropped for which no decapsulation info 
+        associated ."
+        
+   ::= { l2tpGlobalInfo 12 }
+
+
+l2tpTotalEncapedPackets OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the total number of packets inspected and encapsulated by l2tpv3  ."
+        
+   ::= { l2tpGlobalInfo 13 }
+l2tpTotalDecapedPackets OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the total number of packets inspected and decapsulated by l2tpv3  ."
+        
+   ::= { l2tpGlobalInfo 14 }
+
+
+
+l2tpTrcFlag    OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+       "This object is used to enable trace statements in
+         L2TP  module.
+         A four byte integer is used for enabling the trace level.
+         Each bit in the four byte integer represents a particular
+         trace level.
+         The mapping between the bit positions & the trace messages are
+         as follows:
+              0x00000000 -- No traces.
+              0x00000001 -- Init-Shut related traces.
+              0x00000002 -- Data-path related traces.
+              0x00000004 -- Buffer related traces.
+              0x00000008 -- Event  related traces.
+              0x00000010 -- SNMP related traces.
+              0x00000020 -- Enables function entry exit traces.
+              0x00000040 -- Enables error/failure related traces.
+              0x00000080 -- Enables packet dump related traces.
+              0x00000100 -- Management related trace.
+              0x00000200 -- Enables Pseudowire related traces.
+              0x00000400 -- Enables Session related traces.
+              0x00000800 -- Enables XConnect related traces.
+              0x00001FFF -- All Traces.
+        Similarly, Trace messages can also be added with respect to levels namely
+        Critical, Alert, Debug and Info.
+
+        Critical Level - Init-Shut, data-path and  Buffer related traces
+        Alert Level    - Event and Snmp related traces.
+        Debug Level    - Function entry exit, Error/failure,Packet Dump and Management related traces.
+        Info Level     - pseudowire, Session and XConnect related traces.
+
+       The mapping between the bit positions & the trace Levels are
+       as follows:
+
+              0x00000003 --  Critical Level.
+              0x00000012 --  Alert Level.    
+              0x00000150 --  Debug Level.
+              0x00000700 --  Info Level"
+   DEFVAL { 0 } 
+   ::= { l2tpGlobalInfo 15 }
+
+l2tpErrTrapType OBJECT-TYPE
+       SYNTAX   INTEGER   {
+                    none (0),
+                    memfail (1),
+                    bufffail (2)
+                    }
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+           "This object specifies the error event as one of the following:
+            none - none of the below values
+            memfail - memory allocation failure
+            bufffail - buffer allocation failure"
+   ::= { l2tpGlobalInfo 16 }
+
+l2tpSetTraps OBJECT-TYPE
+   SYNTAX   Integer32 (0..3)
+   MAX-ACCESS   read-write
+   STATUS   current
+   DESCRIPTION
+     "This object is used to enable or disable
+      ELMI traps. Currently the following are defined
+      0 - Traps are not enabled.
+      1 - Protocol Errors occurred.
+      2 - Memory failure occurred
+      3 - All the above Traps "
+   ::= { l2tpGlobalInfo 17 }
+
+
+-- end of l2tp global group
+
+----------------------------------------------------------------------------------------------------
+-- L2TP Port group
+
+--This group specifies the l2tp enable/disable status on a particular port.
+----------------------------------------------------------------------------------------------------
+l2tpPortTable  OBJECT-TYPE
+   SYNTAX      SEQUENCE OF L2tpPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "This table is used for configuring the status of l2tp on a port. i.e enabled/disabled."
+   ::= { l2tpPort 1 }
+
+l2tpPortEntry         OBJECT-TYPE
+   SYNTAX             L2tpPortEntry
+   MAX-ACCESS         not-accessible
+   STATUS             current
+   DESCRIPTION
+       "This object specifies port-based administrator configurations of l2tp."
+   INDEX  { l2tpPortIfIndex  }
+   ::= { l2tpPortTable 1 }
+
+L2tpPortEntry ::=
+        SEQUENCE {
+                    l2tpPortIfIndex
+                            INTEGER,
+                    l2tpEnabledStatus
+                            INTEGER,
+                    l2tpPortEncapType
+                           INTEGER,
+                    l2tpPortRowStatus
+                           RowStatus
+                 }
+l2tpPortIfIndex OBJECT-TYPE
+   SYNTAX       INTEGER
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+       "This object specifies the Index of the interface on which the l2tp configuration are made."
+   ::= { l2tpPortEntry 1 }
+
+l2tpEnabledStatus OBJECT-TYPE
+   SYNTAX         EnabledStatus
+   MAX-ACCESS     read-create
+   STATUS         current
+   DESCRIPTION
+       "This object specifies the status of l2tp on a particular port.
+        The status can be either enable or disable."
+   ::= { l2tpPortEntry 2 }
+
+l2tpPortEncapType OBJECT-TYPE
+   SYNTAX         INTEGER {
+                            port(1),
+                            port-vlan(2),
+                            qinq(3),
+                            qinAny(4)
+                          }
+   MAX-ACCESS     read-create
+   STATUS         current
+   DESCRIPTION
+       "This object specifies the type of the packet to be traversed through the tunnel.
+    Encapsulation type can be (port based / port,vlan / QinQ /QinAny)
+
+    Port based - All the packet ingressed on this (port, attachment
+    circuit) will be tunneled with L2TPv3 header encapsulation.
+
+    Port-vlan - The packets ingressed on this port which matches the
+    (outer-vlan, attachment-circuit) will be tunneled with L2TPv3 header encapsulation.
+
+    Qinq - The packets ingressed on this port which matches with 
+    (configured inner-vlan, configured outer-vlan, attachment circuit) will be tunneled
+    with L2TPv3 header encapsulation. if the EtherType of the VLAN is 8100, this configuration 
+    will be used.
+
+    QinAny - The packets ingressed on this port which matches with 
+    (configured inner-vlan, configured outer-vlan, attachment circuit) will be tunneled
+    with L2TPv3 header encapsulation. if the EtherType of the outer-VLAN is 88a8, and
+    the inner-vlan is 8100, then this configuration will be used."
+   ::= { l2tpPortEntry 3 }
+
+l2tpPortRowStatus OBJECT-TYPE
+   SYNTAX         RowStatus
+   MAX-ACCESS     read-create
+   STATUS         current
+   DESCRIPTION
+          "This object specifies the status of this entry. An entry is
+           created in this table when this object is SET to 'createAndWait'.
+           The entry in this table is used when the status of this object
+           is SET 'active'. The entry in this table is not used when this
+           object is SET 'notInService'. An entry created in this table is
+           be deleted when this object is SET 'destroy'."
+            
+   ::= { l2tpPortEntry 4 }
+
+--end of L2TP Port group
+---------------------------------------------------------------------------------------------------
+-- L2TP Pseudowire group 
+
+-- l2tppseudowireTable 
+-- This table specifies information on the active tunnels configured.
+-- This table is used for configuring static tunnels between two LCCEs.
+-- This table has information about the configured pwclass name, loopback interface ip fields .
+
+----------------------------------------------------------------------------------------------------
+
+l2tpPseudowireTable OBJECT-TYPE
+   SYNTAX           SEQUENCE OF L2tpPseudowireEntry
+   MAX-ACCESS       not-accessible
+   STATUS           current
+   DESCRIPTION
+       "This table is used for configuring static tunnels between two LCCEs.
+       This table has information about the configured pseudowire class name, 
+       loopback interface ip, IPSec status, encapsulation mode fields."
+   ::= { l2tpPseudowire 1 }
+
+l2tpPseudowireEntry OBJECT-TYPE
+   SYNTAX           L2tpPseudowireEntry
+   MAX-ACCESS       not-accessible
+   STATUS           current
+   DESCRIPTION
+       "This object specifies pseudowire class name, encapsulation mode, IPSec Status and Loopback interface 
+        of every pseudowire that is configured by the user."
+   INDEX   {  l2tpPwIndex  }
+   ::= { l2tpPseudowireTable 1 }
+
+L2tpPseudowireEntry ::=
+        SEQUENCE {
+                   l2tpPwIndex
+                           Unsigned32,
+                   l2tpPwEncapMode
+                           INTEGER,
+                   l2tpIPSecEnabledStatus
+                           INTEGER,
+                   l2tpIPSecMode
+                           INTEGER,
+        		   l2tpPwLoopBack
+                           DisplayString,
+                   l2tpRemoteIpAddress
+                           IpAddress,
+                   l2tpPwSrcMacAddr
+                           MacAddress,
+                   l2tpPwDestMacAddr
+                           MacAddress,
+                   l2tpPwRowStatus
+                           RowStatus
+                 }
+
+l2tpPwIndex     OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+       "This object uniquely identifies the specified tunnel."
+   ::= { l2tpPseudowireEntry 1 }
+
+l2tpPwEncapMode OBJECT-TYPE
+   SYNTAX       INTEGER { 
+                          l2tpv3(1),
+                          mpls(2)
+                        }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "This object specifies the mode in which the packets are encapsulated and de-capsulated i.e L2tp."
+   DEFVAL { l2tpv3 }
+   ::= { l2tpPseudowireEntry 2 }
+
+l2tpIPSecEnabledStatus OBJECT-TYPE
+   SYNTAX              EnabledStatus
+   MAX-ACCESS          read-create
+   STATUS              current
+   DESCRIPTION
+       "This object specifies the status of L2tpv3 over IPSec - enabled/disabled.
+        When enabled the packet processing will include encryption/decryption."
+
+   DEFVAL  { disabled }
+   ::= { l2tpPseudowireEntry 3 }
+
+l2tpIPSecMode   OBJECT-TYPE
+   SYNTAX       INTEGER {
+                           tunnel(1),
+                           transparent(2)
+                        }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "This object specifies the IPSec mode.
+        Tunnel - IP header is also encrypted.
+        Transparent - IP header is not encrypted."
+
+   DEFVAL  { tunnel }
+   ::= { l2tpPseudowireEntry 4 }
+
+l2tpPwLoopBack OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+       "The object displays the loopback which the tunnel uses to encapsulate and de-capsulate the packet."
+   ::= { l2tpPseudowireEntry 5 }
+
+l2tpRemoteIpAddress OBJECT-TYPE
+   SYNTAX           IpAddress
+   MAX-ACCESS       read-create
+   STATUS           current
+   DESCRIPTION
+       "The object specifies the remote IP address of the pseudowire"
+   ::= { l2tpPseudowireEntry 6 }
+
+l2tpPwSrcMacAddr OBJECT-TYPE
+   SYNTAX      MacAddress
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "The object indicates the source mac address that has to be matched with the packet"
+   ::= { l2tpPseudowireEntry 7 }
+
+l2tpPwDestMacAddr OBJECT-TYPE
+   SYNTAX       MacAddress
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "The object indicates the destination mac address that has to be matched with the packet"
+   ::= { l2tpPseudowireEntry 8 }
+
+l2tpPwRowStatus OBJECT-TYPE
+   SYNTAX       RowStatus
+   MAX-ACCESS   read-create
+   STATUS       current
+   DESCRIPTION
+          "This object specifies the status of this entry. An entry is
+           created in this table when this object is SET to 'createAndWait'.
+           The entry in this table is used when the status of this object
+           is SET 'active'. The entry in this table is not used when this
+           object is SET 'notInService'. An entry created in this table is
+           be deleted when this object is SET 'destroy'."
+            
+   ::= { l2tpPseudowireEntry 9 }
+
+-- end of L2TP Pseudowire group
+
+-----------------------------------------------------------------------------------------------------------
+-- L2TP Session group 
+
+-- l2tpSessionTable 
+
+--  This table specifies information on the number of sessions configured and the number 
+--  of active sessions between the tunnels.
+--  This table is used for configuring static sessions between the tunnels.
+--  This table has information about the configured session ID, peer session ID, encapsulation type,
+--  cookie type, local cookie, remote cookie configured, remote end Id and sequence mode details.
+
+-----------------------------------------------------------------------------------------------------------
+
+l2tpSessionTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF L2tpSessionEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       "This table is used for configuring static sessions between the tunnels.
+        This table has information about the configured remote end Id, session ID, peer session ID, 
+        cookie type, local cookie and remote cookie details ."
+   ::= { l2tpSession 1 }
+
+l2tpSessionEntry OBJECT-TYPE
+   SYNTAX        L2tpSessionEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+        "This object indicates the remote end Id, local and remote cookie Id, cookie type, local and 
+        remote cookie values of every session that is configured by the administrator."
+   INDEX   { l2tpRemoteEndId }
+   ::= { l2tpSessionTable 1 }
+
+L2tpSessionEntry ::=
+        SEQUENCE {
+                    l2tpRemoteEndId
+                            Unsigned32,
+                    l2tpLocalSessionId
+                            Unsigned32,
+                    l2tpRemoteSessionId
+                            Unsigned32,
+                    l2tpSessionPwIndex
+                           INTEGER,
+                    l2tpSessionCookieSize
+                            INTEGER,
+		            l2tpSessionLocalCookie
+                            OCTET STRING,
+                    l2tpSessionRemoteCookie
+		 	                OCTET STRING,
+                    l2tpSessionStatus
+ 		                    INTEGER,
+                    l2tpSessionClearStatistics
+ 		                    TruthValue,
+                    l2tpSessionRowStatus
+                            RowStatus
+                 }
+
+l2tpRemoteEndId OBJECT-TYPE
+   SYNTAX       Unsigned32(0..65535)
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+       "This object specifies the remote end identifier of a session which is unique across a 
+        particular connection (LCCE's sessions)."
+   ::= { l2tpSessionEntry 1 }
+
+l2tpLocalSessionId OBJECT-TYPE
+   SYNTAX          Unsigned32(0..65535)
+   MAX-ACCESS      read-create
+   STATUS          current
+   DESCRIPTION
+       "This object specifies the local session identifier."
+   ::= { l2tpSessionEntry 2 }
+
+l2tpRemoteSessionId OBJECT-TYPE
+   SYNTAX           Unsigned32(0..65535)
+   MAX-ACCESS       read-create
+   STATUS           current
+   DESCRIPTION
+       "This object specifies the remote session identifier."
+   ::= {l2tpSessionEntry 3 }
+
+l2tpSessionPwIndex OBJECT-TYPE
+   SYNTAX           INTEGER
+   MAX-ACCESS       read-create
+   STATUS           current
+   DESCRIPTION
+       "This object specifies the Pseudo wire index of a particular tunnel that is to be used
+       for the virtual connection."
+   ::= { l2tpSessionEntry 4 }
+
+
+l2tpSessionCookieSize OBJECT-TYPE
+   SYNTAX             INTEGER {
+                               four-byte(1),
+                               eight-byte(2),
+                               none(3)
+                              }
+   MAX-ACCESS         read-create
+   STATUS             current
+   DESCRIPTION
+       "The cookie type which can be either 4 byte or 8 byte, Default value is none
+        when the cookiesize is configured as 4-byte, l2tpSessionLocalCookie and 
+        l2tpSessionRemoteCookie will accept only 4 byte cookie-ID
+        when the cookiesize is configured as 8-byte, l2tpSessionLocalCookie and 
+        l2tpSessionRemoteCookie will accept only 8 byte cookie-ID."
+   DEFVAL  { none }
+   ::= { l2tpSessionEntry 5 }
+
+l2tpSessionLocalCookie  OBJECT-TYPE
+   SYNTAX               OCTET STRING 
+   MAX-ACCESS           read-create
+   STATUS               current
+   DESCRIPTION
+       "This object specifies the Local cookie this is configured by the administrator based 
+        on the size configured in l2tpSessionCookieSize."
+   ::= { l2tpSessionEntry 6 }
+
+l2tpSessionRemoteCookie OBJECT-TYPE
+   SYNTAX               OCTET STRING
+   MAX-ACCESS           read-create
+   STATUS               current
+   DESCRIPTION
+       "This object specifies the Remote cookie this is configured by the administrator based
+        on the size configured in l2tpSessionCookieSize."
+   ::= { l2tpSessionEntry 7 }
+
+l2tpSessionStatus OBJECT-TYPE
+   SYNTAX         INTEGER {
+    	                    up(1),
+    	                    down(2)
+                       	  }
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+       "This object specifies the status of the particular session i.e up/down based on the 
+       reachability of the destination IP network/address configured in the attachment-circuit"
+   ::= { l2tpSessionEntry 8 }
+
+l2tpSessionClearStatistics OBJECT-TYPE
+   SYNTAX                  TruthValue
+   MAX-ACCESS              read-create
+   STATUS                  current
+   DESCRIPTION
+       "This object clear the statistics of this L2TP session .
+        - True   - clears the statistics.
+        - False  - Doesn't clear the statistics.By default it is set as ‘False’."
+   ::= { l2tpSessionEntry 9 }
+
+l2tpSessionRowStatus OBJECT-TYPE
+   SYNTAX            RowStatus
+   MAX-ACCESS        read-create
+   STATUS            current
+   DESCRIPTION
+          "This object specifies the status of this entry. An entry is
+           created in this table when this object is SET to 'createAndWait'.
+           The entry in this table is used when the status of this object
+           is SET 'active'. The entry in this table is not used when this
+           object is SET 'notInService'. An entry created in this table is
+           be deleted when this object is SET 'destroy'."
+   ::= { l2tpSessionEntry 10 }
+
+-- end of L2TP Session group
+
+--------------------------------------------------------------------------------------------------------
+-- L2TP Xconnect group 
+
+-- l2tpXconnectTable
+-- This table specifies information on the number of attachment circuits(AC) that are configured.
+-- This table is used for configuring static AC to connect the pseudowire to the respective sessions.
+-- This table has information about the peer destination IP, Remote End Id of the session,pseudowire 
+-- class name and encap type (port based / port,vlan / QinQ /QinAny).
+
+--------------------------------------------------------------------------------------------------------
+
+l2tpXconnectTable OBJECT-TYPE
+   SYNTAX         SEQUENCE OF L2tpXconnectEntry
+   MAX-ACCESS     not-accessible
+   STATUS         current
+   DESCRIPTION
+        "This table is used for configuring static AC to connect the pseudo wire to the respective 
+         sessions.This table has information about the peer destination IP, Remote End Id of the session,
+         Pseudowireclass name and encap type (port based / port,vlan / QinQ /QinAny)"
+   ::= { l2tpXconnect 1 }
+
+l2tpXconnectEntry OBJECT-TYPE
+   SYNTAX         L2tpXconnectEntry
+   MAX-ACCESS     not-accessible
+   STATUS         current
+   DESCRIPTION
+       "This object indicates the destination IP, Remote End Id of the session,Pseudowireclass name 
+        and encap type (port based / port,vlan / QinQ /QinAny) of a particular xconnect."
+   INDEX   { 
+              l2tpXconnectIfIndex ,
+              l2tpXconnectId
+           }
+   ::= { l2tpXconnectTable 1 }
+
+L2tpXconnectEntry ::=
+         SEQUENCE {
+                    l2tpXconnectIfIndex
+                           INTEGER,
+                    l2tpXconnectId
+                           Unsigned32,
+                    l2tpXconnectRemoteEndId
+                           Unsigned32,
+                    l2tpXconnectInnerVlanId
+                           INTEGER,
+                    l2tpXconnectOuterVlanId
+                           INTEGER,
+    	            l2tpXconnectRowStatus
+                           RowStatus
+		       	 }
+
+l2tpXconnectIfIndex OBJECT-TYPE
+   SYNTAX           INTEGER
+   MAX-ACCESS       not-accessible
+   STATUS           current
+   DESCRIPTION
+       "This object specifies the Index of the interface on which the Ac is configured."
+   ::= { l2tpXconnectEntry 1 }
+
+l2tpXconnectId OBJECT-TYPE
+   SYNTAX      Unsigned32(0..65535)
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "This object specifies the attachment circuit identifier."
+   ::= { l2tpXconnectEntry 2 }
+
+l2tpXconnectRemoteEndId OBJECT-TYPE
+   SYNTAX               Unsigned32(0..65535)
+   MAX-ACCESS           read-create
+   STATUS               current
+   DESCRIPTION
+       "This object specifies the remote end Id of the session to be used for the virtual connection."
+   ::= { l2tpXconnectEntry 3 }
+
+l2tpXconnectInnerVlanId OBJECT-TYPE
+   SYNTAX               INTEGER
+   MAX-ACCESS           read-create
+   STATUS               current
+   DESCRIPTION
+       "This object specifies the Inner Vlan Id in which the AC is configured."
+   DEFVAL  {1}
+   ::= { l2tpXconnectEntry 4 }
+
+l2tpXconnectOuterVlanId OBJECT-TYPE
+   SYNTAX               INTEGER
+   MAX-ACCESS           read-create
+   STATUS               current
+   DESCRIPTION
+       "This object specifies the Outer Vlan Id in which the AC is configured."
+   DEFVAL  {1}
+   ::= { l2tpXconnectEntry 5 }
+
+l2tpXconnectRowStatus OBJECT-TYPE
+   SYNTAX             RowStatus
+   MAX-ACCESS         read-create
+   STATUS             current
+   DESCRIPTION
+           "This object specifies the status of this entry. An entry is
+           created in this table when this object is SET to 'createAndWait'.
+           The entry in this table is used when the status of this object
+           is SET 'active'. The entry in this table is not used when this
+           object is SET 'notInService'. An entry created in this table is
+           be deleted when this object is SET 'destroy'."
+   ::= { l2tpXconnectEntry 6 }
+
+-- end of L2TP Xconnect group 
+
+----------------------------------------------------------------------------------------------------
+-- L2TP Session based Statistics group 
+
+-- l2tpSessionStats   
+-- This table specifies information about the statistics of the configured sessions.
+-- This table has the information about the total Tx & Rx packets, total packets encapsulated,
+-- total packets decapsulated, total invalid packets received .
+
+----------------------------------------------------------------------------------------------------
+
+l2tpSessionStatsTable OBJECT-TYPE
+   SYNTAX             SEQUENCE OF L2tpSessionStatsEntry
+   MAX-ACCESS         not-accessible
+   STATUS             current
+   DESCRIPTION
+   "This table specifies information about the statistics of the configured sessions.
+    This table has the information about the total Tx & Rx packets, total packets encapsulated,
+    total packets decapsulated, total invalid packets received."
+   ::= { l2tpSessionStats 1 }
+
+l2tpSessionStatsEntry OBJECT-TYPE
+   SYNTAX             L2tpSessionStatsEntry
+   MAX-ACCESS         not-accessible
+   STATUS             current
+   DESCRIPTION
+       "This table specifies the information about the total Tx & Rx packets, total packets encapsulated,
+        total packets decapsulated, total invalid packets received in a particular 
+        session/pesudowire class/xconnect"
+   INDEX   { 
+              l2tpSessionRemoteEndId
+           }
+   ::= { l2tpSessionStatsTable 1 }
+
+L2tpSessionStatsEntry ::=
+        SEQUENCE      { 
+                        l2tpSessionRemoteEndId
+                                Unsigned32,
+                        l2tpSessionStatsTotalEncap
+                                Counter32,
+                        l2tpSessionStatsTotalDecap
+                                Counter32,
+                        l2tpSessionStatsCookieMismatch
+                                Counter32,
+                        l2tpSessionStatsInvalidPeerIp
+                                Counter32
+                      }
+
+l2tpSessionRemoteEndId OBJECT-TYPE
+   SYNTAX              Unsigned32
+   MAX-ACCESS          not-accessible
+   STATUS              current
+   DESCRIPTION
+       "This object specifies the Remote End Identifier which is unique across the 
+        connection (LCCE's sessions)"
+   ::= { l2tpSessionStatsEntry 1 }
+ 
+
+l2tpSessionStatsTotalEncap OBJECT-TYPE
+   SYNTAX                  Counter32
+   MAX-ACCESS              read-only
+   STATUS                  current
+   DESCRIPTION
+       "This object specifies the total number of packets encapsulated in a particular session."
+   ::= { l2tpSessionStatsEntry 2 }
+
+l2tpSessionStatsTotalDecap OBJECT-TYPE
+   SYNTAX                  Counter32
+   MAX-ACCESS              read-only
+   STATUS                  current
+   DESCRIPTION
+       "This object specifies the total number of packets decapsulated in a particular session."
+   ::= { l2tpSessionStatsEntry 3 }
+
+
+l2tpSessionStatsCookieMismatch OBJECT-TYPE
+   SYNTAX                      Counter32
+   MAX-ACCESS                  read-only
+   STATUS                      current
+   DESCRIPTION
+       "This object specifies the total number of packets with cookie mismatch that are
+        received on a particular session."
+   ::= { l2tpSessionStatsEntry 4 }
+
+
+l2tpSessionStatsInvalidPeerIp OBJECT-TYPE
+   SYNTAX                      Counter32
+   MAX-ACCESS                  read-only
+   STATUS                      current
+   DESCRIPTION
+       "This object specifies the total number of packets with Invalid Ip Address that are
+        received on a particular encap session."
+   ::= { l2tpSessionStatsEntry 5 }
+
+--end of L2TP Session based Statistics group 
+
+----------------------------------------------------------------------------------------------------
+-- L2TP Port based Statistics group
+
+-- l2tpPortStats
+-- This table specifies information about the statistics of a particular port.
+-- This table contains port based packet drops information.
+
+----------------------------------------------------------------------------------------------------
+l2tpPortStatsTable OBJECT-TYPE
+   SYNTAX          SEQUENCE OF L2tpPortStatsEntry
+   MAX-ACCESS      not-accessible
+   STATUS          current
+   DESCRIPTION
+   "This table specifies information about the statistics of a particular port.
+    This table contains port based packet drops information."
+   ::= { l2tpPortStats 1 }
+
+l2tpPortStatsEntry OBJECT-TYPE
+   SYNTAX          L2tpPortStatsEntry
+   MAX-ACCESS      not-accessible
+   STATUS          current
+   DESCRIPTION
+       "This table specifies the information on the statistics of packet drops in a particular port"
+   INDEX   {
+              l2tpPortStatsIfIndex
+           }
+   ::= { l2tpPortStatsTable 1 }
+
+L2tpPortStatsEntry ::=
+        SEQUENCE      {
+                        l2tpPortStatsIfIndex
+                                INTEGER,
+                        l2tpPortStatsInvalidFrames
+                                Counter32,
+                        l2tpPortTotalTx
+                                Counter32,
+                        l2tpPortTotalRx
+                                Counter32
+                      }
+
+l2tpPortStatsIfIndex OBJECT-TYPE
+   SYNTAX            INTEGER
+   MAX-ACCESS        not-accessible
+   STATUS            current
+   DESCRIPTION
+       "This object specifies the Index of the interface on which the l2tp configuration are made."
+   ::= { l2tpPortStatsEntry 1 }
+
+l2tpPortStatsInvalidFrames OBJECT-TYPE
+   SYNTAX                  Counter32
+   MAX-ACCESS              read-only
+   STATUS                  current
+   DESCRIPTION
+       "This object specifies the total packets with invalid frames like packets that does not belong
+       to any session etc that are received on a particular port."
+   ::= { l2tpPortStatsEntry 2 }
+
+l2tpPortTotalTx OBJECT-TYPE
+   SYNTAX                    Counter32
+   MAX-ACCESS                read-only
+   STATUS                    current
+   DESCRIPTION
+       "This object specifies the total number of packets transmitted via particular inteface ."
+   ::= { l2tpPortStatsEntry 3 }
+l2tpPortTotalRx OBJECT-TYPE
+   SYNTAX                    Counter32
+   MAX-ACCESS                read-only
+   STATUS                    current
+   DESCRIPTION
+       "This object specifies the total number of packets Received via particular inteface ."
+   ::= { l2tpPortStatsEntry 4 }
+
+
+--end of L2TP Port based Statistics group
+
+----------------------------------------------------------------------------------------------------
+-- L2TP Notifications
+
+-- This group contains different types of traps used for L2TP
+----------------------------------------------------------------------------------------------------
+
+l2tpTraps OBJECT IDENTIFIER ::= { l2tpNotifications 0 }
+
+l2tpTrapGlobalInfo NOTIFICATION-TYPE
+   OBJECTS	      {
+                        l2tpGlobalEnable,
+                   		l2tpTotalConfiguredPw,
+		            	l2tpTotalConfiguredSessions,
+			            l2tpTotalActiveSessions
+         	      }
+   STATUS         current
+   DESCRIPTION
+       "This notification is sent when there is a change in l2tpGlobalInfo table 
+        
+        The NMS will be notified when l2tp is globally enabled/disabled
+        when a new psuedowire is created/deleted
+        when a new session is created/deleted
+        when the number of active sessions changes"
+   ::= { l2tpTraps 1 }
+
+l2tpTrapSessionStatus NOTIFICATION-TYPE
+   OBJECTS	      {
+              		l2tpRemoteEndId,
+ 			        l2tpLocalSessionId,
+			        l2tpRemoteSessionId,
+	      		    l2tpSessionStatus
+         	      }
+   STATUS         current
+   DESCRIPTION
+       "This notification is sent when the session is changed from up to down state or vice versa"
+   ::= { l2tpTraps 2 }
+
+l2tpErrTrap NOTIFICATION-TYPE
+        OBJECTS {
+           l2tpErrTrapType
+                }
+        STATUS             current
+        DESCRIPTION
+         "Generated when any of the error events like memory failure or buffer failure "
+   ::= { l2tpTraps 3 }
+
+--end of L2TP Notifications
+
+END

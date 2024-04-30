@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -129,48 +129,52 @@ foreach ($sensors_def as $entry) {
     $oid_num = $entry['oid_num'] . $dot_index;
     $value   = snmp_get_oid($device, $oid, 'ServersCheck');
 
-    if ($value != '-') {
-        // Sensor description
-        $descr = snmp_get_oid($device, $entry['oid_descr'] . $dot_index, 'ServersCheck');
-        if ($descr == "-" || str_contains_array($descr, 'Ping')) {
-            continue;
-        }
+    if ($value == '-') {
+        continue;
+    }
 
-        if (is_numeric($value)) {
-            // Class based on descr
-            if (str_contains_array($descr, "Temp")) {
-                $class = "temperature";
-            } elseif (str_contains_array($descr, "Humidity")) {
-                $class = "humidity";
-            } elseif (str_contains_array($descr, "Dew Point")) {
-                $class = "dewpoint";
-            } elseif (str_contains_array($descr, "Airflow")) {
-                $class = "airflow";
-            } elseif (str_contains_array($descr, "Dust")) {
-                $class = "dust";
-            } elseif (str_contains_array($descr, "Sound")) {
-                $class = "sound";
-            } else {
-                $class = "temperature";
-            }
+    // Sensor description
+    $descr = snmp_get_oid($device, $entry['oid_descr'] . $dot_index, 'ServersCheck');
+    if ($descr == "-" || str_contains($descr, 'Ping')) {
+        continue;
+    }
 
-            $options = [];
-            // If the global setting is set telling us all of our serverscheck devices are F, set the unit as F.
-            if (in_array($class, ["temperature", "dewpoint"]) && $config['devices']['serverscheck']['temp_f']) {
-                $options['sensor_unit'] = 'F';
-            } elseif ($type == "airflow") {
-                $options['sensor_unit'] = 'CFM';
-            }
-
-            if (isset($entry['rename_rrd'])) {
-                $options['rename_rrd'] = $entry['rename_rrd'];
-            }
-
-            discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, NULL, $descr, 1, $value, $options);
-
+    if (is_numeric($value)) {
+        // Class based on descr
+        if (str_contains($descr, "Temp")) {
+            $class = "temperature";
+        } elseif (str_contains($descr, "Humidity")) {
+            $class = "humidity";
+        } elseif (str_contains($descr, "Dew Point")) {
+            $class = "dewpoint";
+        } elseif (str_contains($descr, "Volt")) {
+            $class = "voltage";
+        } elseif (str_contains($descr, "Airflow")) {
+            $class = "airflow";
+        } elseif (str_contains($descr, "Dust")) {
+            $class = "dust";
+        } elseif (str_contains($descr, "Sound")) {
+            $class = "sound";
         } else {
-            discover_status_ng($device, $mib, $entry['oid'], $oid_num, $index, 'serverscheck-status', $descr, $value, ['entPhysicalClass' => 'other']);
+            $class = "temperature";
         }
+
+        $options = [];
+        // If the global setting is set telling us all of our serverscheck devices are F, set the unit as F.
+        if (in_array($class, ["temperature", "dewpoint"]) && $config['devices']['serverscheck']['temp_f']) {
+            $options['sensor_unit'] = 'F';
+        } elseif ($type == "airflow") {
+            $options['sensor_unit'] = 'CFM';
+        }
+
+        if (isset($entry['rename_rrd'])) {
+            $options['rename_rrd'] = $entry['rename_rrd'];
+        }
+
+        discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, NULL, $descr, 1, $value, $options);
+
+    } else {
+        discover_status_ng($device, $mib, $entry['oid'], $oid_num, $index, 'serverscheck-status', $descr, $value, ['entPhysicalClass' => 'other']);
     }
 }
 

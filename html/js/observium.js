@@ -14,17 +14,83 @@ jQuery.htmlPrefilter = function (html) {
     return html;
 };
 
-function url_from_form(form_id) {
-    var url = document.getElementById(form_id).action;
-    var partFields = document.getElementById(form_id).elements;
+function time_refresh(element_id, start_time, append_sec = -1) {
+    // set initial seconds left we're counting down to
+    let seconds_left = start_time;
+    // get tag element
+    const countrefresh = document.getElementById(element_id);
+    // time interval
+    const interval = Math.abs(append_sec) * 1000;
 
-    var seen = {};
-    for (var el, i = 0, n = partFields.length; i < n; i++) {
+    let timestring = function (seconds_left) {
+        // do some time calculations
+        let hours   = parseInt(seconds_left / 3600);
+        let minutes = parseInt(seconds_left / 60);
+        let seconds = parseInt(seconds_left % 60);
+
+        // format countdown string + set tag value
+        if (hours > 0) {
+            minutes = minutes - (hours * 60)
+            hours = hours + 'h&nbsp;'
+        } else {
+            hours = '';
+        }
+        if (minutes > 0) {
+            minutes = minutes + 'min&nbsp;';
+            seconds = seconds + 'sec';
+        } else {
+            minutes = '';
+            if (seconds > 0) {
+                seconds = seconds + 'sec';
+            } else {
+                seconds = '0sec';
+            }
+        }
+
+        return '<div class="label">' + hours + minutes + seconds + '</div>'
+    }
+
+    // initial string
+    countrefresh.innerHTML = timestring(seconds_left);
+
+    // update the tag with id "countdown" every 'append_sec' second
+    let loop = setInterval(function () {
+        seconds_left = seconds_left + append_sec;
+        countrefresh.innerHTML = timestring(seconds_left);
+
+        if (seconds_left <= 0) {
+            clearInterval(loop);
+        }
+    }, interval);
+}
+
+function url_from_form(form_id) {
+    let url = document.getElementById(form_id).action;
+    const partFields = document.getElementById(form_id).elements;
+
+    let seen = {};
+    for (let el, i = 0, n = partFields.length; i < n; i++) {
         el = partFields[i];
-        if (el.value != '' && el.name != '') {
+        if (el.name === 'requesttoken' || el.name === '') {
+            // Ignore request token from forms, this value must be only as POST request
+            continue;
+        }
+        if (el.type === "checkbox") {
+            if (seen[el.name] !== 1) { // Skip duplicate vars
+                seen[el.name] = 1;
+                url = url.replace(new RegExp(encodeURIComponent(el.name) + '=[^\/]+\/', 'g'), ''); // remove old var from url
+                if (el.checked) {
+                    url += encodeURIComponent(el.name) + '=' + encode_var(el.value) + '/';
+                } else {
+                    // default checkbox to 0
+                    url += encodeURIComponent(el.name) + '=0/';
+                }
+            }
+            //console.log(el.name + " = '" + el.value + "', checked = ", el.checked);
+        } else if (el.value !== '') {
             if (el.multiple) {
-                var multi = [];
-                for (var part, ii = 0, nn = el.length; ii < nn; ii++) {
+                let multi = [];
+                for (let part, ii = 0, nn = el.length; ii < nn; ii++) {
                     part = el[ii];
                     if (part.selected) {
                         multi.push(encode_var(part.value));
@@ -37,7 +103,7 @@ function url_from_form(form_id) {
                     url += encodeURIComponent(el.name) + '=' + multi.join(',') + '/';
                 }
             } else if (el.checked || el.type !== "checkbox") {
-                if (seen[el.name] !== 1) {            // Skip duplicate vars
+                if (seen[el.name] !== 1) {  // Skip duplicate vars
                     seen[el.name] = 1;
                     url = url.replace(new RegExp(encodeURIComponent(el.name) + '=[^\/]+\/', 'g'), ''); // remove old var from url
                     url += encodeURIComponent(el.name) + '=' + encode_var(el.value) + '/';
@@ -310,14 +376,26 @@ function openLink(url) {
 }
 
 function entity_popup(element) {
+    var url = $(element).data('url') || 'ajax/entity_popup.php'; // Use URL from data tag if available, otherwise default to 'ajax/entity_popup.php'
+
     $(element).qtip({
         content: {
             text: '<i class="icon-spinner icon-spin text-center vertical-align" style="width: 100%;"></i>',
             ajax: {
-                url: 'ajax/entity_popup.php',
+                url: url,
                 type: 'POST',
                 loading: false,
-                data: {entity_type: $(element).data('etype'), entity_id: $(element).data('eid')},
+                data: function() {
+                    // If a full URL is provided, don't send the entity type and ID
+                    if ($(element).data('url')) {
+                        return {};
+                    } else {
+                        return {
+                            entity_type: $(element).data('etype'),
+                            entity_id: $(element).data('eid'),
+                        };
+                    }
+                }(),
             }
         },
         style: {
@@ -474,9 +552,12 @@ var toggle_visibility = (function () {
 // Used to set session variables and then reload page.
 function ajax_action(action, value = '') {
 
+    var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
     var params = {
         action: action,
-        value: value
+        value: value,
+        requesttoken: csrfToken
     };
 
     $.ajax({
@@ -498,6 +579,23 @@ function ajax_action(action, value = '') {
     event.preventDefault();
 
     return false;
+}
+
+function confirmAction(action, element, event) {
+    event.stopPropagation();  // Stop the event from propagating to parent <td>
+
+    var value = $(element).data('value');
+
+    $(event.target).confirmation({
+        rootSelector: '[data-toggle=confirmation]',
+        onConfirm: function() {
+            ajax_action(action, value);
+        },
+        onCancel: function() {
+            // Handle cancelation if necessary
+        }
+    });
+    $(event.target).confirmation('show');
 }
 
 function ajax_settings(setting, value = '') {

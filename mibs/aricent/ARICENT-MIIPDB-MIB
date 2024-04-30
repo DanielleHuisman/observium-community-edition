@@ -1,0 +1,1102 @@
+-- Copyright (C) 2010-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsmiipdb.mib,v 1.2 2012/09/07 09:52:05 siva Exp $
+
+-- MIIP-BINDING-DATABASE Proprietary MIB Definition
+
+   ARICENT-MIIPDB-MIB DEFINITIONS ::= BEGIN
+      IMPORTS
+         MODULE-IDENTITY, OBJECT-TYPE,
+         enterprises, IpAddress, Counter32,
+         Integer32, Unsigned32                    FROM SNMPv2-SMI
+         RowStatus, MacAddress, TruthValue        FROM SNMPv2-TC
+         InterfaceIndex                           FROM IF-MIB;
+
+
+fsMIIpdb  MODULE-IDENTITY
+          LAST-UPDATED "201209050000Z"
+          ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+          CONTACT-INFO "support@aricent.com"
+          DESCRIPTION
+              " Multiple Instance support for IP binding database module. "
+	  REVISION "201209050000Z"
+          DESCRIPTION
+              " Multiple Instance support for IP binding database module. "
+         ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 48 }
+
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+
+Ipv6Address ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "2x:"
+    STATUS       current
+    DESCRIPTION
+       "This data type is used to model IPv6 addresses.
+        This is a binary string of 16 octets in network
+         byte-order."
+    SYNTAX       OCTET STRING (SIZE (16))
+
+
+-- ***************************************************************************
+--                         Groups in the MIB
+-- ***************************************************************************
+    fsMIIpDbScalars               OBJECT IDENTIFIER ::= { fsMIIpdb 1 }
+    fsMIIpDbStatic                OBJECT IDENTIFIER ::= { fsMIIpdb 2 }
+    fsMIIpDbBindings              OBJECT IDENTIFIER ::= { fsMIIpdb 3 }
+    fsMIIpDbInterface             OBJECT IDENTIFIER ::= { fsMIIpdb 4 }
+    fsMIIpDbSrcGuard              OBJECT IDENTIFIER ::= { fsMIIpdb 5 }
+    fsMIIpArpInspect              OBJECT IDENTIFIER ::= { fsMIIpdb 6 }
+    fsMIIpDbv6Static              OBJECT IDENTIFIER ::= { fsMIIpdb 7 }
+    fsMIIpDbv6Bindings            OBJECT IDENTIFIER ::= { fsMIIpdb 8 }
+
+
+-- ***************************************************************************
+--                               SCALARS
+-- ***************************************************************************
+
+    fsMIIpDbNoOfBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Indicates the total number of (host, IP) bindings, across
+            all VLAN's, at a given time. This is nothing but the total
+            number of entries in the IP binding database"
+    ::= { fsMIIpDbScalars 1 }
+
+    fsMIIpDbNoOfStaticBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Indicates the total number of static (host, IP) bindings,
+            across all VLANS, at the given time."
+    ::= { fsMIIpDbScalars 2 }
+
+    fsMIIpDbNoOfDHCPBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Indicates the total number of (host, IP) bindings configured
+             through DHCP, across all VLANS, at the given time."
+    ::= { fsMIIpDbScalars 3 }
+
+    fsMIIpDbNoOfPPPBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Indicates the total number of (host, IP) bindings configured
+             through PPP, across all VLANS, at the given time."
+    ::= { fsMIIpDbScalars 4 }
+
+    fsMIIpDbTraceLevel OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object is used to enable trace statements in IP binding
+            database module.
+
+            A four byte integer is used for enabling the trace level.
+            Each bit in the four byte integer represents a particular
+            trace level.
+
+            The mapping between the bit positions & the trace level is
+            as follows:
+                    BIT 1 - Function entry traces
+                    BIT 2 - Function Exit traces
+                    BIT 3 - Debug traces
+                    BIT 4 - Failure traces
+                    BIT 5 - Function arguments trace
+
+            The remaining bits are unused. Combination of levels are
+            also allowed.
+
+            For example if the bits 1 and 2 are set, then the trace
+            statement related to function entry and exit will be printed.
+
+            The user has to enter the corresponding integer value for the
+            bits set. For example if bits 1 and 2 are to be set ,then user
+            has to give the value 6."
+     ::= { fsMIIpDbScalars 5 }
+
+    fsMIIpDbv6DynamicDbSaveStatus OBJECT-TYPE
+        SYNTAX      INTEGER{
+                            enable(1),
+                            disable (2)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object indicates whether the dynamic binding entries present in the
+             binding table can be saved and restored upon system reboot.
+
+             If this object is set to 'enable', the dynamic entries in the binding table
+             will be saved in addition to the static binding entries.
+
+             If this object is set to 'disable', the dynamic entries in the binding table
+             will not be saved.
+
+             The default value is enable
+             If dynamic binding entries need not be saved, then this object should be configured
+             as 'disabled' before initiating the configuration save opertion in the system.
+
+             This object is supported for IPV6 binding database and not for IPV4 binding database."
+
+        DEFVAL  { enable }
+        ::= { fsMIIpDbScalars 6 }
+
+
+    fsMIIpDbClearBindingStatus OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+	 "This object removes all dynamically learnt (host, IP) Binding entries 
+	  from the binding table fsMIIpDbBindingTable, when it is set as 'true'. 
+	  After flush/clear, this object is set to 'false'"
+
+    DEFVAL  { false }
+    ::= { fsMIIpDbScalars 7 }
+
+    fsMIIpDbv6ClearBindingStatus OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+	 "This object removes all dynamically learnt (host, IPv6) Binding entries
+	  from the binding table fsMIIpDbv6BindingTable, when it is set as 'true'. 
+	  After flush/clear, this object is set to 'false'"
+
+    DEFVAL  { false }
+    ::= { fsMIIpDbScalars 8 }
+
+-- ***************************************************************************
+--                               GROUPS
+-- ***************************************************************************
+
+-- ********************** (HOST, IP) Static Bindings *************************
+
+    fsMIIpDbStaticBindingTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FsMIIpDbStaticBindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table contains the static Host IP configuration 
+             information."
+    ::= { fsMIIpDbStatic 1}
+
+    fsMIIpDbStaticBindingEntry OBJECT-TYPE
+        SYNTAX FsMIIpDbStaticBindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "A single entry contains the binding information of a single 
+             host connected to the system."
+        INDEX { 
+                fsMIIpDbContextId,
+                fsMIIpDbStaticHostVlanId,
+                fsMIIpDbStaticHostMac
+              }
+    ::= { fsMIIpDbStaticBindingTable 1 }
+
+    FsMIIpDbStaticBindingEntry ::= SEQUENCE {
+        fsMIIpDbContextId             Integer32,
+        fsMIIpDbStaticHostVlanId      Integer32,
+        fsMIIpDbStaticHostMac         MacAddress,
+        fsMIIpDbStaticHostIp          IpAddress,
+        fsMIIpDbStaticInIfIndex       Integer32,
+        fsMIIpDbStaticGateway         IpAddress,
+        fsMIIpDbStaticBindingStatus   RowStatus
+    }
+    
+    fsMIIpDbContextId OBJECT-TYPE
+        SYNTAX      Integer32 (0..65535)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Identifies the Virtual Bridge Context."
+    ::= { fsMIIpDbStaticBindingEntry 1 }
+
+    fsMIIpDbStaticHostVlanId OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The VLAN ID to which the host belongs. This is an index of 
+             the table."
+    ::= { fsMIIpDbStaticBindingEntry 2 }
+    
+    fsMIIpDbStaticHostMac OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "MAC address of the Host. This is an index of the table."
+    ::= { fsMIIpDbStaticBindingEntry 3 }
+ 
+    fsMIIpDbStaticHostIp OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "IP address of the Host."
+    ::= { fsMIIpDbStaticBindingEntry 4 }
+        
+    fsMIIpDbStaticInIfIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Indicates the interface to which the host is connected."
+    ::= { fsMIIpDbStaticBindingEntry 5 }
+
+    fsMIIpDbStaticGateway OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Indicates the gateway to which the Host have access to."
+    ::= { fsMIIpDbStaticBindingEntry 6 }
+
+    fsMIIpDbStaticBindingStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The rowstatus of the binding table entry. All the objects in the 
+             table must be filled before making the rowstatus as active."
+    ::= { fsMIIpDbStaticBindingEntry 7 }
+
+-- ********************** (HOST, IP) Binding Database ************************
+
+    fsMIIpDbBindingTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FsMIIpDbBindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table contains the information about all the hosts connected
+             to the system, their MAC Address, VLAN, IP etc."
+    ::= { fsMIIpDbBindings 1}
+
+    fsMIIpDbBindingEntry OBJECT-TYPE
+        SYNTAX FsMIIpDbBindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "A single entry contains the binding information of a single 
+             host connected to the system."
+        INDEX { 
+                fsMIIpDbHostContextId,
+                fsMIIpDbHostVlanId,
+                fsMIIpDbHostMac
+              }
+    ::= { fsMIIpDbBindingTable 1 }
+
+    FsMIIpDbBindingEntry ::= SEQUENCE {
+        fsMIIpDbHostContextId     Integer32,
+        fsMIIpDbHostVlanId        Integer32,
+        fsMIIpDbHostMac           MacAddress,
+        fsMIIpDbHostBindingType   INTEGER,
+        fsMIIpDbHostIp            IpAddress,
+        fsMIIpDbHostInIfIndex     Integer32,
+        fsMIIpDbHostRemLeaseTime  Integer32,
+        fsMIIpDbHostBindingID     Unsigned32
+    }
+    
+    fsMIIpDbHostContextId OBJECT-TYPE
+        SYNTAX      Integer32 (0..65535)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Identifies the Virtual Bridge Context."
+    ::= { fsMIIpDbBindingEntry 1 }
+
+    fsMIIpDbHostVlanId OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The VLAN ID to which the host belongs. This is an index of 
+             the table."
+    ::= { fsMIIpDbBindingEntry 2 }
+
+    fsMIIpDbHostMac OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "MAC address of the Host. This is an index of the table."
+    ::= { fsMIIpDbBindingEntry 3 }
+    
+    fsMIIpDbHostBindingType OBJECT-TYPE
+        SYNTAX      INTEGER { static (1), dhcp (2), ppp (3) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Specifies whether the entry was configured through static 
+            or dynamically learnt through DHCP or PPP."
+    ::= { fsMIIpDbBindingEntry 4 }
+    
+    fsMIIpDbHostIp OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "IP address of the Host."
+    ::= { fsMIIpDbBindingEntry 5 }
+        
+    fsMIIpDbHostInIfIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the interface to which the host is connected."
+    ::= { fsMIIpDbBindingEntry 6 }
+
+    fsMIIpDbHostRemLeaseTime OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The Remaining lease time in seconds for the (host, IP) binding. 
+             Applicable only if the fsIpDbBindingType is DHCP."
+    ::= { fsMIIpDbBindingEntry 7 }
+
+    fsMIIpDbHostBindingID OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "An integer value that identifies the binding type. For Static 
+            Bindings, this value is 0. For DHCP Bindings, this is the 
+            transaction ID. For PPP Bindings, this is the session ID 
+            of PPPoE session."
+    ::= { fsMIIpDbBindingEntry 8 }
+
+
+
+--  Below is the Gateway Table corresponding to each binding entry. 
+--  Each binding entry will contain a table of Gateway IPs, 
+--  which will contain atleast one (default gateway) gateway IP entry.
+
+        fsMIIpDbGatewayIpTable OBJECT-TYPE
+            SYNTAX  SEQUENCE OF FsMIIpDbGatewayIpEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+                "This table is a part of FsDhcpSnpBindingEntry. The table 
+                 contains IP address of Gateways allowed for the host.
+                 The host will be allowed to contact only these Gateways."
+        ::= { fsMIIpDbBindings 2 }
+
+        fsMIIpDbGatewayIpEntry OBJECT-TYPE
+            SYNTAX FsMIIpDbGatewayIpEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+                "Each entry contains an IP address of Gateway allowed for 
+                the host."
+            INDEX { 
+                    fsMIIpDbHostContextId,
+                    fsMIIpDbHostMac,
+                    fsMIIpDbHostVlanId,
+                    fsMIIpDbGatewayNetwork,
+                    fsMIIpDbGatewayNetMask,
+                    fsMIIpDbGatewayIp
+                  }
+        ::= { fsMIIpDbGatewayIpTable 1 }
+    
+        FsMIIpDbGatewayIpEntry ::= SEQUENCE {
+            fsMIIpDbGatewayNetwork    IpAddress,
+            fsMIIpDbGatewayNetMask    IpAddress,
+            fsMIIpDbGatewayIp         IpAddress,
+            fsMIIpDbGatewayIpMode     INTEGER
+        }
+    
+        fsMIIpDbGatewayNetwork OBJECT-TYPE
+            SYNTAX      IpAddress
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+                "The network IP address of the gateway."
+        ::= { fsMIIpDbGatewayIpEntry 1 }
+        
+        fsMIIpDbGatewayNetMask OBJECT-TYPE
+            SYNTAX      IpAddress
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+                "The mask for the network to which the gateway is given."
+        ::= { fsMIIpDbGatewayIpEntry 2 }
+
+        fsMIIpDbGatewayIp OBJECT-TYPE
+            SYNTAX      IpAddress
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+                "The Gateway IP for the given network."
+        ::= { fsMIIpDbGatewayIpEntry 3 }
+
+        fsMIIpDbGatewayIpMode OBJECT-TYPE
+            SYNTAX      INTEGER { active (0) }
+            MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION
+                "The Gateway IP verification mode while ARP 
+                packet processing. "
+        ::= { fsMIIpDbGatewayIpEntry 4 }
+
+-- **************************** Interface Entry ******************************
+
+    fsMIIpDbInterfaceTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FsMIIpDbInterfaceEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table contains the interface (layer 2 VLAN) specific
+             informations."
+    ::= { fsMIIpDbInterface 1 }
+
+    fsMIIpDbInterfaceEntry OBJECT-TYPE
+        SYNTAX FsMIIpDbInterfaceEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry will contain statistics associated with the interface."
+        INDEX { 
+                fsMIIpDbIntfContextId,
+                fsMIIpDbIntfVlanId 
+              }
+    ::= { fsMIIpDbInterfaceTable 1 }
+
+    FsMIIpDbInterfaceEntry ::= SEQUENCE {
+        fsMIIpDbIntfContextId                 Integer32,
+        fsMIIpDbIntfVlanId                    Integer32,
+        fsMIIpDbIntfNoOfVlanBindings          Counter32,
+        fsMIIpDbIntfNoOfVlanStaticBindings    Counter32,
+        fsMIIpDbIntfNoOfVlanDHCPBindings      Counter32,
+        fsMIIpDbIntfNoOfVlanPPPBindings       Counter32,
+        fsMIIpDbIntfNoOfVlanDHCPv6Bindings    Counter32,
+        fsMIIpDbIntfNoOfVlanStaticv6Bindings  Counter32
+    }
+
+    fsMIIpDbIntfContextId OBJECT-TYPE
+        SYNTAX      Integer32 (0..65535)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Identifies the Virtual Bridge Context."
+    ::= { fsMIIpDbInterfaceEntry 1 }
+
+    fsMIIpDbIntfVlanId OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Vlan ID of the VLAN to which this table-entry is associated."
+    ::= { fsMIIpDbInterfaceEntry 2 }
+
+    fsMIIpDbIntfNoOfVlanBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This indicates the total number of (host, IP) bindings for 
+            a given VLAN at a given time."
+    ::= { fsMIIpDbInterfaceEntry 3 }
+
+    fsMIIpDbIntfNoOfVlanStaticBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This indicates the total number of static (host, IP) bindings 
+            for a VLAN at a given time. "
+    ::= { fsMIIpDbInterfaceEntry 4 }
+
+    fsMIIpDbIntfNoOfVlanDHCPBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This indicates the total number of (host, IP) bindings 
+            configured through DHCP for a VLAN at a given time. "
+    ::= { fsMIIpDbInterfaceEntry 5 }
+
+    fsMIIpDbIntfNoOfVlanPPPBindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This indicates the total number of (host, IP) bindings 
+            configured through PPP for a VLAN at a given time. "
+    ::= { fsMIIpDbInterfaceEntry 6 }
+
+    fsMIIpDbIntfNoOfVlanDHCPv6Bindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This indicates the total number of (host, IPv6) bindings
+           learnt through DHCPv6 for a VLAN at a given time. "
+    ::= { fsMIIpDbInterfaceEntry 7 }
+
+    fsMIIpDbIntfNoOfVlanStaticv6Bindings OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This indicates the total number of static (host, IPv6) bindings
+            for a VLAN at a given time. "
+    ::= { fsMIIpDbInterfaceEntry 8 }
+
+-- ======================================================
+-- IP source guard table
+-- ======================================================
+fsMIIpDbSrcGuardConfigTable   OBJECT-TYPE
+    SYNTAX              SEQUENCE OF FsMIIpDbSrcGuardConfigEntry
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+    " This table provides the objects to enable or disable
+    IP/IPv6 source guard on each non routed Layer 2 interfaces. 
+
+    When DHCP/DHCPv6 Snooping is enabled at an interface, a list of 
+    IP/IPv6 addresses is obtained through DHCP snooping for this 
+    particular interface and these list of IP/IPv6 address are 
+    maintained in IP/IPv6 binding database along with the MAC, 
+    VLAN ID and interface index. This database can be populated 
+    using static configuration also. 
+    
+    If IP/IPv6 source guard is enabled, incoming IP traffic on an 
+    interface are allowed when there is a matching entry in IP 
+    binding database. Else, all incoming IP traffic on an 
+    interface are allowed irrespective of the IP/IPv6 binding database."
+    ::= { fsMIIpDbSrcGuard 1 }
+
+
+fsMIIpDbSrcGuardConfigEntry   OBJECT-TYPE
+    SYNTAX              FsMIIpDbSrcGuardConfigEntry
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+    " Each row instance contains the configuration to enable
+    or disable IP/IPv6 source guard on a physical interface. " 
+    INDEX { fsMIIpDbSrcGuardIndex }
+    ::= { fsMIIpDbSrcGuardConfigTable 1 }
+
+FsMIIpDbSrcGuardConfigEntry ::= SEQUENCE {
+    fsMIIpDbSrcGuardIndex  InterfaceIndex,
+    fsMIIpDbSrcGuardStatus INTEGER,
+    fsMIIpDbv6SrcGuardStatus INTEGER
+}
+
+fsMIIpDbSrcGuardIndex OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible 
+    STATUS       current
+    DESCRIPTION
+       "This indicates the interface identifier for which the IP/IPv6 source 
+        guard configuration is applied." 
+    ::= { fsMIIpDbSrcGuardConfigEntry  1 }
+
+fsMIIpDbSrcGuardStatus  OBJECT-TYPE
+    SYNTAX              INTEGER { 
+                            disable(1), 
+                            ip (2),
+                            ipMac (3)
+    }
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+        " This object indicates the IP source guard status of an 
+        interface. 
+    
+        If this object is set to 'disable', IP source guard feature 
+        is disabled and all incoming IP traffic on this interface 
+        will be allowed. 
+    
+        If this object is set to 'ip', IP source guard feature is 
+        enabled on fsIpDbSrcGuardIndex with Source IP address filtering 
+        mode. The switch allows the IP traffic when the source IP 
+        matches with an entry in Ip binding database. 
+
+        If this object is set to 'ipMac', IP source guard is enabled on 
+        the fsIpDbSrcGuardIndex with Source IP and MAC address filtering 
+        mode. The switch allows the IP traffic when the source IP and MAC 
+        address matches with an entry in Ip binding database. 
+
+        When there is no IP binding entries and IP source guard is 
+        enabled, switch drops all types of packets other than DHCP 
+        packet. "
+    
+    DEFVAL  { disable }
+    ::= { fsMIIpDbSrcGuardConfigEntry 2 }
+
+fsMIIpDbv6SrcGuardStatus  OBJECT-TYPE
+    SYNTAX              INTEGER {
+                            enable(1),
+                            disable (2)
+    }
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+        " This object indicates the IPv6 source guard status of an
+        interface.
+
+        If this object is set to 'disable', IPv6 source guard feature
+        is disabled and all incoming IPv6 traffic on this interface
+        will be allowed.
+
+        If this object is set to 'enable', IPv6 source guard is enabled on
+        the fsIpDbSrcGuardIndex with Source IPv6 and MAC address filtering
+        mode. The switch allows the IPv6 traffic when the source IPv6 and MAC
+        address matches with an entry in Ipv6 binding database.
+
+        When there is no IPv6 binding entries and IPv6 source guard is
+        enabled, switch drops all types of packets other than DHCP
+        packet. "
+
+    DEFVAL  { disable }
+    ::= { fsMIIpDbSrcGuardConfigEntry 3 }
+
+  -- ======================================================
+  -- ARP Inspection related objects
+  -- ======================================================
+
+      fsMIIpArpInspectionStatus OBJECT-TYPE
+          SYNTAX      INTEGER {
+                          enabled(1),
+                          disabled(2)
+                      }
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "Contains the informations whether ARP Inspection is
+               enabled/disabled in the switch"
+          DEFVAL { 2 }
+   ::= { fsMIIpArpInspect 1 }
+
+      fsMIIpArpInsValidateOption OBJECT-TYPE
+          SYNTAX      BITS {
+                          srcmac(1),
+                          dstmac(2),
+                          ip(3)
+                      }
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "This objects contains configuration support to enable/disable additional validation of ARP packets.
+               This configuration is applicable when ARP inspection status is enabled in the switch.
+              src-mac: This checks the source MAC address in the Ethernet header against the sender MAC address in the ARP body for both ARP requests and responses.
+              dst-mac: This Checks the destination MAC address in the Ethernet header against the target MAC address in ARP body ARP responses.
+              ip addr: This Checks the ARP body for invalid and unexpected IP addresses i,e 0.0.0.0, 255.255.255.255, and all IP multicast addresses.
+              Sender IP addresses are checked in all ARP requests and responses, and target IP addresses are checked only in ARP responses."
+          DEFVAL { 0 }
+   ::= { fsMIIpArpInspect 2 }
+
+    fsMIIpArpInsArpPktsForwarded OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the total number of ARP packets forwarded
+             after dynamic ARP inspection.
+
+             When ARP inspection is configured on specific VLANs, then the 
+             statistics in the ARP inspection VLAN table alone is applicable. 
+            "
+
+    ::= { fsMIIpArpInspect 3 }
+
+    fsMIIpArpInsArpPktsDropped OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the total number of ARP packets dropped
+             as a result of dynamic ARP inspection.
+
+             When ARP inspection is configured on specific VLANs, then the 
+             statistics in the ARP inspection VLAN table alone is applicable. 
+            "
+    ::= { fsMIIpArpInspect 4 }
+
+    fsMIIpArpInsIPValidFailures OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the total number of ARP packets dropped
+             due to IP validation failures.
+
+             When ARP inspection is configured on specific VLANs, then the 
+             statistics in the ARP inspection VLAN table alone is applicable. 
+            "
+    ::= { fsMIIpArpInspect 5 }
+
+    fsMIIpArpInsDestMACFailures OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the total number of ARP packets dropped
+             due to Destination MAC validation failures.
+
+             When ARP inspection is configured on specific VLANs, then the 
+             statistics in the ARP inspection VLAN table alone is applicable. 
+            "
+    ::= { fsMIIpArpInspect 6 }
+
+    fsMIIpArpInsSrcMACFailures OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the total number of ARP packets dropped
+             due to Source MAC validation failures.
+
+             When ARP inspection is configured on specific VLANs, then the 
+             statistics in the ARP inspection VLAN table alone is applicable. 
+            "
+    ::= { fsMIIpArpInspect 7 }
+
+    fsMIIpArpInsGlobalStatsClear OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+             "This object is used to clear Dynamic ARP inspection global statistics.
+
+              Setting this object to true will cause the statistics to be reset
+              and setting this object to false will have no effect.
+              This object reverts back to false after clearing the statistics."
+
+     DEFVAL  { false }
+    ::= { fsMIIpArpInspect 8 }
+
+
+    fsMIIpArpInsVlanTable OBJECT-TYPE
+          SYNTAX  SEQUENCE OF FsMIIpArpInsVlanEntry
+          MAX-ACCESS  not-accessible
+          STATUS      current
+          DESCRIPTION
+              "This table contains information of arp inspection status and statistics on each vlan inside a switch context"
+      ::= { fsMIIpArpInspect 9 }
+
+	  
+	  fsMIIpArpInsVlanEntry OBJECT-TYPE
+          SYNTAX FsMIIpArpInsVlanEntry
+          MAX-ACCESS  not-accessible
+          STATUS      current
+          DESCRIPTION
+              "Each entry contains the informations whether ARP Inspection is
+              enabled/disabled on the given Vlan."
+
+          INDEX { fsMIIpArpInsVlanContextId, fsMIIpArpInsVlanId}
+      ::= { fsMIIpArpInsVlanTable 1  }
+
+      FsMIIpArpInsVlanEntry ::= SEQUENCE {
+          fsMIIpArpInsVlanContextId         Integer32,
+          fsMIIpArpInsVlanId                Integer32,
+          fsMIIpArpInsVlanStatus            INTEGER,
+          fsMIIpArpInsVlanArpPktsForwarded  Integer32,
+          fsMIIpArpInsVlanArpPktsDropped    Integer32,
+          fsMIIpArpInsVlanIPValidFailures   Integer32,
+          fsMIIpArpInsVlanDestMACFailures   Integer32,
+          fsMIIpArpInsVlanSrcMACFailures    Integer32,
+          fsMIIpArpInsVlanClearStats        TruthValue,
+          fsMIIpArpInsVlanRowStatus          RowStatus
+      }
+
+      fsMIIpArpInsVlanContextId  OBJECT-TYPE
+          SYNTAX      Integer32 (0..255)
+          MAX-ACCESS  not-accessible
+          STATUS      current
+          DESCRIPTION
+              "Identifies the Context Id to which this vlan is mapped.   "
+      ::= { fsMIIpArpInsVlanEntry  1 }
+
+      fsMIIpArpInsVlanId OBJECT-TYPE
+          SYNTAX      Integer32 (1..4094)
+          MAX-ACCESS  not-accessible
+          STATUS      current
+          DESCRIPTION
+              "Vlan ID of the VLAN to which this table-entry is associated."
+
+      ::= { fsMIIpArpInsVlanEntry  2 }
+
+
+      fsMIIpArpInsVlanStatus OBJECT-TYPE
+          SYNTAX      INTEGER { enabled (1), disabled (2) }
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "Setting this object Enables or disables IP ARP Inspection status in the given VLAN.
+               This configuration is applicable only when ARP inspecion status is enabled in the switch globally"
+          DEFVAL  { 2 }
+
+      ::= { fsMIIpArpInsVlanEntry 3 }
+
+      fsMIIpArpInsVlanArpPktsForwarded  OBJECT-TYPE
+          SYNTAX      Integer32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+              "This object specifies the total number of arp packets are forwarded
+               on this VLAN."
+      ::= { fsMIIpArpInsVlanEntry  4 }
+
+      fsMIIpArpInsVlanArpPktsDropped  OBJECT-TYPE
+          SYNTAX      Integer32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+              "This object specifies the total number of arp packets are dropped
+               on this VLAN."
+      ::= { fsMIIpArpInsVlanEntry  5 }
+
+      fsMIIpArpInsVlanIPValidFailures  OBJECT-TYPE
+          SYNTAX      Integer32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+              "This object specifies the total number of arp packets are dropped
+               due to IP validation failures on this VLAN."
+      ::= { fsMIIpArpInsVlanEntry  6 }
+
+     fsMIIpArpInsVlanDestMACFailures  OBJECT-TYPE
+          SYNTAX      Integer32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+              "This object specifies the total number of arp packets are dropped
+               due to DEST MAC validation failures on this VLAN."
+      ::= { fsMIIpArpInsVlanEntry  7 }
+
+     fsMIIpArpInsVlanSrcMACFailures  OBJECT-TYPE
+          SYNTAX      Integer32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+              "This object specifies the total number of arp packets are dropped
+               due to SRC MAC validation failures on this VLAN."
+      ::= { fsMIIpArpInsVlanEntry  8 }
+
+      fsMIIpArpInsVlanClearStats  OBJECT-TYPE
+          SYNTAX      TruthValue
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "This object is used to clear all Dynamic ARP Inspection statistics of this VLAN.
+              Setting this object to true will cause the statistics to be reset
+              and setting this object to false will have no effect.
+              This object revert backs to false after clearing the statistics."
+              DEFVAL  { false }
+      ::= { fsMIIpArpInsVlanEntry  9 }
+
+      fsMIIpArpInsVlanRowStatus OBJECT-TYPE
+          SYNTAX      RowStatus
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "This object specifies Row-Status of VLAN entry"
+      ::= { fsMIIpArpInsVlanEntry 10 }
+
+-- ********************** (HOST, IPv6) Static Bindings *************************
+
+    fsMIIpDbv6StaticBindingTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FsMIIpDbv6StaticBindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table contains the static Host IPv6 configuration
+             information."
+    ::= { fsMIIpDbv6Static 1}
+
+    fsMIIpDbv6StaticBindingEntry OBJECT-TYPE
+        SYNTAX FsMIIpDbv6StaticBindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "A single entry contains the binding information of a single
+             host connected to the system."
+        INDEX {
+                fsMIIpDbv6ContextId,
+                fsMIIpDbv6StaticHostVlanId,
+                fsMIIpDbv6StaticHostMac
+              }
+    ::= { fsMIIpDbv6StaticBindingTable 1 }
+
+
+    FsMIIpDbv6StaticBindingEntry ::= SEQUENCE {
+        fsMIIpDbv6ContextId             Integer32,
+        fsMIIpDbv6StaticHostVlanId      Integer32,
+        fsMIIpDbv6StaticHostMac         MacAddress,
+        fsMIIpDbv6StaticHostIp          Ipv6Address,
+        fsMIIpDbv6StaticInIfIndex       Integer32,
+        fsMIIpDbv6StaticBindingStatus   RowStatus
+    }
+
+    fsMIIpDbv6ContextId OBJECT-TYPE
+        SYNTAX      Integer32 (0..65535)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Identifies the Virtual Bridge Context."
+    ::= { fsMIIpDbv6StaticBindingEntry 1 }
+
+    fsMIIpDbv6StaticHostVlanId OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The VLAN ID to which the host belongs. This is an index of
+             the table."
+    ::= { fsMIIpDbv6StaticBindingEntry 2 }
+
+    fsMIIpDbv6StaticHostMac OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "MAC address of the Host. This is an index of the table."
+    ::= { fsMIIpDbv6StaticBindingEntry 3 }
+
+    fsMIIpDbv6StaticHostIp OBJECT-TYPE
+        SYNTAX      Ipv6Address
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "IPv6 address of the Host."
+    ::= { fsMIIpDbv6StaticBindingEntry 4 }
+
+    fsMIIpDbv6StaticInIfIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Indicates the interface to which the host is connected."
+    ::= { fsMIIpDbv6StaticBindingEntry 5 }
+
+
+    fsMIIpDbv6StaticBindingStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The rowstatus of the Ipv6 binding table entry. All the objects in the
+             table must be filled before making the rowstatus as active."
+    ::= { fsMIIpDbv6StaticBindingEntry 6 }
+
+-- ********************** (HOST, IPv6) Binding Database ************************
+
+    fsMIIpDbv6BindingTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FsMIIpDbv6BindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table contains the information about all the hosts connected
+             to the system, their MAC Address, VLAN, IPv6 address"
+    ::= { fsMIIpDbv6Bindings 1}
+
+    fsMIIpDbv6BindingEntry OBJECT-TYPE
+        SYNTAX FsMIIpDbv6BindingEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "A single entry contains the binding information of a single
+             host connected to the system."
+        INDEX {
+                fsMIIpDbv6HostContextId,
+                fsMIIpDbv6HostVlanId,
+                fsMIIpDbv6HostMac
+              }
+    ::= { fsMIIpDbv6BindingTable 1 }
+
+     FsMIIpDbv6BindingEntry ::= SEQUENCE {
+        fsMIIpDbv6HostContextId     Integer32,
+        fsMIIpDbv6HostVlanId        Integer32,
+        fsMIIpDbv6HostMac           MacAddress,
+        fsMIIpDbv6HostBindingType   INTEGER,
+        fsMIIpDbv6HostIp            Ipv6Address,
+        fsMIIpDbv6HostInIfIndex     Integer32,
+        fsMIIpDbv6HostRemLeaseTime  Integer32
+    }
+
+    fsMIIpDbv6HostContextId OBJECT-TYPE
+        SYNTAX      Integer32 (0..65535)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Identifies the Virtual Bridge Context."
+    ::= { fsMIIpDbv6BindingEntry 1 }
+
+    fsMIIpDbv6HostVlanId OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The VLAN ID to which the host belongs. This is an index of
+             the table."
+    ::= { fsMIIpDbv6BindingEntry 2 }
+
+    fsMIIpDbv6HostMac OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "MAC address of the Host. This is an index of the table."
+    ::= { fsMIIpDbv6BindingEntry 3 }
+
+    fsMIIpDbv6HostBindingType OBJECT-TYPE
+        SYNTAX      INTEGER { static (1), dhcp (2)}
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           "Specifies whether the entry was configured through static configuration
+            or dynamically learnt through DHCPv6.
+	    
+	    This object is in read-write mode for dynamic entry configuration save purpose.                                                                              This object cannot be configured by user."
+    ::= { fsMIIpDbv6BindingEntry 4 }
+
+    fsMIIpDbv6HostIp OBJECT-TYPE
+        SYNTAX      Ipv6Address
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "IPv6 address of the Host.
+	     
+	     This object is in read-write mode for dynamic entry configuration save purpose.
+             This object cannot be configured by user."
+    ::= { fsMIIpDbv6BindingEntry 5 }
+
+    fsMIIpDbv6HostInIfIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Indicates the interface to which the host is connected.
+	     
+	     This object is in read-write mode for dynamic entry configuration save purpose.
+             This object cannot be configured by user."
+    ::= { fsMIIpDbv6BindingEntry 6 }
+
+    fsMIIpDbv6HostRemLeaseTime OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The Remaining lease time in seconds for the (host, IPv6) binding.
+             Applicable only if the fsIpDbv6BindingType is DHCPv6.
+	     
+	     This object is in read-write mode for dynamic entry configuration save purpose.
+             This object cannot be configured by user."
+    ::= { fsMIIpDbv6BindingEntry 7 }
+
+
+END

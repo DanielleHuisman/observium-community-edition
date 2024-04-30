@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -14,15 +14,6 @@ if ($_SESSION['userlevel'] < 5) {
     print_error_permission();
     return;
 }
-
-// Export or save templates
-$templates_export = FALSE;
-if ($vars['saveas'] == 'yes') {
-    $templates_export = $vars['filename'];
-} elseif ($vars['export'] == 'yes') {
-    $templates_export = 'print';
-}
-unset($vars['export'], $vars['saveas'], $vars['filename']);
 
 include($config['html_dir'] . "/includes/alerting-navbar.inc.php");
 
@@ -84,27 +75,13 @@ foreach ($contacts_db as $db_contact) {
     $contacts[$db_contact['alert_checker_id']][] = $db_contact;
 }
 
-if ($templates_export) {
-    //r($alert_check);
-    //r($alert_assoc);
-    // Export alert checkers as templates
-    $for_export = [];
-    foreach ($alert_check as $id => $entry) {
-        foreach ($alert_assoc[$id] as $assoc) {
-            // Multiple association sets (device+entity)
-            $entry['associations'][] = $assoc;
-        }
-        $for_export[] = $entry;
-    }
-    $templates_xml = generate_templates('alert', $for_export);
+if (get_var_true($vars['export'])) {
+    // Export requested
+    if (!get_var_true($vars['saveas'])) {
+        $export_filename = 'observium_alerts_';
+        $export_filename .= $vars['entity_type'] ?: 'all';
+        $export_filename .= '.json';
 
-    if ($templates_export == 'print') {
-        $templates_filename = 'observium_templates_alert_';
-        if ($vars['entity_type']) {
-            $templates_filename .= $vars['entity_type'];
-        } else {
-            $templates_filename .= 'all';
-        }
         $form = ['type'  => 'rows',
                  'space' => '10px',
                  'url'   => generate_url($vars)];
@@ -112,17 +89,19 @@ if ($templates_export) {
         $form['row'][0]['filename'] = [
           'type'        => 'text',
           'name'        => 'Filename',
-          'value'       => $templates_filename . '.xml',
+          'value'       => $export_filename,
           'grid_xs'     => 8,
           'width'       => '100%',
-          'placeholder' => TRUE];
+          'placeholder' => TRUE
+        ];
         // Save as human formatted XML
         $form['row'][0]['formatted'] = [
           'type'    => 'select',
           'grid_xs' => 4,
-          'value'   => (class_exists('DOMDocument') ? 'yes' : 'no'),
-          'values'  => ['yes' => 'Formatted',
-                        'no'  => 'Unformatted']];
+          'value'   => 'yes',
+          'values'  => [ 'yes' => 'Formatted',
+                         'no'  => 'Unformatted' ]
+        ];
         // search button
         $form['row'][0]['saveas'] = [
           'type'  => 'submit',
@@ -132,15 +111,11 @@ if ($templates_export) {
           'value' => 'yes'
         ];
         print_form($form);
-
-        print_xml($templates_xml);
-        //r(xml_to_array($templates_xml));
-    } else {
-        $templates_filename = $templates_export;
-        download_as_file($templates_xml, $templates_filename, $vars);
     }
 
-    unset($for_export, $templates_xml, $templates_export, $templates_filename, $form);
+    json_export('alerts', $vars);
+
+    unset($export_filename, $form);
 }
 
 foreach (dbFetchRows("SELECT * FROM `alert_table`" . $where) as $entry) {
@@ -206,7 +181,7 @@ foreach ($alert_check as $check) {
     foreach ($check['conditions'] as $condition) {
         // Detect incorrect metric used
         if (!in_array($condition['metric'], $allowed_metrics, TRUE)) {
-            print_error("Unknown condition metric '" . $condition['metric'] . "' for Entity type '" . $check['entity_type'] . "'");
+            print_error("Unknown condition metric '" . escape_html($condition['metric']) . "' for Entity type '" . escape_html($check['entity_type']) . "'");
 
             foreach (array_keys($config['entities']) as $suggest_entity) {
                 if (isset($config['entities'][$suggest_entity]['metrics'][$condition['metric']])) {
@@ -217,7 +192,8 @@ foreach ($alert_check as $check) {
             }
         }
 
-        echo '<tr><td>' . $condition['metric'] . '</td><td>' . $condition['condition'] . '</td><td>' . str_replace(",", ", ", $condition['value']) . '</td></tr>';
+        echo '<tr><td>' . escape_html($condition['metric']) . '</td><td>' . escape_html($condition['condition']) .
+            '</td><td>' . escape_html(str_replace(",", ", ", $condition['value'])) . '</td></tr>';
 
         $condition_text_block[] = $condition['metric'] . ' ' . $condition['condition'] . ' ' . $condition['value'];
         //str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists

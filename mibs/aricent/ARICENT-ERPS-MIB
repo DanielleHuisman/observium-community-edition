@@ -1,0 +1,2952 @@
+-- Copyright (C) 2009-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fserps.mib,v 1.34 2016/01/11 13:05:21 siva Exp $
+
+--    ERPS Proprietary MIB Definition
+
+--    This file explains the proprietary MIB implemented for
+--    ERPS (Ethernet Ring Protection Switching) feature
+--    which conforms to the ITU-T specification G.8032/Y.1344 (06/2008) 
+--    and G.8032/Y.1344 Amendment I (04/2009)
+
+ARICENT-ERPS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, 
+    Integer32, Unsigned32, enterprises, Counter32     FROM SNMPv2-SMI
+    VlanId                                            FROM ARICENTQ-BRIDGE-MIB
+    Dot1agCfmMepId                                    FROM IEEE8021-CFM-MIB
+    InterfaceIndex,
+    InterfaceIndexOrZero                              FROM IF-MIB
+    DisplayString, RowStatus, TEXTUAL-CONVENTION, 
+    TruthValue, MacAddress                            FROM SNMPv2-TC;
+
+fsErpsMIB MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com"
+    DESCRIPTION
+        "This MIB is a proprietary MIB for ERPS to provide ethernet
+         ring protection switching as per ITU-T G.8032/Y.1344  and 
+         ITU-T G.8032/Y.1344 Amendment I (04/2009)"
+    REVISION "201209050000Z"
+    DESCRIPTION
+        "This MIB is a proprietary MIB for ERPS to provide ethernet
+         ring protection switching as per ITU-T G.8032/Y.1344  and 
+         ITU-T G.8032/Y.1344 Amendment I (04/2009)"
+
+::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 40 }
+
+-- *****************************************************************************
+--              Subtrees in the ERPS MIB
+-- *****************************************************************************
+    fsErpsContext            OBJECT IDENTIFIER ::= { fsErpsMIB 1 }
+    fsErpsRing               OBJECT IDENTIFIER ::= { fsErpsMIB 2 }
+    fsErpsStats              OBJECT IDENTIFIER ::= { fsErpsMIB 3 }
+    fsErpsNotifications      OBJECT IDENTIFIER ::= { fsErpsMIB 4 }
+
+-- *****************************************************************************
+--              Textual Conventions               
+-- *****************************************************************************
+
+RingId ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+        "Ring identifier used to identify a ring protection group."
+      SYNTAX      Unsigned32 (1..4294967295)
+
+RingMonitorMechanismType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Object represents the type of monitoring mechanism used to monitor 
+         a Ring Entry. The value can be one of the following: 
+
+         cfm(1)        Using Connectivity Fault Management via OAM functions 
+                       and mechanisms for Ethernet based networks (ITU-T 
+                       Y.1731)
+
+	 mplsOam(2)    Using MPLS-OAM functions for MPLS LSP's and 
+		       Pseudowires in MPLS TP networks for monitoring 
+	 	       the working and protection services.
+
+		       For mplsOam monitoring mechanism to monitor the 
+		       ring ports,the monitoring PWs needs to be created in MPLS 
+		       module and down MEPs for the PWs needs to be 
+		       provisioned in BFD for monitoring the PWs and 
+		       the MEPs needs to be provisioned in fsErpsRingCfmTable.
+                       
+		       For sub-rings, Down MEP of the Monitoring PWs of 
+		       fsErpsRingPort1 of the interconnecting nodes needs to be 
+		       provisioned in the same fsErpsRingCfmTable.
+                        
+                       For LDP based VPLS Resiliency, mplsoam as monitoring
+                       mechanism is used to monitor the ring ports (pseudowire interfaces),
+                       the monitoring PWs are created in MPLS module, down MEPs 
+                       need to be provisioned in fsErpsRingCfmTable and pseudowire identifiers
+                       need to be provisioned in fsErpsRingMplsTable.    
+		
+                       In LDP based VPLS Resiliency, for sub-rings, Down MEP of the
+                       monitoring PWs of fsErpsRingPort1 of the interconnencted nodes
+                       needs to be provisioned in the same fsErpsRingCfmTable  
+                       and pseudo-wire identifier of the monitoring PW of fsErpsRingPort1 
+                       of the interconnecting nodes needs to be provisioned in the same 
+                       fsErpsRingMplsTable.
+         ifm(3)        Using just a port operstatus
+         reserved(x)   Reserved for other monitoring mechanisms for future use" 
+
+    SYNTAX      INTEGER { cfm(1),mplsOam(2),ifm(3) }
+
+RingIdOrNone ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+        "The Ring identifier that uniquely identifies a specific ring 
+        protection group,or no ring.  The special value of zero is used 
+        to indicate that no ring is present or used.  This can
+        be used in any situation where an object or a table entry
+        must refer either to a specific ring, or to no ring.
+
+        Note that a MIB object that is defined using this
+        TEXTUAL-CONVENTION should clarify the meaning of
+        'no ring' (i.e., the special value 0)."
+    SYNTAX       Unsigned32 (0 | 1..4294967295)
+
+RingServiceType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A value representing the type of service to be protected by this 
+         ring group. The value can be one of the following: 
+        
+         vlan(1)      - IEEE802.1Q VLAN  
+	 mplsLSP(2)   - MPLS Label Switched Path (LSP)
+	 mplsPW(3)    - MPLS Pseudowire. Right and left pseudowires will be monitored and protected.
+         mplsLSPPW(4) - MPLS LSP Pseduowire.A set of pseudowires can exist and the overlying LSP will be 
+			monitored and all the underlying pseudowires will be protected.
+         reserved(x)  - Reserved for future use. [x values can be 5...7]
+
+        The ring service type indicates the type of the transporting
+        service that needs to be protected for this ring group."
+
+    SYNTAX      INTEGER { vlan(1), mplsLSP(2), mplsPW(3), mplsLSPPW(4) }
+
+
+-- *****************************************************************************
+--                         Context table 
+-- *****************************************************************************
+
+fsErpsContextTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsContextEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "Table of ERPS module parameters per ERPS Virtual Context." 
+   ::= { fsErpsContext 1 }
+
+fsErpsContextEntry OBJECT-TYPE
+   SYNTAX       FsErpsContextEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This entry contains virtual context specific ERPS module parameters."
+   INDEX { fsErpsContextId }
+   ::= { fsErpsContextTable 1 }
+
+FsErpsContextEntry ::=
+   SEQUENCE {
+          fsErpsContextId
+            Unsigned32,
+          fsErpsCtxtName
+            DisplayString,
+          fsErpsCtxtSystemControl
+            INTEGER,
+          fsErpsCtxtModuleStatus
+            INTEGER,
+          fsErpsCtxtTraceInput
+            DisplayString,
+          fsErpsCtxtTrapStatus 
+            INTEGER,
+          fsErpsCtxtClearRingStats 
+            TruthValue,
+          fsErpsCtxtRowStatus 
+            RowStatus,
+          fsErpsCtxtVlanGroupManager
+            INTEGER,
+          fsErpsCtxtProprietaryClearFS 
+            TruthValue
+        }
+
+fsErpsContextId OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION 
+      "Context identifier used to distinguish between the
+       multiple virtual bridge contexts within a bridge."
+   ::= { fsErpsContextEntry 1 }
+
+fsErpsCtxtName OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (1..32))
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+           "This object gives the context-name for this virtual context."
+   ::= { fsErpsContextEntry 2 }
+
+fsErpsCtxtSystemControl OBJECT-TYPE
+   SYNTAX      INTEGER { start(1), shutdown(2) } 
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The administrative shutdown status requested by management for the ERPS 
+       feature. 
+       When set to 'start(1)', ERPS module will be started in this context and
+       the module status will be initialized to 'disable(2)'.
+       When set to 'shutdown(2)', ERPS module will be shutdown in this context 
+       and all ring configurations in this context will be deleted."
+   DEFVAL { shutdown }
+   ::= { fsErpsContextEntry 3 }
+
+fsErpsCtxtModuleStatus OBJECT-TYPE
+   SYNTAX      INTEGER { enable(1), disable(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The administrative status requested by management for the ERPS  
+       feature. 
+       When set to 'enable(1)', ERPS module will be enabled in this context and
+       ERPS protocol will start running on all rings configured in this
+       context.
+       This object can be set to 'enable(1)', only when the 
+       fsErpsCtxtSystemControl is configured as 'start(1)'.
+       When set to 'disable(2)', ERPS module will be disabled in this context 
+       and all rings configured in this context will become non-operational
+       i.e., ERPS protocol will not run on the rings in this context."
+   DEFVAL { disable }
+   ::= { fsErpsContextEntry 4 }
+
+fsErpsCtxtTraceInput OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..255))
+    MAX-ACCESS  read-write 
+    STATUS      current 
+    DESCRIPTION 
+      "This object stores the trace option string input given by the user. To 
+       enable or disable particular trace, the user has to enter the 
+       corresponding string(given below) assigned for that. To enable or 
+       disable more than one trace, the user has to enter the corresponding 
+       strings with SPACE delimiter between each string.
+
+       Syntax:
+          <enable/disable> <trace string1> <trace string2> ...
+
+       For example, to enable the below traces
+           - Start and Shutdown traces
+           - Management traces
+
+       The input string has to be:
+              'enable init-shut mgmt'
+
+       For example, to disable the below traces 
+           - start and Shutdown traces and
+           - Management traces
+
+       The input string has to be:
+              'disable start-shutdown mgmt'
+
+       First string should be either enable or disable.
+
+       The definition of input strings that can be given are:
+
+       enable          - Enables the corresponding option,
+       disable         - Disables the corresponding option,
+       start-shutdown  - Start and Shutdown traces,
+       mgmt            - Management traces,
+       ctrl            - Control Plane traces,
+       pkt-dump        - Packet Dump traces,
+       resource        - Traces related to all resources except buffers,
+       all-fail        - All Failure traces,
+       buffer          - Buffer allocation/ release traces,
+       critical        - Critical traces,
+
+       By default, critical trace will be enabled."
+    DEFVAL  { "critical" }
+    ::= { fsErpsContextEntry 5 }
+
+fsErpsCtxtTrapStatus OBJECT-TYPE
+   SYNTAX      INTEGER { enable(1), disable(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to enable or disable the TRAP notification. The 
+       value 'enable (1)' indicates that the ERPS will send notifications. 
+       The value 'disable (2)' indicates that the ERPS notifications will not 
+       be sent."
+   DEFVAL { enable }
+   ::= { fsErpsContextEntry 6 }
+
+fsErpsCtxtClearRingStats OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to clear statistics counters  for all rings 
+       in this context. When set to true(1), statistics counters for all 
+       rings in this context will be cleared. When set to false(2), no 
+       action will take place.  
+       Get of this object will always return 'false'. "
+   DEFVAL { false }
+   ::= { fsErpsContextEntry 7 }
+
+fsErpsCtxtRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "Row status for the ring context entry. 
+       An entry can be created in this table, only when the corresponding
+       virtual context is created in the system.
+
+       Only 'createAndGo', and 'destroy' values are allowed for this
+       object. 'createAndWait' and 'notInService' values are not allowed.
+
+       When virtual context is deleted from the system, the corresponding
+       entry in this table will be deleted.
+
+       All the fields in this table can be changed, only when the row status
+       is active."
+   ::= { fsErpsContextEntry 8 }
+
+fsErpsCtxtVlanGroupManager OBJECT-TYPE
+   SYNTAX      INTEGER { mstp(1), erps(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+          "This object identifies the module that manages the grouping of 
+           vlans in this virtual context.
+
+           mstp(1) - MSTP(Multiple Spanning Tree Protocol) module manages 
+                     the grouping of vlans. In this case, MSTI(MSTP 
+                     instance Id) identifies the group (or vlan list). 
+                     If a MSTI is mapped to a ring instance, then that ring 
+                     instance will protect the list of vlan mapped to that 
+                     MSTI.
+                     Administrator should make sure that MSTP module is 
+                     started and enabled, if this object is set to mstp(1).
+
+           erps(2) - ERPS module manages the grouping of vlans. 
+                     If this value is set, then fsErpsVlanGroupTable is used 
+                     to configure the grouping of vlans. In this case, 
+                     fsErpsVlanGroupId object identifies the group.
+                     If a list is mapped to a ring instance, the ring 
+                     instance will protect the list of vlans mapped to that 
+                     list.
+           fsErpsVlanGroupTable can be configured in a virtual context only
+           when this object is set to 'erps'.
+           It is recommended to shutdown erps or delete all rings in this 
+           context before changing the value for this context."
+
+   DEFVAL { mstp }
+   ::= { fsErpsContextEntry 9 }
+
+fsErpsCtxtProprietaryClearFS OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This object is used to enable or disable the ERPS proprietary
+       implementation. The value 'true (1)' indicates that the ERPS
+       proprietary implementation will override the standard implementation.
+       On clearing the force switch the ring will move to the Ideal state as 
+       per the standard even though if there is a local SF, as per the standard
+       local SF will be ignored if the ring node is in a force switch state 
+       refer section Table 10-1/G.8032/Y.1344-Request/State Priority but if 
+       Local SF is not handled on Clear FS then this will lead to ring 
+       segmentation. ERPS proprietary implementation will move the ring
+       nodes to protection state on clearing the force switch and will send 
+       RAPS-SF PDU."
+    DEFVAL { false }
+   ::= { fsErpsContextEntry 10 }
+
+--*****************************************************************************
+--                       fsErpsVlanGroupTable
+--*****************************************************************************
+fsErpsVlanGroupTable   OBJECT-TYPE
+    SYNTAX SEQUENCE OF FsErpsVlanGroupEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table is used configure the grouping of set of vlans.
+      This table can be accessed only if fsErpsCtxtVlanGroupManager object 
+      is set to 'erps'.
+      By default a group with GroupId zero will be created and all vlans
+      will get mapped to it.
+      The VLAN will be treated as VFI to be protected by the ring group 
+      when the monitoring mechanism is mplsOam"
+   ::= { fsErpsContext 2 }
+
+fsErpsVlanGroupEntry OBJECT-TYPE
+   SYNTAX      FsErpsVlanGroupEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This entry contains vlan id, group/list/instance Id and status of that 
+      vlan."
+   INDEX { fsErpsContextId, fsErpsVlanId, fsErpsVlanGroupId }
+   ::= { fsErpsVlanGroupTable 1 }
+
+FsErpsVlanGroupEntry ::= SEQUENCE {
+		 fsErpsVlanId
+			VlanId,
+		 fsErpsVlanGroupId
+            Integer32,
+         fsErpsVlanGroupRowStatus
+            RowStatus
+      }
+
+fsErpsVlanId OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This is the vlan id which is mapped to this group."
+   ::= { fsErpsVlanGroupEntry 1 }
+
+fsErpsVlanGroupId OBJECT-TYPE
+    SYNTAX      Integer32 (0..64)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "This is the vlan group identifier. A group can contain multiple vlans,
+      but one vlan cannot be part of multiple groups. It is similar to the 
+      MSTP Instance mapped with vlan." 
+   ::= { fsErpsVlanGroupEntry 2 }
+
+
+fsErpsVlanGroupRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This denotes the row status for this table.
+       Only 'CreateAndGo' and 'destroy' values are allowed for this
+       object. 'CreateAndWait' and 'notInService' values are not allowed.
+       Vlans can be added/removed from a group, even when that group is
+       associated with some active ring instances.
+
+       When a vlan is removed from a non-default group, it gets added to 
+       default group.
+
+       This object cannot be configured for default group.
+       To move a vlan from default group to another group, set the row status
+       for that (non-default group, vlan) as 'createAndGo'.
+
+       Whenever a vlan is created, it is recommended to add that vlan to the
+       required group.
+       Also before deleting a vlan, it is recommended to remove that vlan
+       from the non-default group to which it is mapped.
+
+
+       Example:
+        To add vlans 2, 3 to a group with id as 1 in this table, 
+        the following sequence to be followed:
+        
+           1. Set the fsErpsVlanGroupRowStatus as 'CreateAndGo' for the
+              entry with index 
+              (fsErpsVlanGroupId = 1, fsErpsVlanId = 2) 
+           2. Set the fsErpsVlanGroupRowStatus as 'CreateAndGo' for the
+              entry with index 
+              (fsErpsVlanGroupId = 1, fsErpsVlanId = 3) 
+        
+        To delete a vlan 3 from group 1 do the following:
+           1. Set the fsErpsVlanGroupRowStatus as 'destroy' for the
+              entry with index 
+              (fsErpsVlanGroupId = 1, fsErpsVlanId = 3)."
+   ::= { fsErpsVlanGroupEntry 3 }
+
+-- #############################################################################
+-- Ring Table Dependencies:
+-- ========================
+-- Ring configurations are spread across the following three tables:
+--      1. fsErpsRingTable   
+--             - Ring table is used to configure a 'Protection Ring' in a 
+--               switch. This table contains the mandatory configurations for 
+--               the rings.
+--      2. fsErpsRingCfmTable
+--             - If 'cfm' monitoring mechanism is to be followed, then
+--               through this table, monitoring entities for the ring ports
+--               should be configured.
+--      3. fsErpsRingConfigTable 
+--             - This table contains optional configurations and commands for
+--               the rings.
+--      4. fsErpsRingTcPropTable
+--             - This table contains the list of ring IDs for a sub-ring, where
+--               the sub-ring's TC needs to be propagated.
+--      5. fsErpsRingMplsTable
+--             - If 'mplsoam' monitoring mechanism is to be followed, then
+--               through this table in addition to fsErpsRingCfmTable, 
+--               monitoring entities for the ring ports
+--               should be configured.
+--
+--     
+--     Sample Ring Topology:
+--     
+--        =======        =======  
+--     P3|  N1  |P1   P3|  N2  |P1
+--  =====|      |=======|      |=
+--       |      |       |      |  
+--        =======        =======  
+--          |P2            |P2       
+--          |      R1      |         
+--          |              |         
+--          |P4            |P4         
+--        =======        =======  
+--     P3|  N4  |P1   P3|  N3  |P1
+--  =====|      |==/====|      |=
+--       |      |       |      |  
+--        =======        =======  
+--          |P2            |P2       
+--          |      R2      |         
+--          |              |         
+--          |P4            |P4         
+--        =======        =======  
+--     P3|  N5  |P1   P3|  N6  |P1
+--  =====|      |==/===-|      |=
+--       |      |       |      |  
+--        =======        =======  
+--          |P2            |P2
+--
+--  R1 is a ring formed by the closed loop between the ring nodes N1, N2, 
+--  N3 and N4 with links (N1:P1<==>N2:P3), (N2:P2<==>N3:P4),(N3:P3<==>N4:P1), 
+--  and (N4:P4<==>N1:P2).
+--  RplOwner for Ring R1 is N4 and the RPL port is N4:P1.
+--
+--  R2 is a sub-ring formed by the ring nodes N3,N4,N5 andN6 with links
+--  (N3:P2<==>N6:P4),(N6:P3<==>N5:P1) and (N5:P4<==>N4:P2).
+--  RplOwner for sub-ring R2 is N5 and the RPL port is N5:P1.
+--
+--  N3 and N4 are the interconnected nodes in this topology.
+--  Port P1 in the interconnected node N4 and port P3 in the interconnected
+--  node N3 belong only to ring R1.
+--
+--  For sub-ring R2 in interconnected node N4:
+--          Ring port 1 is P2.
+--          Ring port 2 is 0.
+--
+-- #############################################################################
+fsErpsRingTable   OBJECT-TYPE
+    SYNTAX SEQUENCE OF FsErpsRingEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      " The table for creating and configuring the ring entries. Each entry 
+       has information about one ring in the switch."
+   ::= { fsErpsRing 1 }
+
+fsErpsRingEntry OBJECT-TYPE
+   SYNTAX      FsErpsRingEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "The ring table entry, each entry in this table contains the attributes
+       which define a ring."
+   INDEX { fsErpsContextId, fsErpsRingId }
+   ::= { fsErpsRingTable 1 }
+      
+FsErpsRingEntry ::= SEQUENCE {
+      fsErpsRingId
+         RingId,
+      fsErpsRingVlanId
+         VlanId,
+      fsErpsRingName
+         DisplayString,
+      fsErpsRingPort1
+         InterfaceIndex,
+      fsErpsRingPort2
+         InterfaceIndexOrZero,
+      fsErpsRingRplPort
+         InterfaceIndexOrZero,
+      fsErpsRingPortBlockingOnVcRecovery
+         TruthValue,
+      fsErpsRingNodeType
+         INTEGER,
+      fsErpsRingOperatingMode
+         INTEGER, 
+      fsErpsRingMonitorMechanism
+         RingMonitorMechanismType,
+      fsErpsRingPort1Status
+         INTEGER,
+      fsErpsRingPort2Status 
+         INTEGER,
+      fsErpsRingSemState
+         INTEGER,
+      fsErpsRingNodeStatus
+         Integer32,
+      fsErpsRingRowStatus
+         RowStatus,
+      fsErpsRingMacId
+	     Integer32,
+      fsErpsRingProtectedVlanGroupId
+	     Integer32,
+      fsErpsRingProtectionType
+         INTEGER,
+      fsErpsRingRAPSCompatibleVersion
+          INTEGER,
+      fsErpsRingRplNeighbourPort
+        InterfaceIndexOrZero,
+      fsErpsRingRAPSSubRingWithoutVC
+        TruthValue,
+      fsErpsRingRplNextNeighbourPort
+        InterfaceIndexOrZero,
+      fsErpsRingPort1NodeID
+        MacAddress,
+      fsErpsRingPort2NodeID
+        MacAddress,
+      fsErpsRingPort1BPRBitVal
+        TruthValue,
+      fsErpsRingPort2BPRBitVal
+        TruthValue,
+      fsErpsRingProtectedVlanGroupList
+	OCTET STRING,
+      fsErpsRingServiceType
+         RingServiceType,
+      fsErpsRingPort1SubPortList
+	OCTET STRING,
+      fsErpsRingPort2SubPortList
+	OCTET STRING
+      }
+
+fsErpsRingId OBJECT-TYPE
+    SYNTAX      RingId                
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "Unique numeric identifier of a ring within the context for administrative
+       purposes. In service based protection mode(Multiple ERP instances), this 
+       object represents the id of the ring instance."
+   ::= { fsErpsRingEntry 1 }
+
+fsErpsRingVlanId OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object identifies the dedicated VLAN Id used by a ring for its 
+       R-APS messages communication.  
+
+       It is recommended that the,
+         * R-APS VLANs should be used only for ring R-APS message 
+           communication  and should not be used for data switching and 
+           management purposes.
+
+       It is recommended that R-APS VLAN is created first through the VLAN 
+       configuration before making the ring entry active, in order to avoid 
+       any loss of R-APS PDU Tx/Rx. 
+ 
+       It is not recommended to use the same R-APS VLAN ID for more than 
+       one ring."
+   ::= { fsErpsRingEntry 2 }
+
+fsErpsRingName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object indicates the name of the ring. By default, the ring name 
+       will be constructed by appending ring ID to the string 'ring'.
+       Example: Default ring name for a ring with ID as 1 will be 'ring1'."
+   ::= { fsErpsRingEntry 3 }
+
+fsErpsRingPort1 OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "First port of the two ring ports participating in the ring. Any 
+      interface with valid interface ID can be configured as a ring port."
+   ::= { fsErpsRingEntry 4 }
+
+fsErpsRingPort2 OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "Second port of the two ring ports participating in the ring. Any 
+       interface with valid interface ID can be configured as a ring port.
+       On the interconnected node of a sub-ring, this port should be 
+       configured as zero."
+   ::= { fsErpsRingEntry 5 }
+
+fsErpsRingRplPort OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object identifies the RPL port of the ring. 
+
+       Valid values for this object are '0', 'IfIndex of fsErpsRingPort1' and 
+       'IfIndex of fsErpsRingPort2'. 
+
+       When a port is configured as a RPL port,  that node becomes RPL 
+       owner for that ring.
+
+       Value '0' indicates that none of the ring ports is a RPL port
+       and hence the node is not a RPL owner.
+
+       In an interconnected node of a sub-ring, the 'fsErpsRingPort1' alone 
+       can be chosen as an RPL port when administrator decides to have the 
+       interconnected node as the RPL Owner of the sub-ring.
+
+       Administrator has to ensure that, only one node in a ring is 
+       configured as RPL owner."
+    DEFVAL { 0 }
+   ::= { fsErpsRingEntry 6 }
+
+fsErpsRingPortBlockingOnVcRecovery OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is applicable for the interconnected nodes of a sub-ring. 
+      This configuration helps to avoid the possibility of temporary loops 
+      getting formed in the sub-ring during the virtual channel recovery.
+      This object should be set to 'true' on only one of the interconnected
+      node of the sub-ring. (If 'fsErpsRingPortBlockingOnVcRecovery' is 
+      configured to be 'true' on both the interconnected node of a sub-ring,
+      then that sub-ring will be temporary cutoff from the rest of network).
+      When this object value is set to 'true',  the fsErpsRingPort1 of this 
+      ring node will be blocked in the event of virtual channel recovery. 
+      The fsErpsRingPort1 of the sub-ring will be unblocked when the RPL port
+      of the sub-ring is blocked and NRRB messages from the RPL Owner is 
+      received by this node."
+    DEFVAL { false }
+   ::= { fsErpsRingEntry 7 }
+
+fsErpsRingNodeType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        rplOwner(1), 
+                        nonRplOwner(2) 
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object identifies the node state of this ring node. 
+       If fsErpsRingRplPort is configured for a ring node, then that ring
+       node becomes 'rplOwner', otherwise the node remains as 'nonRplOwner'."
+   ::= { fsErpsRingEntry 8 }
+
+fsErpsRingOperatingMode OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 revertive(1), 
+                 nonRevertive(2) 
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object identifies whether the ring is operating in revertive or
+       nonRevertive manner.
+       In revertive mode of operation, once the failed link recovers, the data
+       path will be switched back from protection path to working path.
+
+       In nonRevertive mode of operation, once the failed link recovers, one 
+       of the recovered link port will remain in blocked state and the data
+       still remains in the protection path. 
+
+       This object can be changed, only when the rowstatus for this ring is 
+       not active."
+   DEFVAL { revertive }
+   ::= { fsErpsRingEntry 9 }
+
+fsErpsRingMonitorMechanism OBJECT-TYPE
+   SYNTAX      RingMonitorMechanismType
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the type of monitoring mechanism used for 
+       detecting faults of the ring link. 
+
+       Currently 'cfm' and 'MPLS OAM' is supported as monitoring mechanism. 
+       For 'cfm' monitoring mechanism to monitor the ring ports, appropriate 
+       down MEPs on the R-APS VLAN of the ring has to be provisioned through 
+       fsErpsRingCfmTable.
+       For sub-rings, a Up & Down MEP on the sub-ring R-APS VLAN needs to
+       be installed on fsErpsRingPort1 of the interconnecting nodes using
+       the same fsErpsRingCfmTable.
+       
+       For 'MPLS OAM' monitoring mechanism to monitor the ring ports, appropriate
+       down MEPs on the R-APS VLAN of the ring has to be provisioned through
+       fsErpsRingCfmTable and pseudo-wire identifiers need to be provisioned through
+       fsErpsRingMplsTable.
+       For sub-rings, Down MEP on the sub-ring R-APS VLAN needs to be installed on
+       fsErpsRingPort1 of the interconnecting nodes using the same fsErpsRingCfmTable
+       and pseudo-wire identifier of the monitoring pseudo-wire of fsErpsRingPort1 of 
+       interconnecting nodes needs to be provisioned"
+   
+   DEFVAL { cfm } 
+   ::= { fsErpsRingEntry 10 }
+
+fsErpsRingPort1Status OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        blocked(1),
+                        unblocked(2)
+                }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates ring port1's current status updated by 
+      ERPS control process of this ring. 
+      If the status is blocked then:
+          - Data traffic will be blocked on this port.
+          - R-APS messages received on this port will be given to ERPS 
+            control process but will not be forwarded.
+          - Similarly R-APS messages received at other member ports of
+            R-APS VLAN will not be forwarded on this port.
+          - Locally regenerated R-APS packets will be transmitted out of
+            this port.
+      If the status is unblocked then:
+          - Data traffic will be unblocked on this port.
+          - R-APS messages received on this port will be given to ERPS 
+            control process and will be forwarded to R-APS VLAN member ports.
+          - Similarly R-APS messages received at other member ports of R-APS
+            VLAN can be forwarded on this port."
+   ::= { fsErpsRingEntry 11 }
+
+fsErpsRingPort2Status OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        blocked(1),
+                        unblocked(2)
+                        }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates ring port2's current status updated by 
+      ERPS control process of this ring.
+      If the status is blocked then:
+          - Data traffic will be blocked on this port.
+          - R-APS messages received on this port will be given to ERPS 
+            control process but will not be forwarded.
+          - Similarly R-APS messages received at other member ports of
+            R-APS VLAN will not be forwarded on this port.
+          - Locally regenerated R-APS packets will be transmitted out of
+            this port.
+      If the status is unblocked then:
+          - Data traffic will be unblocked on this port.
+          - R-APS messages received on this port will be given to ERPS 
+            control process and will be forwarded to R-APS VLAN member ports.
+          - Similarly R-APS messages received at other member ports of R-APS
+            VLAN can be forwarded on this port.
+      For sub-rings in interconnected nodes, this object is not valid,
+      and get on this object will always return 'unblocked'."
+   ::= { fsErpsRingEntry 12 }
+
+fsErpsRingSemState OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        disabled(0),
+                        idle(1),
+                        protection(2),
+                        manualswitch(3),
+                        forcedswitch(4),
+                        pending(5)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This object gives the node state as per the  G.8032 state event
+       machine. When ring Row status is not active or when ERPS is disabled
+       in the virtual context, this object will show 'disabled(0)' status."
+   ::= { fsErpsRingEntry 13 }
+
+fsErpsRingNodeStatus OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "A 32 bit mask giving the current status of the ring by specifying the
+       events/status currently present.
+
+         Bit 1  - Signal-failure on Ring Port 1
+         Bit 2  - Signal-failure on Ring Port 2
+         Bit 3  - Remote-signal-failure received on Ring Port 1
+         Bit 4  - Remote-signal-failure received on Ring Port 2
+         Bit 5  - Rpl-blocked
+         Bit 6  - Wait-to-restore-timer-running
+         Bit 7  - Hold-timer-running
+         Bit 8  - Guard-timer-running
+         Bit 9  - Periodic-timer-running
+         Bit 10 - Wait-to-block-timer-running
+
+      Value 1 of the bit signifies the presence of the event associated with
+      that bit and value zero signifies the absence of that event
+      For example: If a signal failure is received on Ring port 1 and R-APS(SF)
+      is received on port 2, then Bit 1 and 4 will have the value as 1.
+
+      Signal failure on a port represents Port failure indication received from 
+      the monitoring entity. This does not depend on hold off timer status. 
+      If signal failure is received on ring port 1 and hold-off timer is 
+      started, then both Bit 1 and Bit 7 will have the value as 1.
+      
+      Bit 9 indicates periodic timer and Bit 10 will have the value 1 when 
+      WTB timer is triggered."
+   ::= { fsErpsRingEntry 14 }
+
+fsErpsRingRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "Row status of the ring entry. Entries in this table can be modified
+       by setting the RowStatus as NOT_IN_SERVICE.
+
+       This RowStatus can be made active only if:
+           - fsErpsRingPort1 for this entry is set to valid interfaceIndex and
+           - fsErpsRingPort2 for this entry is set to valid interfaceIndex or 
+             is set to zero
+           - fsErpsRingVlanId for this entry is configured
+           - there exists a active entry for this ring in fsErpsRingCfmTable.
+       This RowStatus can be set to 'destroy', only when the corresponding 
+       entry for this ring in fsErpsRingCfmTable is deleted."
+   ::= { fsErpsRingEntry 15 }
+
+fsErpsRingMacId OBJECT-TYPE
+    SYNTAX      Integer32 (1..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object represents the id of the ring instance to be communicated
+      via R-APS PDUs to other ring nodes. For this ring instance, the value 
+      of this object forms the last octet of the destination MAC address 
+      field of the R-APS PDUs. 
+      All ring nodes in a single ring instance must be configured with the
+      same ring mac id. To interoperate with ring nodes implementing the 
+      version 1 of 'G.8032/Y.1344 Ethernet Ring Protection Switching', the
+      value of this object should be set as 1.
+      The ring MAC id can be modified only when the row status of the ring 
+      entry is in not in service."
+    DEFVAL { 1 }
+   ::= { fsErpsRingEntry 16 }
+
+fsErpsRingProtectedVlanGroupId OBJECT-TYPE
+    SYNTAX      Integer32 (0..64)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object identifies the vlan group associated with this ring 
+      instance. 
+      If VlanGroupManager is 'mstp', then this object identifies the 
+      Mstp Instance Id.
+      Otherwise this object identifies the VlanGroup created through
+      fsErpsVlanGroupTable.
+
+      This object can be used when single Vlan Group is to be mapped with the ring.
+      To map multiple Vlan Groups with the ring, the MIB object 
+      'fsErpsRingProtectedVlanGroupList' should be used. 
+
+      When this mib object is configured, it would be added to 
+      fsErpsRingProtectedVlanGroupList. 
+
+      If the ring is running in portBased protection mode then this
+      object will not have any effect.
+
+      Protected vlan group Id can be modified only when the row status
+      of the ring entry in not in service."
+    DEFVAL { 0 }
+   ::= { fsErpsRingEntry 17 }
+
+fsErpsRingProtectionType OBJECT-TYPE
+   SYNTAX      INTEGER { portBased(1), serviceBased(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the type of protection being provided by this
+      ring instance. The following two protection switching types are
+      possible:
+           portBased - Port Based Protection 
+                       This ring applies the protection switching mechanism
+                       for all traffic that pass through its ring ports.
+                       Hence when ERP control process decides to block or
+                       unblock a ring port, all data traffic that passes 
+                       through that port gets affected.
+           serviceBased - Service Based Protection.
+                       This ring applies the protection switching mechanism
+                       only for the set of vlans mapped to this ring instance.
+                       Hence when ERP control process decides to block or
+                       unblock a ring port, only the data traffic of the vlans
+                       that are mapped to this ring instance and that passes 
+                       through that port gets affected.
+      
+      All ring nodes in a single ring instance must be configured with the
+      same protection type.
+
+      In a single virtual context one ring can run in port based protection
+      mode and another ring can run in service based protection mode. 
+
+      It is not recommended to configure a port as ring port in a port based
+      ring instance as well as in a service based  ring instance.
+
+      It is not recommended to configure a port as ring port in multiple port 
+      based ring instance.
+
+      The ring protection type can be modified only when the row status of 
+      the ring entry in not in service."
+
+   DEFVAL { portBased }
+   ::= { fsErpsRingEntry 18 }
+   
+fsErpsRingRAPSCompatibleVersion OBJECT-TYPE
+   SYNTAX      INTEGER { v1(1), v2(2)}
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This is used to configure the compatible version number of the node in the ring.
+    The default value is version2 (2).[Reference : Section 10.1.13 Backward
+    compatibility logic of ITU-T G.8032 Y.1344 (03/2010)]
+
+    The version number can be modified only when the row status of the ring entry is 
+    in not in service."
+
+   DEFVAL { v2 }
+   ::= { fsErpsRingEntry 19 }
+
+fsErpsRingRplNeighbourPort OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object identifies the RPL Neighbour port of the ring .
+        
+       Valid values for this object are '0', 'IfIndex of fsErpsRingPort1' and 
+       'IfIndex of fsErpsRingPort2'. 
+
+       When a port is configured as a RPL Neighbour port,  that node becomes RPL 
+       Neighbour for that ring. [Reference : Section 10.1 of ITU-T G.8032 Y.1344 (03/2010)] 
+
+       Value '0' indicates that none of the ring ports is a RPL Neighbour port
+       and hence the node is not a RPL Neighbour.
+
+       In an interconnected node of a sub-ring, the 'fsErpsRingPort1' alone 
+       can be chosen as an RPL Neighbour port when administrator decides to have the 
+       interconnected node as the RPL Neighbour of the sub-ring.
+
+       Both the RPL owner and RPL Neighbor node cannot be enabled at the same 
+       Ethernet Ring Node.
+
+       Administrator has to ensure that, only one node in a ring is 
+       configured as RPL Neighbour ,and the node is adjacent to the RPL ."
+    DEFVAL { 0 }
+    ::= { fsErpsRingEntry 20 }
+
+fsErpsRingRAPSSubRingWithoutVC OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This configuration helps to configure the sub-ring to run with or 
+      without an RAPS Virtual Channel. 
+      
+      When this object is set to 'false',the sub-ring is configured to run 
+      with a R-APS Virtual Channel and both the traffic channel and the R-APS 
+      channel are blocked, when the ring port is set to blocked state.
+      When this object is set to 'true',the sub-ring is configured to run 
+      without a R-APS Virtual Channel and the traffic channel is blocked but
+      the R-APS channel is not blocked, when the ring port is set to blocked 
+      state [Reference : Section 10.1.14 of ITU-T G.8032 Y.1344 (03/2010)].
+
+      Administrator has to ensure that, this object is configured to true 
+      only in the nodes of a sub-ring. 
+      
+      This object should be set to the same value (true/false) on all the 
+      nodes of the sub-ring.
+      
+      This object is applicable only when the compatible version is 2.
+
+      This object can be changed, only when the rowstatus for this ring is 
+      not active."
+    DEFVAL { false }
+   ::= { fsErpsRingEntry 21 }
+
+fsErpsRingRplNextNeighbourPort OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object identifies the RPL Next Neighbour port of the ring.
+        
+       Valid values for this object are '0', 'IfIndex of fsErpsRingPort1' and 
+       'IfIndex of fsErpsRingPort2'. 
+
+       When a port is configured as a RPL Next Neighbour port,  that node becomes RPL 
+       Next Neighbour node for that ring. [Reference : Section VIII.4 of
+       ITU-T G.8032 Y.1344 (03/2010)] 
+
+       Value '0' indicates that none of the ring ports is a RPL Next Neighbour port
+       and hence the node is not a RPL Next Neighbour.
+
+       In an interconnected node of a sub-ring, the 'fsErpsRingPort1' alone 
+       can be chosen as an RPL Neighbour port when administrator decides to have the 
+       interconnected node as the RPL Neighbour of the sub-ring.
+
+       RPL owner node, RPL Neighbour node and RPL next neighbour node cannot be enabled
+       at the same Ethernet Ring Node.
+
+       Administrator has to ensure that, only nodes in a ring which are adjacent to
+       the RPL owner or RPL Neighbour node are configured as RPL Next Neighbour Nodes.
+
+      This object is applicable only when the compatible version is 2."
+
+    DEFVAL { 0 }
+    ::= { fsErpsRingEntry 22 }
+
+fsErpsRingPort1NodeID OBJECT-TYPE
+   SYNTAX       MacAddress
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+   "This object indicates the Node ID of the Last R-APS PDU
+   received on ring port 1.
+   This object is used for the Flush Logic feature
+   mentioned in Section 10.1.10 of ITU-T G.8032 Y.1344 (03/2010)."
+
+    ::= { fsErpsRingEntry 23 }
+
+fsErpsRingPort2NodeID OBJECT-TYPE
+   SYNTAX       MacAddress
+   MAX-ACCESS   read-only 
+   STATUS       current
+   DESCRIPTION
+   "This object indicates the Node ID of the Last R-APS PDU
+   received on ring port 2.
+   This object is used for the Flush Logic feature
+   mentioned in Section 10.1.10 of ITU-T G.8032 Y.1344 (03/2010)."
+
+    ::= { fsErpsRingEntry 24 }
+
+fsErpsRingPort1BPRBitVal OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+   "This object indicates the Blocked Port Reference (BPR bit)
+   status of the Last R-APS PDU Received on ring port 1.
+   This object is used for the Flush Logic feature
+   mentioned in Section 10.1.10 of ITU-T G.8032 Y.1344 (03/2010)."
+
+   ::= { fsErpsRingEntry 25 }
+
+fsErpsRingPort2BPRBitVal OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+   "This object indicates the Blocked Port Reference (BPR bit)
+   status of the Last R-APS PDU Received on ring port 2.
+   This object is used for the Flush Logic feature
+   mentioned in Section 10.1.10 of ITU-T G.8032 Y.1344 (03/2010)."
+
+   ::= { fsErpsRingEntry 26 }
+
+fsErpsRingProtectedVlanGroupList   OBJECT-TYPE
+   SYNTAX               OCTET STRING (SIZE (0..8))
+   MAX-ACCESS           read-write
+   STATUS               current
+   DESCRIPTION
+      "This object indicates the list of VLAN groups mapped to the ring entry.
+
+      If the ring is running in portBased protection mode then this
+      object will not have any effect.
+
+      This object can be used when list of Vlan Groups are to be mapped with the ring.
+      To map single Vlan Group with the ring, the MIB object
+      'fsErpsRingProtectedVlanGroupId' should be used.
+
+      Protected vlan group List can be modified without making the row status
+      of the ring entry as not in service.
+
+      Example:
+
+      Consider VlanGroup 10 is mapped to a Ring entry Ring 1 using mib object
+      fsErpsRingProtectedVlanGroupId.
+
+      Now configuring a list of  VlangGroups 20,30 and 40 to Ring entry Ring 1
+      by using this mib object will result in the addition of vlan group 10 mapped via 
+      fsErpsRingProtectedVlanGroupId to the Vlan group list.
+
+      Therefore the VlanGroup mapping with Ring entry Ring 1 will contain the list of 
+      vlan groups 10,20,30 and 40."
+   ::= { fsErpsRingEntry 27 }
+
+fsErpsRingServiceType OBJECT-TYPE
+    SYNTAX      RingServiceType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object indicates the service on which protection is provided
+       for this ring.
+       The following service types are provided.
+            - vlan(1)
+            - mplsLSP(2)
+            - mplsPW(3)
+            - mplsLSPPW(4)
+     The service types vlan and mplsLSPPW are currently supported."
+
+    DEFVAL   {vlan}
+   ::= { fsErpsRingEntry 28 }
+
+
+fsErpsRingPort1SubPortList OBJECT-TYPE
+   SYNTAX      OCTET STRING
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This object specifies the list of interfaces to which R-APS service can be extended,
+    without actually running R-APS. An interface identified in this 
+    fsErpsRingPort1SubPortList is  the first port of a ring pair.
+    This list is configured as SubPorts for fsErpsRingPort1. Whenever any state 
+    change is identified in fsErpsRingPort1, it is propogated to the list of interfaces 
+    identified by this MIB object.
+
+    This object should be configured as IfIndex'1', IfIndex'2', ... IfIndex'n' where
+    IfIndex'1', IfIndex'2', IfIndex'n' corresponds to an interface with valid interface
+    ID. If IfIndex'n' in this list is the first port of the ring, then the second port of
+    ring has to be identified as IfIndex'n' in fsErpsRingPort2SubPortList, where 'n'
+    corresponds to the position of the interface index in the list.
+
+    This object is currently applicable only when the fsErpsRingServiceType is set to 
+    mplsLSPPW. The administrator must ensure that the Pseudowire interfaces 
+    configured belong to the same LSP." 
+
+    DEFVAL { "0" }
+
+   ::= { fsErpsRingEntry 29 }
+
+fsErpsRingPort2SubPortList OBJECT-TYPE
+   SYNTAX      OCTET STRING
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This object specifies the list of interfaces to which R-APS support is extended,
+    without actually running R-APS.  An interface identified in this
+    fsErpsRingPort2SubPortList is  the second port of a ring pair.
+    This list is configured as SubPorts for fsErpsRingPort2. Whenever any state
+    change is identified in fsErpsRingPort2, it is propogated to the list of interfaces
+    identified by this MIB object.
+
+    This object should be configured as IfIndex'1', IfIndex'2', ... IfIndex'n' where
+    IfIndex'1', IfIndex'2', IfIndex'n' corresponds to an interface with valid interface 
+    ID. If IfIndex'n' in this list is the second port of the ring, then the first port of
+    ring has to be identified as IfIndex'n' in fsErpsRingPort1SubPortList, where 'n' 
+    corresponds to the position of the interface index in the list.
+
+    This object is currently applicable only when the fsErpsRingServiceType is set to
+    mplsLSPPW. The administrator must ensure that the Pseudowire interfaces
+    configured belongs to the same LSP."
+
+    DEFVAL { "0" }
+
+   ::= { fsErpsRingEntry 30 }
+
+
+
+
+-- *****************************************************************************
+--                        Ring's CFM Table
+-- *****************************************************************************
+fsErpsRingCfmTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsRingCfmEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains the configurations related to the monitoring entities
+      of the ring entry in the fsErpsRingTable.  Currently, fault monitoring 
+      using the Y.1731 mechanism is alone supported. 
+
+      The creation of an entry in this table will not create the Y.1731 
+      monitoring entities. These monitoring entities have to be created 
+      explicitly in ECFM module.
+
+      Entry can be created for a {ContextId , RingId} in this table, only when
+      the corresponding entry exists in the fsErpsRingTable."
+   ::= { fsErpsRing 2 }
+
+fsErpsRingCfmEntry OBJECT-TYPE
+   SYNTAX       FsErpsRingCfmEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "The entry indicates the monitoring entities for each ring entry." 
+   INDEX { fsErpsContextId, fsErpsRingId }
+   ::= { fsErpsRingCfmTable 1 }
+
+FsErpsRingCfmEntry ::=
+   SEQUENCE {
+          fsErpsRingMEG1
+            Unsigned32,
+          fsErpsRingCfmME1
+            Unsigned32,
+          fsErpsRingCfmMEP1
+            Dot1agCfmMepId,
+          fsErpsRingMEG2
+            Unsigned32,
+          fsErpsRingCfmME2
+            Unsigned32,
+          fsErpsRingCfmMEP2
+            Dot1agCfmMepId,
+          fsErpsRingCfmRowStatus
+            RowStatus
+        }
+
+fsErpsRingMEG1 OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This refers to the Maintenance Entity Group of fsErpsRingPort1.
+       Internally this object will refer to mib object dot1agCfmMdIndex
+       of ECFM 802.1ag std. Both the MEPs installed on ring ports has 
+       to be in the same level."   
+   ::= { fsErpsRingCfmEntry 1 }
+
+fsErpsRingCfmME1 OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This refers to the Maintenance Entity (ME) of the fsErpsRingPort1.
+       Internally this object will refer to mib object dot1agCfmMaIndex
+       of ECFM 802.1ag std. This contains the MEP (identified using 
+       object fsErpsRingCfmMEP1) in R-APS VLAN"
+   ::= { fsErpsRingCfmEntry 2 }
+
+fsErpsRingCfmMEP1 OBJECT-TYPE
+   SYNTAX      Dot1agCfmMepId
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This refers to the MEP ID that monitors the ring port fsErpsRingPort1 in
+       R-APS VLAN of the ring. This MEP needs to be down MEP."
+   ::= { fsErpsRingCfmEntry 3 }
+
+fsErpsRingMEG2 OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This refers to the Maintenance Entity Group of fsErpsRingPort2.
+       Internally this object will refer to mib object dot1agCfmMdIndex
+       of ECFM 802.1ag std. Both the MEPs installed on ring ports has 
+       to be in the same level."   
+   ::= { fsErpsRingCfmEntry 4 }
+
+fsErpsRingCfmME2 OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This refers to the Maintenance Entity (ME) of the fsErpsRingPort2.
+       Internally this object will refer to mib object dot1agCfmMaIndex
+       of ECFM 802.1ag std. This contains the MEP (identified using 
+       object fsErpsRingCfmMEP2) in R-APS VLAN."
+   ::= { fsErpsRingCfmEntry 5 }
+
+fsErpsRingCfmMEP2 OBJECT-TYPE
+   SYNTAX      Dot1agCfmMepId
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This refers to the MEP ID that monitors the ring port fsErpsRingPort2 
+       in R-APS VLAN of the ring. This MEP needs to be down MEP. 
+       In the interconnecting node of the sub-ring, this identifies the up MEP
+       installed on the ring port fsErpsRingPort1. This up MEP helps in
+       detecting the failure in R-APS virtual channel of the sub-ring."
+   ::= { fsErpsRingCfmEntry 6 }
+
+fsErpsRingCfmRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "Denotes the Row Status of the Ring CFM Entry.  Creation or 
+       modification of any entry in this table is allowed, only when the 
+       corresponding ring entry is created and not active in the 
+       fsErpsRingTable.
+
+       Similarly RowStatus of fsErpsRingTable can't be made active, 
+       when this RowStaus is not active.
+       This object cannot be set to 'destroy', if corresponding ring 
+       entry's RowStatus in fsErpsRingTable is active." 
+   ::= { fsErpsRingCfmEntry 7 }
+
+
+-- *****************************************************************************
+--                       Ring Entry Configuaration Table
+-- *****************************************************************************
+fsErpsRingConfigTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsRingConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "The Ring configuration table. Each entry in this table corresponds to a 
+      configured ring entry in fsErpsRingTable. Entry in this table is 
+      implicitly created, when a ring entry is created in the fsErpsRingTable 
+      table. 
+      This table contains optional configurations and commands for rings."
+   ::= { fsErpsRing 3 }
+
+fsErpsRingConfigEntry OBJECT-TYPE
+   SYNTAX       FsErpsRingConfigEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "Each entry in this table contains optional configurations and commands
+      for the corresponding ring entry. Objects in this entry can be changed,
+      even when the corresponding Ring Entry's RowStatus is active."
+   INDEX { fsErpsContextId, fsErpsRingId }
+   ::= { fsErpsRingConfigTable 1 }
+
+FsErpsRingConfigEntry ::=
+   SEQUENCE {
+          fsErpsRingConfigHoldOffTime
+            Unsigned32,
+          fsErpsRingConfigGuardTime
+            Unsigned32,
+          fsErpsRingConfigWTRTime
+            Unsigned32,
+          fsErpsRingConfigPeriodicTime
+            Unsigned32,
+          fsErpsRingConfigSwitchPort
+            InterfaceIndexOrZero,
+          fsErpsRingConfigSwitchCmd
+            INTEGER,
+          fsErpsRingConfigRecoveryMethod
+            INTEGER,
+          fsErpsRingConfigPropagateTC
+            INTEGER,
+          fsErpsRingConfigWTBTime
+            Unsigned32, 
+          fsErpsRingConfigClear  
+            INTEGER,
+          fsErpsRingConfigInterConnNode
+            INTEGER,
+          fsErpsRingConfigMultipleFailure
+            INTEGER,
+          fsErpsRingConfigIsPort1Present
+            INTEGER,
+          fsErpsRingConfigIsPort2Present
+            INTEGER,
+          fsErpsRingConfigInfoDistributingPort
+            InterfaceIndexOrZero,
+          fsErpsRingConfigKValue
+            OCTET STRING,
+          fsErpsRingConfigFailureOfProtocol
+            TruthValue
+   }
+
+fsErpsRingConfigHoldOffTime OBJECT-TYPE
+   SYNTAX      Unsigned32 (0..3600000)
+   UNITS       "milliseconds"
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to configure the period for the hold-off timer 
+       of this ring.  
+
+       Hold-Off timer will be started when a new defect (SF) is received for 
+       this ring.  This defect will not be given as local SF to ERP control 
+       process until Hold-Off timer expires.
+
+       When the Hold-Off timer expires and if a local defect still exists, it
+       will be given as local SF to the ERPS control process of this ring.
+
+       The configured value of this timer is applicable only from the next
+       start/re-start of the timer.
+
+       The Hold-Off timer has a period from 0 to 1 hour, configurable in units 
+       of 1 milliseconds. For example, to configure Hold-Off Time as 5 seconds, 
+       configure the value as 5000. Default value of Hold-Off timer is 0"
+   DEFVAL  { 0 }
+   ::= { fsErpsRingConfigEntry 1 }
+
+fsErpsRingConfigGuardTime OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..3600000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object is used to configure the period for the guard timer of this 
+       ring.  This timer is required to prevent reception of outdated R-APS 
+       messages.
+
+       Guard timer will be started on reception of local clear SF event.
+       R-APS messages (except R-APS event messages) received during the running
+       of the guard timer will be discarded.
+
+       The configured value of this timer is applicable only from the next
+       start/re-start of the timer.
+
+       The guard timer has a period from 0 to 1 hour, configurable in units of 
+       1 millisecond. For example, to configure GuardTime as 1 second, 
+       configure the value as 1000." 
+    DEFVAL { 500 }
+   ::= { fsErpsRingConfigEntry 2 }
+
+fsErpsRingConfigWTRTime OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..86400000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object is used to configure the period for the Wait to restore 
+       timer.
+
+       This object is applicable, only if this ring is operating in the
+       revertive mode of operation. In the revertive mode of operation, if 
+       this object is configured with a value of '0', then the traffic is 
+       switched back to the working entity from the protection entity 
+       immediately upon recovery of the working entity from failure.
+
+       The configured value of this timer is applicable only from the next
+       start/re-start of the timer.
+
+       The WTR timer has a period from 0 to 24 hour, configurable in
+       units of 1 ms.  For example, to configure WTR as 15 minutes, configure 
+       the value as 900000. Default WTR timer value is 5 minutes" 
+    DEFVAL { 300000 }
+   ::= { fsErpsRingConfigEntry 3 }
+
+fsErpsRingConfigPeriodicTime OBJECT-TYPE
+   SYNTAX      Unsigned32 (1..3600000)
+   UNITS       "milliseconds"
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to configure the periodic timer.  Periodic timer
+       is used to configure the transmission interval of R-APS PDUs. Periodic
+       timer is not valid for the first 3 R-APS PDU transmission, that will
+       be send on any change of R-APS information.
+
+       The configured value of this timer is applicable only from the next
+       start/re-start of the timer.
+
+       The periodic timer has a period from 1 ms to 1 hour, configurable in
+       units of 1ms.For example, to configure Periodic timer value as 1 minute,
+       configure the value as 60000. Default periodic timer value is 5 seconds."
+   DEFVAL  { 5000 }
+   ::= { fsErpsRingConfigEntry 4 }
+
+fsErpsRingConfigSwitchPort OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object identifies the port that will be blocked by enforcing 
+       Forced or Manual Switching command. Port configured here should be one 
+       among the fsErpsRingPort1 or fsErpsRingPort2. This configuration is
+       allowed, only when fsErpsRingConfigSwitchCmd is set to 'none'."
+    DEFVAL { 0 }
+   ::= { fsErpsRingConfigEntry 5 }
+
+fsErpsRingConfigSwitchCmd OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 none(1),
+                 forceSwitch(2), 
+                 manualSwitch(3) 
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "Before configuring this object with (forceSwitch) or (manualSwitch),
+       fsErpsRingConfigSwitchPort must be configured. 
+
+       When ForcedSwitch is enabled on a ring, irrespective of the status
+       (Failed or not failed) of the switched port, port will be blocked.
+
+       If a link failure is present in the ring, then setting the value
+       as 'manualSwitch' will not be allowed.
+       Failure of the link in the ring will clear the Manual Switch condition.
+
+       Force Switch is of higher priority than the Manual switch. Force switch
+       will overwrite the manual switch configuration. Similarly manual switch
+       will not be allowed, when force switch is enabled.
+
+       When this object is set to forceSwitch: 
+                          - forceswitch will be applied for this ring.
+                          - port identified in fsErpsRingConfigSwitchPort object
+                            will be blocked.
+       Setting of this object to manualswitch value will fail if:
+                          - forceswitch is already set or
+                          - local SF is present in any of the ring port or
+                          - R-APS(SF) is present in the priority logic for this 
+                            ring.
+       When this object is set to manualSwitch: 
+                          - Port identified in fsErpsRingConfigSwitchPort object
+                            will be blocked.
+       ManualSwitch will be automatically cleared if:
+                          - local-SF is received on one of the ring ports
+                          - R-APS(SF) is received on the ring port
+
+       (none) command will clear the Manual/Force Switch, and the ring 
+        will work in the normal mode.
+       The value of (none) is applicable to clear the manual/force switch only 
+       when the compatible version is 1."
+
+   DEFVAL { none }
+   ::= { fsErpsRingConfigEntry 6 }
+
+
+fsErpsRingConfigRecoveryMethod OBJECT-TYPE
+   SYNTAX      INTEGER {
+                 auto(1), 
+                 manual(2) 
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is valid, only when the operating mode for the ring is
+       nonRevertive. This object will not have any impact when the ring is
+       operating in revertive mode.
+
+       auto   - Normal nonRevertive mode of operation will be performed.
+                Local clear SF will be considered according to the 
+                nonRevertive mode of operation.
+       manual - Ignore local clear SF on this node, if the node is working
+                in nonRevertive mode of operation.
+                When the link recovers, link ports will remain in blocked state
+                until manual method is changed to auto by administrator. When
+                manual method is changed to auto by administrator, the ERPS
+                will start behaving as in auto mode."
+   DEFVAL { auto }
+   ::= { fsErpsRingConfigEntry 7 }
+
+fsErpsRingConfigPropagateTC OBJECT-TYPE
+    SYNTAX      INTEGER { enable(1), disable(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object is used to enable/disable the propagation of TC in the
+       associated rings, whenever the flush FDB is triggered for this sub-ring.
+       This configuration is applicable only in the interconnecting nodes
+       of the sub-ring"
+    DEFVAL { disable }
+   ::= { fsErpsRingConfigEntry 8 }
+
+ fsErpsRingConfigWTBTime OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..86400000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object is used to configure the period for  Wait to Block 
+       timer.
+      
+       This object is effective, only when  Force switch or Manual switch is configured 
+       in the ring and when clear command is issued to recover the ring from force switch or 
+       manual switch.           
+       
+      The WTB timer is defined to be 5 seconds longer than the guard timer.
+      [Reference : Section 10.1.4 of ITU-T G.8032 Y.1344 (03/2010)]
+
+       The WTB timer has a period from 0 to 24 hour, configurable in units 
+       of 1 millisecond. For example, to configure WTB timer  as 1 second
+       configure the value as 1000."
+
+    DEFVAL { 5500 }
+    ::= { fsErpsRingConfigEntry 9 }
+
+fsErpsRingConfigClear OBJECT-TYPE
+   SYNTAX      INTEGER {
+	         none(1),
+  	         clear(2)
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The purpose of this object is described below : 
+        a) Clearing the forced switch in the ring.
+        b) Clearing the manual switch in the ring.
+        c) Trigger reversion before the WTR or WTB timer expires when the ring operates in revertive mode.
+        d) Trigger reversion when the ring operates in non-revertive mode. 
+           [Reference : Section 8 of ITU-T G.8032 Y.1344 (03/2010)].
+       
+       If none of the above conditions exist in the Ring,then this object configuration
+       does not have any effect.
+
+       This object can be configured in any node in the Ring.But when
+       this object is configured to trigger the reversion of operating 
+       modes (revertive / non-revertive), the configuration is effective only 
+       when the ring node is configured as RPL owner.           
+ 
+       This object is applicable only when the compatible version is 2.
+
+       This object is applicable only when the ring is active"
+
+   DEFVAL { none }
+   ::= { fsErpsRingConfigEntry 10 }
+
+fsErpsRingConfigInterConnNode OBJECT-TYPE
+   SYNTAX      INTEGER { none(0), primary(1), secondary(2)}
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This object is configured in interconnection node of the sub-ring to
+    support the feature 'Minimizing segmentation in interconnected rings'
+    as per Appendix X of ITU-T G.8032/Y.1344 (03/2010) standard.
+
+    Configured value of the objects fsErpsRingConfigInterConnNode and
+    fsErpsRingConfigMultipleFailure is used in Block Indication Logic Procedure
+    as per Section X.3.2 in Appendix X of ITU-T G.8032/Y.1344 (03/2010) standard.
+    interconnected rings as described below :
+        a) If Loss of connectivity between the interconnection nodes is detected
+            and if the objects fsErpsRingConfigInterConnNode and
+            fsErpsRingConfigMultipleFailure are configured to have identical
+           values(i.e both are set to either primary or secondary) then Local MS
+           command is applied on the subring port else loss of connectivity
+           between the interconnection nodes is ignored.
+        b) Similarly when loss of connectivity between the interconnection nodes
+           is recovered and if the objects fsErpsRingConfigInterConnNode and
+           fsErpsRingConfigMultipleFailure are configured to have identical values
+           (i.e both are set to either primary or secondary) then Local MS command
+           on the subring port is cleared else recovery of connectivity between the
+           interconnection nodes is ignored.
+
+    This object is effective only when ring node is interconnection node.
+
+    The default value is disabled (0).
+
+    This object is applicable only when the compatible version is 2."
+
+   DEFVAL { none }
+   ::= { fsErpsRingConfigEntry 11 }
+
+fsErpsRingConfigMultipleFailure OBJECT-TYPE
+   SYNTAX      INTEGER { disabled(0), primary(1), secondary(2)}
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "This object is configured in interconnection node of the sub-ring to
+    support the feature 'Minimizing segmentation in interconnected rings'
+    as per Appendix X of ITU-T G.8032/Y.1344 (03/2010) standard.
+
+    Configured value of the objects fsErpsRingConfigInterConnNode and
+    fsErpsRingConfigMultipleFailure is used in Block Indication Logic Procedure
+    as per Section X.3.2 in Appendix X of ITU-T G.8032/Y.1344 (03/2010) standard.
+    interconnected rings as described below :
+        a) If Loss of connectivity between the interconnection nodes is detected
+            and if the objects fsErpsRingConfigInterConnNode and
+            fsErpsRingConfigMultipleFailure are configured to have identical
+           values(i.e both are set to either primary or secondary) then Local MS
+           command is applied on the subring port else loss of connectivity
+           between the interconnection nodes is ignored.
+        b) Similarly when loss of connectivity between the interconnection nodes
+           is recovered and if the objects fsErpsRingConfigInterConnNode and
+           fsErpsRingConfigMultipleFailure are configured to have identical values
+           (i.e both are set to either primary or secondary) then Local MS command
+           on the subring port is cleared else recovery of connectivity between the
+           interconnection nodes is ignored.
+
+    This object is effective only when ring node is interconnection node.
+
+    The default value is disabled (0).
+
+    This object is applicable only when the compatible version is 2."
+
+   DEFVAL { disabled }
+   ::= { fsErpsRingConfigEntry 12 }
+
+
+fsErpsRingConfigIsPort1Present OBJECT-TYPE
+   SYNTAX      INTEGER { local(1), remote(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+       "This object identifies the presence of port1 of the ring in the line
+    card.
+
+    This object should be configured as 'remote' only if the ports are
+    distributed across two line cards.
+
+    This object can be altered even when the ring is active.
+
+    When Ring port ifIndex is not configured, configuration of Port presence
+        as 'remote' for the corresponding port should be rejected."
+
+   DEFVAL { local }
+   ::= { fsErpsRingConfigEntry 13 }
+
+
+fsErpsRingConfigIsPort2Present OBJECT-TYPE
+   SYNTAX      INTEGER { local(1), remote(2) }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+        "This object identifies the presence of port2 of the ring in the line
+    card.
+
+    This object should be configured as 'remote' only if the ports are
+    distributed across two line cards.
+
+    This object can be altered even when the ring is active.
+
+    When Ring port ifIndex is not configured, configuration of Port presence
+        as 'remote' for the corresponding port should be rejected."
+
+    DEFVAL { local }
+   ::= { fsErpsRingConfigEntry 14 }
+
+fsErpsRingConfigInfoDistributingPort OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This object is used in Distributed ERPS to synchronize
+    the ring information between local and remote line cards.
+   
+   The MEP's installed on this distributing port will be used
+   for synchronization process.
+
+    This object should be configured only if the ports are
+    distributed across two line cards.
+    (i.e. only if one of the ring port presence is configured
+    as remote)
+
+    The MEP information for the remote port should be present 
+    before configuring this object."
+
+    DEFVAL { 0 }
+    ::= { fsErpsRingConfigEntry 15 }
+
+fsErpsRingConfigKValue OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE(4))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object is used to configure with integer value which is used 
+       for running the timer interval of periodic multiplied by this 
+       value to raise a TFOP defect when un related packet received on
+       running of this timer interval.
+
+       The kvalue is a period from 0 to 86400000.
+       Default kvalue is 3.50."
+    DEFVAL { "3.50" }
+   ::= { fsErpsRingConfigEntry 16 }
+
+fsErpsRingConfigFailureOfProtocol OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This object is used to enable or disable the Failure Of
+       Protocol feature. The value 'true (1)' indicates that 
+       TFOP feature is enabled to raise the TRAP when 
+       1. Valid Three RAPS packets are not received on Ring Node
+       2. And after receiving the Valid RAPS Packets on Ring Node.
+       The TFOP Timer started with Multiple of Periodic timer and
+       KValue. If the Ring node is not receiving the RAPS packets
+       till the timer expiry, it will raise TFOP defect occurred TRAP.
+       Once the Ring node receive the Valid RAPS Packet it will 
+       raise the TFOP defect Cleared TRAP."
+           
+    DEFVAL { false }
+   ::= { fsErpsRingConfigEntry 17 }
+
+
+-- *****************************************************************************
+--                       Ring TC Propagation Table
+-- *****************************************************************************
+
+fsErpsRingTcPropTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsRingTcPropEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table is used to configure the list of rings, where 
+      Topology Change (TC) has to be propagated, whenever there is a 
+      FDB flush condition in the sub-ring.
+    
+      This table is applicable only for the sub-rings in the inter-connected 
+      nodes."
+      ::= { fsErpsRing 4 }
+
+fsErpsRingTcPropEntry OBJECT-TYPE
+   SYNTAX       FsErpsRingTcPropEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "Each entry in this table identifies the ring to which TC needs to be 
+      propagated upon FDB flush condition in the sub-ring.
+
+      When TC propagation is enabled for a sub-ring (the object 
+      'fsErpsRingConfigPropagateTC' is configured as 'true' for the sub-ring), 
+      and whenever FDB flush is triggered on this sub-ring, Topology Change 
+      will be triggered for all the associated rings of this subring as 
+      identified by this table. "
+
+   INDEX { fsErpsContextId, fsErpsRingId, fsErpsRingTcPropRingId }
+   ::= { fsErpsRingTcPropTable 1 }
+
+FsErpsRingTcPropEntry ::=
+   SEQUENCE {
+          fsErpsRingTcPropRingId
+            RingId,
+          fsErpsRingTcPropRowStatus
+            RowStatus
+   }
+
+fsErpsRingTcPropRingId OBJECT-TYPE
+   SYNTAX      RingId
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "This object identifies the ring ID to which TC needs to be propagated
+       upon FDB flush condition in the sub-ring identified by 'fsErpsRingId'.
+       This object value should not be equal to the fsErpsRingId (Same 
+       entries index)"
+   ::= { fsErpsRingTcPropEntry 1 }
+
+fsErpsRingTcPropRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "Denotes the Row Status for TC Propagation table entry.
+       Only 'CreateAndGo' and 'destroy' values are allowed for this
+       object. 'CreateAndWait' and 'notInService' values are not allowed."
+   ::= { fsErpsRingTcPropEntry 2 }
+       
+--*****************************************************************************
+--                       Ring ConfigExt Table
+-- *****************************************************************************
+fsErpsRingConfigExtTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsRingConfigExtEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "The Ring configuration Extension table. Each entry in this table 
+     corresponds to a configured ring entry in fsErpsRingTable. 
+     Entry in this table is implicitly created, when a ring entry is 
+     created in the fsErpsRingTable table. 
+      This table contains optional configurations and commands for rings."
+   ::= { fsErpsRing 5 }
+
+fsErpsRingConfigExtEntry OBJECT-TYPE
+   SYNTAX       FsErpsRingConfigExtEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "Each entry in this table contains optional configurations and commands
+      for the corresponding ring entry. Objects in this entry can be changed,
+      even when the corresponding Ring Entry's RowStatus is active."
+   INDEX { fsErpsContextId, fsErpsRingId }
+   ::= { fsErpsRingConfigExtTable 1 }
+
+FsErpsRingConfigExtEntry ::=
+   SEQUENCE {
+          fsErpsRingConfigExtVCRecoveryPeriodicTime
+            Unsigned32,
+          fsErpsRingConfigExtMainRingId
+            RingIdOrNone
+   }
+
+fsErpsRingConfigExtVCRecoveryPeriodicTime OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..3600000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This object is used to configure the time interval for which the 
+       periodic timer needs to be restarted, when the corresponding main
+       ring indicates the virtual channel status change to this sub-ring
+       and when the virtual channel of this sub-ring is in failed state.
+
+       When one of the ring port of the main ring is in failed state, 
+       main ring indicates virtual channel status change indication to 
+       sub-ring when one of the following event happens:
+             - R-APS (NR) is received on a ring port of the main ring
+             - Local Clear SF on the main ring.
+
+       On getting this virtual channel status indication from the main ring,
+       this sub-ring will restart the periodic timer for this value, only 
+       if the virtual channel is in failed state.
+
+       Once the periodic timer expires, it will get restarted only for the
+       normal periodic time (value present in fsErpsRingConfigPeriodicTime).
+       
+       This object is valid only for sub-rings. For normal rings, configuring 
+       this object will not have any impact.
+
+       This value must be configured on both the inter-connected nodes of the 
+       main ring.
+
+       It is recommended to configure the value for this object as: 
+       (Periodic Timer Value + 3 * CC interval + GuardTimer Value of Main 
+       Ring + delta-T). It is recommended to have 3*CC interval as delta-T.
+       
+       The configured value of this timer is applicable only from the next
+       start/re-start of the timer.
+
+       This object can take the value between 0 to 1 hour, configurable in
+       unit of 1 milliseconds. For example, to configure the value as 
+       5 seconds, configure the value as 5000. 
+
+       Default value for this object is 5560. This value is derived from the 
+       above formula with periodic timer value as 5 seconds, CC interval as 
+       10 milliseconds, guard timer value as 500 milliseconds and delta T as
+       30 milliseconds."
+    DEFVAL { 5560 }
+   ::= { fsErpsRingConfigExtEntry 1 }
+
+   fsErpsRingConfigExtMainRingId OBJECT-TYPE
+   SYNTAX      RingIdOrNone
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object identifies ID of the main Ring to which the sub-ring 
+       is connected. Upon configuration, this sub-ring will get added to the 
+       sub-ring list maintained by the Main Ring.
+       
+       Main ring will given the virtual channel status change indication to 
+       all the sub-rings present in its sub-ring list.
+       
+       This value must be configured on both the inter-connected nodes of the 
+       main ring.
+
+       Only ring id's of rings created in the fsErpsRingTable can be configured
+       for this object.
+      
+       To remove the association of the main ring id from the sub-ring, 
+       a value of zero should be configured for this object."
+
+   ::= { fsErpsRingConfigExtEntry 2 }
+
+-- *****************************************************************************
+--                        Ring's MPLS Table
+-- *****************************************************************************
+fsErpsRingMplsTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsRingMplsEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains the configurations related to the monitoring entities
+      of the ring entry in the fsErpsRingTable. Fault monitoring
+      using MPLS OAM mechanism is supported.
+
+      The creation of an entry in this table will not create the MPLS
+      monitoring entities (pseudo-wires). These monitoring entities have to be created
+      explicitly in MPLS module.
+
+      Entry can be created for a {ContextId, RingId} in this table, only when
+      the corresponding entry exists in the fsErpsRingTable."
+   ::= { fsErpsRing 6 }
+
+fsErpsRingMplsEntry OBJECT-TYPE
+   SYNTAX       FsErpsRingMplsEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "This entry indicates the monitoring entities for each ring entry."
+   INDEX { fsErpsContextId, fsErpsRingId }
+   ::= { fsErpsRingMplsTable 1 }
+
+FsErpsRingMplsEntry ::=
+   SEQUENCE {
+          fsErpsRingPwVcId1
+            Unsigned32,
+          fsErpsRingPwVcId2
+            Unsigned32,
+          fsErpsRingMplsRowStatus
+            RowStatus
+        }
+
+fsErpsRingPwVcId1 OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the pseudo-wire identifier of fsErpsRingPort1."
+   ::= { fsErpsRingMplsEntry 1 }
+
+fsErpsRingPwVcId2 OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the pseudo-wire identifier of fsErpsRingPort2."
+   ::= { fsErpsRingMplsEntry 2 }
+
+fsErpsRingMplsRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the Row Status of the Ring MPLS Entry.  Creation or
+       modification of any entry in this table is allowed, only when the
+       corresponding ring entry is created and not active in the
+       fsErpsRingTable.
+
+       Similarly RowStatus of fsErpsRingTable can't be made active,
+       when this RowStaus is not active.
+       This object cannot be set to 'destroy', if corresponding ring
+       entry's RowStatus in fsErpsRingTable is active."
+   ::= { fsErpsRingMplsEntry 3 }
+
+
+--*****************************************************************************
+--                       fsErpsStats subtree
+--*****************************************************************************
+fsErpsMemFailCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object identifies number of times Memory allocation failure occurred
+       in the ERPS module."
+   ::= { fsErpsStats 1 }
+
+fsErpsBufFailCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object identifies number of times Buffer related failure occurred
+       in the ERPS module."
+   ::= { fsErpsStats 2 }
+
+fsErpsTimerFailCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object identifies number of times Timer related failure occurred
+       in the ERPS module."
+   ::= { fsErpsStats 3 }
+
+fsErpsRingStatsTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsErpsRingStatsEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "This table contains statistics information for each of the ring
+      present in the system. Entries in this table are created 
+      implicitly by the creation of entries in the fsErpsRingTable."
+   ::= { fsErpsStats 4 }
+
+fsErpsRingStatsEntry OBJECT-TYPE
+   SYNTAX       FsErpsRingStatsEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "There is one entry in this table for each entry in the fsErpsRingTable.
+      Each entry contains the statistics for both ring ports. For a sub-ring 
+      in an interconnected node, Port 2 statistics represent the statistics 
+      of the UP MEP installed on fsErpsRingPort1."
+   INDEX { fsErpsContextId, fsErpsRingId }
+   ::= { fsErpsRingStatsTable 1 }
+
+FsErpsRingStatsEntry ::=
+   SEQUENCE {
+          fsErpsRingClearRingStats 
+            TruthValue,
+          fsErpsRingPort1RapsPduSentCount
+            Counter32,
+          fsErpsRingPort2RapsPduSentCount
+            Counter32,
+          fsErpsRingPort1RapsPduRcvdCount
+            Counter32,
+          fsErpsRingPort2RapsPduRcvdCount
+            Counter32,
+          fsErpsRingPort1RapsPduDiscardCount
+            Counter32,
+          fsErpsRingPort2RapsPduDiscardCount
+            Counter32,
+          fsErpsRingPort1BlockedCount
+            Counter32,
+          fsErpsRingPort2BlockedCount
+            Counter32,
+          fsErpsRingPort1UnblockedCount
+            Counter32,
+          fsErpsRingPort2UnblockedCount
+            Counter32,
+          fsErpsRingPort1FailedCount
+            Counter32,
+          fsErpsRingPort2FailedCount
+            Counter32,
+          fsErpsRingPort1RecoveredCount
+            Counter32,
+          fsErpsRingPort2RecoveredCount
+            Counter32,
+          fsErpsRingPort1VersionDiscardCount
+            Counter32,
+          fsErpsRingPort2VersionDiscardCount
+            Counter32,
+          fsErpsRingPort1RapsFSPduRxCount
+            Counter32,
+          fsErpsRingPort1RapsFSPduTxCount
+            Counter32,
+          fsErpsRingPort2RapsFSPduRxCount
+            Counter32,
+          fsErpsRingPort2RapsFSPduTxCount
+            Counter32,
+          fsErpsRingPort1RapsMSPduRxCount
+            Counter32,
+          fsErpsRingPort1RapsMSPduTxCount
+            Counter32,
+          fsErpsRingPort2RapsMSPduRxCount
+            Counter32,
+          fsErpsRingPort2RapsMSPduTxCount
+            Counter32,
+          fsErpsRingPort1RapsEventPduRxCount
+            Counter32,
+          fsErpsRingPort1RapsEventPduTxCount
+            Counter32,
+          fsErpsRingPort2RapsEventPduRxCount
+            Counter32,
+          fsErpsRingPort2RapsEventPduTxCount
+            Counter32,
+          fsErpsRingPort1RapsSFPduRxCount
+            Counter32,
+          fsErpsRingPort1RapsSFPduTxCount
+            Counter32,
+          fsErpsRingPort2RapsSFPduRxCount
+            Counter32,
+          fsErpsRingPort2RapsSFPduTxCount
+            Counter32,
+          fsErpsRingPort1RapsNRPduRxCount
+            Counter32,
+          fsErpsRingPort1RapsNRPduTxCount
+            Counter32,
+          fsErpsRingPort2RapsNRPduRxCount
+            Counter32,
+          fsErpsRingPort2RapsNRPduTxCount
+            Counter32,
+          fsErpsRingPort1RapsNRRBPduRxCount
+            Counter32,
+          fsErpsRingPort1RapsNRRBPduTxCount
+            Counter32,
+          fsErpsRingPort2RapsNRRBPduRxCount
+            Counter32,
+          fsErpsRingPort2RapsNRRBPduTxCount
+            Counter32,
+          fsErpsRingGeneratedTrapsCount 
+            Counter32,
+          fsErpsRingPort1DefectEncTimeSec
+            Unsigned32,
+          fsErpsRingPort2DefectEncTimeSec
+            Unsigned32,
+          fsErpsRingPort1DefectClearedTimeSec
+            Unsigned32,
+          fsErpsRingPort2DefectClearedTimeSec
+            Unsigned32,
+          fsErpsRingRplPortStatChgTimeSec
+            Unsigned32,
+          fsErpsRingRplNbrPortStatChgTime
+            Unsigned32,
+          fsErpsRingDistPortPduRxCount
+            Counter32,
+          fsErpsRingDistPortPduTxCount
+            Counter32,
+          fsErpsRingRapsPort1DefectEncTimeNSec
+            Unsigned32,
+          fsErpsRingRapsPort1DefectClearedTimeNSec
+            Unsigned32,
+          fsErpsRingRapsPort2DefectEncTimeNSec
+            Unsigned32,
+          fsErpsRingRapsPort2DefectClearedTimeNSec
+            Unsigned32,
+          fsErpsRingRapsRplPortStatChgTimeNSec
+            Unsigned32,
+          fsErpsRingDefectSwitchOverTimeMSec
+            Unsigned32,
+          fsErpsRingDefectClearedSwitchOverTimeMSec
+            Unsigned32
+        }
+
+fsErpsRingClearRingStats OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to clear statistics counters  for this ring.
+       When set to true(1), statistics counters for this ring will be 
+       cleared. When set to false(2), no action will take place.  
+       Get of this object will always return 'false'. "
+    DEFVAL { false }
+   ::= { fsErpsRingStatsEntry 1 }
+
+fsErpsRingPort1RapsPduSentCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of valid R-APS PDUs sent on the 
+       fsErpsRingPort1 of the ring. R-APS PDUs include all types like R-APS(SF),
+       R-APS(NR) & R-APS (NR, RB)."
+   ::= { fsErpsRingStatsEntry 2 }
+
+fsErpsRingPort2RapsPduSentCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of valid R-APS PDUs sent on the 
+       fsErpsRingPort2 of the ring. R-APS PDUs include all types like 
+       R-APS(SF), R-APS(NR) & R-APS (NR, RB)."
+   ::= { fsErpsRingStatsEntry 3 }
+
+fsErpsRingPort1RapsPduRcvdCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of valid R-APS PDUs received on the 
+       fsErpsRingPort1 of the ring. R-APS PDUs include all types like 
+       R-APS(SF), R-APS(NR) & R-APS (NR, RB)."
+   ::= { fsErpsRingStatsEntry 4 }
+
+fsErpsRingPort2RapsPduRcvdCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of valid R-APS PDUs received on the 
+       fsErpsRingPort2 of the ring. R-APS PDUs include all types like R-APS(SF),
+       R-APS(NR) & R-APS (NR, RB)."
+   ::= { fsErpsRingStatsEntry 5 }
+
+fsErpsRingPort1RapsPduDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS PDUs discarded on the 
+       fsErpsRingPort1 of the ring. R-APS PDUs include all types like R-APS(SF),
+       R-APS(NR) & R-APS (NR, RB). R-APS PDUs with invalid RAPS header 
+       information(wrong request/state) will be discarded."
+   ::= { fsErpsRingStatsEntry 6 }
+
+fsErpsRingPort2RapsPduDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS PDUs discarded on the 
+       fsErpsRingPort2 of the ring. R-APS PDUs include all types like R-APS(SF),
+       R-APS(NR) & R-APS (NR, RB). R-APS PDUs with invalid RAPS header 
+       information(wrong request/state) will be discarded."
+   ::= { fsErpsRingStatsEntry 7 }
+
+fsErpsRingPort1BlockedCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number times the fsErpsRingPort1 is blocked.
+       A port might be blocked because of local failure, or because of link
+       configured as RPL, or if Force/Manual switch is configured"
+   ::= { fsErpsRingStatsEntry 8 }
+
+fsErpsRingPort2BlockedCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number times the fsErpsRingPort2 is blocked. 
+       A port might be blocked because of local failure, or because of link
+       configured as RPL, or if Force/Manual switch is configured"
+   ::= { fsErpsRingStatsEntry 9 }
+
+fsErpsRingPort1UnblockedCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number times the fsErpsRingPort1 is unblocked.
+       A port might be unblocked because of recovery from local failure, or 
+       if the link is configured as RPL link and there is any other failure
+       in the network, or if Force/Manual switch configuration is removed."
+   ::= { fsErpsRingStatsEntry 10 }
+
+fsErpsRingPort2UnblockedCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number times the fsErpsRingPort2 is unblocked.
+       A port might be unblocked because of recovery from local failure, or 
+       if the link is configured as RPL link and there is any other failure
+       in the network, or if Force/Manual switch configuration is removed."
+   ::= { fsErpsRingStatsEntry 11 }
+
+fsErpsRingPort1FailedCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of times the fsErpsRingPort1 failed 
+       because of local SF condition." 
+   ::= { fsErpsRingStatsEntry 12 }
+
+fsErpsRingPort2FailedCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of times the fsErpsRingPort2 failed 
+       because of local SF condition." 
+   ::= { fsErpsRingStatsEntry 13 }
+
+fsErpsRingPort1RecoveredCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of times the fsErpsRingPort1 recovered 
+       from a failure (local clear SF condition)." 
+   ::= { fsErpsRingStatsEntry 14 }
+
+fsErpsRingPort2RecoveredCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only 
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of times the fsErpsRingPort2 recovered 
+       from a failure (local clear SF condition)." 
+   ::= { fsErpsRingStatsEntry 15 }
+
+fsErpsRingPort1VersionDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS PDUs discarded on the 
+       fsErpsRingPort1 of the ring due to version mismatch.
+
+       The version discard count increments in the following scenarios:-
+       
+       a) If the (Request/State) field in the received R-APS PDUs does not
+       correspond to  R-APS(SF) or R-APS(NR)  or R-APS event messages,
+       when compatible version of the ring is 1.
+
+       b)If the (Request/State) field in the received R-APS PDUs does not
+       correspond to  R-APS(SF) or R-APS(NR) or R-APS Event or R-APS(FS) or R-APS(MS)
+       messages, when compatible version of the ring is 2."
+
+   ::= { fsErpsRingStatsEntry 16 }
+
+fsErpsRingPort2VersionDiscardCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS PDUs discarded on the 
+       fsErpsRingPort2 of the ring due to version mismatch.
+
+       The version discard count increments in the following scenarios:-
+
+       a) If the (Request/State) field in the received R-APS PDUs does not
+       correspond to  R-APS(SF) or R-APS(NR) or R-APS event messages,
+       when compatible version of the ring is 1.
+
+       b) If the (Request/State) field in the received R-APS PDUs does not
+       correspond to  R-APS(SF) or R-APS(NR) or R-APS Event or R-APS(FS) or R-APS(MS)
+       messages, when compatible version of the ring is 2."
+  
+   ::= { fsErpsRingStatsEntry 17 }
+
+fsErpsRingPort1RapsFSPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS (FS) PDUs received on the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 18 }
+
+fsErpsRingPort1RapsFSPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (FS) PDUs sent from  the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 19 }
+
+
+fsErpsRingPort2RapsFSPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (FS) PDUs received on the 
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 20 }
+
+
+
+fsErpsRingPort2RapsFSPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (FS) PDUs sent from  the
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 21 }
+
+fsErpsRingPort1RapsMSPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (MS) PDUs received on the 
+       fsErpsRingPort1 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 22 }
+
+
+
+fsErpsRingPort1RapsMSPduTxCount  OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (MS) PDUs sent from  the
+       fsErpsRingPort1 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 23 }
+
+fsErpsRingPort2RapsMSPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (MS) PDUs received on the 
+       fsErpsRingPort2 of the ring .
+
+       The RapsMSPduRx count increments only if the R-APS(MS)is recieved" 
+ 
+   ::= { fsErpsRingStatsEntry 24 }
+
+
+fsErpsRingPort2RapsMSPduTxCount  OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (MS) PDUs sent from  the
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 25 }
+
+fsErpsRingPort1RapsEventPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (Event) PDUs received on the 
+       fsErpsRingPort1 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 26 }
+
+
+fsErpsRingPort1RapsEventPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (Event) PDUs sent from  the
+       fsErpsRingPort1 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 27 }
+
+fsErpsRingPort2RapsEventPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (MS) PDUs received on the 
+       fsErpsRingPort2 of the ring .
+
+       The RapsEventPduRx count increments only if the R-APS(Event)is recieved" 
+ 
+   ::= { fsErpsRingStatsEntry 28 }
+
+
+fsErpsRingPort2RapsEventPduTxCount  OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (Event) PDUs sent from  the
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 29 }
+
+fsErpsRingPort1RapsSFPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS (SF) PDUs received on the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 30 }
+
+fsErpsRingPort1RapsSFPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (SF) PDUs sent from  the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 31 }
+
+
+fsErpsRingPort2RapsSFPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (SF) PDUs received on the 
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 32 }
+
+
+
+fsErpsRingPort2RapsSFPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (SF) PDUs sent from  the
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 33 }
+
+fsErpsRingPort1RapsNRPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS (NR) PDUs received on the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 34 }
+
+fsErpsRingPort1RapsNRPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (NR) PDUs sent from  the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 35 }
+
+
+fsErpsRingPort2RapsNRPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (NR) PDUs received on the 
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 36 }
+
+
+
+fsErpsRingPort2RapsNRPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (NR) PDUs sent from  the
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 37 }
+
+fsErpsRingPort1RapsNRRBPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the number of R-APS (NRRB) PDUs received on the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 38 }
+
+fsErpsRingPort1RapsNRRBPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (NRRB) PDUs sent from  the 
+       fsErpsRingPort1 of the ring ."
+
+   ::= { fsErpsRingStatsEntry 39 }
+
+
+fsErpsRingPort2RapsNRRBPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (NRRB) PDUs received on the 
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 40 }
+
+
+fsErpsRingPort2RapsNRRBPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of R-APS (NRRB) PDUs sent from  the
+       fsErpsRingPort2 of the ring ."
+ 
+   ::= { fsErpsRingStatsEntry 41 }
+
+
+fsErpsRingGeneratedTrapsCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      " This object indicates the number of trap messages send from a ring node."
+
+   ::= { fsErpsRingStatsEntry 42 }
+
+fsErpsRingPort1DefectEncTimeSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when the defect occurred for port1 of the ring
+       and returns time in seconds."
+   ::= { fsErpsRingStatsEntry 43 }
+
+fsErpsRingPort2DefectEncTimeSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when the defect occurred for port2 of the ring
+       and returns time in seconds."
+   ::= { fsErpsRingStatsEntry 44 }
+
+fsErpsRingPort1DefectClearedTimeSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when the defect cleared for port1 of the ring
+       and returns time in seconds."
+   ::= { fsErpsRingStatsEntry 45 }
+
+fsErpsRingPort2DefectClearedTimeSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when the defect cleared for port2 of the ring
+       and returns time in seconds."
+   ::= { fsErpsRingStatsEntry 46 }
+
+fsErpsRingRplPortStatChgTimeSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when Rpl Port status change for the ring
+       and returns time in milliseconds."
+   ::= { fsErpsRingStatsEntry 47 }
+
+fsErpsRingRplNbrPortStatChgTime OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when Rpl Neighbor Port status change for the ring
+       and returns time in milliseconds."
+   ::= { fsErpsRingStatsEntry 48 }
+
+
+fsErpsRingDistPortPduRxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      " This object indicates the number of Dynamic sync PDUs received on
+      the fsErpsRingConfigInfoDistributingPort of the ring."
+
+   ::= { fsErpsRingStatsEntry 49 }
+
+
+fsErpsRingDistPortPduTxCount OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      " This object indicates the number of Dynamic sync PDUs send from
+      the fsErpsRingConfigInfoDistributingPort of the ring."
+
+   ::= { fsErpsRingStatsEntry 50 }
+
+
+fsErpsRingRapsPort1DefectEncTimeNSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+         "This object indicates the time in nano seconds when the defect occurred on port1 of the ring."
+       
+
+   ::= { fsErpsRingStatsEntry 51 }
+
+fsErpsRingRapsPort1DefectClearedTimeNSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+         "This object indicates the time in nano seconds when the defect cleared occurred on port1 of the ring."
+       
+
+   ::= { fsErpsRingStatsEntry 52 }
+
+fsErpsRingRapsPort2DefectEncTimeNSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+         "This object indicates the time in nano seconds when the defect occurred on port2 of the ring."
+       
+
+   ::= { fsErpsRingStatsEntry 53 }
+
+fsErpsRingRapsPort2DefectClearedTimeNSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+         "This object indicates the time in nano seconds when the defect cleared occurred on port2 of the ring."
+       
+
+   ::= { fsErpsRingStatsEntry 54 }
+
+
+fsErpsRingRapsRplPortStatChgTimeNSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the time when Rpl Port status change for the ring
+       and returns time in nanoseconds."
+   ::= { fsErpsRingStatsEntry 55 }
+
+fsErpsRingDefectSwitchOverTimeMSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the differences of the switch over time
+        in milliseconds."
+   ::= { fsErpsRingStatsEntry 56 }
+
+fsErpsRingDefectClearedSwitchOverTimeMSec OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object indicates the differences of the switch over time
+        in milliseconds."
+   ::= { fsErpsRingStatsEntry 57 }
+
+
+-- *****************************************************************************
+--                       fsErpsNotifications subtree
+-- *****************************************************************************
+
+fsErpsTraps OBJECT IDENTIFIER ::= { fsErpsNotifications 0 }
+
+fsErpsTypeOfFailure OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object provides the text indicating a particular failure 
+         condition. 
+
+         'R-APSPduTxFailure' will be set, when the state machine is unable to 
+          transmit an R-APS PDU.
+
+         'HwProgramFailure' will be set, when hardware programming for the ring
+          fails. 
+
+         'BufferAllocFailure' will be set, when there is memory allocation 
+         failure issues.
+
+         'TimerFailure' will be set, when there is any failure in the 
+         timer start."
+    ::= { fsErpsNotifications 1 }
+
+fsErpsTrapSwitchingMechanism OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the type of switching that is currently active
+
+         'AutoSwitch' will be set, when the switching happens  automatically 
+         through the operation of the R-APS protocol (Local or remote event 
+         occurred; Local Events can be local signal failure, Clearance of the 
+         signal failure, disabling the ring, administrator issuing clear command. 
+         Remote Events can be remote Signal Failure, remote clearance of the signal failure, 
+         Forced / Manual switch applied on a remote node in the ring.)).
+         
+         'ForcedSwitch' will be set, when the Force Switch(Local FS) is active on the node.
+
+         'ManualSwitch' will be set, when the Manual Switch(Local MS) is active on the node."
+
+    ::= { fsErpsNotifications 2 }
+
+fsErpsStateChangeTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        fsErpsCtxtName,
+        fsErpsRingName,
+        fsErpsTrapSwitchingMechanism,
+        fsErpsRingSemState,
+        fsErpsRingNodeStatus
+    }
+    STATUS   current
+    DESCRIPTION
+         "This trap is generated on the following events:
+               - Local SF is received for the ring (Auto Trap).
+               - Local Clear SF is received for the ring (Auto Trap).
+               - Remote failure is detected on this ring (Auto Trap).
+               - Remote failure is cleared on this ring (Auto Trap).
+               - Force Switch (Local FS) is issued for a ring (ForcedSwitch).
+               - Manual Switch (Local MS)is issued for a ring (ManualSwitch).
+               - R-APS FS is received on a ring (Auto Trap).
+               - R-APS MS is received on a ring (Auto Trap).
+               - After Clear command is issued on a ring (Auto Trap).
+               - After a ring is moved to Disabled state (Auto Trap)."
+
+
+    ::= { fsErpsTraps 1 }
+
+fsErpsFailureTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        fsErpsCtxtName,
+        fsErpsRingName,
+        fsErpsTypeOfFailure
+    }
+    STATUS   current
+    DESCRIPTION
+        "This trap is generated when there is any failure on a ring."
+    ::= { fsErpsTraps 2 }
+
+
+END

@@ -67,7 +67,7 @@ if (($vars['submit'] === 'save' || $vars['action'] === 'save') && request_token_
     // Set fields that were submitted with custom value
     if (safe_count($sets)) {
 
-        $query = 'SELECT * FROM `config` WHERE ' . generate_query_values_ng(array_keys($sets), 'config_key');
+        $query = 'SELECT * FROM `config` WHERE ' . generate_query_values(array_keys($sets), 'config_key');
         // Fetch current rows in config file so we know which one to UPDATE and which one to INSERT
         $in_db = [];
         foreach (dbFetchRows($query) as $row) {
@@ -93,7 +93,7 @@ if (($vars['submit'] === 'save' || $vars['action'] === 'save') && request_token_
 
     // Delete fields that were reset to default
     if (safe_count($deletes)) {
-        dbDelete('config', generate_query_values_ng($deletes, 'config_key'));
+        dbDelete('config', generate_query_values($deletes, 'config_key'));
         //r(generate_query_values_ng($deletes, 'config_key'));
         //r(dbError());
         $updates++;

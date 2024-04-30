@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -34,7 +34,7 @@ if ($processes = dbFetchRows($sql, [$device['device_id']])) {
         'Command', 'Name', 'Started', 'Poller ID'
         //'Device'
     ];
-    echo build_table($processes, ['columns' => $cols, 'process_start' => 'unixtime']);
+    echo build_table($processes, ['columns' => $cols, 'process_start' => 'prettytime']);
     echo generate_box_close();
 }
 
@@ -174,13 +174,14 @@ if ($vars['view'] === 'db') {
                         <tbody>
                         <?php
 
+                        //r($device['state']['poller_mod_perf']);
                         foreach ($device['state']['poller_mod_perf'] as $module => $time) {
                             if ($time > 0.001) {
-                                $perc = round(float_div($time, $device['last_polled_timetaken']) * 100, 2, 2);
+                                $perc = format_number_short(float_div($time, $device['last_polled_timetaken']) * 100, 2);
 
                                 echo('    <tr>
       <td><strong>' . $module . '</strong></td>
-      <td style="width: 80px;">' . number_format($time, 4) . 's</td>
+      <td style="width: 80px;">' . format_value($time) . 's</td>
       <td style="width: 70px;"><span style="color:' . percent_colour($perc) . '">' . $perc . '%</span></td>
     </tr>');
 
@@ -188,7 +189,7 @@ if ($vars['view'] === 'db') {
                                 foreach ($device['state']['poller_' . $module . '_perf'] as $submodule => $subtime) {
                                     echo('    <tr>
         <td>&nbsp;<i class="icon-share-alt icon-flip-vertical"></i><strong style="padding-left:1em"><i>' . $submodule . '</i></strong></td>
-        <td style="width: 80px;"><i>' . number_format($subtime, 4) . 's</i></td>
+        <td style="width: 80px;"><i>' . format_value($subtime) . 's</i></td>
         <td style="width: 70px;"></td>
       </tr>');
                                 }
@@ -256,11 +257,11 @@ if ($vars['view'] === 'db') {
 
                         foreach ($device['state']['discovery_mod_perf'] as $module => $time) {
                             if ($time > 0.001) {
-                                $perc = round(float_div($time, $device['last_discovered_timetaken']) * 100, 2, 2);
+                                $perc = format_number_short(float_div($time, $device['last_discovered_timetaken']) * 100, 2);
 
                                 echo('    <tr>
       <td><strong>' . $module . '</strong></td>
-      <td style="width: 80px;">' . number_format($time, 4) . 's</td>
+      <td style="width: 80px;">' . format_value($time) . 's</td>
       <td style="width: 70px;"><span style="color:' . percent_colour($perc) . '">' . $perc . '%</span></td>
     </tr>');
 
@@ -268,7 +269,7 @@ if ($vars['view'] === 'db') {
                                 foreach ($device['state']['discovery_' . $module . '_perf'] as $submodule => $subtime) {
                                     echo('    <tr>
         <td>&nbsp;<i class="icon-share-alt icon-flip-vertical"></i><strong style="padding-left:1em"><i>' . $submodule . '</i></strong></td>
-        <td style="width: 80px;"><i>' . number_format($subtime, 4) . 's</i></td>
+        <td style="width: 80px;"><i>' . format_value($subtime) . 's</i></td>
         <td style="width: 70px;"></td>
       </tr>');
                                 }

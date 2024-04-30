@@ -281,14 +281,14 @@ function generate_sla_row($sla, $vars)
     $table_cols = "8";
 
     $graph_array           = [];
-    $graph_array['to']     = $config['time']['now'];
+    $graph_array['to']     = get_time();
     $graph_array['id']     = $sla['sla_id'];
     $graph_array['type']   = $sla['graph_type'];
     $graph_array['legend'] = "no";
     $graph_array['width']  = 80;
     $graph_array['height'] = 20;
     $graph_array['bg']     = 'ffffff00';
-    $graph_array['from']   = $config['time']['day'];
+    $graph_array['from']   = get_time('day');
 
     if ($sla['rtt_event'] && $sla['rtt_sense']) {
         $mini_graph = generate_graph_tag($graph_array);
@@ -307,7 +307,7 @@ function generate_sla_row($sla, $vars)
     $out .= '<td>' . $sla['sla_owner'] . '</td>';
     $out .= '<td>' . $sla['rtt_label'] . '</td>';
     $out .= '<td>' . generate_entity_link('sla', $sla, $mini_graph, NULL, FALSE) . '</td>';
-    $out .= '<td style="white-space: nowrap">' . generate_tooltip_link(NULL, format_uptime(($config['time']['now'] - $sla['rtt_last_change']), 'short-2') . ' ago', format_unixtime($sla['rtt_last_change'])) . '</td>';
+    $out .= '<td style="white-space: nowrap">' . generate_tooltip_link(NULL, format_uptime((get_time('now') - $sla['rtt_last_change']), 'short-2') . ' ago', format_unixtime($sla['rtt_last_change'])) . '</td>';
     $out .= '<td style="text-align: right;"><strong>' . generate_tooltip_link('', $sla['rtt_event'], $sla['event_descr'], $sla['event_class']) . '</strong></td>';
     $out .= '<td style="text-align: right;"><strong>' . generate_tooltip_link('', $sla['rtt_sense'], $sla['event_descr'], $sla['event_class']) . '</strong></td>';
     $out .= '<td><span class="' . $sla['sla_class'] . '">' . $sla['human_value'] . $sla['human_unit'] . '</span></td>';

@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -116,22 +116,21 @@ function print_fdbtable($vars)
  * @return array
  *
  */
-function get_fdbtable_array($vars)
-{
+function get_fdbtable_array($vars) {
 
     $array = [];
 
     // With pagination? (display page numbers in header)
-    $array['pagination'] = (isset($vars['pagination']) && $vars['pagination']);
+    $array['pagination'] = isset($vars['pagination']) && $vars['pagination'];
     pagination($vars, 0, TRUE); // Get default pagesize/pageno
     $array['pageno']   = $vars['pageno'];
     $array['pagesize'] = $vars['pagesize'];
     $start             = $array['pagesize'] * $array['pageno'] - $array['pagesize'];
     $pagesize          = $array['pagesize'];
 
-    $params     = [];
-    $where      = ' WHERE 1 ';
-    $join_ports = FALSE;
+    $params      = [];
+    $where_array = [];
+    $join_ports  = FALSE;
     if (!isset($vars['deleted'])) {
         // Do not show deleted entries by default
         $vars['deleted'] = 0;
@@ -140,56 +139,55 @@ function get_fdbtable_array($vars)
     foreach ($vars as $var => $value) {
 
         // Skip empty variables (and array with empty first entry) when building query
-        if ($value == '' || (is_array($value) && count($value) == 1 && $value[0] == '')) {
+        if (safe_empty($value) || (safe_count($value) === 1 && safe_empty($value[0]))) {
             continue;
         }
 
         switch ($var) {
             case 'device':
             case 'device_id':
-                $where .= generate_query_values_and($value, 'F.device_id');
+                $where_array[] = generate_query_values($value, 'F.device_id');
                 break;
             case 'port':
             case 'port_id':
-                $where .= generate_query_values_and($value, 'F.port_id');
+                $where_array[] = generate_query_values($value, 'F.port_id');
                 break;
             case 'interface':
             case 'port_name':
-                $where      .= generate_query_values_and($value, 'I.ifDescr', 'LIKE%');
+                $where_array[] = generate_query_values($value, 'I.ifDescr', 'LIKE%');
                 $join_ports = TRUE;
                 break;
             case 'trunk':
                 if (get_var_true($value)) {
-                    $where      .= " AND (`I`.`ifTrunk` IS NOT NULL AND `I`.`ifTrunk` != '')";
+                    $where_array[] = "(`I`.`ifTrunk` IS NOT NULL AND `I`.`ifTrunk` != '')";
                     $join_ports = TRUE;
-                } elseif (in_array($value, ['none', 'no', '0'])) {
-                    $where      .= " AND (`I`.`ifTrunk` IS NULL OR `I`.`ifTrunk` = '')";
+                } elseif (get_var_false($value, 'none')) {
+                    $where_array[] = "(`I`.`ifTrunk` IS NULL OR `I`.`ifTrunk` = '')";
                     $join_ports = TRUE;
                 }
                 break;
             case 'vlan_id':
-                $where .= generate_query_values_and($value, 'F.vlan_id');
+                $where_array[] = generate_query_values($value, 'F.vlan_id');
                 break;
             case 'vlan_name':
-                $where .= generate_query_values_and($value, 'V.vlan_name');
+                $where_array[] = generate_query_values($value, 'V.vlan_name');
                 break;
             case 'address':
-                if (str_contains_array($value, ['*', '?'])) {
+                if (str_contains_array($value, [ '*', '?' ])) {
                     $like = 'LIKE';
                 } else {
                     $like = '%LIKE%';
                 }
-                $where .= generate_query_values_and(str_replace([':', ' ', '-', '.', '0x'], '', $value), 'F.mac_address', $like);
+                $where_array[] = generate_query_values(str_replace([':', ' ', '-', '.', '0x'], '', $value), 'F.mac_address', $like);
                 break;
             case 'deleted':
-                $where    .= ' AND `deleted` = ?';
+                $where_array[] = 'F.`deleted` = ?';
                 $params[] = $value;
         }
     }
 
-    $sort_order = get_sort_order($vars);
-
     if (isset($vars['sort'])) {
+        $sort_order = get_sort_order($vars);
         switch ($vars['sort']) {
             case "vlan_id":
                 //$sort = " ORDER BY `V`.`vlan_vlan`";
@@ -217,17 +215,19 @@ function get_fdbtable_array($vars)
                 //$sort = " ORDER BY `mac_address`";
                 $sort = generate_query_sort('mac_address', $sort_order);
         }
+    } else {
+        $sort = '';
     }
 
     // Show FDB tables only for permitted ports
-    $query_permitted = generate_query_permitted(['device', 'port'], ['device_table' => 'F', 'port_table' => 'F', 'port_null' => TRUE]);
+    $query_permitted = generate_query_permitted_ng([ 'device', 'port' ], [ 'device_table' => 'F', 'port_table' => 'F', 'port_null' => TRUE ]);
 
     $query = 'FROM `vlans_fdb` AS F ';
     $query .= 'LEFT JOIN `vlans` as V ON F.`vlan_id` = V.`vlan_vlan` AND F.`device_id` = V.`device_id` ';
     if ($join_ports) {
         $query .= 'LEFT JOIN `ports` AS I ON I.`port_id` = F.`port_id` ';
     }
-    $query       .= $where . $query_permitted;
+    $query       .= generate_where_clause($where_array, $query_permitted);
     $query_count = 'SELECT COUNT(*) ' . $query;
     $query       = 'SELECT F.*, V.`vlan_vlan`, V.`vlan_name` ' . $query;
     $query       .= $sort;

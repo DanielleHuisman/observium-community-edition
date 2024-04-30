@@ -245,8 +245,8 @@ if ($device['type'] == 'wireless') {
                     foreach ($graph_types as $graph_type => $graph_text) {
                         //$graph_type = "lwappmember_" . $graph_type;
                         $graph_type            = "wifi-ap-member_" . $graph_type;
-                        $graph_array['to']     = $config['time']['now'];
-                        $graph_array['from']   = $config['time']['day'];
+                        $graph_array['to']     = get_time();
+                        $graph_array['from']   = get_time('day');
                         $graph_array['id']     = $member['ap_index_member'];
                         $graph_array['type']   = $graph_type;
                         $graph_array['legend'] = "no";

@@ -41,6 +41,9 @@ foreach (dbFetchRows($sql) as $pw) {
 ksort($pw_types);
 
 foreach ($pw_types as $text => $type) {
+
+    if($type[0] == "") { continue; }
+
     $type = implode(',', $type);
 
     if ($vars['pwtype'] == $type) {
@@ -111,6 +114,8 @@ if ($vars['view'] == "graphs")
 */
 print_navbar($navbar);
 unset($navbar);
+
+print_pseudowire_form($vars);
 
 // Pagination
 $vars['pagination'] = TRUE;

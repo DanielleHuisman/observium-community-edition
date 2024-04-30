@@ -4,16 +4,15 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 /// SEARCH STATUS
-$sql = "SELECT * FROM `status`
-                        LEFT JOIN `devices` USING (`device_id`)" .
-       generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '`status_descr` LIKE ?') .
+$sql = "SELECT * FROM `status` LEFT JOIN `devices` USING (`device_id`)" .
+       generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`status_descr` LIKE ?') .
        " ORDER BY `status_descr` LIMIT $query_limit";
 
 $results = dbFetchRows($sql, [$query_param]);

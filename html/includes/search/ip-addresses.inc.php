@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -16,10 +16,10 @@
 
 if (preg_match('/^(?:(?<both>\d+)|(?<ipv6>[\d\:abcdef]+)|(?<ipv4>[\d\.]+))$/i', $addr, $matches)) {
     $query_ipv4 = 'SELECT `device_id`, `port_id`, `ipv4_address` AS `ip_address`, `ipv4_prefixlen` AS `ip_prefixlen` FROM `ipv4_addresses`';
-    $query_ipv4 .= generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '`ipv4_address` LIKE ?');
+    $query_ipv4 .= generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`ipv4_address` LIKE ?');
 
     $query_ipv6 = 'SELECT `device_id`, `port_id`, `ipv6_compressed` AS `ip_address`, `ipv6_prefixlen` AS `ip_prefixlen` FROM `ipv6_addresses`';
-    $query_ipv6 .= generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '(`ipv6_address` LIKE ? OR `ipv6_compressed` LIKE ?)');
+    $query_ipv6 .= generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '(`ipv6_address` LIKE ? OR `ipv6_compressed` LIKE ?)');
 
     $query_end   = " ORDER BY `ip_address` LIMIT $query_limit";
     $query_param = "%$addr%";

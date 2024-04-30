@@ -1,0 +1,1164 @@
+-- Copyright (C) 2007-2015 Aricent Group . All Rights Reserved
+
+-- $Id: fsfsbmi.mib,v 1.4 2016/01/14 11:32:22 siva Exp $
+
+-- Aricent FSB Proprietary MIB Definition 
+ 
+-- This MIB contains tables to configure FIP snooping functionality
+-- in an Ethernet bridge..
+
+   ARICENT-FSB-MI-MIB DEFINITIONS ::= BEGIN 
+ 
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, 
+    enterprises, Integer32, 
+    Unsigned32,Counter32  FROM SNMPv2-SMI
+    TruthValue,RowStatus, MacAddress FROM SNMPv2-TC     
+    InterfaceIndex    FROM IF-MIB        
+    VlanId            FROM Q-BRIDGE-MIB; 
+ 
+fsMIFsbMIB MODULE-IDENTITY 
+      LAST-UPDATED "201506250000Z"
+      ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+      CONTACT-INFO
+
+        "ARICENT COMMUNICATIONS SOFTWARE
+         3460 Hillview Avenue,
+         Palo Alto, CA 94304-1388, USA,
+         Phone : +1-650-391-1088
+         E-mail:support@aricent.com"
+
+      DESCRIPTION  
+      " Aricent proprietary MIB module for FSB (FIP Snooping Bridge) with multiple
+        instance capability "
+
+      REVISION "201506250000Z"
+
+      DESCRIPTION
+       "The enterprise ID 29601 is assigned to Aricent Communication
+       Holdings Limited. This is the initial version for FSB 
+       related mib objects."
+   ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 102 }
+
+-- ----------------------------------------------------------------------------
+-- Main Groups in the FSB MIB Module
+-- ----------------------------------------------------------------------------
+    fsMIFsbContext              OBJECT IDENTIFIER ::= { fsMIFsbMIB 1 }
+    fsMIFsbSystem               OBJECT IDENTIFIER ::= { fsMIFsbMIB 2 }
+    fsMIFsbStatistics           OBJECT IDENTIFIER ::= { fsMIFsbMIB 3 }
+    fsMIFsbNotificationObjects  OBJECT IDENTIFIER ::= { fsMIFsbMIB 4 }
+    fsMIFsbNotifications        OBJECT IDENTIFIER ::= { fsMIFsbMIB 5 }
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbContextTable - Start
+-- ----------------------------------------------------------------------------  
+
+fsMIFsbContextTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIFsbContextEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "This table contains the global parameters of FSB module
+      that is required to be configured for each virtual switch context."
+    ::= { fsMIFsbContext 1 }
+
+fsMIFsbContextEntry OBJECT-TYPE
+    SYNTAX      FsMIFsbContextEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "The object specifies entry that has the FSB global configuration for virtual switch context"
+    INDEX { fsMIFsbContextId }
+    ::= { fsMIFsbContextTable 1 }
+
+FsMIFsbContextEntry ::= SEQUENCE {
+            fsMIFsbContextId                  Unsigned32,
+            fsMIFsbSystemControl              INTEGER,
+            fsMIFsbModuleStatus               INTEGER,
+            fsMIFsbFcMapMode                  INTEGER,
+            fsMIFsbFcmap                      OCTET STRING,
+            fsMIFsbHouseKeepingTimePeriod     Unsigned32,
+            fsMIFsbTraceOption                Integer32,
+            fsMIFsbTrapStatus                 INTEGER,
+            fsMIFsbClearStats                 TruthValue,
+            fsMIFsbDefaultVlanId              VlanId,
+            fsMIFsbRowStatus                  RowStatus
+     }
+
+fsMIFsbContextId OBJECT-TYPE
+     SYNTAX        Unsigned32
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+      "This object distinguishes between the
+       multiple virtual bridge contexts within a bridge."
+    ::= { fsMIFsbContextEntry 1 }
+
+fsMIFsbSystemControl OBJECT-TYPE
+   SYNTAX      INTEGER { start(1), shutdown(2) } 
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object controls status requested
+       by management for the FSB feature. 
+
+       When set to 'start(1)', FSB module will be started in this context, 
+       memory allocated for data structures  and  the
+       module status will be initialized to 'disable(2)'.
+
+       When set to 'shutdown(2)', FSB module will be shutdown in this context 
+       and all FIP Snooping related configurations, entries and memory will be deleted."
+   DEFVAL { shutdown }
+    ::= { fsMIFsbContextEntry 2 }
+
+fsMIFsbModuleStatus OBJECT-TYPE 
+  SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+  MAX-ACCESS  read-write
+  STATUS      current 
+  DESCRIPTION 
+      "This object enables or disables FIP Snooping functionality in the system. A value of 
+      'enabled' (1) indicates that FIP Snooping is enabled in the device.
+      A value of 'disabled' (2) indicates that FIP Snooping is disabled 
+      in the device ." 
+  DEFVAL  { disabled }
+  ::= { fsMIFsbContextEntry 3 }
+
+fsMIFsbFcMapMode OBJECT-TYPE
+    SYNTAX          INTEGER  {
+                        global(1),
+                        vlan(2)
+                    }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object specifies the FCMAP mode supported in the FIP Snooping Ethernet
+         Bridge. 
+         
+         When the object is set to global, the value of fsMIFsbFcmap
+         is used in the validation against the FCMAP received in the FIP
+         FCF Advertisement.
+
+         When the object is set to vlan, the value of fsMIFsbFIPSnoopingFcmap 
+         is used in the validation against the FCMAP received in the FIP
+         FCF Advertisement."
+  DEFVAL  { global }
+  ::= { fsMIFsbContextEntry 4 }
+
+fsMIFsbFcmap OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..3))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object configures the FC-MAP value associated with the
+    FIP snooping Ethernet Bridge."
+    DEFVAL { '0EFC00'h }
+  ::= { fsMIFsbContextEntry 5 }
+
+fsMIFsbHouseKeepingTimePeriod OBJECT-TYPE
+    SYNTAX          Unsigned32 
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+    "This object specifies the amount of time the FCoE switch waits to receive keep alive
+     messages from the ENode for a given FCoE session.
+     When the time expires and no keep alive messages were received for 
+     any entity of the session, the session information is removed.
+     Timer value shall be between 250-350 seconds.
+     Default value of this timer is 300 seconds. 
+     Value of zero in this object, indicates that this functionality
+     will not be supported in the FIP Snooping Bridge. This will be done
+     when the D-Bit is being set in the Discovery Advertisement Frame."
+     DEFVAL { 300 }
+  ::= { fsMIFsbContextEntry 6 }
+
+fsMIFsbTraceOption OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This object is enables Trace Statements in
+                 FSB module.
+ 
+                  A FOUR BYTE integer is used for enabling the level of tracing.
+                  Each BIT in the four byte integer represents a particular
+                  level of Trace.
+ 
+                  The mapping between the bit positions & the level of trace is
+                  as follows:
+                          0 - Init and Shutdown Traces
+                          1 - Management Traces
+                          2 - Data Path Traces
+                          3 - Control Plane Traces
+                          4 - Packet Dump Traces
+                          5 - Traces related to All Resources except Buffers
+                          6 - All Failure Traces
+                          7 - Buffer Traces
+                          8 - Critical Traces
+ 
+                  The remaining bits are unused. Combination of levels are
+                  also allowed.
+ 
+                  For example if the bits 0 and 1 are set, then the Trace
+                  statements related to Init-Shutdown and management
+                  will be printed.
+ 
+                  The user has to enter the corresponding INTEGER VALUE for the
+                  bits set. For example if bits 0 and 1 are set then user has to
+                  set the value 3."
+    
+    DEFVAL{0}
+  ::= { fsMIFsbContextEntry 7 }
+
+fsMIFsbTrapStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        enable (1),
+                        disable (2) }
+
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object enables or disables the trap for FIP Snooping module."
+    DEFVAL { disable }
+    ::= { fsMIFsbContextEntry 8 }
+
+fsMIFsbClearStats OBJECT-TYPE
+    SYNTAX         TruthValue 
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION 
+    "This object is used to clear the global statistics, per vlan 
+     statistics and per session statistics in this virtual switch context."
+    ::= { fsMIFsbContextEntry 9 }
+
+fsMIFsbDefaultVlanId OBJECT-TYPE
+    SYNTAX         VlanId
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION
+    "This object configures the VLAN ID used in the system for classifying
+     untagged VLAN discovery frames in FIP Snooping Module,
+     in this virtual switch context. 
+     
+     This object is used only for filter installation.  
+     It does not take care of configuring the switch port VLAN ID configuration 
+     which is used for classifying the untagged traffic"
+    ::= { fsMIFsbContextEntry 10 }
+
+fsMIFsbRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object specifies the status of the conceptual row.
+
+    The writable columns in a row cannot be changed if the row
+    is active. All columns must have a valid value before a row
+    can be activated.
+
+    Only 'createAndGo', and 'destroy' values are allowed for this
+    object. 'createAndWait' and 'notInService' values are not allowed.
+
+     All the fields in this table can be changed, only when the row status
+     is active."
+    ::= { fsMIFsbContextEntry 11 }
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbContextTable - End
+-- ----------------------------------------------------------------------------  
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbFIPSnoopingTable 
+-- ---------------------------------------------------------------------------- 
+
+fsMIFsbFIPSnoopingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIFsbFIPSnoopingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This conceptual table contains VLANs for which FIP snooping
+    is individually enabled."
+    ::= { fsMIFsbContext 2 }
+
+fsMIFsbFIPSnoopingEntry OBJECT-TYPE
+    SYNTAX      FsMIFsbFIPSnoopingEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object specifies an entry (conceptual row) in the fsMIFsbFIPSnoopingTable,
+    representing a VLAN on which FIP Snooping is to be performed."
+    INDEX { fsMIFsbContextId, fsMIFsbFIPSnoopingVlanIndex}
+    ::= { fsMIFsbFIPSnoopingTable 1 }
+
+FsMIFsbFIPSnoopingEntry ::= SEQUENCE {
+            fsMIFsbFIPSnoopingVlanIndex       VlanId,
+            fsMIFsbFIPSnoopingFcmap           OCTET STRING,
+            fsMIFsbFIPSnoopingEnabledStatus   INTEGER,
+            fsMIFsbFIPSnoopingRowStatus       RowStatus 
+     }
+
+fsMIFsbFIPSnoopingVlanIndex OBJECT-TYPE
+    SYNTAX        VlanId 
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+     "This object identifies the VLAN-ID that the FCoE FIP Snooping
+     function is being enabled for."
+    ::= { fsMIFsbFIPSnoopingEntry 1 }
+
+fsMIFsbFIPSnoopingFcmap OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..3))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object configures the FC-MAP value associated with the
+    FIP snooping Ethernet Bridge for the FCoE VLAN."
+    DEFVAL { '0EFC00'h }
+    ::= { fsMIFsbFIPSnoopingEntry 2 }
+
+fsMIFsbFIPSnoopingEnabledStatus OBJECT-TYPE 
+  SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+  MAX-ACCESS  read-write
+  STATUS      current 
+  DESCRIPTION 
+     "This object indicates that FIP snooping functionality is activated 
+      on this FCoE VLAN when enabled(1), and indicates that FIP snooping 
+      functionality is not activated in this FCoE VLAN when disabled(2).
+      When fsMIFsbModuleStatus is made Enabled, FIP snooping functionality
+      will only be applicable for all FCoE VLAN entries with
+      fsMIFsbFIPSnoopingEnabledStatus as Enabled."
+  DEFVAL  { disabled }
+    ::= { fsMIFsbFIPSnoopingEntry 3 }
+
+fsMIFsbFIPSnoopingRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object specifies the status of the conceptual row.
+
+    Only 'createAndGo', and 'destroy' values are allowed for this
+    object. 'createAndWait' and 'notInService' values are not allowed.
+
+    All the fields in this table can be changed, only when the row status
+    is active.
+
+    When the value is set as CreateAndGo, entries will be populated in 
+    the fsMIFsbIntfTable for the FCoE VLAN that has been configured."
+    ::= { fsMIFsbFIPSnoopingEntry 4 }
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbFIPSnoopingTable - End
+-- ----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------  
+--  fsMIFsbIntfTable 
+-- ----------------------------------------------------------------------------
+fsMIFsbIntfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIFsbIntfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains information about the list of interfaces associated
+     with the FCoE VLANs on the FIP snooping bridge and their roles.
+
+     The port role assigned depends on where the port resides within the 
+     FCoE transit switch path and the source of the traffic (ENode, FCF, or both) 
+     the port will receive.
+   
+     This table is populated/updated in the following scenarios.
+     1) FCoE VLAN Creation.
+     2) When ports are added to an FCoE VLAN.
+     3) When ports are removed from an FCoE VLAN."
+    ::= { fsMIFsbSystem 1 }
+
+fsMIFsbIntfEntry OBJECT-TYPE
+    SYNTAX          FsMIFsbIntfEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+     "This object specifies an entry in the fsMIFsbIntfTable specifying the 
+      interfaces associated with the FCoE VLAN in the FSB."
+    INDEX { fsMIFsbIntfVlanIndex, fsMIFsbIntfIfIndex }
+    ::= { fsMIFsbIntfTable 1 }
+
+FsMIFsbIntfEntry ::= SEQUENCE {
+            fsMIFsbIntfVlanIndex        VlanId,
+            fsMIFsbIntfIfIndex          InterfaceIndex,
+            fsMIFsbIntfPortRole         INTEGER,
+            fsMIFsbIntfRowStatus        RowStatus 
+     }
+
+fsMIFsbIntfVlanIndex OBJECT-TYPE
+    SYNTAX        VlanId 
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+     "This object identifies the VLAN-ID which is configured as an
+     FCoE VLAN by the administrator."
+    ::= { fsMIFsbIntfEntry 1 }
+
+fsMIFsbIntfIfIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "The object specifies an ifIndex of the member ports of FCoE VLAN on which 
+     FIP snooping is enabled."
+     ::= { fsMIFsbIntfEntry 2 }
+
+
+fsMIFsbIntfPortRole OBJECT-TYPE
+    SYNTAX          INTEGER  {
+                        enodefacing(1),
+                        fcffacing(2),
+                        both(3)
+                    }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object specifies the port role in the FIP Snooping Bridge. 
+         This object can be modified only when fsMIFsbFIPSnoopingEnabledStatus 
+         is disabled." 
+  DEFVAL  { enodefacing }
+    ::= { fsMIFsbIntfEntry 3 }
+
+fsMIFsbIntfRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object specifies the status of the conceptual row.
+
+    The writable columns in a row cannot be changed if the row
+    is active. All columns must have a valid value before a row
+    can be activated.
+
+    Entries in this table shall not be added/deleted by the administrator.
+    Port roles can be modified."
+    ::= { fsMIFsbIntfEntry 4 }
+
+-- ----------------------------------------------------------------------------  
+--  fsMIFsbIntfTable End
+-- ----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbFIPSessionTable 
+-- ----------------------------------------------------------------------------
+fsMIFsbFIPSessionTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsMIFsbFIPSessionEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This table stores the currently active FLOGI or FDISC
+     sessions between ENode and FCF"
+    ::= { fsMIFsbSystem 2 }
+
+fsMIFsbFIPSessionEntry OBJECT-TYPE
+    SYNTAX          FsMIFsbFIPSessionEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies an entry in the table pertaining the details to a
+     session."
+    INDEX           {fsMIFsbFIPSessionVlanId,
+                     fsMIFsbFIPSessionEnodeIfIndex,
+                     fsMIFsbFIPSessionEnodeMacAddress,
+                     fsMIFsbFIPSessionFcfMacAddress,
+                     fsMIFsbFIPSessionFCoEMacAddress
+                     }
+    ::= { fsMIFsbFIPSessionTable 1 }
+    
+
+FsMIFsbFIPSessionEntry ::= SEQUENCE
+{
+    fsMIFsbFIPSessionVlanId                  VlanId,
+    fsMIFsbFIPSessionEnodeIfIndex            InterfaceIndex,
+    fsMIFsbFIPSessionEnodeMacAddress         MacAddress,
+    fsMIFsbFIPSessionFcfMacAddress           MacAddress,
+    fsMIFsbFIPSessionFCoEMacAddress          MacAddress,
+    fsMIFsbFIPSessionFcMap                   OCTET STRING,
+    fsMIFsbFIPSessionFcfIfIndex              InterfaceIndex,
+    fsMIFsbFIPSessionFcfNameId               OCTET STRING,
+    fsMIFsbFIPSessionFcId                    OCTET STRING,
+    fsMIFsbFIPSessionEnodeConnectType        INTEGER,
+    fsMIFsbFIPSessionHouseKeepingTimerStatus TruthValue
+}
+
+fsMIFsbFIPSessionVlanId OBJECT-TYPE
+    SYNTAX          VlanId
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+     "This object identifies the FCoE VLAN in which the FIP 
+      Snooping frames are being exchanged."
+    ::= { fsMIFsbFIPSessionEntry 1}
+
+fsMIFsbFIPSessionEnodeIfIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION  
+    "The object specifies the interface index connected to the
+     Enode initiator."
+    ::= { fsMIFsbFIPSessionEntry 2}
+
+fsMIFsbFIPSessionEnodeMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object represents the server provided MAC address of
+     the Enode. This MAC is used as the source MAC in FIP frames
+     originating from Enode."
+    ::= { fsMIFsbFIPSessionEntry 3}
+
+fsMIFsbFIPSessionFcfMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object represents the MAC Address of the Fibre
+     Channel Forwarder to which the session is established."
+    ::= { fsMIFsbFIPSessionEntry 4}
+
+fsMIFsbFIPSessionFCoEMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the Fabric provided MAC Address of the Enode. 
+     This MAC is assigned by FCF as a result of successful FLOGI or 
+     FDISC and is used as the source MAC for FCoE traffic originating 
+     from Enode."
+    ::= { fsMIFsbFIPSessionEntry 5}
+
+fsMIFsbFIPSessionFcMap OBJECT-TYPE
+    SYNTAX          OCTET STRING(SIZE (0..3))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object represents the FC MAP."
+    ::= { fsMIFsbFIPSessionEntry 6}
+
+fsMIFsbFIPSessionFcfIfIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies an Interface index of the port connected to FCF"
+    ::= { fsMIFsbFIPSessionEntry 7}
+
+fsMIFsbFIPSessionFcfNameId OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE(0..8))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the World Wide Node Name of the fabric port as
+     advertised by the FCF."
+    ::= { fsMIFsbFIPSessionEntry 8}
+
+fsMIFsbFIPSessionFcId OBJECT-TYPE
+    SYNTAX          OCTET STRING(SIZE (0..8))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the FC address assigned by the Fabric."
+    ::= { fsMIFsbFIPSessionEntry 9}
+
+fsMIFsbFIPSessionEnodeConnectType OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                       flogi(1),
+                       fdisc(2)
+                    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object represents the method by which ENode connects to an FCF"
+    ::= { fsMIFsbFIPSessionEntry 10}
+
+fsMIFsbFIPSessionHouseKeepingTimerStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " This object indicates that housekeeping timer functionality is enabled
+          when TRUE(1), and indicates that housekeeping timer functionality 
+          is disabled when FALSE(2)."
+    ::= { fsMIFsbFIPSessionEntry 11}
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbFIPSessionTable - End
+-- ----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbFcfTable 
+-- ----------------------------------------------------------------------------
+
+fsMIFsbFcfTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsMIFsbFcfEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This table stores the list of FCFs which are currently active.
+     This table will be indexed by the FCF port index, FCF mac address
+     and an FCoE VLAN."
+    ::= { fsMIFsbSystem 3 }
+
+fsMIFsbFcfEntry OBJECT-TYPE
+    SYNTAX          FsMIFsbFcfEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "An entry in the table specifying the FCF MAC associated
+     with the interface connected to an FCF on the FCoE VLAN."
+    INDEX           {fsMIFsbFcfVlanId,
+                     fsMIFsbFcfIfIndex,
+                     fsMIFsbFcfMacAddress
+                     }
+    ::= { fsMIFsbFcfTable 1}
+
+FsMIFsbFcfEntry ::= SEQUENCE
+{
+   fsMIFsbFcfVlanId           VlanId,
+   fsMIFsbFcfIfIndex          InterfaceIndex,
+   fsMIFsbFcfMacAddress       MacAddress,
+   fsMIFsbFcfFcMap            OCTET STRING,
+   fsMIFsbFcfAddressingMode   INTEGER,
+   fsMIFsbFcfEnodeLoginCount  Integer32,
+   fsMIFsbFcfNameId           OCTET STRING, 
+   fsMIFsbFcfFabricName       OCTET STRING
+}
+
+fsMIFsbFcfVlanId OBJECT-TYPE
+    SYNTAX          VlanId
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the FCoE VLAN ID advertised by FCF"
+    ::= {fsMIFsbFcfEntry 1}
+
+fsMIFsbFcfIfIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies an interface index of the port connected to FCF"
+    ::= {fsMIFsbFcfEntry 2}
+
+fsMIFsbFcfMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+    "This object configures the MAC address of the Fibre Channel
+     Forwarder(FCF). This MAC Address will be used as the DA MAC by
+     ENodes requesting FLOGI or FDISC."
+    ::= {fsMIFsbFcfEntry 3}
+
+fsMIFsbFcfFcMap OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (0..3))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the Fiber Channel MAC address prefix used by the FCF to
+     assign fabric provided MAC addresses(FPMA)."
+    ::= {fsMIFsbFcfEntry 4}
+
+fsMIFsbFcfAddressingMode OBJECT-TYPE
+    SYNTAX          INTEGER  {
+                        fpma(1),
+                        spma(2)
+                    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This object specifies an addressing mode supported by the FCF" 
+  DEFVAL  { fpma }
+    ::= {fsMIFsbFcfEntry 5}
+
+fsMIFsbFcfEnodeLoginCount OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This objects represents the number of ENodes that have
+     logged into this FCF."
+    ::= {fsMIFsbFcfEntry 6}
+
+fsMIFsbFcfNameId OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE(0..8))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the World Wide Node Name of the fabric port as advertised by
+     the FCF."
+    ::= {fsMIFsbFcfEntry 7}
+
+fsMIFsbFcfFabricName OBJECT-TYPE
+   SYNTAX          OCTET STRING (SIZE(0..8))
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION     
+   "This object specifies the Fabric name identifier of Fabric as advertised by FCF."
+   ::= {fsMIFsbFcfEntry 8}
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbFcfTable - End
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbGlobalStatsTable 
+-- ----------------------------------------------------------------------------
+
+fsMIFsbGlobalStatsTable OBJECT-TYPE
+    SYNTAX         SEQUENCE OF FsMIFsbGlobalStatsEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This table contains global statistics information."
+    ::= {fsMIFsbStatistics 1}
+
+fsMIFsbGlobalStatsEntry OBJECT-TYPE
+    SYNTAX         FsMIFsbGlobalStatsEntry 
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This table specifies an entry in the global statistics table."
+    INDEX          { fsMIFsbContextId }
+    ::= { fsMIFsbGlobalStatsTable 1}
+
+FsMIFsbGlobalStatsEntry ::= SEQUENCE
+{
+   fsMIFsbGlobalStatsVlanRequests           Counter32,
+   fsMIFsbGlobalStatsVlanNotification       Counter32 
+}
+
+fsMIFsbGlobalStatsVlanRequests OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of VLAN Requests received in this
+     FIP Snooping Bridge."
+    ::= { fsMIFsbGlobalStatsEntry 1}
+
+fsMIFsbGlobalStatsVlanNotification OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of VLAN Notification received in this
+    FIP Snooping Bridge."
+    ::= { fsMIFsbGlobalStatsEntry 2}
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbGlobalStatsTable - End 
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbVlanStatsTable 
+-- ----------------------------------------------------------------------------
+
+fsMIFsbVlanStatsTable OBJECT-TYPE
+    SYNTAX         SEQUENCE OF FsMIFsbVlanStatsEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This table contains FCoE VLAN statistics information."
+    ::= {fsMIFsbStatistics 2}
+
+fsMIFsbVlanStatsEntry OBJECT-TYPE
+    SYNTAX         FsMIFsbVlanStatsEntry 
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This object specifies an entry in the VLAN statistics table."
+    INDEX          {fsMIFsbContextId, fsMIFsbFIPSnoopingVlanIndex}
+    ::= { fsMIFsbVlanStatsTable 1}
+
+FsMIFsbVlanStatsEntry ::= SEQUENCE
+{
+   fsMIFsbVlanStatsUnicastDisAdv           Counter32,
+   fsMIFsbVlanStatsMulticastDisAdv         Counter32,
+   fsMIFsbVlanStatsUnicastDisSol           Counter32,
+   fsMIFsbVlanStatsMulticastDisSol         Counter32,
+   fsMIFsbVlanStatsFLOGICount              Counter32,
+   fsMIFsbVlanStatsFDISCCount              Counter32,
+   fsMIFsbVlanStatsLOGOCount               Counter32,
+   fsMIFsbVlanStatsFLOGIAcceptCount        Counter32,
+   fsMIFsbVlanStatsFLOGIRejectCount        Counter32,
+   fsMIFsbVlanStatsFDISCAcceptCount        Counter32,
+   fsMIFsbVlanStatsFDISCRejectCount        Counter32,
+   fsMIFsbVlanStatsLOGOAcceptCount         Counter32,
+   fsMIFsbVlanStatsLOGORejectCount         Counter32,
+   fsMIFsbVlanStatsClearLinkCount          Counter32, 
+   fsMIFsbVlanFcMapMisMatchCount           Counter32, 
+   fsMIFsbVlanMTUMisMatchCount             Counter32, 
+   fsMIFsbVlanACLFailureCount              Counter32,
+   fsMIFsbVlanInvalidFIPFramesCount        Counter32,
+   fsMIFsbVlanFCFDiscoveryTimeoutsCount    Counter32
+}
+
+fsMIFsbVlanStatsUnicastDisAdv  OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of Unicast Discovery Advertisements sent
+     from FCF to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 1}
+
+fsMIFsbVlanStatsMulticastDisAdv OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of Multicast Discovery Advertisements sent
+     from FCF to ENode  in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 2}
+
+fsMIFsbVlanStatsUnicastDisSol OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of Unicast Discovery Solicitations sent
+     from ENode to FCF in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 3}
+
+fsMIFsbVlanStatsMulticastDisSol OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of Multicast Discovery Solicitations sent
+     from ENode to FCF  in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 4}
+
+fsMIFsbVlanStatsFLOGICount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of FLOGI frames exchanged between
+     ENode and FCF in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 5}
+
+fsMIFsbVlanStatsFDISCCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of FDISC frames exchanged between
+     ENode and FCF in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 6}
+
+fsMIFsbVlanStatsLOGOCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+     "This object displays the number of LOGO frames exchanged between
+     ENode and FCF in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 7}
+
+fsMIFsbVlanStatsFLOGIAcceptCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of FLOGI Accept frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 8}
+
+fsMIFsbVlanStatsFLOGIRejectCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of FLOGI Reject frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 9}
+
+fsMIFsbVlanStatsFDISCAcceptCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of FDISC Accept frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 10}
+
+fsMIFsbVlanStatsFDISCRejectCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of FDISC Reject frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 11}
+
+fsMIFsbVlanStatsLOGOAcceptCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of LOGO Accept frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 12}
+
+fsMIFsbVlanStatsLOGORejectCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of LOGO Reject frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 13}
+
+
+fsMIFsbVlanStatsClearLinkCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object displays the number of Clear Link frames sent from FCF
+     to ENode in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 14}
+
+fsMIFsbVlanFcMapMisMatchCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object gets incremented when there is an mismatch
+     between the FCMAP configured and FCMAP received in this
+     FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 15}
+
+fsMIFsbVlanMTUMisMatchCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object gets incremented when there is an mismatch
+     between the MTU configured and the MTU received in the FIP packet
+     in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 16}
+
+fsMIFsbVlanACLFailureCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object gets incremented when the filter installation in
+     the hardware is failed for this FCoE VLAN"
+    ::= { fsMIFsbVlanStatsEntry 17}
+
+fsMIFsbVlanInvalidFIPFramesCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object gets incremented when invalid FIP frames are 
+     received in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 18}
+
+fsMIFsbVlanFCFDiscoveryTimeoutsCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    
+    "This object gets incremented when FCF discovery timeout 
+     occurs in this FCoE VLAN."
+    ::= { fsMIFsbVlanStatsEntry 19}
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbVlanStatsTable - End 
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbSessStatsTable 
+-- ----------------------------------------------------------------------------
+
+fsMIFsbSessStatsTable    OBJECT-TYPE
+    SYNTAX         SEQUENCE OF FsMIFsbSessStatsEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This table contains per session FIPs statistics."
+    ::= {fsMIFsbStatistics 3}
+
+fsMIFsbSessStatsEntry    OBJECT-TYPE
+    SYNTAX         FsMIFsbSessStatsEntry 
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This object specifies an entry in the session statistics table."
+    INDEX          {fsMIFsbSessStatsVlanId,
+                    fsMIFsbSessStatsEnodeIfIndex,
+                    fsMIFsbSessStatsEnodeMacAddress,
+                    fsMIFsbSessStatsFcfMacAddress,
+                    fsMIFsbSessStatsFCoEMacAddress
+
+                    }
+    ::= { fsMIFsbSessStatsTable 1}
+
+FsMIFsbSessStatsEntry ::= SEQUENCE
+{
+   fsMIFsbSessStatsVlanId                Integer32,
+   fsMIFsbSessStatsEnodeIfIndex          InterfaceIndex,
+   fsMIFsbSessStatsEnodeMacAddress       MacAddress,
+   fsMIFsbSessStatsFcfMacAddress         MacAddress,
+   fsMIFsbSessStatsFCoEMacAddress        MacAddress,
+   fsMIFsbSessStatsEnodeKeepAliveCount   Counter32,
+   fsMIFsbSessStatsVNPortKeepAliveCount  Counter32 
+}
+
+fsMIFsbSessStatsVlanId OBJECT-TYPE
+    SYNTAX          Integer32 (1..32)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     
+     "This object identifies the FCoE VLAN in which the FIP 
+      Snooping frames are being exchanged."
+    ::= { fsMIFsbSessStatsEntry 1}
+
+fsMIFsbSessStatsEnodeIfIndex OBJECT-TYPE
+    SYNTAX         InterfaceIndex
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This object specifies an interface index of the Enode."
+    ::= { fsMIFsbSessStatsEntry 2}
+
+fsMIFsbSessStatsEnodeMacAddress OBJECT-TYPE
+    SYNTAX         MacAddress
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    
+    "This object represents the server provided MAC address of
+     the Enode"
+    ::= { fsMIFsbSessStatsEntry 3}
+
+fsMIFsbSessStatsFcfMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This object represents the MAC Address of the Fibre
+     Channel Forwarder to which the session is established."
+    ::= { fsMIFsbSessStatsEntry 4}
+
+fsMIFsbSessStatsFCoEMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This object specifies the Fabric provided MAC Address of the Enode.
+     This MAC is assigned by FCF as a result of successful FLOGI or
+     FDISC and is used as the source MAC for FCoE traffic originating
+     from Enode."
+    ::= { fsMIFsbSessStatsEntry 5}
+
+fsMIFsbSessStatsEnodeKeepAliveCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION 
+    "This object displays the number of ENode Keep Alive Frames sent
+     from ENode to an FCF for this session."
+    ::= { fsMIFsbSessStatsEntry 6}
+
+fsMIFsbSessStatsVNPortKeepAliveCount OBJECT-TYPE
+    SYNTAX         Counter32 
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION 
+    "This object displays the number of VN Port Keep Alive Frames sent
+     from ENode to an FCF for this session."
+    ::= { fsMIFsbSessStatsEntry 7}
+
+-- ----------------------------------------------------------------------------  
+-- fsMIFsbSessStatsTable - End 
+-- ----------------------------------------------------------------------------
+
+-- *****************************************************************************
+--                       fsMIFsbNotifications subtree
+-- *****************************************************************************
+fsMIFsbTrapObjects OBJECT IDENTIFIER ::= { fsMIFsbNotificationObjects 1 }
+
+fsMIFsbSessionVlanId OBJECT-TYPE
+     SYNTAX      VlanId
+     MAX-ACCESS  accessible-for-notify
+     STATUS      current
+     DESCRIPTION
+     "This object identifies the VLAN-ID which is configured as an
+     FCoE VLAN by the administrator."
+     ::= { fsMIFsbTrapObjects 1 }
+
+fsMIFsbSessionEnodeIfIndex OBJECT-TYPE
+     SYNTAX      InterfaceIndex 
+     MAX-ACCESS  accessible-for-notify
+     STATUS      current
+     DESCRIPTION
+    "The object specifies the interface index connected to the
+     Enode initiator."
+     ::= { fsMIFsbTrapObjects 2 }
+
+fsMIFsbSessionEnodeMacAddress OBJECT-TYPE
+     SYNTAX      MacAddress
+     MAX-ACCESS  accessible-for-notify
+     STATUS      current
+     DESCRIPTION
+    "This object represents the server provided MAC address of
+     the Enode. This MAC is used as the source MAC in FIP frames
+     originating from Enode."
+     ::= { fsMIFsbTrapObjects 3 }
+
+fsMIFsbTraps OBJECT IDENTIFIER ::= { fsMIFsbNotifications 0 }
+fsMIFsbFIPSessionClear NOTIFICATION-TYPE
+    OBJECTS  {
+                    fsMIFsbSessionVlanId,
+                    fsMIFsbSessionEnodeIfIndex,
+                    fsMIFsbSessionEnodeMacAddress
+             }
+    STATUS      current
+    DESCRIPTION
+    "This object specifies notification that is generated when FIP session is
+     cleared/removed."
+    ::= { fsMIFsbTraps 1 }
+
+fsMIFsbFcmapMismatch NOTIFICATION-TYPE
+    OBJECTS  {
+                    fsMIFsbSessionVlanId,
+                    fsMIFsbSessionEnodeIfIndex,
+                    fsMIFsbSessionEnodeMacAddress
+             }
+    STATUS      current
+    DESCRIPTION
+    "This object specifies notification that is generated when there is a mismatch
+     between the FCMAP configured and FCMAP received."
+    ::= { fsMIFsbTraps 2 }
+
+fsMIFsbMTUMismatch NOTIFICATION-TYPE
+    OBJECTS  {
+                    fsMIFsbSessionVlanId,
+                    fsMIFsbSessionEnodeIfIndex,
+                    fsMIFsbSessionEnodeMacAddress
+             }
+    STATUS      current
+    DESCRIPTION
+    "This object specifies notification that is generated when there is a mismatch
+     between the MTU configured and the MTU received in the FIP packet"
+    ::= { fsMIFsbTraps 3 }
+
+fsMIFsbAclFailure NOTIFICATION-TYPE
+    OBJECTS  {
+                    fsMIFsbSessionVlanId,
+                    fsMIFsbSessionEnodeIfIndex,
+                    fsMIFsbSessionEnodeMacAddress
+             }
+    STATUS      current
+    DESCRIPTION
+    "This object specifies notification that is generated when the filter installation
+    in the hardware is failed."
+    ::= { fsMIFsbTraps 4 }
+END 
+
+

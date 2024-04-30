@@ -1,0 +1,984 @@
+-- Copyright (C) 2007-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsmpfrr.mib,v 1.6 2016/08/04 07:24:02 siva Exp $
+
+ARICENT-MPLS-FRR-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+       MODULE-IDENTITY, OBJECT-TYPE,
+       Integer32, Unsigned32,
+       NOTIFICATION-TYPE, enterprises, Gauge32
+          FROM SNMPv2-SMI                            -- [RFC2578]
+       TruthValue, TimeInterval, RowStatus
+          FROM SNMPv2-TC                             -- [RFC2579]
+       InterfaceIndexOrZero
+          FROM IF-MIB                                -- [RFC2863]
+       MplsTunnelIndex, MplsTunnelInstanceIndex,
+       MplsLsrIdentifier, MplsBitRate, MplsLabel,
+       MplsTunnelAffinity, MplsExtendedTunnelId
+          FROM MPLS-TC-STD-MIB                       -- [RFC3811]
+       mplsTunnelEntry, mplsTunnelARHopListIndex, 
+       mplsTunnelARHopIndex, mplsTunnelIndex, 
+       mplsTunnelInstance, mplsTunnelIngressLSRId, 
+       mplsTunnelEgressLSRId
+          FROM MPLS-TE-STD-MIB                       -- [RFC3812]
+       InetAddressType, InetAddress
+          FROM INET-ADDRESS-MIB                      -- [RFC3291]
+       ;
+
+    fsMplsFrrMIB MODULE-IDENTITY
+       LAST-UPDATED "201209050000Z"
+       ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+       CONTACT-INFO "support@aricent.com"
+     
+     DESCRIPTION  "All rights reserved"
+     REVISION     "201209050000Z" 
+     DESCRIPTION  "The Proprietary MIB for MPLS FRR module"
+
+   ::= { enterprises futuresoftware (2076) futureMpls (13) 3}
+
+    -- Top level components of this MIB module.
+    fsMplsFrrNotif         OBJECT IDENTIFIER ::= { fsMplsFrrMIB 0 }
+    fsMplsFrrScalars       OBJECT IDENTIFIER ::= { fsMplsFrrMIB 1 }
+    fsMplsFrrObjects       OBJECT IDENTIFIER ::= { fsMplsFrrMIB 2 }
+
+    -- objects that work for either method of FRR
+    fsMplsFrrGeneralObjects OBJECT IDENTIFIER ::= { fsMplsFrrObjects 1 }
+
+    -- MPLS Fast Reroute scalars.
+    fsMplsFrrDetourIncoming OBJECT-TYPE
+       SYNTAX        Integer32 (-1|0..2147483647)
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "The number of detour LSPs entering the device
+          (greater than or equal to 0) if fsMplsFrrConstProtectionMethod
+          is set to oneToOneBackup(1), or -1 if
+          fsMplsFrrConstProtectionMethod is set to facilityBackup(2)."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 1 }
+
+    fsMplsFrrDetourOutgoing OBJECT-TYPE
+       SYNTAX        Integer32 (-1|0..2147483647)
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "The number of detour LSPs leaving the device (greater
+          than or equal to 0) if fsMplsFrrConstProtectionMethod
+          is set to oneToOneBackup(1), or -1 if
+          fsMplsFrrConstProtectionMethod is set to
+          facilityBackup(2)."
+       DEFVAL { 0 }
+      ::= { fsMplsFrrScalars 2 }
+
+    fsMplsFrrDetourOriginating OBJECT-TYPE
+    SYNTAX        Integer32(-1|0..2147483647)
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "The number of detour LSPs originating at this PLR (greater
+          than or equal to 0) if fsMplsFrrConstProtectionMethod
+          is set to oneToOneBackup(1).  This object MUST
+          return -1 if the fsMplsFrrConstProtectionMethod is set to
+          facilityBackup(2)."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 3 }
+
+    fsMplsFrrSwitchover OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "The number of tunnel instances for which this LSR
+          is the ingress that are currently using a detour
+          or bypass LSP to reach their egress."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 4 }
+
+    fsMplsFrrConfIfs OBJECT-TYPE
+       SYNTAX        Integer32(-1|0..2147483647)
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the number of MPLS interfaces configured for
+          protection by the FRR feature if
+          fsMplsFrrConstProtectionMethod
+          is set to facilityBackup(2), otherwise this value
+          MUST return -1 to indicate that LSPs traversing any
+          interface are not protected."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 5 }
+
+    fsMplsFrrActProtectedIfs OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the number of interfaces currently being
+          protected by the FRR feature if
+          fsMplsFrrConstProtectionMethod is set to
+          facilityBackup(2), otherwise this value should return
+          0 to indicate that LSPs traversing any interface may
+          not be protected. This value MUST be less than or equal
+          to fsMplsFrrConfIfs except when fsMplsFrrConfIfs is
+          set to -1, in which case the value of this object
+          is meaningless and SHOULD be ignored."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 6 }
+
+    fsMplsFrrConfProtectionTuns OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the number of bypass tunnels configured to
+          protect TE tunnels on this LSR using the FRR feature
+          if fsMplsFrrConstProtectionMethod is set to
+          facilityBackup(2), otherwise this value MUST return
+          0 and SHOULD be ignored."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 7 }
+
+    fsMplsFrrActProtectionTuns OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the number of bypass tunnels indicated in
+          mplsFrrConfProtectionTuns whose operStatus
+          is up(1) indicating that they are currently protecting
+          TE tunnels on this LSR using the FRR feature. This
+          object MUST return 0 if fsMplsFrrConstProtectionMethod
+          is set to oneToOneBackup(1)."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 8 }
+
+    fsMplsFrrActProtectedLSPs OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the number of LSPs currently protected by
+          the FRR feature where this device acts as the PLR
+          for those LSPs. If fsMplsFrrConstProtectionMethod
+          is set to facilityBackup(2) this object MUST return
+          0."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrScalars 9 }
+        
+    fsMplsFrrRevertiveMode OBJECT-TYPE
+        SYNTAX         BITS { 
+                             global(0),
+                             local(1)
+                            }
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "
+            Global revertive mode: The head-end LSR of each tunnel is
+            responsible for reoptimizing the TE LSPs that used the failed
+            resource.  There are several potential reoptimization triggers:
+            RSVP error messages, inspection of OSPF LSAs or ISIS LSPs, and
+            timers.  Note that this re-optimization process may proceed as
+            soon as the failure is detected.  It is not tied to the
+            restoration of the failed resource.
+
+            Local revertive mode: Upon detecting that the resource is
+            restored, the PLR re-signals each of the TE LSPs that used to be
+            routed over the restored resource.  Every TE LSP successfully
+            re-signaled along the restored resource is switched back."
+    ::= { fsMplsFrrScalars 10 }
+  
+   fsMplsFrrDetourMergingEnabled OBJECT-TYPE
+        SYNTAX            TruthValue
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "Enables or disables FRR Detour Merging. 
+             Detour Merging is enabled by default. This is applicable for 
+             One-to-One Backup Method only."
+        DEFVAL { true }
+    ::= { fsMplsFrrScalars 11 }
+
+   fsMplsFrrDetourEnabled OBJECT-TYPE
+        SYNTAX            TruthValue
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "Enables or disables FRR Detour object handling. 
+             Detour object handling is enabled by default. 
+             This is applicable for One-to-One Backup Method only."
+        DEFVAL { true }
+    ::= { fsMplsFrrScalars 12 }
+
+  fsMplsFrrCspfRetryInterval OBJECT-TYPE
+        SYNTAX        TimeInterval   -- UNITS thousandths of a second
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The value of the CSPF retry interval, which is used to 
+             periodically send the CSPF calculation trigger until 
+             the valid CSPF calculation done. It is specified in
+             milli seconds."
+        DEFVAL  { 30000 } 
+    ::= { fsMplsFrrScalars 13 }
+     
+  fsMplsFrrCspfRetryCount OBJECT-TYPE
+        SYNTAX        Gauge32   -- UNITS thousandths of a second
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This indicates the value of the CSPF retry count."
+        DEFVAL  { 10 } 
+    ::= { fsMplsFrrScalars 14 }
+     
+  fsMplsFrrNotifsEnabled OBJECT-TYPE
+        SYNTAX            TruthValue
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "Enables or disables FRR notifications defined in this
+             MIB module. Notifications are disabled by default."
+        DEFVAL { false }
+    ::= { fsMplsFrrScalars 15 }
+
+  fsMplsFrrMakeAfterBreakEnabled OBJECT-TYPE
+        SYNTAX            TruthValue
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "Enables or disables Make after break support for FRR 
+             Protected LSP. It is disabled by default."
+        DEFVAL { false }
+    ::= { fsMplsFrrScalars 16 }
+  
+    --
+    --  General FRR Table Section
+    --
+    --  These tables apply to both types of FRR
+    --  and should be implemented by all LSRs supporting
+    --  FRR.
+    --
+
+    -- MPLS Fast Reroute Constraints table
+
+-- Start of fsMplsTnlFrrObjects
+
+   fsMplsFrrConstTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsFrrConstEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "This table shows detour LSP or bypass tunnel setup
+          constraints."
+     ::= { fsMplsFrrGeneralObjects 1 }
+
+    fsMplsFrrConstEntry OBJECT-TYPE
+     SYNTAX        FsMplsFrrConstEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "An entry in this table represents detour LSP or bypass
+          tunnel setup constraints for a tunnel instance to be
+          protected by detour LSPs or a bypass tunnel.
+
+          Agents must only allow entries in this table to be
+          created for tunnel instances that require fast-reroute
+          as indicated by the presense of the FAST_REROUTE Object
+          in the signaling for the LSP in question, as speciifed
+          in section 4.1 of RFC4090.
+
+          Entries indexed with fsMplsFrrConstIfIndex set to 0 apply to
+          all interfaces on this device for which the FRR feature can
+          operate.
+
+          Note that as per [RFC3812] the mplsTunnelInstance object
+          set to a value of 0 indicates that the mplsTunnelEntry
+          contains at a tunnel ingress. This is typically how
+          configuration of this feature is performed on devices
+          where the actual protection LSP used is left up to the
+          protecting tunnel. However, in cases where static
+          configuration is possible, any valid tunnel
+          instance is possible; however, in these cases, it is
+          STRONGLY RECOMMENDED that the instance index SHOULD
+          use the following convention to identify backup LSPs:
+
+          - lower 16 bits : protected tunnel instance
+          - higher 16 bits: must be all zeros
+       "     
+      INDEX {  mplsTunnelIndex,
+               mplsTunnelInstance,
+               mplsTunnelIngressLSRId,
+               mplsTunnelEgressLSRId
+            }
+      ::= { fsMplsFrrConstTable 1 }
+
+     FsMplsFrrConstEntry ::= SEQUENCE {
+          fsMplsFrrConstIfIndex          InterfaceIndexOrZero,
+          fsMplsFrrConstProtectionMethod INTEGER,
+          fsMplsFrrConstProtectionType   INTEGER,
+          fsMplsFrrConstSetupPrio        Unsigned32,
+          fsMplsFrrConstHoldingPrio      Unsigned32,
+          fsMplsFrrConstSEStyle          TruthValue,
+          fsMplsFrrConstInclAnyAffinity  MplsTunnelAffinity,
+          fsMplsFrrConstInclAllAffinity  MplsTunnelAffinity,
+          fsMplsFrrConstExclAnyAffinity  MplsTunnelAffinity,
+          fsMplsFrrConstHopLimit         Unsigned32,
+          fsMplsFrrConstBandwidth        MplsBitRate,
+          fsMplsFrrConstRowStatus        RowStatus
+    }
+
+    fsMplsFrrConstIfIndex  OBJECT-TYPE
+       SYNTAX        InterfaceIndexOrZero
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Uniquely identifies an interface which a fast reroute
+          protection tunnel is configured to potentially protect
+          in the event of a fault. Entries with this index set to
+          0 indicates that the protection tunnel configured protects
+          all interfaces on this device (i.e.: node protection)."
+       ::= { fsMplsFrrConstEntry 1 }
+
+    fsMplsFrrConstProtectionMethod OBJECT-TYPE
+       SYNTAX        INTEGER { oneToOneBackup(1),
+                               facilityBackup(2)
+                             }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "This object indicates which protection method is to be used for fast
+          reroute on the device. Some devices requires a reboot
+          if this variable is to take affect after being modified."
+       DEFVAL { facilityBackup }
+       ::= { fsMplsFrrConstEntry 2 }
+
+    fsMplsFrrConstProtectionType OBJECT-TYPE
+       SYNTAX        INTEGER { linkProtection(1),
+                               nodeProtection(2)
+                             }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates type of the resource protection:
+
+          linkProtection(1) indicates that this tunnel is
+            setup to protect a particular link's resources.
+
+          nodeProtection(2) indicates that this tunnel is
+            setup to protect an entire node from failure.
+         "
+       DEFVAL { linkProtection }
+       ::= { fsMplsFrrConstEntry 3 }
+
+    fsMplsFrrConstSetupPrio OBJECT-TYPE
+       SYNTAX        Unsigned32 (0..7)
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the setup priority of the detour LSP
+          or bypass tunnel."
+       REFERENCE
+         "RFC 3209"
+       DEFVAL { 7 }
+       ::= { fsMplsFrrConstEntry 4 }
+
+    fsMplsFrrConstHoldingPrio OBJECT-TYPE
+       SYNTAX        Unsigned32 (0..7)
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the holding priority for detour LSP
+          or bypass tunnel."
+       REFERENCE
+         "RFC 3209"
+       DEFVAL { 0 }
+       ::= { fsMplsFrrConstEntry 5 }
+
+    fsMplsFrrConstSEStyle OBJECT-TYPE
+       SYNTAX        TruthValue
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the SE style desired. This will be TRUE when 
+         facility backup method is desired. One to One backup method 
+         can be made sender template specific by setting this style TRUE."
+       DEFVAL { true }
+       ::= { fsMplsFrrConstEntry 6 }
+
+    fsMplsFrrConstInclAnyAffinity OBJECT-TYPE
+       SYNTAX        MplsTunnelAffinity
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the include-any link constraint for the
+          detour LSP or bypass tunnel. A link satisfies the
+          include-any constraint if and only if the constraint
+          is zero, or the link and the constraint have a
+          resource class in common."
+       REFERENCE
+         "RFC 3209"
+       DEFVAL { 0 }
+       ::= { fsMplsFrrConstEntry 7 }
+
+    fsMplsFrrConstInclAllAffinity OBJECT-TYPE
+       SYNTAX        MplsTunnelAffinity
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the include-all link constraint for the
+          detour LSP or bypass tunnel. A link satisfies the
+          include-all constraint if and only if the link contains
+          all of the administrative groups specified in the
+          constraint."
+       REFERENCE
+         "RFC 3209"
+       DEFVAL { 0 }
+       ::= { fsMplsFrrConstEntry 8 }
+
+    fsMplsFrrConstExclAnyAffinity OBJECT-TYPE
+       SYNTAX        MplsTunnelAffinity
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "Indicates the exclude-any link constraint for the
+          detour LSP or bypass tunnel. A link satisfies the
+          exclude-any constraint if and only if the link contains
+          none of the administrative groups specified in the
+          constraint."
+       REFERENCE
+         "RFC 3209"
+       DEFVAL { 0 }
+       ::= { fsMplsFrrConstEntry 9 }
+
+    fsMplsFrrConstHopLimit OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "The maximum number of hops that the detour LSP or
+          bypass tunnel may traverse."
+       REFERENCE
+         "RFC4090."
+       DEFVAL { 32 }
+    ::= { fsMplsFrrConstEntry 10 }
+
+    fsMplsFrrConstBandwidth OBJECT-TYPE
+       SYNTAX        MplsBitRate
+       UNITS         "kilobits per second"
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+         "The maximum bandwidth specifically reserved for detour
+          LSP or bypass tunnel, in units of thousands of bits
+          per second (Kbps). Note that setting this value to 0
+          indicates best-effort treatment."
+       DEFVAL { 0 }
+       ::= { fsMplsFrrConstEntry 11 }
+
+    fsMplsFrrConstRowStatus OBJECT-TYPE
+       SYNTAX        RowStatus
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+          "This variable is used to create, modify, and/or
+           delete a row in this table."
+           ::= { fsMplsFrrConstEntry 12 }
+
+    -- End of fsMplsTnlFrrObjects
+
+    -- Start of fsMplsTunnelExtTable
+
+   fsMplsTunnelExtTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsTunnelExtTable
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "This table is an extension to mplsTunnelTable. This Table
+            performs the association of tunnels to an interface, 
+            association of Protected Tunnel with that of backup tunnel,
+            and shows the status of the backup tunnels."
+     ::= { fsMplsFrrGeneralObjects 2 }
+
+    fsMplsTunnelExtEntry OBJECT-TYPE
+     SYNTAX        FsMplsTunnelExtTable
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "An entry in this table represents an extension to 
+            mplsTunnelTable."
+      
+      AUGMENTS { mplsTunnelEntry }
+      ::= { fsMplsTunnelExtTable 1 }
+
+     FsMplsTunnelExtTable ::= SEQUENCE {
+          fsMplsTunnelExtProtIfIndex              InterfaceIndexOrZero,
+          fsMplsTunnelExtProtectionType           INTEGER,
+          fsMplsTunnelExtBkpTunIdx                MplsTunnelIndex,
+          fsMplsTunnelExtBkpInst                  MplsTunnelInstanceIndex,
+          fsMplsTunnelExtBkpIngrLSRId             MplsExtendedTunnelId,
+          fsMplsTunnelExtBkpEgrLSRId              MplsExtendedTunnelId,
+          fsMplsTunnelExtOne2OnePlrId             MplsLsrIdentifier,
+          fsMplsTunnelExtOne2OnePlrSenderAddrType InetAddressType,
+          fsMplsTunnelExtOne2OnePlrSenderAddr     InetAddress,
+          fsMplsTunnelExtOne2OnePlrAvoidNAddrType InetAddressType,
+          fsMplsTunnelExtOne2OnePlrAvoidNAddr     InetAddress,
+          fsMplsTunnelExtDetourActive             TruthValue,
+          fsMplsTunnelExtDetourMerging            INTEGER,
+          fsMplsTunnelExtFacRouteDBProtTunStatus  INTEGER,
+          fsMplsTunnelExtFacRouteDBProtTunResvBw  MplsBitRate,
+          fsMplsTunnelExtProtectionMethod         INTEGER,
+          fsMplsTunnelExtMaxGblRevertTime         TimeInterval
+    }
+
+    fsMplsTunnelExtProtIfIndex  OBJECT-TYPE
+       SYNTAX        InterfaceIndexOrZero
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Uniquely identifies an interface which a fast reroute
+          protection tunnel is configured to potentially protect
+          in the event of a fault." 
+       DEFVAL { 0 }
+       ::= { fsMplsTunnelExtEntry 1 }
+     
+     fsMplsTunnelExtProtectionType OBJECT-TYPE
+       SYNTAX        INTEGER { none(0),
+                               linkProtection(1),
+                               nodeProtection(2)
+                             }
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates type of the resource protection:
+
+          none(0) indicates default value this will be used
+           when tunnel is not supporting facility backups.
+           
+          linkProtection(1) indicates that this tunnel is
+            setup to protect a particular link's resources.
+
+          nodeProtection(2) indicates that this tunnel is
+            setup to protect an entire node from failure.
+         "
+       ::= { fsMplsTunnelExtEntry 2 }
+
+     fsMplsTunnelExtBkpTunIdx OBJECT-TYPE
+       SYNTAX        MplsTunnelIndex
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Denotes Backup Tunnel Index for the Tunnel in mplsTunnelTable."
+       ::= { fsMplsTunnelExtEntry 3 }
+
+    fsMplsTunnelExtBkpInst OBJECT-TYPE
+       SYNTAX        MplsTunnelInstanceIndex
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Denotes Backup Tunnel Instance for the Tunnel in mplsTunnelTable.
+
+         - lower 16 bits : protected tunnel instance
+         - higher 16 bits: detour instance"
+       ::= { fsMplsTunnelExtEntry 4 }
+
+    fsMplsTunnelExtBkpIngrLSRId OBJECT-TYPE
+       SYNTAX        MplsExtendedTunnelId
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Denotes Backup Tunnel Ingress LSR ID for the Tunnel in mplsTunnelTable."
+       REFERENCE
+         "RFC3209"
+       ::= { fsMplsTunnelExtEntry 5 }
+
+     fsMplsTunnelExtBkpEgrLSRId OBJECT-TYPE
+       SYNTAX        MplsExtendedTunnelId
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Denotes Backup Tunnel Egress LSR ID for the Tunnel in mplsTunnelTable."
+       ::= { fsMplsTunnelExtEntry 6 }
+
+    fsMplsTunnelExtOne2OnePlrId OBJECT-TYPE
+       SYNTAX        MplsLsrIdentifier
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "This value represents the PLR that has initiated a detour LSP
+          to protect a tunnel instance.
+          This value is signalled via the DETOUR object defined in MPLS
+          RSVP protocol as described in RFC-4090."
+       ::= { fsMplsTunnelExtEntry 7 }
+
+    fsMplsTunnelExtOne2OnePlrSenderAddrType OBJECT-TYPE
+       SYNTAX        InetAddressType
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Denotes the address type of this detour instance's sender address."
+       ::= { fsMplsTunnelExtEntry 8 }
+
+    fsMplsTunnelExtOne2OnePlrSenderAddr OBJECT-TYPE
+       SYNTAX        InetAddress
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "The IP address of the PLR which has initiated the detour LSP.
+          The type of this address is determined by the value of the
+          fsMplsTunnelExtOne2OnePlrSenderAddrType object."
+       ::= { fsMplsTunnelExtEntry 9 }
+
+    fsMplsTunnelExtOne2OnePlrAvoidNAddrType OBJECT-TYPE
+       SYNTAX        InetAddressType
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Denotes the address type of the node that this PLR tries to
+          avoid."
+       ::= { fsMplsTunnelExtEntry 10 }
+
+    fsMplsTunnelExtOne2OnePlrAvoidNAddr OBJECT-TYPE
+       SYNTAX        InetAddress
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "The IP address of the node that this PLR tries to avoid.
+          The type of this address is determined by the value of the
+          fsMplsTunnelExtOne2OnePlrAvoidNAddrType object.
+          This value is signalled via the DETOUR object defined in MPLS
+          RSVP protocol as described in RFC-4090."
+       ::= { fsMplsTunnelExtEntry 11 }
+
+    fsMplsTunnelExtDetourActive OBJECT-TYPE
+       SYNTAX        TruthValue
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates whether or not the main LSP has switched over to
+          this detour LSP. This is only relevant for detours
+          originated by this node."
+       ::= { fsMplsTunnelExtEntry 12 }
+
+    fsMplsTunnelExtDetourMerging OBJECT-TYPE
+       SYNTAX        INTEGER { none(1),
+                               protectedTunnel(2),
+                               detour(3)
+                             }
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "This value represents whether or not this detour is merged.
+          This value MUST be set to none(1) if this detour is not
+          merged.
+
+          This value MUST be set to protectedTunnel(2) if this detour is
+          merged with the protected tunnel. This value MUST be set to
+          detour(3) if this detour is merged with another detour
+          protecting the same tunnel."
+       ::= { fsMplsTunnelExtEntry 13 }
+
+    fsMplsTunnelExtFacRouteDBProtTunStatus OBJECT-TYPE
+        SYNTAX            INTEGER {
+                              active(1),
+                              ready(2),
+                              partial(3)
+                          }
+        MAX-ACCESS        read-only
+        STATUS            current
+        DESCRIPTION
+            "Specifies the state of the protected tunnel.
+
+             active  This tunnel's label has been placed in the
+                      LFIB and is ready to be applied to incoming
+                      packets.
+
+             ready -  This tunnel's label entry has been created but is
+                      not yet in the LFIB.
+
+             partial - This tunnel's label entry as not been fully
+                       created."
+    ::= { fsMplsTunnelExtEntry 14 }
+
+    fsMplsTunnelExtFacRouteDBProtTunResvBw  OBJECT-TYPE
+        SYNTAX            MplsBitRate
+        UNITS             "kilobits per second"
+        MAX-ACCESS        read-only
+        STATUS            current
+        DESCRIPTION
+            "Specifies the amount of bandwidth in units
+             of '1,000 bits per second', actually reserved by
+             the protection tunnel for facility backup purposes.
+             This value is repeated here from the
+             MPLS-TE-STD-MIB MIB module because the tunnel entry will
+             reveal the bandwidth reserved by the signaling protocol,
+             which is typically 0 for backup tunnels so as to not
+             over-book bandwidth. However, internal reservations are
+             typically made on the PLR, thus this value should be
+             revealed here as it is often different from the one found
+             in the MPLS-TE-STD-MIB MIB module."
+     ::= { fsMplsTunnelExtEntry 15 }
+
+     fsMplsTunnelExtProtectionMethod OBJECT-TYPE
+       SYNTAX        INTEGER { oneToOneBackup(1),
+                               facilityBackup(2)
+                             }
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates type of the protection method in use:
+
+          oneToOneBackup(1) indicates OneToOne Backup method
+          is used.
+           
+          facilityBackup(2) indicates facility backup method
+          is used. "
+       ::= { fsMplsTunnelExtEntry 16 }
+    
+     fsMplsTunnelExtMaxGblRevertTime OBJECT-TYPE
+       SYNTAX        TimeInterval
+       MAX-ACCESS    read-write
+       STATUS        current
+       DESCRIPTION
+            "The Maximum Time after which the re-optimization of LSP begins 
+            for the FRR Protected LSP in case of link/node failure detection.
+            It is specified in milli seconds." 
+        DEFVAL  { 600000 } 
+       ::= { fsMplsTunnelExtEntry 17 }
+    
+    -- End of fsMplsTunnelExtTable
+   
+    -- Start of fsMplsBypassTunnelIfTable
+
+   fsMplsBypassTunnelIfTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsBypassTunnelIfTable
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "This table associates the tunnel to an interface to be 
+           used as a Backup Tunnel for a protected tunnelin case of 
+           facility backup method. This Table is applicable only in
+           case of Fast ReRoute Support."
+     ::= { fsMplsFrrGeneralObjects 3 }
+
+    fsMplsBypassTunnelIfEntry OBJECT-TYPE
+     SYNTAX        FsMplsBypassTunnelIfTable
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+           "An entry in this table represents the association of 
+            the tunnel to an interface to be used as a backup tunnel for
+            fast reroute supported tunnel in case of facility backup method.            
+            The Bypass Tunnel associated with an interface should have an 
+            entry in mplsTunnelTable."
+      
+      INDEX { fsMplsBypassTunnelIfIndex,
+              fsMplsBypassTunnelIndex,
+              fsMplsBypassTunnelIngressLSRId,
+              fsMplsBypassTunnelEgressLSRId
+            }
+      ::= { fsMplsBypassTunnelIfTable 1 }
+
+     FsMplsBypassTunnelIfTable ::= SEQUENCE {
+          fsMplsBypassTunnelIfIndex               InterfaceIndexOrZero,
+          fsMplsBypassTunnelIndex                 MplsTunnelIndex,
+          fsMplsBypassTunnelIngressLSRId          MplsExtendedTunnelId,
+          fsMplsBypassTunnelEgressLSRId           MplsExtendedTunnelId,
+          fsMplsBypassTunnelRowStatus             RowStatus
+    }
+
+    fsMplsBypassTunnelIfIndex  OBJECT-TYPE
+       SYNTAX        InterfaceIndexOrZero
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+         " Uniquely identifies an interface to which a Bypass Tunnel is 
+          associated to protect a Fast ReRoute Supported Tunnel in the 
+          event of a fault. It is the primary index to this table." 
+       ::= { fsMplsBypassTunnelIfEntry 1 }
+     
+     fsMplsBypassTunnelIndex OBJECT-TYPE
+       SYNTAX        MplsTunnelIndex
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+         " Uniquely identifies the Tunnel index of the Bypass Tunnel used 
+          to protect a Fast ReRoute Supported Tunnel in the even of fault.
+          It is a secondary index to this table. This Object 
+          should have an entry in mplsTunnelEntry."
+       ::= { fsMplsBypassTunnelIfEntry 2 }
+
+
+    fsMplsBypassTunnelIngressLSRId OBJECT-TYPE
+       SYNTAX        MplsExtendedTunnelId
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+         " Uniquely identifies the Tunnel Ingress LSR ID of the Bypass Tunnel 
+         used to protect a Fast ReRoute Supported Tunnel in the even of fault.
+         It is a secondary index to this table. This Object should have an 
+         entry in mplsTunnelEntry."
+       ::= { fsMplsBypassTunnelIfEntry 3 }
+
+    fsMplsBypassTunnelEgressLSRId OBJECT-TYPE
+       SYNTAX        MplsExtendedTunnelId
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+         " Uniquely identifies the Tunnel Egress LSR ID of the Bypass Tunnel 
+         used to protect a Fast ReRoute Supported Tunnel in the even of fault.
+         It is a secondary index to this table. This Object should have an 
+         entry in mplsTunnelEntry."
+       ::= { fsMplsBypassTunnelIfEntry 4 }
+
+     fsMplsBypassTunnelRowStatus OBJECT-TYPE
+       SYNTAX        RowStatus
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+          "This variable is used to create and delete a row in this table.
+          The Only Operations supported in this table are Create and Go 
+          and Destroy."
+       ::= { fsMplsBypassTunnelIfEntry 5 }
+
+    -- End of fsMplsBypassTunnelTable
+  
+    -- MPLS Fast Reroute Tunnel Actual Route Hop table
+
+    fsMplsFrrTunARHopTable OBJECT-TYPE
+       SYNTAX             SEQUENCE OF FsMplsFrrTunARHopEntry
+       MAX-ACCESS         not-accessible
+       STATUS             current
+       DESCRIPTION
+         "This table sparsely extends mplsTunnelARHopTable defined
+          in the MPLS-TE-STD-MIB MIB module with fast-reroute objects.
+          These objects specify the status of local protection including
+          availability and active use, on a per-hop basis, of hops
+          traversed by a protected tunnel.  Note that object
+          availability in this table is governed by the support of
+          the Record Route Object in the RSVP-TE signaling of the
+          implementation."
+       ::= {  fsMplsFrrGeneralObjects 4 }
+
+    fsMplsFrrTunARHopEntry  OBJECT-TYPE
+       SYNTAX             FsMplsFrrTunARHopEntry
+       MAX-ACCESS         not-accessible
+       STATUS             current
+       DESCRIPTION
+         "This entry contains fast-reroute protection status of a single
+          protected tunnel hop."
+          INDEX {
+                mplsTunnelARHopListIndex,
+                mplsTunnelARHopIndex
+         }
+       ::= { fsMplsFrrTunARHopTable 1 }
+
+    FsMplsFrrTunARHopEntry    ::= SEQUENCE {
+        fsMplsFrrTunARHopProtectType      BITS,
+        fsMplsFrrTunARHopProtectTypeInUse BITS,
+        fsMplsFrrTunARHopLabel            MplsLabel, 
+        fsMplsFrrTunARBwProtAvailable     TruthValue 
+    }
+
+     fsMplsFrrTunARHopProtectType  OBJECT-TYPE
+       SYNTAX                       BITS { path(0), node(1), link(2) }
+       MAX-ACCESS                   read-only
+       STATUS                       current
+       DESCRIPTION
+         "This object indicates the protection type or types of the
+          associated path hop object.  Note that since this object is a
+          BITS type, one, none or all of the bits may be set to indicate
+          various combinations of protection types."
+        REFERENCE
+          "See section 4 of RFC4090 where the SESSION_ATTRIBUTE
+           and RECORD_ROUTE objects are extended to
+           support bandwidth and node protection features."
+       ::= { fsMplsFrrTunARHopEntry 1 }
+
+     fsMplsFrrTunARHopProtectTypeInUse OBJECT-TYPE
+       SYNTAX                       BITS { path(0), node(1),
+                                           link(2) }
+       MAX-ACCESS                   read-only
+       STATUS                       current
+       DESCRIPTION
+         "This object indicates the protection type or types that are
+          currently in use by the associated path hop object.
+          Note that since this object is a BITS type, one, none or all
+          of the bits may be set to indicate various combinations of
+          protection types.  If no bits are set, this indicates that
+          no protection types are in use."
+        REFERENCE
+          "See section 4 of RFC4090 where the SESSION_ATTRIBUTE
+           and RECORD_ROUTE objects are extended to
+           support bandwidth and node protection features."
+       ::= { fsMplsFrrTunARHopEntry 2 }
+
+    fsMplsFrrTunARHopLabel OBJECT-TYPE
+      SYNTAX        MplsLabel
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+        "This label indicates the downstream node label used incase of 
+         fast reroute facility backup method is desired by the LSP"
+       ::= { fsMplsFrrTunARHopEntry 3 }
+      
+    fsMplsFrrTunARBwProtAvailable OBJECT-TYPE
+      SYNTAX        TruthValue
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+        "This Object indicates whether bandwidth protection is 
+        available on this node."
+       ::= { fsMplsFrrTunARHopEntry 4 }
+    
+    -- Notifications
+
+    fsMplsFrrFacProtected NOTIFICATION-TYPE
+        OBJECTS { fsMplsTunnelExtFacRouteDBProtTunStatus,
+                  fsMplsTunnelExtFacRouteDBProtTunResvBw
+                }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when a tunnel running over an
+         interface as specified in the fsMplsFrrConstTable is initially
+         protected by the backup tunnel also specified in the
+         fsMplsFrrConstTable. In some implementations there may be
+         a difference between when the control plane triggers
+         this notification and when the hardware is programmed to
+         utilize the protection path. Due to the urgency of this
+         operation, it is acceptable for the control plane to
+         either issue this notification before or after it programs
+         the hardware. In cases where it is the latter approach,
+         the notification MUST be sent immediately after the
+         data plane has been altered.
+
+         This notification should not be generated
+         for each subsequent tunnel that is backed up by the FRR feature
+         on this LSR, as this may result in potential scaling issues
+         with regard to LSR performance and network loading. 
+
+         Note this notification only applicable to the facility based
+         fastreroute protection method, and should be ignored by
+         implementations that do not support this method."
+        ::= { fsMplsFrrNotif 1 }
+
+    fsMplsFrrFacUnProtected NOTIFICATION-TYPE
+        OBJECTS { fsMplsTunnelExtFacRouteDBProtTunStatus,
+                  fsMplsTunnelExtFacRouteDBProtTunResvBw
+                }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when the final tunnel that is
+         being protected by a backup tunnel as specified in the
+         fsMplsFrrConstTable is restored to normal operation. This
+         notification should not be generated for each restored tunnel,
+         as this may result in potential scaling issues with regard to
+         LSR performance and network loading. 
+
+         Note this notification only applicable to the facility based
+         fastreroute protection method, and should be ignored by
+         implementations that do not support this method."
+        ::= { fsMplsFrrNotif 2 }
+
+   END
+

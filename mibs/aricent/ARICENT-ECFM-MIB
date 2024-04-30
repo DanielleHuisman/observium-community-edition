@@ -1,0 +1,1558 @@
+-- Copyright (C) 2015 Aricent. All Rights Reserved.
+
+-- $Id: fsecfm.mib,v 1.17 2015/05/27 13:50:15 siva Exp $
+
+-- ECFM Proprietary MIB Definition 
+ 
+-- This MIB contains tables used to configure a switch running 
+-- ECFM in addition to the standard MIB.
+ 
+   ARICENT-ECFM-MIB DEFINITIONS ::= BEGIN 
+ 
+   IMPORTS 
+      MODULE-IDENTITY, 
+      OBJECT-TYPE,  
+      NOTIFICATION-TYPE,
+      enterprises,     Integer32, 
+      Unsigned32       FROM SNMPv2-SMI 
+      TEXTUAL-CONVENTION, 
+      TruthValue, RowStatus, 
+      MacAddress,TDomain, TAddress   FROM SNMPv2-TC
+      InterfaceIndex                 FROM IF-MIB
+      VlanId                         FROM Q-BRIDGE-MIB
+      Dot1agCfmPortStatus, Dot1agCfmInterfaceStatus FROM IEEE8021-CFM-MIB
+      LldpChassisId,
+      LldpChassisIdSubtype           FROM LLDP-MIB      -- [IEEExxx]
+      ;
+      fsecfm MODULE-IDENTITY 
+         LAST-UPDATED "201209050000Z" 
+         ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE" 
+         CONTACT-INFO "support@aricent.com" 
+         
+         DESCRIPTION 
+            " The proprietary MIB module for ECFM. "
+         REVISION "201209050000Z" 
+         DESCRIPTION 
+              "The Proprietary MIB for ECFM module"
+      ::=  { enterprises futuresoftware (2076) 150 }
+ 
+-- ------------------------------------------------------------  
+-- Textual conventions for CFM MIB
+-- ------------------------------------------------------------ 
+ FsEcfmOuiType ::= TEXTUAL-CONVENTION
+       STATUS       current
+       DESCRIPTION 
+         "24-bit Organizationally Unique Identifier.  Information on
+         OUIs can be found in IEEE 802-2001 [802-2001] Clause 9."
+       SYNTAX       OCTET STRING(SIZE(3))
+       
+ FsEcfmSetTraps ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Multiple traps can be enabled at the same time.
+       "
+    SYNTAX BITS {
+                  trapUnUsedbit(0),
+                  trapRDICCM(1),
+                  trapMACstatus(2),
+                  trapRemoteCCM(3),
+                  trapErrorCCM(4),
+                  trapXconCCM(5)
+               }
+ 
+-- ------------------------------------------------------------  
+-- groups in the MIB  
+-- ------------------------------------------------------------ 
+ 
+      fsEcfmSystem  OBJECT IDENTIFIER ::= { fsecfm 1 } 
+      fsEcfmExObjects OBJECT IDENTIFIER ::= { fsecfm 2 } 
+      fsEcfmTrapsControl OBJECT IDENTIFIER ::= { fsecfm 3 }
+      fsEcfmTraps OBJECT IDENTIFIER ::= { fsecfm 4 }
+      
+-- ------------------------------------------------------------------ 
+-- The ECFM System Group 
+-- ------------------------------------------------------------------ 
+ 
+      fsEcfmSystemControl OBJECT-TYPE 
+          SYNTAX      INTEGER  { start(1), shutdown(2) } 
+          MAX-ACCESS  read-write 
+          STATUS      current 
+          DESCRIPTION 
+              "The administrative system control status of Ethernet
+               CFM module. The value 'start' (1) indicates that all
+               resources required by ECFM module should be allocated 
+               and ECFM should be supported in the device on all ports. 
+               The value 'shutdown' (2) indicates that ECFM should be 
+               shutdown in the device on all ports and all allocated 
+               memory must be released."   
+          ::= { fsEcfmSystem 1 } 
+          
+      fsEcfmModuleStatus OBJECT-TYPE 
+          SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+          MAX-ACCESS  read-write
+          STATUS      current 
+          DESCRIPTION 
+             "The administrative module status of Ethernet CFM module. 
+              This enables or disables ECFM in the system. A value of 
+              'enabled' (1) indicates that ECFM is enabled in the device.
+              A value of 'disabled' (2) indicates that ECFM is disabled 
+              in the device." 
+          DEFVAL  { disabled }
+          ::= { fsEcfmSystem 2 } 
+
+        fsEcfmOui OBJECT-TYPE
+          SYNTAX      FsEcfmOuiType
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION 
+             "The Organizational Unique Identifier of the local ECFM 
+              Client. This will be sent in the Information CFMPDU in 
+              Local Information TLV.
+              Default for this object will be the first three bytes 
+              of system MAC address."
+          ::= { fsEcfmSystem 3 }
+
+        fsEcfmTraceOption OBJECT-TYPE 
+          SYNTAX      Integer32
+          MAX-ACCESS  read-write 
+          STATUS      current 
+          DESCRIPTION 
+             "This object is used to enable trace statements in 
+              Ethernet CFM module. 
+              A four byte integer is used for enabling the trace level.  
+              Each bit in the four byte integer represents a particular  
+              trace level.  
+              The mapping between the bit positions & the trace level is  
+              as follows:  
+                  Bit 0 - Init and Shutdown traces 
+                  Bit 1 - Management traces 
+                  Bit 2 - Data Path traces [NOT REQUIRED IN ECFM] 
+                  Bit 3 - Control Plane traces 
+                  Bit 4 - Packet Dump traces 
+                  Bit 5 - Traces related to all resources except buffers 
+                  Bit 6 - All Failure traces 
+                  Bit 7 - Buffer allocation/release traces 
+ 
+                  Bit 16 - ECFM Function Entry traces
+                  Bit 17 - ECFM Function Exit traces
+                  Bit 18 - ECFM Name traces 
+ 
+              The remaining bits are unused. Combinations of levels are 
+              also allowed. 
+ 
+              For example, if the bits 19 and 20 are set, then the trace
+              statement related to discovery and remote loopback related
+              messages will be printed. 
+ 
+              The user has to enter the corresponding integer value for the 
+              bits set. For example if bits 8 and 9 are to be set ,then user
+              has to give the value 0x300." 
+       DEFVAL { '00040000'H }
+          ::= { fsEcfmSystem 4 }
+
+      fsEcfmLtrCacheStatus OBJECT-TYPE 
+          SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+          MAX-ACCESS  read-write
+          STATUS      current 
+          DESCRIPTION 
+             "The administrative status of LTR cache. 
+              This enables or disables caching of CFM data learned through trace
+              route messages." 
+          DEFVAL  { disabled }
+          ::= { fsEcfmSystem 5 }
+ 
+      fsEcfmLtrCacheClear OBJECT-TYPE
+          SYNTAX      TruthValue               
+          MAX-ACCESS  read-write           
+          STATUS      current
+          DESCRIPTION
+              "Indicates if the contents of trace route cache are to be removed. 
+               If set to true then entries in trace route cache are removed,
+               and if set to false, the entries in trace route cache are not removed."
+          DEFVAL { false }
+           ::= { fsEcfmSystem 6 }
+
+      fsEcfmLtrCacheHoldTime OBJECT-TYPE
+        SYNTAX      Integer32 (1..10080)               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the time in minutes for which CFM trace route cache entries 
+               are retained."
+        DEFVAL { 100 }
+         ::= { fsEcfmSystem 7 }
+
+      fsEcfmLtrCacheSize OBJECT-TYPE
+        SYNTAX      Integer32 (1..4095)               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the maximum number of entries for the CFM trace route cache table,
+               only if fsEcfmLtrCacheStatus is enabled." 
+        DEFVAL { 100 }
+         ::= { fsEcfmSystem 8 }
+
+
+
+-- -------------------------------------
+-- fsEcfmPortTable - Start
+-- -------------------------------------
+        
+       fsEcfmPortTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmPortEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+        "List of port related parameters for ECFM module."
+        ::= { fsEcfmSystem 9 }
+
+       fsEcfmPortEntry OBJECT-TYPE
+         SYNTAX       FsEcfmPortEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "Port related parameters for ECFM module."
+         INDEX { fsEcfmPortIndex }
+          ::= { fsEcfmPortTable 1 }
+
+       FsEcfmPortEntry ::=
+       SEQUENCE {
+              fsEcfmPortIndex
+                Unsigned32,
+              fsEcfmPortLLCEncapStatus
+                TruthValue,
+              fsEcfmPortModuleStatus
+                INTEGER,     
+              fsEcfmPortTxCfmPduCount
+                Unsigned32,
+              fsEcfmPortTxCcmCount
+                Unsigned32,
+              fsEcfmPortTxLbmCount 
+                Unsigned32,
+              fsEcfmPortTxLbrCount 
+                Unsigned32,
+              fsEcfmPortTxLtmCount 
+                Unsigned32,
+              fsEcfmPortTxLtrCount
+                Unsigned32,
+              fsEcfmPortTxFailedCount 
+                Unsigned32,
+              fsEcfmPortRxCfmPduCount
+                Unsigned32,
+              fsEcfmPortRxCcmCount 
+                Unsigned32,
+              fsEcfmPortRxLbmCount 
+                Unsigned32,
+              fsEcfmPortRxLbrCount 
+                Unsigned32,
+              fsEcfmPortRxLtmCount 
+                Unsigned32,
+              fsEcfmPortRxLtrCount 
+                Unsigned32,
+              fsEcfmPortRxBadCfmPduCount 
+                Unsigned32,
+              fsEcfmPortFrwdCfmPduCount
+                Unsigned32,
+              fsEcfmPortDsrdCfmPduCount
+                Unsigned32
+             }
+       fsEcfmPortIndex OBJECT-TYPE
+         SYNTAX        Unsigned32 (1..65535)
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+           "Identifies the port."
+        ::= { fsEcfmPortEntry 1 }
+ 
+       fsEcfmPortLLCEncapStatus OBJECT-TYPE
+         SYNTAX      TruthValue               
+         MAX-ACCESS  read-write           
+         STATUS      current
+         DESCRIPTION
+            "Indicates the LLC encapsulation status. 
+             If set to true, then LLC SNAP header shall be added to the
+             transmitted CFM PDUs. Otherwise, LLC SNAP header shall not
+             be added."
+         DEFVAL { false }
+         ::= { fsEcfmPortEntry 2 }
+ 
+       fsEcfmPortModuleStatus OBJECT-TYPE
+         SYNTAX      INTEGER { enabled(1), disabled(2) } 
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+            "The administrative module status of Ethernet CFM module.
+             This enables or disables ECFM in the system.
+             If set to enable, enables the ECFM for a
+             particular port. Otherwise, disables  ECFM for a particular
+             port."
+         DEFVAL { disabled }
+         ::= { fsEcfmPortEntry 3 }
+
+       fsEcfmPortTxCfmPduCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CFM-PDUs transmitted."
+        ::= { fsEcfmPortEntry 4 }
+
+       fsEcfmPortTxCcmCount OBJECT-TYPE 
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CCMs transmitted."
+        ::= { fsEcfmPortEntry 5 }
+
+       fsEcfmPortTxLbmCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LBMs transmitted."
+        ::= { fsEcfmPortEntry 6 }
+
+       fsEcfmPortTxLbrCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LBRs transmitted."
+        ::= { fsEcfmPortEntry 7 }
+
+       fsEcfmPortTxLtmCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LTMs transmitted."
+        ::= { fsEcfmPortEntry 8 }
+
+       fsEcfmPortTxLtrCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LTRs transmitted."
+        ::= { fsEcfmPortEntry 9 }
+
+       fsEcfmPortTxFailedCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CFM-PDU transmission failed."
+        ::= { fsEcfmPortEntry 10 }
+
+       fsEcfmPortRxCfmPduCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CFM-PDUs received."
+        ::= { fsEcfmPortEntry 11 }
+
+       fsEcfmPortRxCcmCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CCMs received."
+        ::= { fsEcfmPortEntry 12 }
+
+       fsEcfmPortRxLbmCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LBMs received."
+        ::= { fsEcfmPortEntry 13 }
+
+       fsEcfmPortRxLbrCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LBRs received."
+        ::= { fsEcfmPortEntry 14 }
+
+       fsEcfmPortRxLtmCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LTMs received."
+        ::= { fsEcfmPortEntry 15 }
+
+       fsEcfmPortRxLtrCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of LTRs received."
+        ::= { fsEcfmPortEntry 16 }
+
+       fsEcfmPortRxBadCfmPduCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of Bad CFM-PDUs received."
+        ::= { fsEcfmPortEntry 17 }
+
+       fsEcfmPortFrwdCfmPduCount OBJECT-TYPE
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CFM-PDUs forwarded."
+        ::= { fsEcfmPortEntry 18 }
+
+       fsEcfmPortDsrdCfmPduCount OBJECT-TYPE 
+         SYNTAX        Unsigned32
+         MAX-ACCESS    read-write
+         STATUS        current
+         DESCRIPTION
+           "Identifies the number of CFM-PDUs discarded."
+        ::= { fsEcfmPortEntry 19 }
+
+-- -------------------------------------
+-- fsEcfmPortTable - End
+-- -------------------------------------
+    fsEcfmMipCcmDbStatus OBJECT-TYPE 
+          SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+          MAX-ACCESS  read-write
+          STATUS      current 
+          DESCRIPTION 
+             "The administrative status of MIP CCM DB. 
+              This enables or disables caching of data learned through CCM
+              messages" 
+          DEFVAL  { disabled }
+          ::= { fsEcfmSystem 10 }
+ 
+      fsEcfmMipCcmDbClear OBJECT-TYPE
+          SYNTAX      TruthValue               
+          MAX-ACCESS  read-write           
+          STATUS      current
+          DESCRIPTION
+              "Indicates if the contents of MIP CCM DB are to be removed. 
+               If set to true, then entries in trace route cache are removed,
+               and if set to false, the entries in the trace route are removed."
+          DEFVAL { false }
+           ::= { fsEcfmSystem 11 }
+
+      fsEcfmMipCcmDbSize OBJECT-TYPE
+        SYNTAX      Integer32 (1000..10000)                
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the maximum number of entries for the MIP CCM DB table,
+               only if fsEcfmMipDbStatus is enabled." 
+        DEFVAL { 1000 }
+         ::= { fsEcfmSystem 12 }
+      
+      fsEcfmMipCcmDbHoldTime OBJECT-TYPE
+        SYNTAX      Integer32 (24..48)               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the time in hours for which MIP CCM DB table entries 
+               are retained."
+        DEFVAL { 24 }
+         ::= { fsEcfmSystem 13 }
+
+      fsEcfmMemoryFailureCount OBJECT-TYPE
+        SYNTAX      Unsigned32                
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of memory allocation failures."
+         ::= { fsEcfmSystem 14 }
+      
+      fsEcfmBufferFailureCount OBJECT-TYPE
+        SYNTAX      Unsigned32                
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of buffer allocation failures."
+         ::= { fsEcfmSystem 15 }
+      
+      fsEcfmUpCount OBJECT-TYPE
+        SYNTAX      Unsigned32                
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times module was enabled."
+         ::= { fsEcfmSystem 16 }
+      
+      fsEcfmDownCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times module was disabled."
+         ::= { fsEcfmSystem 17 }
+      
+      fsEcfmNoDftCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times no defect occurred in any MEP."
+         ::= { fsEcfmSystem 18 }
+      
+      fsEcfmRdiDftCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times RDI defect occurred in any MEP."
+         ::= { fsEcfmSystem 19 }
+      
+      fsEcfmMacStatusDftCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times MAC status defect occurred in any MEP."
+         ::= { fsEcfmSystem 20 }
+      
+      fsEcfmRemoteCcmDftCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times remote CCM defect occurred in any MEP."
+         ::= { fsEcfmSystem 21 }
+      
+      fsEcfmErrorCcmDftCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times error CCM defect occurred in any MEP."
+         ::= { fsEcfmSystem 22 }
+      
+      fsEcfmXconDftCount OBJECT-TYPE
+        SYNTAX      Unsigned32               
+        MAX-ACCESS  read-write           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the number of times Xconn defect occurred in any MEP
+              filtering rules."
+         ::= { fsEcfmSystem 23 }
+      
+      fsEcfmCrosscheckDelay OBJECT-TYPE
+        SYNTAX      Integer32 (3..100)                
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "To configure the number of CCMs to be missed, for which a device waits for the
+              remote maintenance end points(MEPs) to come up. If the user has not configured then we will use standard 3.5 as default."
+         ::= { fsEcfmSystem 24 }
+      
+     
+      fsEcfmMipDynamicEvaluationStatus OBJECT-TYPE
+        SYNTAX      TruthValue                
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "This enables or disables the implicit evaluation and creation of MIPs
+              is purged."
+         ::= { fsEcfmSystem 25 }
+-- -------------------------------------
+-- fsEcfmMipTable - Start
+-- -------------------------------------
+       fsEcfmMipTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmMipEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       "The Maintenance Intermediate Point (MIP) table.
+
+        Each row in the table represents a different MIP. 
+        A MIP consists two MIP Half Functions (MHFs) on a 
+        single bridge port, an Up MHF and a Down MHF."
+        
+        ::= { fsEcfmSystem 26 }
+
+       fsEcfmMipEntry OBJECT-TYPE
+         SYNTAX       FsEcfmMipEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "The MIP table entry"
+         INDEX { fsEcfmMipIfIndex,
+                 fsEcfmMipMdLevel,
+                 fsEcfmMipVid
+               }
+          ::= { fsEcfmMipTable 1 }
+
+       FsEcfmMipEntry ::=
+       SEQUENCE {
+              fsEcfmMipIfIndex
+                InterfaceIndex,
+              fsEcfmMipMdLevel
+                Integer32 ,
+              fsEcfmMipVid
+                VlanId,     
+              fsEcfmMipActive
+                TruthValue,     
+              fsEcfmMipRowStatus
+                RowStatus     
+             }
+         fsEcfmMipIfIndex OBJECT-TYPE
+         SYNTAX        InterfaceIndex
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+         "This object is the interface index of the interface either a
+          bridge port, or an aggregated IEEE 802.1 link within a bridge
+          port, to which the MIP is attached."
+        ::= { fsEcfmMipEntry 1 }
+         
+         fsEcfmMipMdLevel OBJECT-TYPE
+         SYNTAX        Integer32 (0..7)
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+          "The maintenance domain level at which MIP is configured."
+        ::= { fsEcfmMipEntry 2 }
+         
+         fsEcfmMipVid  OBJECT-TYPE
+         SYNTAX        VlanId
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+          " Vlan Identifier to which MIP is attached."
+        ::= { fsEcfmMipEntry 3 }
+         
+         fsEcfmMipActive  OBJECT-TYPE
+         SYNTAX        TruthValue
+         MAX-ACCESS    read-create
+         STATUS        current
+         DESCRIPTION
+         "Administrative state of the MIP
+
+         A Boolean indicating the administrative state of the MIP.
+
+         True indicates that the MIP is to function normally, and
+         false that it is to cease functioning."
+
+        ::= { fsEcfmMipEntry 4 }
+        
+        fsEcfmMipRowStatus  OBJECT-TYPE
+         SYNTAX        RowStatus
+         MAX-ACCESS    read-create
+         STATUS        current
+         DESCRIPTION
+         "The status of the row.
+
+         The writable columns in a row can not be changed, if the row
+         is active. All columns must have a valid value before a row
+         can be activated."
+
+        ::= { fsEcfmMipEntry 5 }
+ 
+ 
+-- -------------------------------------
+-- fsEcfmMipTable - End
+-- -------------------------------------
+-- -------------------------------------
+-- fsEcfmMipCcmDbTable - Start
+-- -------------------------------------
+      fsEcfmMipCcmDbTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmMipCcmDbEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       "It is a list of every distinct {FID, source_address, 
+        InterfaceIndex} triple from all of the CCMs presented
+        to all of the bridge's MIPs. Continuity Check Receivers
+        since the bridge was last reset. Entries in the MIP CCM
+        Database are timed out very slowly, in the order of one day,
+        so that their information is available for fault isolation even
+        after the information is no longer used for frame forwarding."
+        
+        ::= { fsEcfmSystem 27 }
+
+       fsEcfmMipCcmDbEntry OBJECT-TYPE
+         SYNTAX       FsEcfmMipCcmDbEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "The MIP CCM DB table entry"
+         INDEX { fsEcfmMipCcmFid, fsEcfmMipCcmSrcAddr }
+          ::= { fsEcfmMipCcmDbTable 1 }
+
+       FsEcfmMipCcmDbEntry ::= SEQUENCE {
+              fsEcfmMipCcmFid             Unsigned32,
+              fsEcfmMipCcmSrcAddr         MacAddress,
+              fsEcfmMipCcmIfIndex         InterfaceIndex
+                }
+
+         fsEcfmMipCcmFid OBJECT-TYPE
+         SYNTAX        Unsigned32 (1..4094)
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+        "The Filtering database id (FID) is the VLAN ID of MEP from which
+         CCM is received, that will be used along with source MacAddress for
+         frame forwarding."
+        ::= { fsEcfmMipCcmDbEntry 1 }
+         
+         fsEcfmMipCcmSrcAddr OBJECT-TYPE
+         SYNTAX        MacAddress
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+          "MAC address of the MEP from which CCM is received."
+        ::= { fsEcfmMipCcmDbEntry 2 }
+ 
+          fsEcfmMipCcmIfIndex  OBJECT-TYPE
+         SYNTAX        InterfaceIndex
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+          " Index of interface through which CCM is received."
+        ::= { fsEcfmMipCcmDbEntry 3 }
+        
+         
+         
+-- -------------------------------------
+-- fsEcfmMipCcmDbTable - End
+-- -------------------------------------
+       fsEcfmGlobalCcmOffload OBJECT-TYPE
+          SYNTAX      INTEGER  { enabled(1), disabled(2) }
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+         "The administrative Global CCMOffloading status.
+          when value 'enable' (1) is set, then CCMOffloading will start for all the
+          MEPs in the system and will overwrite the per MEP offloading configuration.
+          when value 'disabled' (2) is set, then CCMOffloading will be disabled for all the
+          MEPs in the system.
+          CCMOffloading is disabled by default."
+          DEFVAL  { disabled }
+          ::= { fsEcfmSystem 28 }
+
+-- -------------------------------------
+-- fsEcfmDynMipPreventionTable - Start
+-- -------------------------------------
+       fsEcfmDynMipPreventionTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmDynMipPreventionEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       "The Dynamic Maintenance Intermediate Point (MIP) Prevention table.
+        An entry in this table will restrict the automatic creation of 
+        MIPs for the corresponding index (IfIndex, MD Level and VLAN Id)."
+        ::= { fsEcfmSystem 29 }
+
+       fsEcfmDynMipPreventionEntry OBJECT-TYPE
+       SYNTAX       FsEcfmDynMipPreventionEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+       "The Dynamic MIP Prevention table entry."
+       INDEX { fsEcfmMipIfIndex,
+               fsEcfmMipMdLevel,
+               fsEcfmMipVid
+             }
+        ::= { fsEcfmDynMipPreventionTable 1 }
+
+       FsEcfmDynMipPreventionEntry ::=
+       SEQUENCE {
+              fsEcfmDynMipPreventionRowStatus RowStatus     
+             }
+        
+       fsEcfmDynMipPreventionRowStatus  OBJECT-TYPE
+	   SYNTAX      RowStatus {
+                             createAndGo(4),
+                             destroy(6)
+                           }
+       MAX-ACCESS    read-create
+       STATUS        current
+       DESCRIPTION
+       "The status of the row.
+        A row can be created in this table by assigning the value 
+        'createAndGo' for the status object. Every 'active' row indicates 
+        that the automatic creation of MIP will be restricted. 
+        And an 'active' row can be deleted by assigning the value 
+        'destroy' to the status." 
+
+        ::= { fsEcfmDynMipPreventionEntry 1 }
+ 
+-- -------------------------------------
+-- fsEcfmDynMipPreventionTable - End
+-- -------------------------------------
+
+-- ------------------------------------------------------------------ 
+-- The ECFM fsEcfmExObjects Group 
+-- ------------------------------------------------------------------ 
+-- -------------------------------------
+-- fsEcfmRemoteMepDbExTable - Start
+-- -------------------------------------
+       fsEcfmRemoteMepDbExTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmRemoteMepDbExEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+        " The MEP Database. A database, maintained by every MEP, that
+          maintains received information about other MEPs in the
+          Maintenance Domain."
+
+        ::= { fsEcfmExObjects 1 }
+
+       fsEcfmRemoteMepDbExEntry OBJECT-TYPE
+         SYNTAX       FsEcfmRemoteMepDbExEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "The MEP database table entry."
+         INDEX { fsEcfmMdIndex, 
+                 fsEcfmMaIndex, 
+                 fsEcfmMepIdentifier,
+                 fsEcfmRMepIdentifier
+               }
+          ::= { fsEcfmRemoteMepDbExTable 1 }
+
+       FsEcfmRemoteMepDbExEntry ::=
+       SEQUENCE {
+              fsEcfmMdIndex
+                Unsigned32,
+              fsEcfmMaIndex
+                Unsigned32,
+              fsEcfmMepIdentifier
+                Unsigned32,
+              fsEcfmRMepIdentifier
+                Unsigned32,
+              fsEcfmRMepCcmSequenceNum
+                Unsigned32,
+              fsEcfmRMepPortStatusDefect 
+                TruthValue,
+              fsEcfmRMepInterfaceStatusDefect
+                TruthValue,
+              fsEcfmRMepCcmDefect
+                TruthValue,
+              fsEcfmRMepRDIDefect
+                TruthValue,
+              fsEcfmRMepMacAddress    
+                MacAddress,
+              fsEcfmRMepRdi
+                TruthValue,
+              fsEcfmRMepPortStatusTlv
+                Dot1agCfmPortStatus,
+              fsEcfmRMepInterfaceStatusTlv
+                Dot1agCfmInterfaceStatus,
+              fsEcfmRMepChassisIdSubtype   
+                LldpChassisIdSubtype,
+              fsEcfmMepDbChassisId  
+                LldpChassisId,
+              fsEcfmRMepManAddressDomain 
+                TDomain,
+              fsEcfmRMepManAddress  
+                TAddress
+              }
+
+        fsEcfmMdIndex OBJECT-TYPE
+        SYNTAX        Unsigned32(1..4294967295) 
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+           "The index to the maintenance domain table."
+        ::= { fsEcfmRemoteMepDbExEntry 1 }
+ 
+        fsEcfmMaIndex OBJECT-TYPE
+        SYNTAX      Unsigned32(1..4294967295)               
+        MAX-ACCESS  not-accessible           
+        STATUS      current
+        DESCRIPTION
+              "Identifies the maintenance association of remote MEP"
+           ::= { fsEcfmRemoteMepDbExEntry 2 }
+
+        fsEcfmMepIdentifier OBJECT-TYPE
+        SYNTAX        Unsigned32(1..8191)               
+        MAX-ACCESS    not-accessible           
+        STATUS        current
+        DESCRIPTION
+             "Integer that is unique among all the MEPs in the same MA.
+             Other definition is: a small integer, unique over a given
+             maintenance association, identifying a specific maintenance
+             association end point.
+
+             MEP Identifier is also known as the MEPID.
+             "
+           ::= { fsEcfmRemoteMepDbExEntry 3 }
+
+        fsEcfmRMepIdentifier OBJECT-TYPE
+        SYNTAX        Unsigned32(1..8191)               
+        MAX-ACCESS    not-accessible           
+        STATUS        current
+        DESCRIPTION
+             "Maintenance association end point identifier of a remote MEP
+             whose information from the MEP Database is to be returned."
+           ::= { fsEcfmRemoteMepDbExEntry 4 }
+
+        fsEcfmRMepCcmSequenceNum OBJECT-TYPE
+        SYNTAX        Unsigned32               
+        MAX-ACCESS    read-only           
+        STATUS        current
+        DESCRIPTION
+              "Sequence number of CCM sent by remote MEP"
+           ::= { fsEcfmRemoteMepDbExEntry 5 }
+        
+        fsEcfmRMepPortStatusDefect OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write           
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating that the remote MEP is reporting a failure
+              in its port-Status TLV."
+           ::= { fsEcfmRemoteMepDbExEntry 6 }
+        
+        fsEcfmRMepInterfaceStatusDefect OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write           
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating that the remote MEP is reporting a failure
+              in its interface-Status TLV."
+           ::= { fsEcfmRemoteMepDbExEntry 7 }
+        
+        fsEcfmRMepCcmDefect OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write           
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating that no CCM has been received from the
+              remote MEP for at least (3.25*CCMtime(CCMinterval)) seconds."
+           ::= { fsEcfmRemoteMepDbExEntry 8 }
+        
+        fsEcfmRMepRDIDefect OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write          
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating that RDI flag is received from the remote
+              MEP."
+           ::= { fsEcfmRemoteMepDbExEntry 9 }
+
+        fsEcfmRMepMacAddress OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+             "The MAC address of the remote MEP."
+           ::= { fsEcfmRemoteMepDbExEntry 10 }
+
+        fsEcfmRMepRdi OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+          "State of the RDI bit in the last received CCM (true for
+           RDI=1), or false if none has been received."
+           ::= { fsEcfmRemoteMepDbExEntry 11 }
+
+        fsEcfmRMepPortStatusTlv OBJECT-TYPE
+        SYNTAX      Dot1agCfmPortStatus
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           "An enumerated value of the port status TLV received in the
+           last CCM from the remote MEP or the default value
+           psNoPortStateTLV indicating either no CCM has been received,
+           or that nor port status TLV was received in the last CCM."
+        DEFVAL { psNoPortStateTLV }
+           ::= { fsEcfmRemoteMepDbExEntry 12}
+
+        fsEcfmRMepInterfaceStatusTlv OBJECT-TYPE
+        SYNTAX      Dot1agCfmInterfaceStatus
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           "An enumerated value of the interface status TLV received
+           in the last CCM from the remote MEP or the default value
+           isNoInterfaceStatus TLV indicating either no CCM has been
+           received, or that no interface status TLV was received in
+           the last CCM."
+           DEFVAL { isNoInterfaceStatusTLV }
+           ::= { fsEcfmRemoteMepDbExEntry 13}
+
+        fsEcfmRMepChassisIdSubtype OBJECT-TYPE
+        SYNTAX      LldpChassisIdSubtype
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           "This object specifies the format of the Chassis ID received
+           in the last CCM."
+	    DEFVAL { 4 }
+           ::= { fsEcfmRemoteMepDbExEntry 14 }
+
+        fsEcfmMepDbChassisId OBJECT-TYPE
+        SYNTAX      LldpChassisId
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           "The Chassis ID. The format of this object is determined by the
+           value of the dot1agCfmLtrChassisIdSubtype object."
+           ::= { fsEcfmRemoteMepDbExEntry 15 }
+
+        fsEcfmRMepManAddressDomain OBJECT-TYPE
+        SYNTAX      TDomain
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           "The TDomain that identifies the type and format of
+           the related dot1agCfmMepDbManAddress object, used to access
+           the SNMP agent of the system transmitting the CCM. Received
+           in the CCM sender ID TLV from that system.
+
+           Typical values will be one of (not all inclusive) list:
+
+
+           snmpUDPDomain          (from SNMPv2-TM, RFC3417)
+           snmpIeee802Domain      (from SNMP-IEEE802-TM-MIB, RFC4789)
+
+           The value 'zeroDotZero' (from RFC2578) indicates 'no LTR
+           sender ID TLV received', in which case the related object
+           fsEcfmRMepManAddress must have a zero-length OCTET STRING
+           as a value."
+           ::= { fsEcfmRemoteMepDbExEntry 16 }
+
+       fsEcfmRMepManAddress OBJECT-TYPE
+       SYNTAX      TAddress
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The TAddress that can be used to access the SNMP
+          agent of the system transmitting the CCM, received in the CCM
+          Sender ID TLV from that system.
+
+          If the related object fsEcfmRMepManAddressDomain contains
+          the value 'zeroDotZero', this object fsEcfmRMepManAddress
+          must have a zero-length OCTET STRING as a value."
+        ::= { fsEcfmRemoteMepDbExEntry 17 }
+
+    
+-- -------------------------------------
+-- fsEcfmRemoteMepDbExTable - End
+-- -------------------------------------
+-- -------------------------------------
+-- fsEcfmLtmTable - Start
+-- -------------------------------------
+
+       fsEcfmLtmTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmLtmEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       "This table contains a list of parameters with which the link trace
+       messages were transmitted/initiated by MEP."
+
+        ::= { fsEcfmExObjects 2 }
+
+       fsEcfmLtmEntry OBJECT-TYPE
+         SYNTAX       FsEcfmLtmEntry 
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "The Link trace Message table entry."
+           
+         INDEX { fsEcfmMdIndex, 
+                 fsEcfmMaIndex, 
+                 fsEcfmMepIdentifier,
+                 fsEcfmLtmSeqNumber
+               }
+          ::= { fsEcfmLtmTable 1 }
+
+       FsEcfmLtmEntry ::=
+       SEQUENCE {
+              fsEcfmLtmSeqNumber
+                Unsigned32,
+              fsEcfmLtmTargetMacAddress
+                MacAddress,
+              fsEcfmLtmTtl
+                Unsigned32
+             }
+
+        fsEcfmLtmSeqNumber OBJECT-TYPE
+        SYNTAX        Unsigned32 (0..4294967295)               
+        MAX-ACCESS    not-accessible           
+        STATUS        current
+        DESCRIPTION
+             "Transaction identifier/Sequence number returned by a previous
+              transmit link trace message command, indicating which LTM's
+              response is going to be returned."
+           ::= { fsEcfmLtmEntry 1 }
+
+        fsEcfmLtmTargetMacAddress OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The target MAC address of MP for which LTM has been initiated :
+             A unicast destination MAC address."
+           ::= { fsEcfmLtmEntry 2 }
+
+        fsEcfmLtmTtl OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+           "The LTM TTL field, with which LTM has been initiated.
+            The TTL field indicates the number of hops expected to be covered
+            by the LTM, decremented by 1 by each Link trace responder that 
+            handles the LTM. The value received in the LTM is returned
+            in the LTR."
+           ::= { fsEcfmLtmEntry 3 }
+
+-- -------------------------------------
+-- fsEcfmLtmTable - End
+-- -------------------------------------
+-- -------------------------------------
+-- fsEcfmMepExTable - Start
+-- -------------------------------------
+       fsEcfmMepExTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmMepExEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       
+       "The Maintenance Association End Point (MEP) table.
+
+        Each row in the table represents a different MEP.  A MEP is
+        an actively managed CFM entity, associated with a specific
+        DSAP of a service instance which can generate and receive
+        CFM PDUs and track any responses. It is an end point of a
+        single maintenance association, and is an endpoint of a
+        separate maintenance entity for each of the other MEPs in
+        the same maintenance a	ssociation (802.1ag clause 3.18).
+
+        This table uses three indices. The first two indices are the
+        indices of the maintenance domain and MA tables, the reason
+        being that a MEP is always related to an MA and Maintenance
+        Domain."
+        ::= { fsEcfmExObjects 3 }
+
+       fsEcfmMepExEntry OBJECT-TYPE
+         SYNTAX       FsEcfmMepExEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "The MEP Database table entry."
+         INDEX { fsEcfmMdIndex, 
+                 fsEcfmMaIndex, 
+                 fsEcfmMepIdentifier
+               }
+          ::= { fsEcfmMepExTable 1 }
+
+       FsEcfmMepExEntry ::=
+       SEQUENCE {
+              fsEcfmXconnRMepId
+                Unsigned32,
+              fsEcfmErrorRMepId
+                Unsigned32,
+              fsEcfmMepDefectRDICcm 
+                TruthValue,
+              fsEcfmMepDefectMacStatus
+                TruthValue,
+              fsEcfmMepDefectRemoteCcm
+                TruthValue,
+              fsEcfmMepDefectErrorCcm 
+                TruthValue,
+              fsEcfmMepDefectXconnCcm 
+                TruthValue,
+              fsEcfmMepCcmOffload 
+                INTEGER,
+                fsEcfmMepLbrIn
+                Unsigned32,
+              fsEcfmMepLbrInOutOfOrder
+                Unsigned32,
+              fsEcfmMepLbrBadMsdu  
+                Unsigned32,
+              fsEcfmMepUnexpLtrIn        
+                Unsigned32,
+              fsEcfmMepLbrOut 
+                Unsigned32,
+              fsEcfmMepCcmSequenceErrors
+                Unsigned32,
+              fsEcfmMepCciSentCcms
+                Unsigned32
+
+             }
+
+        fsEcfmXconnRMepId OBJECT-TYPE
+        SYNTAX        Unsigned32(0..8191)               
+        MAX-ACCESS    read-write           
+        STATUS        current
+        DESCRIPTION
+              "MEP identifier of the Remote MEP which caused the cross-connect
+              defect, 0 indicates that no remote MEP is cross-connected."
+           ::= { fsEcfmMepExEntry 1 }
+        
+        fsEcfmErrorRMepId OBJECT-TYPE
+        SYNTAX        Unsigned32(0..8191)               
+        MAX-ACCESS    read-write          
+        STATUS        current
+        DESCRIPTION
+              "MEP identifier of the remote MEP which caused the error CCM
+              defect, 0 indicates that no errored CCM is received from any remote MEP."
+           ::= { fsEcfmMepExEntry 2 }
+        
+        fsEcfmMepDefectRDICcm OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write          
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating the aggregate health of the remote MEPs.
+              True indicates that at least one of the remote MEP state 
+              machines is receiving valid CCMs from its remote MEP that
+              have the RDI bit set, and false that no remote MEP state
+              machines are receiving valid CCMs with the RDI bit set."
+           ::= { fsEcfmMepExEntry 3 }
+        
+        fsEcfmMepDefectMacStatus OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write          
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating that one or more of the remote MEPs is
+              reporting a failure in its Port Status TLV or Interface Status TLV ."          
+           ::= { fsEcfmMepExEntry 4 }
+        
+        fsEcfmMepDefectRemoteCcm OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write          
+        STATUS        current
+        DESCRIPTION
+              "A Boolean indicating the aggregate state of the remote MEP state
+              machines. True indicates that at least one  of the remote MEP state
+              machines is not receiving valid CCMs from its remote MEP, and false
+              that all remote MEP state machines are receiving valid CCMs."
+           ::= { fsEcfmMepExEntry 5 }
+        
+        fsEcfmMepDefectErrorCcm OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write          
+        STATUS        current
+        DESCRIPTION
+              "A Boolean flag set and cleared by the remote MEP error state
+              machine to indicate that one or more invalid CCMs has been received,
+              and that 3.5 times that CCMs transmission interval has not yet expired."
+           ::= { fsEcfmMepExEntry 6 }
+        
+        fsEcfmMepDefectXconnCcm OBJECT-TYPE
+        SYNTAX        TruthValue               
+        MAX-ACCESS    read-write           
+        STATUS        current
+        DESCRIPTION
+              "A Boolean flag set and cleared by the MEP cross connect state
+               machine to indicate that one or more crossconnect CCMs have been
+               received and that 3.5 times of at least one of those CCMs'
+               transmission interval has not yet expired."
+           ::= { fsEcfmMepExEntry 7 }
+        
+       fsEcfmMepCcmOffload OBJECT-TYPE
+        SYNTAX      INTEGER  { enabled(1), disabled(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+             "The administrative MEP CCMOffloading status.
+              when value 'enabled' (1) is set the CCM Offloading starts for 
+              the MEP in the system. When value 'disabled' (2) is set, then 
+              CCMOffloading will disabled for the MEP in system.
+              By Default CCMOffloading is disabled."
+  DEFVAL  { disabled }
+          ::= { fsEcfmMepExEntry 8 }
+ 
+ fsEcfmMepLbrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of valid, in-order loopback replies received."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:y and 20.31.1"
+    ::= { fsEcfmMepExEntry 9 }
+ 
+  fsEcfmMepLbrInOutOfOrder OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The total number of valid, out-of-order loopback replies
+        received."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:z and 20.31.1"
+    ::= { fsEcfmMepExEntry 10 }
+
+fsEcfmMepLbrBadMsdu OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "(optional) The total number of LBRs received whose
+        mac_service_data_unit did not match (except for the OpCode)
+        that of the corresponding LBM (20.2.3)."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:aa 20.2.3"
+    ::= { fsEcfmMepExEntry 11}
+
+fsEcfmMepUnexpLtrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The total number of unexpected LTRs received (20.39.1)."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:ac 20.39.1"
+    ::= { fsEcfmMepExEntry 12 }
+
+fsEcfmMepLbrOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of loopback replies transmitted."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:ad and 20.26.2"
+    ::= { fsEcfmMepExEntry 13 }
+
+fsEcfmMepCcmSequenceErrors OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The total number of out-of-sequence CCMs received from all
+        remote MEPs."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:v and 20.16.12"
+    ::= { fsEcfmMepExEntry 14 }
+
+fsEcfmMepCciSentCcms OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of continuity check messages transmitted."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:w and 20.10.2"
+    ::= { fsEcfmMepExEntry 15 }
+
+ 
+-- -------------------------------------
+-- fsEcfmMepExTable - End
+-- -------------------------------------
+-- -------------------------------------
+-- fsEcfmMdExTable - Start
+-- -------------------------------------
+       fsEcfmMdExTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmMdExEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       "The maintenance domain table. Each row in the table
+       represents a different maintenance domain. A maintenance domain
+       is described in 802.1ag (3.22) as the network or the part of the
+       network for which faults in connectivity are to be managed. The
+       boundary of a maintenance domain is defined by a set of DSAPs, 
+       each of which can become a point of connectivity to a service
+       instance."
+        ::= { fsEcfmExObjects 4 }
+
+       fsEcfmMdExEntry OBJECT-TYPE
+         SYNTAX       FsEcfmMdExEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+         "The maintenance domain table entry. This entry is not lost
+         upon reboot. It is backed up by stable storage."
+         INDEX { fsEcfmMdIndex 
+         }
+          ::= { fsEcfmMdExTable 1 }
+
+       FsEcfmMdExEntry ::=
+       SEQUENCE {
+              fsEcfmMepArchiveHoldTime 
+                Integer32
+             }
+
+        fsEcfmMepArchiveHoldTime OBJECT-TYPE
+        SYNTAX      Integer32 (100..65535)                
+        MAX-ACCESS  read-write            
+        STATUS      current
+        DESCRIPTION
+              "Number of minutes that data from a remote MEP is kept before it
+              is purged."
+        DEFVAL { 100 }
+         ::= { fsEcfmMdExEntry 1 }
+ 
+-- -------------------------------------
+-- fsEcfmMdExTable - End
+-- -------------------------------------
+-- -------------------------------------
+-- fsEcfmMaExTable - Start
+-- -------------------------------------
+       fsEcfmMaExTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsEcfmMaExEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+      "The Maintenance Association table.  Each row in the table
+        represents an MA.  An MA is a set of MEPs, each configured
+        with a single service instance.
+
+        Creation of a service instance establishes a connectionless
+        association among the selected DSAPs. Configuring a
+        Maintenance Association End Point (MEP) at each of the
+        DSAPs creates a Maintenance Association (MA) to monitor
+        that connectionless connectivity. The MA is identified by a
+        Short MA Name that is unique within the maintenance domain
+        and chosen to facilitate easy identification of the service
+        instance.  Together, the maintenance domain Name and the
+        Short MA Name form the Maintenance Association Identifier
+        (MAID) that is carried in CFM Messages to identify
+        incorrect connectivity among Service Instances. A small
+        integer, the Maintenance association End Point Identifier
+        (MEPID), identifies each MEP among those configured on a
+        single MA (802.1ag clauses 3.17 and 18.2).
+
+        This table uses two indices, first index is the index of the
+        Maintenance Domain table.
+
+       The writable objects in this table need to be persistent
+       upon reboot or restart of a device."
+
+
+        ::= { fsEcfmExObjects 5 }
+
+       fsEcfmMaExEntry OBJECT-TYPE
+         SYNTAX       FsEcfmMaExEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+         "The MA table entry."
+         INDEX {fsEcfmMdIndex, fsEcfmMaIndex }
+         ::= { fsEcfmMaExTable 1 }
+
+       FsEcfmMaExEntry ::=
+       SEQUENCE {
+              fsEcfmMaCrosscheckStatus 
+                INTEGER
+             }
+
+       fsEcfmMaCrosscheckStatus OBJECT-TYPE 
+          SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+          MAX-ACCESS  read-write
+          STATUS      current 
+          DESCRIPTION 
+             "The administrative status of MA crosscheck. 
+              This enables or disables cross checking between the list of
+              configured remote maintenance end points (MEPs)of a domain and
+              MEPs learned through continuity check messages (CCMs).
+              messages." 
+          DEFVAL  { enabled }
+ 
+         ::= { fsEcfmMaExEntry 1 }
+ 
+-- -------------------------------------
+-- fsEcfmMaExTable - End
+-- -------------------------------------
+ 
+-- -------------------------------------
+-- TRAP MIB BEGIN
+-- -------------------------------------
+
+        fsEcfmTrapControl OBJECT-TYPE
+        SYNTAX   FsEcfmSetTraps
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+        "This object is used to enable or disable ECFM
+        traps.A string of 8 bits, corresponding to the administrative 
+        status of Traps. The second bit corresponds to bit 1 of Traps  
+	    (Trap for RDI CCM defect), the third bit corresponds to bit 2
+        (Trap for MAC status defect), the fourth bit corresponds to bit 3
+        (Trap for Remote CCM defect), the fifth bit corresponds to bit 4
+        (Trap for Errorred CCM defect), the sixth bit corresponds to bit 5
+        (Trap for cross connected defect)."
+ 
+         ::= { fsEcfmTrapsControl 1 }
+
+         
+        fsEcfmTrapType OBJECT-TYPE
+        SYNTAX    INTEGER  { 
+                            none(0), 
+                            trapRDICCM(2), 
+                            trapMACStatus(3),
+                            trapRemoteCCM(4),
+                            trapErroredCCM(5), 
+                            trapXConnCCM(6)
+                            }
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+        " Trap types:   
+	      trapRDICCM : Generated when at least one of the remote MEP
+          state machines is receiving valid CCMs from its remote MEP that have the RDI
+          bit set.
+          trapMACStatus : Generated when one or more of the remote MEPs is
+          reporting a failure in its port status TLV or interface status TLV.
+          
+          trapRemoteCCM : Generated when that at least one  of the
+          Remote MEP state machines is not receiving valid CCMs from its remote
+          MEP.
+          
+          trapErroredCCM : Generated when one or more invalid CCMs
+          has been received and that 3.5 times that CCMs' transmission interval has
+          not yet expired.
+          
+          trapXConnCCM : Generated when one or more cross connect CCMs
+          have been received and that 3.5 times of at least one of those CCMs."
+          
+         ::= { fsEcfmTrapsControl 2 }
+
+futureEcfmTraps OBJECT IDENTIFIER ::= { fsEcfmTraps 0 }
+
+
+         fsEcfmMepDefectTrap NOTIFICATION-TYPE
+         OBJECTS {
+             fsEcfmTrapType
+                 }
+         STATUS             current
+         DESCRIPTION
+         "A MEP has a persistent defect condition. A notification
+         is sent to the management entity with the OID
+         of the MEP or remote MEP that has detected the fault.
+
+         Various faults are described in, as shown
+         in Table 20-1, is reported in the notification.
+
+         The management entity receiving the notification can identify
+         the system from the network source address of the
+         notification, and can identify the MEP or remote MEP 
+         reporting the defect by the indices in the OID of the fsEcfmTrapType
+         variable in the notification:
+
+         fsEcfmMdIndex - Also the index of the MEP's
+                             Maintenance Domain table entry
+         fsEcfmMaIndex - Also an index (with the MD table index)
+                             of the MEP's Maintenance Association
+                              table entry.
+         fsEcfmMepIdentifier - MEP Identifier index
+                              into the MEP table.
+         fsEcfmRMepIdentifier - (Not for the defects errored CCM and
+                                 cross-connected CCM)remote MEP Identifier index
+                                 into the MEP Database table."
+
+           ::= {futureEcfmTraps 1 }
+         
+         
+-- -------------------------------------
+-- TRAP MIB END
+-- -------------------------------------
+
+END 

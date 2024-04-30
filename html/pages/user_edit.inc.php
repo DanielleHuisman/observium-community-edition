@@ -85,14 +85,12 @@ register_html_resource('js', 'observium-entities.js');
                                                                      'user_id'      => $vars['user_id'],
                                                                      'confirm'      => 'yes',
                                                                      'requesttoken' => $_SESSION['requesttoken']]) . '"
-                   data-toggle="confirmation"
-                   data-confirm-content="You have requested deletion of the user <strong>' . escape_html($user_data['username']) . '</strong>.<br />This action can not be reversed."
-                   data-confirm-placement="bottom">
-                <i class="' . $config['icon']['cancel'] . '"></i> Delete User</a></li>';
+                   data-toggle="confirm"
+                   data-content="You have requested deletion of the user <strong>' . escape_html($user_data['username']) . '</strong>.<br /><span class=\'text-nowrap\'>This action can not be reversed.</span>"
+                   data-placement="bottom" data-btn-ok-class="btn-sm btn-danger" data-btn-cancel-class="btn-sm btn-primary" data-popout="true" data-html="true">' . get_icon('cancel') . ' Delete User</a></li>';
                                 echo '</ul>';
 
-                                register_html_resource('js', 'jquery.popconfirm.js');
-                                register_html_resource('script', '$("[data-toggle=\'confirmation\']").popConfirm();');
+                                register_html_resource('js', 'bootstrap-confirmation.min.js');
                             }
                         }
 

@@ -14,7 +14,7 @@
 if (!$config['enable_bgp'] || !is_device_mib($device, 'BGP4-MIB')) {
     // Note, BGP4-MIB is main MIB, without it, the rest will not be checked
     if ($device['bgpLocalAs']) {
-        // Clean old discovered peers?
+        // FIXME. Clean old discovered peers?
         log_event('BGP Local ASN removed: AS' . $device['bgpLocalAs'], $device, 'device', $device['device_id']);
         dbUpdate([ 'bgpLocalAs' => [ 'NULL' ] ], 'devices', 'device_id = ?', [ $device['device_id'] ]);
         print_cli_data("Updated ASN", $device['bgpLocalAs'] . " -> ''", 2);
@@ -24,7 +24,7 @@ if (!$config['enable_bgp'] || !is_device_mib($device, 'BGP4-MIB')) {
 
 // Get Local ASN
 
-// Get array with exist MIBs on device with LocasAs-es
+// Get an array with existed MIBs on a device with LocasAs-es
 $local_as_array = get_bgp_localas_array($device);
 
 $vendor_mib    = FALSE; // CLEANME. Clear after full rewrite to definitions.
@@ -119,7 +119,7 @@ if (is_numeric($bgpLocalAs) && $bgpLocalAs != 0) {
     echo("No BGP on host");
     if (is_numeric($device['bgpLocalAs'])) {
         log_event('BGP ASN removed: AS' . $device['bgpLocalAs'], $device, 'device', $device['device_id']);
-        dbUpdate(['bgpLocalAs' => ['NULL']], 'devices', 'device_id = ?', [$device['device_id']]);
+        dbUpdate([ 'bgpLocalAs' => [ 'NULL' ] ], 'devices', 'device_id = ?', [$device['device_id']]);
         print_message('Removed ASN (' . $device['bgpLocalAs'] . ')');
     } # End if
 } # End if
@@ -129,7 +129,7 @@ if (is_numeric($bgpLocalAs) && $bgpLocalAs != 0) {
 global $table_rows;
 $table_rows = [];
 
-if (safe_count($peerlist)) {
+if (!safe_empty($peerlist)) {
     print_debug_vars($peerlist);
 
     echo(PHP_EOL);
@@ -152,60 +152,21 @@ if (safe_count($peerlist)) {
         $astext      = get_astext($peer['as']);
         $reverse_dns = gethostbyaddr6($peer['ip']);
         if ($reverse_dns == $peer['ip']) {
-            unset($reverse_dns);
+            $reverse_dns = '';
         }
 
-        // Search remote device if possible
+        // Search a remote device if possible
         $peer_addr_version = get_ip_version($peer['ip']);
-        $peer_addr_type    = get_ip_type($peer['ip']);
-        $peer_local_type   = get_ip_type($peer['local_ip']);
-        $peer_device_id    = ['NULL'];
-        if (!in_array($peer_addr_type, ['unspecified', 'loopback']) &&
-            !in_array($peer_local_type, ['unspecified', 'loopback'])) {
 
-            //if ($tmp_id = dbFetchCell('SELECT `device_id` FROM `bgpPeers` WHERE `bgpPeerLocalAddr` = ? AND `bgpPeerRemoteAs` = ? AND `bgpPeerRemoteAddr` = ?' . $peer_as_where, array($peer['ip'], $bgpLocalAs, $peer['local_ip'])))
-            print_debug("bgpPeerLocalAddr: " . $peer['ip'] . ", bgpPeerRemoteAddr: " . $peer['local_ip']);
-            if (isset($peer_devices[$peer['ip']][$peer['local_ip']])) {
-                // Simple search remote device by Local IP and Local AS and Remote IP
-                //$peer_device_id = $tmp_id;
-                $peer_device_id = $peer_devices[$peer['ip']][$peer['local_ip']];
-
-            } elseif ($ids = get_entity_ids_ip_by_network('device', $peer['ip'], $peer_ip_where)) {
-                // Fetch all devices with peer IP
-                // Peer device will found if device UP and NOT DISABLED, port with IP is UP, bgpLocalAs present on remote device
-
-                $peer_device_id = array_shift($ids);
-                /*
-                foreach($ids as $tmp_id)
-                {
-                  //if (dbFetchCell('SELECT COUNT(*) FROM `bgpPeers` WHERE `device_id` = ? AND `bgpPeerRemoteAs` = ?', array($tmp_id, $bgpLocalAs)))
-                  if (dbExist('bgpPeers', '`device_id` = ? AND `bgpPeerRemoteAs` = ?', array($tmp_id, $bgpLocalAs)))
-                  {
-                     // Validate if bgpLocalAs also present on remote device
-                     $peer_device_id = $tmp_id;
-                     break; // Found, stop loop
-                  }
-                }
-                */
-
-            }
-
-        }
-
-        if (is_numeric($peer_device_id)) {
-            $peer_device = device_by_id_cache($peer_device_id);
-        } else {
-            unset($peer_device);
-        }
+        $peer_device_id = get_peer_remote_device_id($peer, $peer_devices, $peer_ip_where);
+        $peer_device    = is_numeric($peer_device_id) ? device_by_id_cache($peer_device_id) : [];
 
         //$peer['local_as']        = (isset($peer['local_as']) && $peer['local_as'] != 0 && $peer['local_as'] != '') ? $peer['local_as'] : $bgpLocalAs;
-        $local_as     = $peer['local_as'];
-        $virtual_name = [ 'NULL' ];
+        $local_as = $peer['local_as'];
         if (isset($peer['virtual_name'])) {
-            $local_as     .= ' (' . $peer['virtual_name'] . ')';
-            $virtual_name = $peer['virtual_name'];
+            $local_as .= ' (' . $peer['virtual_name'] . ')';
         }
-        $table_rows[$peer['ip']] = [$local_as, $peer['local_ip'], $peer['as'], $peer['ip'], '', $reverse_dns, truncate($peer_device['hostname'], 30)];
+        $table_rows[$peer['ip']] = [ $local_as, $peer['local_ip'], $peer['as'], $peer['ip'], '', $reverse_dns, truncate($peer_device['hostname'], 30) ];
         $params                  = [
           'device_id'         => $device['device_id'],
           'bgpPeerIdentifier' => $peer['identifier'],
@@ -215,12 +176,12 @@ if (safe_count($peerlist)) {
           'bgpPeerRemoteAs'   => $peer['as'],
           'astext'            => $astext,
           'reverse_dns'       => $reverse_dns,
-          'virtual_name'      => $virtual_name,
-          'peer_device_id'    => $peer_device_id
+          'virtual_name'      => $peer['virtual_name'] ?? [ 'NULL' ],
+          'peer_device_id'    => $peer_device_id ?: [ 'NULL' ]
         ];
 
         $peer_db = dbFetchRow('SELECT * FROM `bgpPeers` WHERE `device_id` = ? AND `bgpPeerRemoteAddr` = ?', [$device['device_id'], $peer['ip']]);
-        if (safe_count($peer_db)) {
+        if (!safe_empty($peer_db)) {
             $update_array = [];
             foreach ($params as $param => $value) {
 
@@ -233,9 +194,9 @@ if (safe_count($peerlist)) {
                 }
             }
 
-            if (count($update_array)) {
+            if ($update_count = count($update_array)) {
                 dbUpdate($update_array, 'bgpPeers', '`device_id` = ? AND `bgpPeerRemoteAddr` = ?', [$device['device_id'], $peer['ip']]);
-                if (isset($update_array['reverse_dns']) && count($update_array) === 1) {
+                if (isset($update_array['reverse_dns']) && $update_count === 1) {
                     // Do not count updates if changed only reverse DNS
                     $GLOBALS['module_stats'][$module]['unchanged']++;
                 } else {
@@ -298,7 +259,7 @@ if (safe_count($peerlist)) {
     } # AF list
     if (safe_count($cbgp_delete)) {
         // Multi-delete
-        dbDelete('bgpPeers_cbgp', generate_query_values_ng($cbgp_delete, 'cbgp_id'));
+        dbDelete('bgpPeers_cbgp', generate_query_values($cbgp_delete, 'cbgp_id'));
     }
     unset($af_list, $cbgp_delete);
 } # end peerlist
@@ -322,8 +283,8 @@ foreach (dbFetchRows($query, [$device['device_id']]) as $entry) {
 }
 if (count($peers_delete)) {
     // Multi-delete
-    dbDelete('bgpPeers', generate_query_values_ng($peers_delete, 'bgpPeer_id'));
-    dbDelete('bgpPeers_cbgp', generate_query_values_ng($peers_delete, 'bgpPeer_id'));
+    dbDelete('bgpPeers', generate_query_values($peers_delete, 'bgpPeer_id'));
+    dbDelete('bgpPeers_cbgp', generate_query_values($peers_delete, 'bgpPeer_id'));
 }
 
 $table_headers = ['%WLocal: AS (VRF)%n', '%WIP%n', '%WPeer: AS%n', '%WIP%n', '%WFamily%n', '%WrDNS%n', '%WRemote Device%n'];

@@ -230,61 +230,138 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-   * @dataProvider providerIntAdd
-   * @group numbers
-   */
-  public function testIntAdd($a, $b, $result)
-  {
-    $this->assertSame($result, int_add($a, $b));
-  }
+    /**
+    * @dataProvider providerIntAdd
+    * @group numbers
+    */
+    public function testIntAdd($a, $b, $result) {
+        $this->assertSame($result, int_add($a, $b));
+    }
 
-  public function providerIntAdd()
-  {
-      // $a = "18446742978492891134"; $b = "0"; $sum = gmp_add($a, $b); echo gmp_strval($sum) . "\n"; // Result: 18446742978492891134
-      // $a = "18446742978492891134"; $b = "0"; $sum = $a + $b; printf("%.0f\n", $sum);               // Result: 18446742978492891136
-      // Accurate math
-      $array = array(
-        array( '18446742978492891134', '0',  '18446742978492891134'),
-        array('-18446742978492891134', '0', '-18446742978492891134'),
-        array( '18446742978492891134', '18446742978492891134', '36893485956985782268'),
-        array('-18446742978492891134', '18446742978492891134', '0'),
+    public function providerIntAdd() {
+        // $a = "18446742978492891134"; $b = "0"; $sum = gmp_add($a, $b); echo gmp_strval($sum) . "\n"; // Result: 18446742978492891134
+        // $a = "18446742978492891134"; $b = "0"; $sum = $a + $b; printf("%.0f\n", $sum);               // Result: 18446742978492891136
+        // Accurate math
+        return [
+            array( '18446742978492891134', '0',  '18446742978492891134'),
+            array('-18446742978492891134', '0', '-18446742978492891134'),
+            array( '18446742978492891134', '18446742978492891134', '36893485956985782268'),
+            array('-18446742978492891134', '18446742978492891134', '0'),
 
-        // Floats
-        [ '1111111111111111111111111.6', 0, '1111111111111111111111112' ],
-        [ 0, '1111111111111111111111111.6', '1111111111111111111111112' ],
-        [ '18446742978492891134.3', '18446742978492891134.6', '36893485956985782269' ],
-      );
-    return $array;
-  }
+            // Floats
+            [ '1111111111111111111111111.6', 0, '1111111111111111111111112' ],
+            [ 0, '1111111111111111111111111.6', '1111111111111111111111112' ],
+            [ '18446742978492891134.3', '18446742978492891134.6', '36893485956985782269' ],
 
-  /**
-   * @dataProvider providerIntSub
-   * @group numbers
-   */
-  public function testIntSub($a, $b, $result)
-  {
-    $this->assertSame($result, int_sub($a, $b));
-  }
+            // numbers with comma
+            [ '7,619,627.6010', 0, '7619628' ],
+            [ 0, '7,619,627.6010', '7619628' ],
+        ];
+    }
 
-  public function providerIntSub()
-  {
-      // Accurate math
-      $array = array(
-        array( '18446742978492891134', '0',  '18446742978492891134'),
-        array('-18446742978492891134', '0', '-18446742978492891134'),
-        array( '18446742978492891134', '18446742978492891134', '0'),
-        array('-18446742978492891134', '18446742978492891134', '-36893485956985782268'),
+    /**
+    * @dataProvider providerIntSub
+    * @group numbers
+    */
+    public function testIntSub($a, $b, $result) {
+        $this->assertSame($result, int_sub($a, $b));
+    }
 
-        // Floats
-        [ '1111111111111111111111111.6', 0, '1111111111111111111111112' ],
-        [ 0, '1111111111111111111111111.6', '-1111111111111111111111112' ],
-        [ '-18446742978492891134.3', '18446742978492891134.6', '-36893485956985782269' ],
+    public function providerIntSub() {
+        // Accurate math
+        return [
+            array( '18446742978492891134', '0',  '18446742978492891134'),
+            array('-18446742978492891134', '0', '-18446742978492891134'),
+            array( '18446742978492891134', '18446742978492891134', '0'),
+            array('-18446742978492891134', '18446742978492891134', '-36893485956985782268'),
 
-      );
+            // Floats
+            [ '1111111111111111111111111.6', 0, '1111111111111111111111112' ],
+            [ 0, '1111111111111111111111111.6', '-1111111111111111111111112' ],
+            [ '-18446742978492891134.3', '18446742978492891134.6', '-36893485956985782269' ],
 
-    return $array;
-  }
+            // numbers with comma
+            [ '7,619,627.6010', 0, '7619628' ],
+            [ 0, '7,619,627.6010', '-7619628' ],
+        ];
+    }
+
+    /**
+     * @dataProvider providerFloatDiv
+     * @group numbers
+     */
+    public function testFloatDiv($a, $b, $result) {
+        if (method_exists($this, 'assertEqualsWithDelta')) {
+            $this->assertEqualsWithDelta($result, float_div($a, $b), 0.00001);
+        } else {
+            $this->assertSame($result, float_div($a, $b));
+        }
+    }
+
+    public function providerFloatDiv() {
+        // Accurate math
+        return [
+            array( '18446742978492891134', '0',  0),
+            array('-18446742978492891134', '0',  0),
+            array( '18446742978492891134', '18446742978492891134',  1.0),
+            array('-18446742978492891134', '18446742978492891134', -1.0),
+
+            // Floats
+            [ '1111111111111111111111111.6', 0, 0 ],
+            [ 0, '1111111111111111111111111.6', 0 ],
+            [ '18446742978492891134.3', '18446742978492891134.6', 1.0 ],
+
+            // numbers with comma
+            [ '7,619,627.6010', 0, 0 ],
+            [ 0, '7,619,627.6010', 0 ],
+            [ '1,192.0036', 6.3, 189.20692 ]
+        ];
+    }
+
+    /**
+     * @dataProvider providerHexToFloat
+     * @group numbers
+     */
+    public function testHexToFloat($hex, $result)
+    {
+        $this->assertSame($result, hex2float($hex));
+    }
+
+    public function providerHexToFloat()
+    {
+        // Accurate math
+        $array = [
+
+            [ '429241f0', 73.1287841796875 ],
+
+        ];
+
+        return $array;
+    }
+
+    /**
+     * @dataProvider providerIeeeIntToFloat
+     * @group numbers
+     */
+    public function testIeeeIntToFloat($int, $result)
+    {
+        $this->assertSame($result, ieeeint2float($int));
+    }
+
+    public function providerIeeeIntToFloat()
+    {
+        $array = [
+
+            [ 1070575314,          1.6225225925445557 ],
+            [ 2998520959,         -2.1629828594882383E-8 ],
+            [ '1070575314',        1.6225225925445557 ],
+            [ hexdec('429241f0'), 73.1287841796875 ],
+            [ 0,                   0.0 ],
+
+        ];
+
+        return $array;
+    }
 
   /**
    * @dataProvider providerIsHexString
@@ -969,6 +1046,7 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       array('172.16.1.1',               'private'),
       array('192.168.0.3',              'private'),
       array('fdf8:f53b:82e4::53',       'private'),
+      array('100.80.76.30',             'cgnat'),
       array('0:0:0:0:0:ffff:c000:22f',  'ipv4mapped'),
       array('::ffff:192.0.2.47',        'ipv4mapped'),
       array('77.222.50.30',             'unicast'),

@@ -1,0 +1,1691 @@
+-- Copyright (C) 2008-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fscfmext.mib,v 1.6 2012/09/07 09:52:05 siva Exp $
+-- ECFM Extension as given in 802.1ap MIB Definition 
+-- This MIB contains the tables used to configure CFM entities on a 802.1ah
+-- switch.
+ARICENT-ECFM-EXT-MI-MIB DEFINITIONS ::= BEGIN 
+IMPORTS 
+    MODULE-IDENTITY, OBJECT-TYPE,
+    enterprises, Integer32, 
+    Unsigned32                FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION,
+    RowStatus,
+    TruthValue, MacAddress    FROM SNMPv2-TC     
+    TimeInterval              FROM SNMPv2-TC
+    fsMIEcfmContextId, FsMIEcfmCcmInterval ,fsMIEcfmMdIndex,
+    FsMIEcfmIdPermission ,
+    FsMIEcfmMhfCreation ,
+    FsMIEcfmMepIdOrZero ,
+    FsMIEcfmMepDefects ,
+    FsMIEcfmTransmitStatus ,
+    FsMIEcfmLowestAlarmPri,
+    FsMIEcfmHighestDefectPri,
+    FsMIEcfmFngState,
+    FsMIEcfmMepId,
+    FsMIEcfmMpDirection ,
+    FsMIEcfmConfigErrors ,
+    FsMIEcfmMDLevelOrNone ,
+    FsMIEcfmMDLevel ,
+    FsMIEcfmMaintAssocName,
+    FsMIEcfmMaintAssocNameType FROM ARICENT-ECFM-MI-MIB
+    InterfaceIndex FROM IF-MIB
+    ; 
+fsMIEcfmExtMIB MODULE-IDENTITY 
+    LAST-UPDATED "201209050000Z" 
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE" 
+    CONTACT-INFO "support@aricent.com"
+    DESCRIPTION
+    "The proprietary multiple instance MIB for extending ECFM module
+    with 802.1ah features."
+    REVISION "201209050000Z" 
+    DESCRIPTION
+    "The proprietary multiple instance MIB for extending ECFM module
+    with 802.1ah features."
+::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 13 }
+
+fsMIEcfmExtMIBObjects         OBJECT IDENTIFIER ::= { fsMIEcfmExtMIB 1 }
+
+-- ----------------------------------------------------------------------------
+-- Groups in the ECFM MIB Module
+-- ----------------------------------------------------------------------------
+fsMIEcfmExtSystem            OBJECT IDENTIFIER ::= { fsMIEcfmExtMIBObjects 1 }
+fsMIEcfmExtContext           OBJECT IDENTIFIER ::= { fsMIEcfmExtMIBObjects 2 }
+-- ----------------------------------------------------------------------------
+-- Textual conventions
+-- ----------------------------------------------------------------------------
+ServiceSelectorType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "A value that represents a type (and thereby the format)
+        of a ServiceSelectorValue.  The value can be one of
+        the following:
+
+        ieeeReserved(0)   Reserved for definition by IEEE 802.1
+                          recommend to not use zero unless
+                          absolutely needed.
+        vlanId(1)         12-Bit identifier as described in IEEE802.1Q.
+        isid(2)           20-Bit identifier as described in IEEE802.1ah.
+        mplsTunnelLsp(3)  Identifies the MPLS Tunnel LSP.
+        mplsPseudoWire(4) Identifies the MPLS PseudoWire.
+        ieeeReserved(xx)  Reserved for definition by IEEE 802.1
+                          xx values can be [3..7].
+
+        To support future extensions, the ServiceSelectorType
+        textual convention SHOULD NOT be sub-typed in object type
+        definitions.  It MAY be sub-typed in compliance statements in
+        order to require only a subset of these address types for a
+        compliant implementation.
+
+        Implementations MUST ensure that ServiceSelectorType
+        objects and any dependent objects (e.g.,
+        ServiceSelectorValue objects) are consistent.  An
+        inconsistentValue error MUST be generated if an attempt to
+        change an ServiceSelectorType object would, for
+        example, lead to an undefined ServiceSelectorValue value."
+    SYNTAX      INTEGER {
+                    vlanId(1),
+                    isid(2),
+                    mplsTunnelLsp(3),
+                    mplsPseudoWire(4)
+                }
+
+ServiceSelectorValueOrNone ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+        "An integer that uniquely identifies a generic MAC service,
+         or none.  Examples of service selectors are a VLAN-ID
+         (IEEE 802.1Q) and an I-SID (IEEE 802.1ah).
+
+         An ServiceSelectorValueOrNone value is always
+         interpreted within the context of an
+         ServiceSelectorType value.  Every usage of the
+         ServiceSelectorValueOrNone textual convention is
+         required to specify the ServiceSelectorType object
+         that provides the context.  It is suggested that the
+         ServiceSelectorType object be logically registered
+         before the object(s) that use the
+         ServiceSelectorValueOrNone textual convention, if
+         they appear in the same logical row.
+
+         The value of an ServiceSelectorValueOrNone object
+         must always be consistent with the value of the associated
+         ServiceSelectorType object.  Attempts to set an
+         ServiceSelectorValueOrNone object to a value
+         inconsistent with the associated
+         ServiceSelectorType must fail with an
+         inconsistentValue error.
+
+         The special value of zero is used to indicate that no
+         service selector is present or used.  This can be used in
+         any situation where an object or a table entry MUST either
+         refer to a specific service, or not make a selection.
+
+         Note that a MIB object that is defined using this
+         TEXTUAL-CONVENTION SHOULD clarify the meaning of
+         'no service' (i.e., the special value 0), as well as the
+         maximum value (i.e., 4094, for a VLAN ID)."
+    SYNTAX       Unsigned32 (0 | 1..4294967295)
+
+ServiceSelectorValue ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+        "An integer that uniquely identifies a generic MAC service.
+         Examples of service selectors are a VLAN-ID (IEEE 802.1Q)
+         and an I-SID (IEEE 802.1ah).
+
+         An ServiceSelectorValue value is always interpreted
+         within the context of an ServiceSelectorType value.
+         Every usage of the ServiceSelectorValue textual
+         convention is required to specify the
+         ServiceSelectorType object that provides the context.
+         It is suggested that the ServiceSelectorType object
+         be logically registered before the object(s) that use the
+         ServiceSelectorValue textual convention, if they
+         appear in the same logical row.
+
+         The value of an ServiceSelectorValue object must
+         always be consistent with the value of the associated
+         ServiceSelectorType object.  Attempts to set an
+         ServiceSelectorValue object to a value inconsistent
+         with the associated ServiceSelectorType must fail
+         with an inconsistentValue error.
+
+         Note that a MIB object that is defined using this
+         TEXTUAL-CONVENTION SHOULD clarify the
+         maximum value (i.e., 4094, for a VLAN ID)."
+    SYNTAX       Unsigned32 (1..4294967295)
+-- ----------------------------------------------------------------------------  
+-- The ECFM Stack Table - Start
+-- ----------------------------------------------------------------------------  
+fsMIEcfmExtStackTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIEcfmExtStackEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "There is one CFM Stack table per bridge. It permits
+    the retrieval of information about the Maintenance Points
+    configured on any given interface.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.2"
+    ::= { fsMIEcfmExtSystem 1 }
+
+fsMIEcfmExtStackEntry OBJECT-TYPE
+    SYNTAX      FsMIEcfmExtStackEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Stack table entry"
+    INDEX { fsMIEcfmExtStackIfIndex, 
+        fsMIEcfmExtStackServiceSelectorType,
+        fsMIEcfmExtStackServiceSelectorOrNone,
+        fsMIEcfmExtStackMdLevel, fsMIEcfmExtStackDirection
+      }
+    ::= { fsMIEcfmExtStackTable 1 }
+
+FsMIEcfmExtStackEntry ::= SEQUENCE {
+    fsMIEcfmExtStackIfIndex                    InterfaceIndex,
+    fsMIEcfmExtStackServiceSelectorType        ServiceSelectorType,
+    fsMIEcfmExtStackServiceSelectorOrNone      ServiceSelectorValueOrNone,
+    fsMIEcfmExtStackMdLevel                    FsMIEcfmMDLevel,
+    fsMIEcfmExtStackDirection                  FsMIEcfmMpDirection,
+    fsMIEcfmExtStackMdIndex                    Unsigned32,
+    fsMIEcfmExtStackMaIndex                    Unsigned32,
+    fsMIEcfmExtStackMepId                      FsMIEcfmMepIdOrZero,
+    fsMIEcfmExtStackMacAddress                 MacAddress
+}
+
+fsMIEcfmExtStackIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This object represents the  Bridge Port or aggregated port
+    on which MEPs or MHFs might be configured.
+
+    Upon a restart of the system, the system SHALL, if necessary,
+    change the value of this variable, and  rearrange the
+    fsMIEcfmExtStackTable, so that it indexes the entry in the
+    interface table with the same value of ifAlias that it
+    indexed before the system restart.  If no such entry exists,
+    then the system SHALL delete all entries in the
+    fsMIEcfmExtStackTable with the interface index.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.2.1.2:a"
+    ::= { fsMIEcfmExtStackEntry 1 }
+
+fsMIEcfmExtStackServiceSelectorType OBJECT-TYPE
+    SYNTAX      ServiceSelectorType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Type of the Service Selector identifier indicated by 
+        fsMIEcfmStackServiceSelectorOrNone. See textual convention 
+        ServiceSelectorType for details.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.2.1.2:d, 22.1.7"
+    ::= { fsMIEcfmExtStackEntry 2 }
+
+fsMIEcfmExtStackServiceSelectorOrNone OBJECT-TYPE
+    SYNTAX      ServiceSelectorValueOrNone
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Service Selector identifier to which the MP is attached, or 0, if none.
+        See textual convention ServiceSelectorValue for details.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.2.1.2:d, 22.1.7"
+    ::= { fsMIEcfmExtStackEntry 3 }
+
+fsMIEcfmExtStackMdLevel OBJECT-TYPE
+    SYNTAX      FsMIEcfmMDLevel
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "MD Level of the Maintenance Point."
+    REFERENCE
+       "802.1ag clause 12.14.2.1.2:b"
+    ::= { fsMIEcfmExtStackEntry 4 }
+
+fsMIEcfmExtStackDirection OBJECT-TYPE
+    SYNTAX      FsMIEcfmMpDirection
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Direction in which the MP faces on the Bridge Port"
+    REFERENCE
+       "802.1ag clause 12.14.2.1.2:c"
+    ::= { fsMIEcfmExtStackEntry 5 }
+
+fsMIEcfmExtStackMdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The index of the Maintenance Domain in the fsMIEcfmMdTable
+    to which the MP is associated, or 0, if none."
+    REFERENCE
+       "802.1ag clause 12.14.2.1.3:b"
+    ::= { fsMIEcfmExtStackEntry 6 }
+
+fsMIEcfmExtStackMaIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The index of the MA in the fsMIEcfmExtMaTable to which the MP
+    is associated, or 0, if none."
+    REFERENCE
+       "802.1ag clause 12.14.2.1.3:c"
+    ::= { fsMIEcfmExtStackEntry 7 }
+
+fsMIEcfmExtStackMepId OBJECT-TYPE
+    SYNTAX      FsMIEcfmMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "If an MEP is configured, the MEPID, else 0"
+    REFERENCE
+       "802.1ag clause 12.14.2.1.3:d"
+    ::= { fsMIEcfmExtStackEntry 8 }
+
+fsMIEcfmExtStackMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "MAC address of the MP."
+    REFERENCE
+      "802.1ag clause 12.14.2.1.3:e"
+    ::= { fsMIEcfmExtStackEntry 9 }
+-- ----------------------------------------------------------------------------  
+-- The ECFM Stack Table - End
+-- ----------------------------------------------------------------------------  
+
+-- ----------------------------------------------------------------------------  
+-- The Default MD Level Table - Start
+----------------------------------------------------------------------------  
+
+fsMIEcfmExtDefaultMdTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIEcfmExtDefaultMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "For each bridge component, the Default MD Level Managed Object
+        controls MHF creation for VIDs that are not attached to a
+        specific Maintenance Association Managed Object, and Sender ID
+        TLV transmission by those MHFs.
+
+        For each Bridge Port, and for each VLAN ID/ISID whose data can
+        pass through that Bridge Port, an entry in this table is
+        used by the algorithm in subclause 22.2.3 only if there is no
+        entry in the Maintenance Association table defining an MA
+        for the same VLAN ID/ISID and MD Level as this table's entry, and
+        on which MA an Up MEP is defined.  If there exists such an
+        MA, that MA's objects are used by the algorithm in
+        subclause 22.2.3 in place of this table entry's objects.  The
+        agent maintains the value of fsMIEcfmExtDefaultMdStatus to
+        indicate whether this entry is overridden by an MA.
+
+        When first initialized, the agent creates this table
+        automatically with entries for all VLAN ID/ISID,
+        with the default values specified for each object.
+
+        After this initialization, the writable objects in this
+        table need to be persistent upon reboot or restart of a
+        device.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.3"
+    ::= { fsMIEcfmExtContext 1 }
+
+fsMIEcfmExtDefaultMdEntry OBJECT-TYPE
+    SYNTAX      FsMIEcfmExtDefaultMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Default MD Level table entry."
+    INDEX { fsMIEcfmContextId,
+            fsMIEcfmExtDefaultMdPrimarySelectorType,
+            fsMIEcfmExtDefaultMdPrimarySelector}
+    ::= { fsMIEcfmExtDefaultMdTable 1 }
+
+FsMIEcfmExtDefaultMdEntry ::= SEQUENCE {
+      fsMIEcfmExtDefaultMdPrimarySelectorType    ServiceSelectorType,
+      fsMIEcfmExtDefaultMdPrimarySelector        ServiceSelectorValue,
+      fsMIEcfmExtDefaultMdStatus                 TruthValue,
+      fsMIEcfmExtDefaultMdLevel                  FsMIEcfmMDLevelOrNone,
+      fsMIEcfmExtDefaultMdMhfCreation            FsMIEcfmMhfCreation,
+      fsMIEcfmExtDefaultMdIdPermission           FsMIEcfmIdPermission
+    }
+
+fsMIEcfmExtDefaultMdPrimarySelectorType OBJECT-TYPE
+    SYNTAX      ServiceSelectorType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Type of the Primary Service Selector identifier indicated by 
+        fsMIEcfmExtDefaultMdPrimarySelector. See textual
+        convention ServiceSelectorType for details.
+       "
+    ::= { fsMIEcfmExtDefaultMdEntry 1 }
+
+fsMIEcfmExtDefaultMdPrimarySelector OBJECT-TYPE
+    SYNTAX      ServiceSelectorValue
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Primary Service Selector identifier of a Service Instance with 
+        no MA configured. See ServiceSelectorValue for details.
+       "
+    ::= {  fsMIEcfmExtDefaultMdEntry 2 }
+
+fsMIEcfmExtDefaultMdStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "State of this Default MD Level table entry.  True if there is
+        no entry in the Maintenance Association table defining an MA
+        for the same VLAN ID/ISID and MD Level as this table's entry, and
+        on which MA an Up MEP is defined, else false.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.3.1.3:b"
+    ::= { fsMIEcfmExtDefaultMdEntry 3 }
+
+fsMIEcfmExtDefaultMdLevel OBJECT-TYPE
+    SYNTAX      FsMIEcfmMDLevelOrNone
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "A value indicating the MD Level at which MHFs are to be
+        created, and Sender ID TLV transmission by those MHFs is to
+        be controlled, for the VLAN/ISID to which this entry's objects
+        apply.  If this object has the value -1, the MD Level for MHF
+        creation for this VLAN/ISID is controlled by
+        fsMIEcfmExtDefaultMdLevel.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.3.1.3:c, 12.14.3.2.2:b"
+    DEFVAL {-1}
+    ::= { fsMIEcfmExtDefaultMdEntry 4 }
+
+fsMIEcfmExtDefaultMdMhfCreation OBJECT-TYPE
+    SYNTAX      FsMIEcfmMhfCreation
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "A value indicating if the Management entity can create MHFs
+        (MIP Half Function) for this VID/ISID at this MD Level.  If this
+        object has the value defMHFdefer, MHF creation for this VLAN/ISID
+        is controlled by fsMIEcfmExtDefaultMdMhfCreation.
+
+        The value of this variable is meaningless if the values of
+        fsMIEcfmExtDefaultMdStatus is false.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.3.1.3:d"
+    DEFVAL {defMHFdefer}
+    ::= { fsMIEcfmExtDefaultMdEntry 5 }
+
+fsMIEcfmExtDefaultMdIdPermission OBJECT-TYPE
+    SYNTAX      FsMIEcfmIdPermission
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Enumerated value indicating what, if anything, is to be
+        included in the Sender ID TLV (21.5.3) transmitted by MHFs
+        created by the Default Maintenance Domain.  If this object
+        has the value sendIdDefer, Sender ID TLV transmission for
+        this VLAN/ISID is controlled by fsMIEcfmExtDefaultMdIdPermission.
+
+        The value of this variable is meaningless if the values of
+        fsMIEcfmExtDefaultMdStatus is false.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.3.1.3:e"
+    DEFVAL { sendIdDefer }
+    ::= { fsMIEcfmExtDefaultMdEntry 6 }
+
+-- ----------------------------------------------------------------------------  
+-- The Default MD Level Table - End
+-- ----------------------------------------------------------------------------  
+-- ----------------------------------------------------------------------------  
+-- The CFM configuration error list managed object. This group will
+-- contain all the MIB objects used to read the interfaces and VIDs
+-- configured incorrectly.
+-- ----------------------------------------------------------------------------  
+-- ----------------------------------------------------------------------------  
+-- The CFM Configuration Error List Table - Start
+-- ----------------------------------------------------------------------------  
+
+fsMIEcfmExtConfigErrorListTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIEcfmExtConfigErrorListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The CFM Configuration Error List table provides a list of
+        Interfaces and VIDs that are incorrectly configured.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.4"
+    ::= {fsMIEcfmExtSystem 2}
+
+fsMIEcfmExtConfigErrorListEntry OBJECT-TYPE
+    SYNTAX      FsMIEcfmExtConfigErrorListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Config Error List Table  entry"
+    INDEX { fsMIEcfmExtConfigErrorListSelectorType,
+            fsMIEcfmExtConfigErrorListSelector,
+            fsMIEcfmExtConfigErrorListIfIndex
+          }
+    ::= { fsMIEcfmExtConfigErrorListTable 1}
+
+FsMIEcfmExtConfigErrorListEntry ::= SEQUENCE {
+      fsMIEcfmExtConfigErrorListSelectorType           ServiceSelectorType,
+      fsMIEcfmExtConfigErrorListSelector               ServiceSelectorValue,
+      fsMIEcfmExtConfigErrorListIfIndex                InterfaceIndex,
+      fsMIEcfmExtConfigErrorListErrorType              FsMIEcfmConfigErrors
+    }
+
+fsMIEcfmExtConfigErrorListSelectorType OBJECT-TYPE
+    SYNTAX      ServiceSelectorType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Type of the Service Selector identifier indicated by
+        fsMIEcfmExtConfigErrorListSelectorType. See textual 
+        convention ServiceSelectorType for details.
+       "
+    REFERENCE
+       "802.1ag Clause 12.14.4.1.2:a"
+    ::= { fsMIEcfmExtConfigErrorListEntry 1 }
+
+fsMIEcfmExtConfigErrorListSelector OBJECT-TYPE
+    SYNTAX      ServiceSelectorValue
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Service Selector Identifier of the Service with interfaces
+        in error. See ServiceSelectorValue for details.
+       "
+    REFERENCE
+       "802.1ag Clause 12.14.4.1.2:a"
+    ::= { fsMIEcfmExtConfigErrorListEntry 2 }
+
+fsMIEcfmExtConfigErrorListIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+          "This object is the logicl port number  of the interface.
+
+        Upon a restart of the system, the system SHALL, if necessary,
+        change the value of this variable so that it indexes the
+        entry in the interface table with the same value of ifAlias
+        that it indexed before the system restart.  If no such
+        entry exists, then the system SHALL delete any entries in
+        fsMIEcfmExtConfigErrorListTable indexed by that IfIndex value."
+    REFERENCE
+       "802.1ag clause 12.14.4.1.2:b"
+    ::= { fsMIEcfmExtConfigErrorListEntry 3 }
+
+fsMIEcfmExtConfigErrorListErrorType OBJECT-TYPE
+    SYNTAX      FsMIEcfmConfigErrors
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "A vector of Boolean error conditions from 22.2.4, any of
+        which may be true:
+
+        0) CFMleak;
+        1) ConflictingVids;
+        2) ExcessiveLevels;
+        3) OverlappedLevels.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.4.1.3:b"
+    ::= { fsMIEcfmExtConfigErrorListEntry 4 }
+-- ----------------------------------------------------------------------------  
+-- The CFM Configuration Error List Table - End
+-- ----------------------------------------------------------------------------  
+ 
+-- ----------------------------------------------------------------------------  
+-- The Maintenance Association Object. This group contains all the
+-- MIB objects used to read, create, modify, and delete Maintenance
+-- Associations in the MIB.
+-- ----------------------------------------------------------------------------  
+
+-- ----------------------------------------------------------------------------  
+-- The Maintenance Association (MA) Table - Start
+-- ----------------------------------------------------------------------------  
+
+fsMIEcfmExtMaTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIEcfmExtMaEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association table.  Each row in the table
+        represents an MA.  An MA is a set of MEPs, each configured
+        with a single service instance.
+
+        Creation of a Service Instance establishes a connectionless
+        association among the selected DSAPs.  Configuring a
+        Maintenance association End Point (MEP) at each of the
+        DSAPs creates a Maintenance Association (MA) to monitor
+        that connectionless connectivity.  The MA is identified by a
+        Short MA Name that is unique within the Maintenance Domain
+        and chosen to facilitate easy identification of the Service
+        Instance.  Together, the Maintenance Domain Name and the
+        Short MA Name form the Maintenance Association Identifier
+        (MAID) that is carried in CFM Messages to identify
+        incorrect connectivity among Service Instances.  A small
+        integer, the Maintenance association End Point Identifier
+        (MEPID), identifies each MEP among those configured on a
+        single MA (802.1ag clauses 3.17 and 18.2).
+
+        This table uses two indices, first index is the index of the
+        Maintenance Domain table.
+
+       The writable objects in this table need to be persistent
+       upon reboot or restart of a device.
+
+       "
+    REFERENCE
+       "802.1ag clause 18.2"
+    ::= { fsMIEcfmExtContext 2 }
+
+fsMIEcfmExtMaEntry OBJECT-TYPE
+    SYNTAX      FsMIEcfmExtMaEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MA table entry."
+    INDEX { fsMIEcfmContextId, fsMIEcfmMdIndex, 
+            fsMIEcfmExtMaIndex,fsMIEcfmExtMaPrimarySelectorType,
+            fsMIEcfmExtMaPrimarySelectorOrNone}
+    ::= { fsMIEcfmExtMaTable 1 }
+
+FsMIEcfmExtMaEntry ::= SEQUENCE {
+      fsMIEcfmExtMaIndex                   Unsigned32,
+      fsMIEcfmExtMaPrimarySelectorType     ServiceSelectorType,
+      fsMIEcfmExtMaPrimarySelectorOrNone   ServiceSelectorValueOrNone,
+      fsMIEcfmExtMaFormat                  FsMIEcfmMaintAssocNameType,
+      fsMIEcfmExtMaName                    FsMIEcfmMaintAssocName,
+      fsMIEcfmExtMaMhfCreation             FsMIEcfmMhfCreation,
+      fsMIEcfmExtMaIdPermission            FsMIEcfmIdPermission,
+      fsMIEcfmExtMaCcmInterval             FsMIEcfmCcmInterval,
+      fsMIEcfmExtMaNumberOfVids            Unsigned32,
+      fsMIEcfmExtMaRowStatus               RowStatus,
+      fsMIEcfmExtMaCrosscheckStatus        INTEGER
+ }
+
+fsMIEcfmExtMaIndex OBJECT-TYPE
+    SYNTAX      Unsigned32(1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+
+       "Index of the MA table fsMIEcfmExtMdMaTableNextIndex needs to
+        be inspected to find an available index for row-creation.
+       "
+    ::= { fsMIEcfmExtMaEntry 1 }
+
+fsMIEcfmExtMaPrimarySelectorType OBJECT-TYPE
+    SYNTAX      ServiceSelectorType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Type of the Service Selector identifiers indicated by 
+        fsMIEcfmExtMaPrimarySelectorOrNone. If the service instance is defined by more 
+        than one Service Selector, this parameter also indicates the type of the 
+        fsMIEcfmExtVlanSelector and fsMIEcfmExtVlanPrimarySelector in the fsMIEcfmVlanTable. 
+        In Services instances made of multiple Service Selector identifiers, ensures that the
+        type of the Service selector identifiers is the same. See textual convention 
+        Dot1agCfmServiceSelectorType for details.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.6.1.3:b"
+    ::= { fsMIEcfmExtMaEntry 2 }
+    
+
+fsMIEcfmExtMaPrimarySelectorOrNone OBJECT-TYPE
+    SYNTAX      ServiceSelectorValueOrNone
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Service Selector identifier to which the MP is attached, or 0, if none.
+       If the MA is associated with more than one VID/ISID, the
+        fsMIEcfmVlanTable lists them.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.6.1.3:b"
+    ::= { fsMIEcfmExtMaEntry 3 }
+
+fsMIEcfmExtMaFormat OBJECT-TYPE
+    SYNTAX      FsMIEcfmMaintAssocNameType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The type (and thereby format) of the Maintenance Association
+        Name.
+       "
+    REFERENCE
+       "802.1ag clauses 21.6.5.4"
+    ::= { fsMIEcfmExtMaEntry 4 }
+
+fsMIEcfmExtMaName OBJECT-TYPE
+    SYNTAX      FsMIEcfmMaintAssocName
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The Short Maintenance Association name. The type/format of
+        this object is determined by the value of the
+        fsMIEcfmExtMaNameType object.
+       "
+    REFERENCE
+       "802.1ag clauses 21.6.5.6, and Table 21-20"
+    ::= { fsMIEcfmExtMaEntry 5 }
+
+fsMIEcfmExtMaMhfCreation OBJECT-TYPE
+    SYNTAX      FsMIEcfmMhfCreation
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Indicates if the Management entity can create MHFs (MIP Half
+        Function) for this MA.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.6.1.3:c"
+    DEFVAL { defMHFdefer }
+    ::= { fsMIEcfmExtMaEntry 6 }
+
+fsMIEcfmExtMaIdPermission OBJECT-TYPE
+    SYNTAX      FsMIEcfmIdPermission
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Enumerated value indicating what, if anything, is to be
+        included in the Sender ID TLV (21.5.3) transmitted by MPs
+        configured in this MA.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.6.1.3:d"
+    DEFVAL { sendIdDefer }
+    ::= { fsMIEcfmExtMaEntry 7 }
+
+fsMIEcfmExtMaCcmInterval OBJECT-TYPE
+    SYNTAX      FsMIEcfmCcmInterval
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Interval between CCM transmissions to be used by all MEPs
+        in the MA.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.6.1.3:e"
+    DEFVAL { interval1s }
+    ::= { fsMIEcfmExtMaEntry 8 }
+
+fsMIEcfmExtMaNumberOfVids OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of VIDs associated with the MA.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.6.1.3:b"
+    ::= { fsMIEcfmExtMaEntry 9 }
+
+fsMIEcfmExtMaRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The status of the row.
+
+        The writable columns in a row can not be changed if the row
+        is active. All columns must have a valid value before a row
+        can be activated.
+       "
+    ::= { fsMIEcfmExtMaEntry 10}
+
+fsMIEcfmExtMaCrosscheckStatus OBJECT-TYPE 
+          SYNTAX      INTEGER  { enabled(1), disabled(2) } 
+          MAX-ACCESS  read-write
+          STATUS      current 
+          DESCRIPTION 
+             "The administrative status of MA Crosscheck . 
+              This enables or disables cross checking between the list of
+              configured remote maintenance end points (MEPs)of a domain and
+              MEPs learned through continuity check messages (CCMs).
+              messages" 
+          DEFVAL  { enabled }
+ 
+         ::= { fsMIEcfmExtMaEntry 11 }
+-- ----------------------------------------------------------------------------  
+-- The Maintenance Association (MA) Table - End
+-- ----------------------------------------------------------------------------  
+
+-- -------------------------------------
+-- fsMIEcfmExtMipTable - Start
+-- -------------------------------------
+       fsMIEcfmExtMipTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF FsMIEcfmExtMipEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+       "The Maintenance Intermediate Point (MIP) table.
+
+        Each row in the table represents a different MIP. 
+        A MIP consists two MIP Half Functions (MHFs) on a 
+        single Bridge Port, an Up MHF and a Down MHF."
+        
+        ::= { fsMIEcfmExtSystem 3 }
+
+       fsMIEcfmExtMipEntry OBJECT-TYPE
+         SYNTAX       FsMIEcfmExtMipEntry
+         MAX-ACCESS   not-accessible
+         STATUS       current
+         DESCRIPTION
+           "The MIP table entry"
+         INDEX { fsMIEcfmExtMipIfIndex,
+                 fsMIEcfmExtMipMdLevel,
+                 fsMIEcfmExtMipSelectorType,
+                 fsMIEcfmExtMipPrimarySelector
+               }
+          ::= { fsMIEcfmExtMipTable 1 }
+
+       FsMIEcfmExtMipEntry ::=
+       SEQUENCE {
+              fsMIEcfmExtMipIfIndex
+                InterfaceIndex,
+              fsMIEcfmExtMipMdLevel
+                Integer32,
+              fsMIEcfmExtMipSelectorType    
+                ServiceSelectorType,
+              fsMIEcfmExtMipPrimarySelector      
+                ServiceSelectorValue,
+              fsMIEcfmExtMipActive
+                TruthValue,     
+              fsMIEcfmExtMipRowStatus
+                RowStatus
+       }
+         fsMIEcfmExtMipIfIndex OBJECT-TYPE
+         SYNTAX        InterfaceIndex
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+         "This object is the interface index of the interface either a
+          bridge port, or an aggregated IEEE 802.1 link within a bridge
+          port, to which the MIP is attached."
+         ::= { fsMIEcfmExtMipEntry 1 }
+         
+         fsMIEcfmExtMipMdLevel OBJECT-TYPE
+         SYNTAX        Integer32 (0..7)
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+          "The Maintenance Domain Level at which MIP is configured."
+          ::= { fsMIEcfmExtMipEntry 2 }
+
+         fsMIEcfmExtMipSelectorType OBJECT-TYPE
+         SYNTAX      ServiceSelectorType
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+         "Type of the Primary Service Selector identifier indicated by 
+         fsMIEcfmExtMipPrimarySelector. See textual
+         convention ServiceSelectorType for details.
+         "
+         ::= { fsMIEcfmExtMipEntry 3 }
+
+         fsMIEcfmExtMipPrimarySelector  OBJECT-TYPE
+         SYNTAX        ServiceSelectorValue
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+         "Primary Service Selector identifier of a Service Instance to which
+          MIP is attached. See ServiceSelectorValue for details"
+        ::= { fsMIEcfmExtMipEntry 4 }
+         
+         fsMIEcfmExtMipActive  OBJECT-TYPE
+         SYNTAX        TruthValue
+         MAX-ACCESS    read-create
+         STATUS        current
+         DESCRIPTION
+          "Administrative state of the MIP. A Boolean indicating the 
+           administrative state of the MIP. True indicates that the MIP 
+           is to function normally, and false that it is to cease functioning."
+          ::= { fsMIEcfmExtMipEntry 5 }
+        
+        fsMIEcfmExtMipRowStatus  OBJECT-TYPE
+         SYNTAX        RowStatus
+         MAX-ACCESS    read-create
+         STATUS        current
+         DESCRIPTION
+         "The status of the row.
+
+         The writable columns in a row can not be changed if the row
+         is active. All columns must have a valid value before a row
+         can be activated.
+        "
+
+        ::= { fsMIEcfmExtMipEntry 6 }
+
+-- -------------------------------------
+-- fsMIEcfmExtMipTable - End
+-- -------------------------------------
+-- ----------------------------------------------------------------------------  
+-- The MEP Table - Start
+-- ----------------------------------------------------------------------------  
+
+fsMIEcfmExtMepTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMIEcfmExtMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association End Point (MEP) table.
+
+        Each row in the table represents a different MEP.  A MEP is
+        an actively managed CFM entity, associated with a specific
+        DSAP of a Service Instance, which can generate and receive
+        CFM PDUs and track any responses.  It is an end point of a
+        single Maintenance Association, and is an endpoint of a
+        separate Maintenance Entity for each of the other MEPs in
+        the same Maintenance Association (802.1ag clause 3.18).
+
+        This table uses three indices. The first two indices are the
+        indices of the Maintenance Domain and MA tables, the reason
+        being that a MEP is always related to an MA and Maintenance
+        Domain.
+
+        The Transmit Loopback table.  Entries in this table are
+        created/removed at the same time than entries in the MEP
+        table are created/removed.
+
+        The MEP table also stores all the managed objects for sending
+        LBM and LTM.
+
+        *LBM Managed objects
+
+        LBM Managed objects in the MEP table 
+        enables the management entity to initiate
+        transmission of Loopback messages.  It will signal the MEP
+        that it should transmit some number of Loopback messages
+        and detect the detection (or lack thereof) of the
+        corresponding Loopback messages.
+ 
+        Steps to use entries in this table:
+
+        1) Wait for fsMIEcfmExtMepTransmitLbmStatus value to be
+           'ready'.  To do this do this sequence:
+           a. an SNMP GET for both SnmpSetSerialNo and
+              fsMIEcfmExtMepTransmitLbmStatus objects (in same SNMP
+              PDU).
+           b. Check if value for fsMIEcfmExtMepTransmitLbmStatus is
+              'ready'
+              - if not, wait x seconds, go to step a above.
+              - if yes, save the value of SnmpSetSerialNo and go
+                to step 2) below
+        2) Change fsMIEcfmExtMepTransmitLbmStatus value from 'ready' to
+           'notReady' to ensure no other management entity will use
+           the service. In order to not disturb a possible other NMS
+           do this by sending an SNMP SET for both SnmpSetSerialNo 
+           and fsMIEcfmExtMepTransmitLbmStatus objects (in same SNMP
+           PDU,  and make sure SNmpSetSerialNo is the first varBind).
+           For the SnmpSetSerialNo varBind, use the value that you
+           obtained in step 1)a.. This ensures that two cooperating
+           NMSes will not step on each others toes.
+        3) Setup the different data to be sent (number of messages,
+           optional TLVs,...).
+        4) Record the current values of fsMIEcfmExtMepLbrIn,
+           fsMIEcfmExtMepLbrInOutOfOrder, and fsMIEcfmExtMepLbrBadMsdu.
+        6) Change fsMIEcfmExtMepTransmitLbmStatus value from 'notReady'
+           to 'transmit' to initiate transmission of Loopback
+           messages.
+        7) Check the value of fsMIEcfmExtMepTransmitLbmResultOK to
+           find out if the operation was successfully initiated or
+           not.
+        8) Monitor the value of fsMIEcfmExtMepTransmitLbmMessages.
+           When it reaches 0, the last LBM has been transmitted.
+           Wait an additional 5 seconds to ensure that all LBRs have
+           been returned.
+        9) Compare fsMIEcfmExtMepLbrIn, fsMIEcfmExtMepLbrInOutOfOrder,
+           and fsMIEcfmExtMepLbrBadMsdu to their old values from step
+           4, above, to get the results of the test.
+       10) Change the fsMIEcfmExtMepTransmitLbmStatus value back to
+           'ready' to allow other management entities to use the
+           table.
+
+        *LTM Managed objects
+        The LTM Managed objects in the MEP table are used in a manner
+        similar to that described for LBM transmission, above.  Upon
+        successfully initiating the transmission, the variables
+        fsMIEcfmExtMepTransmitLtmSeqNumber and
+        fsMIEcfmExtMepTransmitLtmEgressIdentifier return the information
+        required to recover the results of the LTM from the
+        fsMIEcfmLtrTable.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7 and 19.2"
+    ::= { fsMIEcfmExtContext 3 }
+
+fsMIEcfmExtMepEntry OBJECT-TYPE
+    SYNTAX      FsMIEcfmExtMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP table entry"
+    INDEX { fsMIEcfmContextId,
+            fsMIEcfmMdIndex,
+            fsMIEcfmExtMaIndex,
+            fsMIEcfmExtMepIdentifier
+          }
+    ::= { fsMIEcfmExtMepTable 1 }
+
+FsMIEcfmExtMepEntry ::= SEQUENCE {
+      fsMIEcfmExtMepIdentifier                   FsMIEcfmMepId,
+      fsMIEcfmExtMepIfIndex                      InterfaceIndex,
+      fsMIEcfmExtMepDirection                    FsMIEcfmMpDirection,
+      fsMIEcfmExtMepPrimaryVidOrIsid             Unsigned32,
+      fsMIEcfmExtMepActive                       TruthValue,
+      fsMIEcfmExtMepFngState                     FsMIEcfmFngState,
+      fsMIEcfmExtMepCciEnabled                   TruthValue,
+      fsMIEcfmExtMepCcmLtmPriority               Unsigned32,
+      fsMIEcfmExtMepMacAddress                   MacAddress,
+      fsMIEcfmExtMepLowPrDef                     FsMIEcfmLowestAlarmPri,
+      fsMIEcfmExtMepFngAlarmTime                 TimeInterval,
+      fsMIEcfmExtMepFngResetTime                 TimeInterval,
+      fsMIEcfmExtMepHighestPrDefect              FsMIEcfmHighestDefectPri,
+      fsMIEcfmExtMepDefects                      FsMIEcfmMepDefects,
+      fsMIEcfmExtMepErrorCcmLastFailure          OCTET STRING,
+      fsMIEcfmExtMepXconCcmLastFailure           OCTET STRING,
+      fsMIEcfmExtMepCcmSequenceErrors            Unsigned32,
+      fsMIEcfmExtMepCciSentCcms                  Unsigned32,
+      fsMIEcfmExtMepNextLbmTransId               Unsigned32,
+      fsMIEcfmExtMepLbrIn                        Unsigned32,
+      fsMIEcfmExtMepLbrInOutOfOrder              Unsigned32,
+      fsMIEcfmExtMepLbrBadMsdu                   Unsigned32,
+      fsMIEcfmExtMepLtmNextSeqNumber             Unsigned32,
+      fsMIEcfmExtMepUnexpLtrIn                   Unsigned32,
+      fsMIEcfmExtMepLbrOut                       Unsigned32,
+      fsMIEcfmExtMepTransmitLbmStatus            FsMIEcfmTransmitStatus,
+      fsMIEcfmExtMepTransmitLbmDestMacAddress    MacAddress,
+      fsMIEcfmExtMepTransmitLbmDestMepId         FsMIEcfmMepIdOrZero,
+      fsMIEcfmExtMepTransmitLbmDestIsMepId       TruthValue,
+      fsMIEcfmExtMepTransmitLbmMessages          Integer32,
+      fsMIEcfmExtMepTransmitLbmDataTlv           OCTET STRING,
+      fsMIEcfmExtMepTransmitLbmVlanIsidPriority      Integer32,
+      fsMIEcfmExtMepTransmitLbmVlanIsidDropEnable    TruthValue,
+      fsMIEcfmExtMepTransmitLbmResultOK          TruthValue,
+      fsMIEcfmExtMepTransmitLbmSeqNumber         Unsigned32,
+      fsMIEcfmExtMepTransmitLtmStatus            FsMIEcfmTransmitStatus,
+      fsMIEcfmExtMepTransmitLtmFlags             BITS,
+      fsMIEcfmExtMepTransmitLtmTargetMacAddress  MacAddress,
+      fsMIEcfmExtMepTransmitLtmTargetMepId       FsMIEcfmMepIdOrZero,
+      fsMIEcfmExtMepTransmitLtmTargetIsMepId     TruthValue,
+      fsMIEcfmExtMepTransmitLtmTtl               Unsigned32,
+      fsMIEcfmExtMepTransmitLtmResult            TruthValue,
+      fsMIEcfmExtMepTransmitLtmSeqNumber         Unsigned32,
+      fsMIEcfmExtMepTransmitLtmEgressIdentifier  OCTET STRING,
+      fsMIEcfmExtMepRowStatus                    RowStatus,
+      fsMIEcfmExtMepCcmOffload                   INTEGER
+    }
+
+fsMIEcfmExtMepIdentifier OBJECT-TYPE
+    SYNTAX      FsMIEcfmMepId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Integer that is unique among all the MEPs in the same MA.
+        Other definition is: a small integer, unique over a given
+        Maintenance Association, identifying a specific Maintenance
+        association End Point (3.19).
+
+        MEP Identifier is also known as the MEPID.
+       "
+    REFERENCE
+       "802.1ag clauses 3.19, 19.2 and 12.14.7"
+    ::= { fsMIEcfmExtMepEntry 1 }
+
+fsMIEcfmExtMepIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object is the interface index of the interface either a
+        bridge port, or an aggregated IEEE 802.1 link within a bridge
+        port, to which the MEP is attached.
+
+        Upon a restart of the system, the system SHALL, if necessary,
+        change the value of this variable so that it indexes the
+        entry in the interface table with the same value of ifAlias
+        that it indexed before the system restart.  If no such
+        entry exists, then the system SHALL set this variable to 0.
+
+        For MPLS-TP based MEPs this object is not configurable and the ifIndex 
+        shall remain as zero.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:b"
+    ::= { fsMIEcfmExtMepEntry 2 }
+
+fsMIEcfmExtMepDirection OBJECT-TYPE
+    SYNTAX      FsMIEcfmMpDirection
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The direction in which the MEP faces on the Bridge port. 
+        
+        For MEPs that are created over the MPLS TP networks, always the 
+        direction is allowed as Down.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:c and 19.2"
+    ::= { fsMIEcfmExtMepEntry 3 }
+
+fsMIEcfmExtMepPrimaryVidOrIsid OBJECT-TYPE
+    SYNTAX      Unsigned32(0..16777215)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "An integer indicating the Primary VID/ISID of the MEP, always
+        one of the VIDs/ISID assigned to the MEP's MA.  The value 0
+        indicates that either the Primary VID/ISID is that of the
+        MEP's MA, or that the MEP's MA is associated with no VID/ISID."
+   REFERENCE
+       "802.1ag clauses 12.14.7.1.3:d"
+   DEFVAL { 0 }
+    ::= { fsMIEcfmExtMepEntry 4 }
+
+fsMIEcfmExtMepActive OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Administrative state of the MEP
+
+        A Boolean indicating the administrative state of the MEP.
+
+        True indicates that the MEP is to function normally, and
+        false that it is to cease functioning."
+   REFERENCE
+       "802.1ag clauses 12.14.7.1.3:e and 20.9.1"
+   DEFVAL { false }
+   ::= { fsMIEcfmExtMepEntry 5 }
+
+fsMIEcfmExtMepFngState OBJECT-TYPE
+    SYNTAX      FsMIEcfmFngState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Current state of the MEP Fault Notification Generator
+        State Machine.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:f and 20.35"
+    DEFVAL { fngReset }
+    ::= { fsMIEcfmExtMepEntry 6 }
+
+fsMIEcfmExtMepCciEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "If set to true, the MEP will generate CCM messages."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:g and 20.10.1"
+    DEFVAL { false }
+    ::= { fsMIEcfmExtMepEntry 7 }
+
+fsMIEcfmExtMepCcmLtmPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The priority value for CCMs and LTMs transmitted by the MEP.
+        Default Value in the highest priority value allowed to pass
+        through the bridge port for any of this MEPs VIDs.
+        The management entity can obtain the default value for this 
+        variable from the priority regeneration table by extracting the 
+        highest priority value in this table on this MEPs bridge port.
+        (1 is lowest, then 2, then 0, then 3-7).
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:h"
+    ::= { fsMIEcfmExtMepEntry 8 }
+
+fsMIEcfmExtMepMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "MAC address of the MEP. 
+
+        For MEPs that do not posses a MAC address this value will be all zeroes.
+        Such an MEP will be present in the MPLS TP networks.
+       "
+    REFERENCE
+      "802.1ag clause 12.14.7.1.3:i and 19.4"
+    ::= { fsMIEcfmExtMepEntry 9 }
+
+fsMIEcfmExtMepLowPrDef OBJECT-TYPE
+    SYNTAX      FsMIEcfmLowestAlarmPri
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "An integer value specifying the lowest priority defect 
+        that is allowed to generate fault alarm.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:k and 20.9.5 and Table 20-1"
+    DEFVAL { macRemErrXcon }
+    ::= { fsMIEcfmExtMepEntry 10}
+
+fsMIEcfmExtMepFngAlarmTime OBJECT-TYPE
+    SYNTAX      TimeInterval (250..1000)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The time that defects must be present before a Fault Alarm is
+        issued (fngAlarmTime. 20.33.3) (default 2.5s).
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:l and 20.33.3"
+    DEFVAL { 250 }
+    ::= { fsMIEcfmExtMepEntry 11 }
+
+fsMIEcfmExtMepFngResetTime OBJECT-TYPE
+    SYNTAX      TimeInterval (250..1000)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The time that defects must be absent before re-enabling a
+        Fault Alarm (fngResetTime, 20.33.4) (default 10s).
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:m and 20.33.4"
+    DEFVAL { 1000 }
+    ::= { fsMIEcfmExtMepEntry 12 }
+   
+fsMIEcfmExtMepHighestPrDefect OBJECT-TYPE
+    SYNTAX   FsMIEcfmHighestDefectPri
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The highest priority defect that has been present since the
+        MEPs Fault Notification Generator State Machine was last in
+        the FNG_RESET state.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:n  20.33.9 and Table 21-1"
+    ::= { fsMIEcfmExtMepEntry 13 }
+
+fsMIEcfmExtMepDefects OBJECT-TYPE
+    SYNTAX      FsMIEcfmMepDefects
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "A vector of Boolean error conditions from Table 20-1, any of
+        which may be true:
+
+        DefRDICCM(1)
+        DefMACstatus(2)
+        DefRemoteCCM(3)
+        DefErrorCCM(4)
+        DefXconCCM(5)
+       "
+    REFERENCE
+       ".1ag clauses 12.14.7.1.3:o, 12.14.7.1.3:p, 12.14.7.1.3:q,
+        12.14.7.1.3:r, 12.14.7.1.3:s, 20.21.3, 20.23.3, 20.33.5,
+        20.33.6, 20.33.7."
+    ::= { fsMIEcfmExtMepEntry 14 }
+
+fsMIEcfmExtMepErrorCcmLastFailure OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..1522))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The last-received CCM that triggered an DefErrorCCM fault."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:t and 20.21.2"
+    ::= { fsMIEcfmExtMepEntry 15 }
+
+fsMIEcfmExtMepXconCcmLastFailure OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..1522))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The last-received CCM that triggered a DefXconCCM fault."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:u and 20.23.2"
+    ::= { fsMIEcfmExtMepEntry 16 }
+
+fsMIEcfmExtMepCcmSequenceErrors OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The total number of out-of-sequence CCMs received from all
+        remote MEPs.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:v and 20.16.12"
+    ::= { fsMIEcfmExtMepEntry 17 }
+
+fsMIEcfmExtMepCciSentCcms OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of Continuity Check messages transmitted."
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:w and 20.10.2"
+    ::= { fsMIEcfmExtMepEntry 18 }
+
+fsMIEcfmExtMepNextLbmTransId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Next sequence number/transaction identifier to be sent in a
+        Loopback message. This sequence number can be zero because
+        it wraps around.
+       "
+    REFERENCE
+       "802.1ag clauses 12.14.7.1.3:x and 20.28.2"
+    ::= { fsMIEcfmExtMepEntry 19 }
+
+fsMIEcfmExtMepLbrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of valid, in-order Loopback Replies received."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:y and 20.31.1"
+    ::= { fsMIEcfmExtMepEntry 20 }
+
+fsMIEcfmExtMepLbrInOutOfOrder OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The total number of valid, out-of-order Loopback Replies
+        received.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:z and 20.31.1"
+    ::= { fsMIEcfmExtMepEntry 21 }
+
+fsMIEcfmExtMepLbrBadMsdu OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "(optional) The total number of LBRs received whose
+        mac_service_data_unit did not match (except for the OpCode)
+        that of the corresponding LBM (20.2.3).
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:aa  20.2.3"
+    ::= { fsMIEcfmExtMepEntry 22}
+
+fsMIEcfmExtMepLtmNextSeqNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Next transaction identifier/sequence number to be sent in a
+        Linktrace message. This sequence number can be zero because
+        it wraps around.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:ab and 20.36.1"
+    ::= { fsMIEcfmExtMepEntry 23 }
+
+fsMIEcfmExtMepUnexpLtrIn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The total number of unexpected LTRs received (20.39.1).
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:ac  20.39.1"
+    ::= { fsMIEcfmExtMepEntry 24 }
+
+fsMIEcfmExtMepLbrOut OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Total number of Loopback Replies transmitted."
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:ad and 20.26.2"
+    ::= { fsMIEcfmExtMepEntry 25 }
+
+fsMIEcfmExtMepTransmitLbmStatus OBJECT-TYPE
+   SYNTAX      FsMIEcfmTransmitStatus
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+      "A Enumerated value set to 'transmit'to initiate LBM transmission.
+       Set to 'ready' or 'notReady' by the MEP Loopback Initiator State Machine."
+   DEFVAL { ready }
+   ::= { fsMIEcfmExtMepEntry 26 }
+
+fsMIEcfmExtMepTransmitLbmDestMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The Target MAC Address Field to be transmitted: A unicast
+        destination MAC address.
+        This address will be used if the value of the column
+        fsMIEcfmExtMepTransmitLbmDestIsMepId is 'false'.
+       "
+  REFERENCE
+       "802.1ag clause 12.14.7.3.2:b"
+    ::= { fsMIEcfmExtMepEntry 27 }
+
+fsMIEcfmExtMepTransmitLbmDestMepId OBJECT-TYPE
+    SYNTAX      FsMIEcfmMepIdOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance association End Point Identifier of another
+        MEP in the same Maintenance Association to which the LBM is
+        to be sent.
+        This address will be used if the value of the column
+        fsMIEcfmExtMepTransmitLbmDestIsMepId is 'true'.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:b"
+    ::= { fsMIEcfmExtMepEntry 28 }
+
+fsMIEcfmExtMepTransmitLbmDestIsMepId OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "True indicates that MEPID of the target MEP is used for
+        Loopback transmission.
+        False indicates that unicast destination MAC address of the
+        target MEP is used for Loopback transmission.
+
+        For MEPs residing over the MPLS TP transport networks, this value 
+        will always be True.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:b"
+    ::= {fsMIEcfmExtMepEntry 29 }
+
+fsMIEcfmExtMepTransmitLbmMessages OBJECT-TYPE
+    SYNTAX      Integer32(1..1024)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The number of Loopback messages to be transmitted."
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:c"
+    DEFVAL { 1 }
+    ::= {fsMIEcfmExtMepEntry 30 }
+
+fsMIEcfmExtMepTransmitLbmDataTlv OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..1500))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "An arbitrary amount of data to be included in the Data TLV,
+        if the Data TLV is selected to be sent.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:d"
+    ::= { fsMIEcfmExtMepEntry 31 }
+
+fsMIEcfmExtMepTransmitLbmVlanIsidPriority OBJECT-TYPE
+    SYNTAX      Integer32(0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Priority. 3 bit value to be used in the VLAN tag, if present
+        in the transmitted frame.
+
+        The default value is CCM priority.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:e"
+    ::= { fsMIEcfmExtMepEntry 32 }
+
+fsMIEcfmExtMepTransmitLbmVlanIsidDropEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Drop Enable bit value to be used in the VLAN tag, if present
+        in the transmitted frame.
+
+        For more information about VLAN Drop Enable, please check
+        IEEE 802.1ad.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.2:e"
+    DEFVAL { true }
+    ::= { fsMIEcfmExtMepEntry 33 }
+
+fsMIEcfmExtMepTransmitLbmResultOK OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Indicates the result of the operation:
+
+        - true       The Loopback Message(s) will be
+                     (or has been) sent.
+        - false      The Loopback Message(s) will not
+                     be sent.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.3:a"
+    DEFVAL { true }
+    ::= { fsMIEcfmExtMepEntry 34 }
+
+fsMIEcfmExtMepTransmitLbmSeqNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The Loopback Transaction Identifier
+       (fsMIEcfmExtMepNextLbmTransId) of the first LBM (to be) sent.
+        The value returned is undefined if
+        fsMIEcfmExtMepTransmitLbmResultOK is false.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.3.3:a"
+    ::= { fsMIEcfmExtMepEntry 35 }
+
+fsMIEcfmExtMepTransmitLtmStatus OBJECT-TYPE
+   SYNTAX      FsMIEcfmTransmitStatus
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+      "A Enumerated value set to 'transmit' to initiate LTM transmission. 
+       Set to 'ready' or 'notReady' by the MEP Linktrace Initiator State 
+       Machine.
+      "
+   DEFVAL { ready }
+   ::= { fsMIEcfmExtMepEntry 36 }
+
+fsMIEcfmExtMepTransmitLtmFlags OBJECT-TYPE
+    SYNTAX      BITS {
+                  useFDBonly   (0)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The flags field for LTMs transmitted by the MEP."
+    REFERENCE
+       "802.1ag clause 12.14.7.4.2:b and 20.37.1"
+    DEFVAL {0}
+    ::= { fsMIEcfmExtMepEntry 37 }
+
+fsMIEcfmExtMepTransmitLtmTargetMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The Target MAC Address Field to be transmitted: A unicast
+        destination MAC address.
+        This address will be used if the value of the column
+        fsMIEcfmExtMepTransmitLtmTargetIsMepId is 'false'.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.4.2:c"
+    ::= { fsMIEcfmExtMepEntry 38 }
+
+fsMIEcfmExtMepTransmitLtmTargetMepId OBJECT-TYPE
+    SYNTAX      FsMIEcfmMepIdOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "An indication of the Target MAC Address Field to be
+        transmitted:
+        The Maintenance association End Point Identifier of
+        another MEP in the same Maintenance Association
+        This address will be used if the value of the column
+        fsMIEcfmExtMepTransmitLtmTargetIsMepId is 'true'.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.4.2:c"
+    ::= { fsMIEcfmExtMepEntry 39 }
+
+fsMIEcfmExtMepTransmitLtmTargetIsMepId OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "True indicates that MEPID of the target MEP is used for
+        Linktrace transmission.
+        False indicates that unicast destination MAC address of the
+        target MEP is used for Loopback transmission.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.4.2:c"
+    ::= { fsMIEcfmExtMepEntry 40 }
+
+fsMIEcfmExtMepTransmitLtmTtl OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The LTM TTL field. Default value, if not specified, is 64.
+        The TTL field indicates the number of hops remaining to the
+        LTM.  Decremented by 1 by each Linktrace Responder that
+        handles the LTM.  The value received in the LTM is returned
+        in the LTR.  If 0 on input, the LTM is not transmitted to the
+        next hop.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.4.2:d and 21.8.4"
+    DEFVAL {64}
+    ::= { fsMIEcfmExtMepEntry 41 }
+
+fsMIEcfmExtMepTransmitLtmResult OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Indicates the result of the operation:
+
+        - true    The Linktrace Message will be (or has been) sent.
+        - false   The Linktrace Message will not be sent"
+    REFERENCE
+       "802.1ag clause 12.14.7.4.3:a"
+    DEFVAL { true }
+    ::= { fsMIEcfmExtMepEntry 42 }
+
+fsMIEcfmExtMepTransmitLtmSeqNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The LTM Transaction Identifier
+        (fsMIEcfmExtMepLtmNextSeqNumber) of the LTM sent.
+        The value returned is undefined if
+        fsMIEcfmExtMepTransmitLtmResult is false.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.4.3:a"
+    ::= { fsMIEcfmExtMepEntry 43 }
+
+fsMIEcfmExtMepTransmitLtmEgressIdentifier OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(8))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Identifies the MEP Linktrace Initiator that is originating,
+        or the Linktrace Responder that is forwarding, this LTM.
+        The low-order six octets contain a 48-bit IEEE MAC address
+        unique to the system in which the MEP Linktrace Initiator
+        or Linktrace Responder resides.  The high-order two octets
+        contain a value sufficient to uniquely identify the MEP
+        Linktrace Initiator or Linktrace Responder within that system.
+
+        For most Bridges, the address of any MAC attached to the
+        Bridge will suffice for the low-order six octets, and 0 for
+        the high-order octets.  In some situations, e.g. if multiple
+        virtual Bridges utilizing emulated LANs are implemented in a
+        single physical system, the high-order two octets can be used
+        to differentiate among the transmitting entities.
+
+        The value returned is undefined if
+        fsMIEcfmExtMepTransmitLtmResult is false.
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.4.3:b and 21.8.8"
+    ::= { fsMIEcfmExtMepEntry 44 }
+   
+fsMIEcfmExtMepRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The status of the row.
+
+        The writable columns in a row can not be changed if the row
+        is active. All columns must have a valid value before a row
+        can be activated.
+       "
+   ::= { fsMIEcfmExtMepEntry 45 }
+
+fsMIEcfmExtMepCcmOffload OBJECT-TYPE
+        SYNTAX      INTEGER  { enabled(1), disabled(2) }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+             "The administrative MEP CCMOffloading status.
+              when value 'enabled' (1) is set The CCM Offloading starts for 
+              the MEP in the system.when value 'disabled' (2) is set then 
+              CCMOffloading will disabled for the MEP in system.
+              By Default CCMOffloading is disabled."
+          DEFVAL  { disabled }
+          ::= { fsMIEcfmExtMepEntry 46 }
+
+
+-- ----------------------------------------------------------------------------  
+-- The MEP Table - End
+-- ----------------------------------------------------------------------------  
+
+ END 

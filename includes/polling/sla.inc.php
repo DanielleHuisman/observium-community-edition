@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
+ * @package    observium
+ * @subpackage poller
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -17,18 +17,14 @@ $table_rows     = [];
 
 // WARNING. Discovered all SLAs, but polled only 'active'
 $sql = "SELECT * FROM `slas` WHERE `device_id` = ? AND `deleted` = 0;"; // AND `sla_status` = 'active';";
-foreach (dbFetchRows($sql, [$device['device_id']]) as $entry) {
+foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry) {
     $sla_db_count++; // Fetch all entries for correct counting, but skip inactive/deleted
     if ($entry['sla_status'] !== 'active') {
         continue;
     }
 
-    $index     = $entry['sla_index'];
+    $index     = get_sla_index($entry);
     $mib_lower = strtolower($entry['sla_mib']);
-    if (!in_array($entry['sla_mib'], ['CISCO-RTTMON-MIB', 'HPICF-IPSLA-MIB'])) {
-        // Use 'owner.index' as index for all except Cisco and HPE
-        $index = $entry['sla_owner'] . '.' . $index;
-    }
 
     $sla_db[$mib_lower][$index] = $entry;
 }
@@ -49,35 +45,30 @@ foreach (array_keys($sla_db) as $mib_lower) {
 
     print_debug_vars($cache_sla);
 
-    //$sla_db_count   += count($sla_db[$mib_lower]);
     $sla_snmp_count += safe_count($cache_sla[$mib_lower]);
 
-    foreach ($sla_db[$mib_lower] as $sla) {
+    foreach ($sla_db[$mib_lower] as $index => $sla) {
 
-        $rrd_index = $mib_lower . '-' . $sla['sla_index'];
-        if ($sla['sla_owner']) {
-            // Add owner name to rrd file if not empty
-            $rrd_index .= '-' . $sla['sla_owner'];
+        // Compatibility with old code
+        if (empty($sla['sla_graph'])) {
+            if (str_contains($sla['rtt_type'], 'jitter')) {
+                $sla['sla_graph'] = 'jitter';
+            } else {
+                $sla['sla_graph'] = 'echo';
+            }
         }
-        $rrd_filename = "sla-" . $rrd_index . ".rrd";
-        $rrd_ds       = "DS:rtt:GAUGE:600:0:300000";
 
-        $index = $sla['sla_index'];
-        if (!in_array($sla['sla_mib'], ['CISCO-RTTMON-MIB', 'HPICF-IPSLA-MIB'])) {
-            // Use 'owner.index' as index for all except Cisco and HPE
-            $index = $sla['sla_owner'] . '.' . $index;
-        }
+        $rrd_type   = 'sla-' . $sla['sla_graph'];
+        $rrd_values = [];
 
         if (isset($cache_sla[$mib_lower][$index])) {
             $sla_state = $cache_sla[$mib_lower][$index];
 
             //echo($sla_state['rtt_value'] . 'ms at ' . format_unixtime($sla_state['rtt_unixtime']) . ', Sense code - "' . $sla_state['rtt_sense'] . '"');
 
-            $rrd_value = $sla_state['rtt_value'];
-
             // Check limits
             $rtt_count        = (int)($sla_state['rtt_success'] + $sla_state['rtt_loss']);
-            $rtt_loss_percent = float_div($sla_state['rtt_loss'], $rtt_count) * 100;
+            $rtt_loss_percent = percent($sla_state['rtt_loss'], $rtt_count, 2);
             $limit_msg        = ''; // FIXME, Later use 'rtt_reason' state entry
             if ($sla_state['rtt_event'] === 'ok' || $sla_state['rtt_event'] === 'warning') {
                 if (is_numeric($sla_state['rtt_value']) && is_numeric($sla['sla_limit_high'])) {
@@ -104,8 +95,7 @@ foreach (array_keys($sla_db) as $mib_lower) {
                 ($sla['rtt_event'] != $sla_state['rtt_event'])) {
                 // SLA sense changed, log and set rtt_last_change
                 $sla_state['rtt_last_change'] = $sla_polled_time;
-                if ($sla['rtt_sense']) // Log only if old sense not empty
-                {
+                if ($sla['rtt_sense']) { // Log only if old sense not empty
                     log_event('SLA changed: [#' . $index . ', ' . $sla['sla_tag'] . '] ' . $sla['rtt_event'] . ' -> ' . $sla_state['rtt_event'] . ' (value: ' . $sla_state['rtt_value'] . 'ms, event: ' . $sla_state['rtt_sense'] . $limit_msg . ')', $device, 'sla', $sla['sla_id'], 'warning');
                 }
             } else {
@@ -113,34 +103,17 @@ foreach (array_keys($sla_db) as $mib_lower) {
                 $sla_state['rtt_last_change'] = $sla['rtt_last_change'];
             }
 
-            // Compatibility with old code
-            if (empty($sla['sla_graph'])) {
-                if (str_contains($sla['rtt_type'], 'jitter')) {
-                    $sla['sla_graph'] = 'jitter';
-                } else {
-                    $sla['sla_graph'] = 'echo';
-                }
-            }
-
-            switch ($sla['sla_graph']) {
-                case 'jitter':
-                    $rrd_filename = 'sla_jitter-' . $rrd_index . '.rrd';
-                    $rrd_ds       .= ' DS:rtt_minimum:GAUGE:600:0:300000 DS:rtt_maximum:GAUGE:600:0:300000 DS:rtt_success:GAUGE:600:0:300000 DS:rtt_loss:GAUGE:600:0:300000';
-                    if (is_numeric($sla_state['rtt_success'])) {
-                        $rrd_value .= ':' . $sla_state['rtt_minimum'] . ':' . $sla_state['rtt_maximum'] . ':' . $sla_state['rtt_success'] . ':' . $sla_state['rtt_loss'];
-                    } else {
-                        $rrd_value .= ':U:U:U:U';
-                    }
-                    //var_dump($rrd_ds);
-                    //$graphs['sla-'.$sla['rtt_type']] = TRUE;
-                    break;
-                case 'echo':
-                default:
-                    //$graphs['sla'] = TRUE;
+            $rrd_values['rtt'] = $sla_state['rtt_value'];
+            // Jitter extra rtt values
+            if ($sla['sla_graph'] === 'jitter') {
+                $rrd_values['rtt_minimum'] = $sla_state['rtt_minimum'];
+                $rrd_values['rtt_maximum'] = $sla_state['rtt_maximum'];
+                $rrd_values['rtt_success'] = $sla_state['rtt_success'];
+                $rrd_values['rtt_loss']    = $sla_state['rtt_loss'];
             }
 
             // Update SQL State
-            dbUpdate($sla_state, 'slas', '`sla_id` = ?', [$sla['sla_id']]);
+            dbUpdate($sla_state, 'slas', '`sla_id` = ?', [ $sla['sla_id'] ]);
 
             // Check alerts
             $metrics                     = [];
@@ -172,13 +145,9 @@ foreach (array_keys($sla_db) as $mib_lower) {
 
         } else {
             echo('NaN');
-            $rrd_value = 'U';
         }
 
-        rrdtool_create($device, $rrd_filename, $rrd_ds);
-        rrdtool_update($device, $rrd_filename, 'N:' . $rrd_value);
-
-        unset($rrd_ds, $rrd_value, $rrd_filename);
+        rrdtool_update_ng($device, $rrd_type, $rrd_values, get_sla_rrd_index($sla));
     }
 }
 

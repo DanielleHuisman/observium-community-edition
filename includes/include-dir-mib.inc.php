@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     common
+ * @package    observium
+ * @subpackage common
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -38,7 +38,7 @@ foreach (get_device_mibs_permitted($device, $include_order) as $mib) {
         }
         if ($inc_status !== FALSE) {
             // MIB timing only for valid includes
-            $include_stats[$mib] = microtime(TRUE) - $inc_start;
+            $include_stats[$mib] = elapsed_time($inc_start);
         }
 
     } elseif (is_dir($inc_dir)) {
@@ -59,7 +59,7 @@ foreach (get_device_mibs_permitted($device, $include_order) as $mib) {
             // separated functions include, for exclude fatal redeclare errors
             include_once($inc_dir . '.lib.php');
         }
-        $include_stats[$mib] += microtime(TRUE) - $inc_start; // MIB timing
+        $include_stats[$mib] += elapsed_time($inc_start); // MIB timing
 
     }
 }

@@ -1,0 +1,1667 @@
+
+--------------------------------------------------------------------------
+-- File Name : ZTE-AN-EVENT-MIB.mib
+-- Date      : 2006-09-05
+-- Author    : ZTE Nms dept.
+
+--
+-- Zte Event Mib for Access Node
+-- 
+-- 
+--------------------------------------------------------------------------
+
+
+ZTE-AN-EVNET-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32, 
+        Unsigned32, IpAddress, NOTIFICATION-TYPE    FROM SNMPv2-SMI
+        enterprises                                 FROM SNMPv2-SMI
+        RowStatus,DisplayString,TEXTUAL-CONVENTION,TruthValue   FROM SNMPv2-TC
+        InetAddressType     FROM INET-ADDRESS-MIB
+        InetAddress         FROM INET-ADDRESS-MIB;
+
+
+    zxAnEventMib MODULE-IDENTITY
+        LAST-UPDATED "201001201200Z"
+        ORGANIZATION "ZTE Corporation"
+        CONTACT-INFO "ZTE NMS dept. 
+                      Su Chunshan   68896292,
+                      Zeng Nanxi    68896250
+                      Chen Cheng     "
+        DESCRIPTION  "This MIB defines managed objects of zte event mgmt . "
+        REVISION     "201001201200Z"
+        DESCRIPTION  "Add alarm management features to comply with  ZTE alarm R&D 
+                                specification. "
+         ::= {zxAn 190}
+         
+    zte OBJECT IDENTIFIER ::= { enterprises 3902 }
+    zxAn OBJECT IDENTIFIER ::= { zte 1015 } 
+         
+    zxAnEventSysObjects         OBJECT IDENTIFIER  ::= {zxAnEventMib 1}
+    zxAnEventConfirmObjects     OBJECT IDENTIFIER  ::= {zxAnEventMib 2}
+    zxAnEventSynchObjects       OBJECT IDENTIFIER  ::= {zxAnEventMib 3}
+    zxAnEventConfObjects        OBJECT IDENTIFIER  ::= {zxAnEventMib 4}
+    zxAnEventRecieverObjects    OBJECT IDENTIFIER  ::= {zxAnEventMib 5}
+    zxAnEventTrapObjects        OBJECT IDENTIFIER  ::= {zxAnEventMib 6}
+    zxAnEventSyslogObjects      OBJECT IDENTIFIER  ::= {zxAnEventMib 7}
+    zxAnEventDefineObjects      OBJECT IDENTIFIER  ::= {zxAnEventMib 8}
+    zxAnEventReportingObjects   OBJECT IDENTIFIER  ::= {zxAnEventMib 9}    
+    
+    zxAnEventReportCtrlObjects      OBJECT IDENTIFIER  ::= {zxAnEventReportingObjects 2}
+
+--------------------------------------------------------------------------------
+-- Following objects are defined.
+-- 1.Event System Mgmt
+-- 2.Event Confirm
+-- 3.Event Synchronization
+-- 4.Event Configuration
+-- 5.Event Reciever
+-- 6.Trap
+-- 7.Event Definition
+-- 8.Event Reporting Control Objects
+--------------------------------------------------------------------------------
+
+-- Textual Conventions
+
+ -- ResourceId is intended to be a general textual convention
+ -- that can be used outside of the set of MIBs related to
+ -- Alarm Management.
+ResourceId ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+            "A unique identifier for this resource.
+
+            The type of the resource can be determined by looking
+            at the OID that describes the resource.
+
+            Resources must be identified in a consistent manner.
+            For example, if this resource is an interface, this
+            object MUST point to an ifIndex and if this resource
+            is a physical entity [RFC2737], then this MUST point
+            to an entPhysicalDescr, given that entPhysicalIndex
+            is not accessible.  In general, the value is the
+            name of the instance of the first accessible columnar
+            object in the conceptual row of a table that is
+            meaningful for this resource type, which SHOULD
+            be defined in an IETF standard MIB."
+    SYNTAX         OBJECT IDENTIFIER
+    
+
+
+
+------------------------------------------------------------------------------
+-- 1.Event System Mgmt
+------------------------------------------------------------------------------
+
+    zxAnEventCurrentEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to indicate the current EventId.
+            When the agent start,this object is 0 and the agent should send a
+            trap to manager to request which eventId should be used by this 
+            agent.After time out,the agent begin to use it to manage the event."
+
+        DEFVAL { 0 }
+        ::= { zxAnEventSysObjects 1 }
+
+    zxAnEventNmsHelloTrapMgmt  OBJECT IDENTIFIER  ::= { zxAnEventSysObjects 2 }
+
+    zxAnEventNmsHelloTrapEnable OBJECT-TYPE
+        SYNTAX INTEGER
+            {
+                enable(1),
+                disable(2)
+            }                
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Enable or disable the sending Hello Trap to NMS server.
+            When it is enabled,the agent should send Hello Trap to NMS server 
+            anytime and its period of sending is zxAnEventNmsHelloTrapInterval."
+        DEFVAL { disable }
+        ::= { zxAnEventNmsHelloTrapMgmt 1 }
+
+    zxAnEventNmsHelloTrapInterval OBJECT-TYPE
+        SYNTAX      Integer32(1..600)
+        UNITS       "second" 
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Interval of sending Hello Trap to NMS server."
+        DEFVAL { 120 }
+        ::= { zxAnEventNmsHelloTrapMgmt 2 }
+
+    zxAnEventCapabilities OBJECT-TYPE 
+        SYNTAX BITS {
+            snmpOperType(0),
+            reserved(1),
+            receiverPort(2),
+            securityLevel(3)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The syslog management capabilities of this equipment. 
+             The bit value 1 means the function represented by this bit is 
+             supported.  
+             reserved(1): before October 2012, value 1 means support 
+                 zxAnEventReceiverSecurityLevel and the SYNTAX of 
+                 zxAnEventReceiverIndex is DisplayString(SIZE(1..32)).
+             receiverPort(2): value 1 means support zxAnEventReceiverPort.
+             securityLevel(3): value 1 means support 
+                zxAnEventReceiverSecurityLevel."
+        ::=  {  zxAnEventSysObjects  3  }
+        
+    zxAnEventSendingLimit OBJECT-TYPE 
+        SYNTAX       INTEGER(0..50)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION       
+            "Limit the number of sending event per second.             
+             Value 0 means no limit.
+             
+             This object is used to prevent sending too many events to NMS at 
+             the same time. 
+            "
+        ::=  {  zxAnEventSysObjects 4 }
+        
+    zxAnEventMaskEnable OBJECT-TYPE 
+        SYNTAX       INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION       
+            "Enables or disables to mask all events."
+        ::=  {  zxAnEventSysObjects 5 }
+    
+------------------------------------------------------------------------------
+--  2.Event Confirm
+------------------------------------------------------------------------------
+
+-- IMPORTANT!! 
+-- The mechanism of trap confirmation
+------------------------------------------------------------------------------
+-- The trap confirmation is often needed when the trap is a important 
+-- event.And this function will avoid the defect of a trap because SNMP trap is
+-- based on UDP and has no confirmation, that is,a agent broadcasts a tarp and 
+-- dosen't care if a target manager has recieved this trap.
+-- 
+-- This mib defines the mechanism of trap confirmation to enforce 
+-- the reliability of trap recieving.
+-- 
+--   1.The main skill in this mechanism is that the trap community is used to 
+--     bring information about confirmation.
+--   2.The information in a trap community includes the real community,
+--     eventId of this trap and the key word to indiacte if this trap need 
+--     confirmation 
+--   3.The syntax of information in a trap community is as following.
+--    real community + '@eventId='+ eventId + '@level=' + eventLevel + '@confirm' + '@timestamp'
+-- 
+--     The community is divided into some fields by symbol '@'.Thesefields are
+-- 
+--       real community    :the actual community in this trap
+--       eventId           :the event Id of this trap,it's a index of a event.
+--                          The value style is a name-value pair,such as 
+--                          "eventId=145"
+--       event level       :the event level of this trap,it's a  dispaly string 
+--                          and the available values are:
+--                             critical,
+--                             major,
+--                             minor,
+--                             warning,
+--                             indeterminate,
+--                             cleared,
+--                             notification
+--
+--                          The value style is a name-value pair,such as 
+--                          "level=cleared"
+--       confirm           :If this field exist,this trap should be  confirmed by
+--                          a manager.
+--                          The value style is a key word,such as "confirm"
+-- 
+--       timestamp          :the occurrence time of this trap,it's  format year(xxxx) + month(xx) + date(xx) 
+--                           + hour(xx) + minute(xx) + second(xx), the timestamp string's length is 14,the 
+--                            range of field is: year:[2000, 2130];month:[1,12];date:[1,31];hour:[0,23];
+--                            minute:[0,59];second:[0,59]
+--                          for  example: 20080111010159
+-- 
+--     Examples of a trap community,  
+--         1) a trap community with confirmation
+--           public@eventId=1022@level=critical@confirm@20081124151349
+-- 
+--         2) a trap community without confirmation
+--           public@eventId=1022@level=critical@20080124151309 
+-- 
+-- 
+-- 
+--    4.The procedures of trap sending and confirming
+-- 
+--         1) The agent sends a trap with community including key word "confirm".
+--            And begin to wait for the manager's confirmation.
+--         2) The manager recieves this trap and anaylizes its community.If the 
+--            key word "confirm" is found,the manager get eventId and event 
+--            level from this community.
+--         3) The manager sets eventId to agent's zxAnEventConfirmEventId if 
+--            event level isn't "cleared".
+--         4) The manager sets eventId to agent's zxAnEventConfirmClearedEventId
+--            if  event level is "cleared".
+--         5) When zxAnEventConfirmEventId or zxAnEventConfirmClearedEventId is 
+--            set,the agent should take this event as confirmed event and finishes
+--            the waiting process for confirmation.
+--         6) If the agent dosen't recieved the confirmation after firt time out,
+--            then go to procedure 1) until retry times is reached.
+--         7) After above procedures,the process of trap sending and confirming 
+--            is over.
+--
+------------------------------------------------------------------------------
+
+    zxAnEventConfirmEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The non cleard Event Id to be confirmed by a snmp manager.
+            When a manager recieve a trap with confirmation information,
+            then the manager should set this mib object to inform the agent
+            that this manager has got this event.And then the agent should 
+            remove this event from a unconfirmed event queue."
+        ::= { zxAnEventConfirmObjects 1 }
+
+
+    zxAnEventConfirmClearedEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The cleard Event Id to be confirmed by a snmp manager.
+            When a manager recieve a trap with confirmation information,
+            then the manager should set this mib object to inform the agent
+            that this manager has got this event.And then the agent should 
+            remove this event from a unconfirmed event queue."
+        ::= { zxAnEventConfirmObjects 2 }
+        
+    zxAnEventConfirmTimeout    OBJECT-TYPE 
+        SYNTAX       INTEGER(5..1800)
+        UNITS        "seconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION       
+            "Specifies the time-out value, in seconds, for an event to be
+             confirmed."
+        DEFVAL { 180 }
+        ::= { zxAnEventConfirmObjects 3 }
+    
+    zxAnEventResendingTimes OBJECT-TYPE 
+        SYNTAX       INTEGER(0..10)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION       
+            "The resending event times when device does not receive the event 
+             confirm message from the snmp manager."
+        DEFVAL { 0 }
+        ::= { zxAnEventConfirmObjects 4 }
+
+------------------------------------------------------------------------------
+--  3.Event Synchronization  
+------------------------------------------------------------------------------
+
+    zxAnEventSyncUnconfirmedEvents OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to excute a process to report the unconfirmed events 
+            again.
+            When this object is set,the agent should resend traps of these 
+            unconfirmed events.And these traps still need to be confirmed by 
+            a manager."
+        ::= { zxAnEventSynchObjects 1 }
+
+
+    zxAnEventSyncSpecificEvents OBJECT-TYPE
+        SYNTAX      OBJECT IDENTIFIER
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to excute a process to report the specific events 
+            again.
+            This object is like a style of OID.And each number of OID is the 
+            eventId.
+            When this object is set,the agent should resend traps of these 
+            eventId.And these traps still need to be confirmed by a manager."
+        ::= { zxAnEventSynchObjects 2 }
+
+
+
+    zxAnEventSyncNextEventIdList OBJECT-TYPE
+        SYNTAX      OBJECT IDENTIFIER
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The next EventIdList is used to synchronize events by a manager.
+            Before the synchronization,a manager will get all the eventId via 
+            this mib object,and then to judge which event has not been in 
+            manager's database so as to tell the agent to resend the missing 
+            events.
+            "
+        ::= { zxAnEventSynchObjects 3 }
+        
+    zxAnEventSyncStartEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to tell an agent which EventId should be began with 
+            when a manager get zxAnEventNextEventIdList.
+            
+            If it is 0,zxAnEventNextEventIdList should begin with the first event.
+            "
+        ::= { zxAnEventSynchObjects 4 }
+
+--------------------------------------------------------------------------------
+-- 4.Event Configuration
+--------------------------------------------------------------------------------
+    zxAnEventConfTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF ZxAnEventConfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of trap destination entries."
+        ::= { zxAnEventConfObjects 1 }
+
+    zxAnEventConfEntry OBJECT-TYPE
+        SYNTAX      ZxAnEventConfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This entry includes a destination IP address to which traps are 
+            sent for this community."
+        INDEX { zxAnEventConfTrapOid }
+        ::= { zxAnEventConfTable 1 }
+
+    ZxAnEventConfEntry ::= SEQUENCE {
+        zxAnEventConfTrapOid            OBJECT IDENTIFIER,
+        zxAnEventName                   DisplayString,
+        zxAnEventConfSeverityLevel      INTEGER
+    }
+
+    zxAnEventConfTrapOid  OBJECT-TYPE
+        SYNTAX      OBJECT IDENTIFIER
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Event trap oid."
+        ::= { zxAnEventConfEntry 1 }
+
+
+    zxAnEventName  OBJECT-TYPE
+        SYNTAX      DisplayString(SIZE(0..32))
+        MAX-ACCESS  read-only
+        STATUS current
+        DESCRIPTION
+            "The name of an event."
+        ::= { zxAnEventConfEntry 2 }
+
+
+    zxAnEventConfSeverityLevel  OBJECT-TYPE
+        SYNTAX      INTEGER{
+                     critical(0),
+                     major(1),
+                     minor(2),
+                     warning(3),
+                     indeterminate(4)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Severity Level of an event."
+        ::= { zxAnEventConfEntry 3 }
+
+    zxAnEventDeleteEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The non cleard Event Id to be deleted by a snmp manager.
+            The agent should remove this event from event queue.
+            The trap deleting is often needed when the trap is unable 
+            to be cleared in NE agent.This mib defines the mechanism 
+            of trap deleting to enforce the removal of dirty trap.
+            "
+        ::= { zxAnEventConfObjects 2 }
+
+    zxAnEventCtrlProfileTable    OBJECT-TYPE
+        SYNTAX     SEQUENCE OF ZxAnEventCtrlProfileEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event control profile table.
+             When an event is added to profile, interface that the profile 
+             is applied to will enable the event.
+            "
+        ::= { zxAnEventConfObjects 3 }
+
+    zxAnEventCtrlProfileEntry OBJECT-TYPE
+        SYNTAX     ZxAnEventCtrlProfileEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event control profile table entry."
+        INDEX 
+            { 
+                zxAnEventCtrlProfileName,
+                zxAnEventCode,
+                zxAnEventReportChannelType
+            }
+        ::= { zxAnEventCtrlProfileTable 1 }        
+    
+    ZxAnEventCtrlProfileEntry ::= SEQUENCE {
+        zxAnEventCtrlProfileName         DisplayString,
+        zxAnEventCode                    Integer32,
+        zxAnEventReportChannelType       INTEGER,
+        zxAnEventCtrlProfileRowStatus    RowStatus
+    }
+    
+    zxAnEventCtrlProfileName  OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event control profile name."
+        ::= { zxAnEventCtrlProfileEntry 1 }
+        
+    zxAnEventCode  OBJECT-TYPE
+        SYNTAX     Integer32
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event code."
+        ::= { zxAnEventCtrlProfileEntry 2 }
+        
+    zxAnEventReportChannelType  OBJECT-TYPE
+        SYNTAX     INTEGER
+            {
+                snmp(1),
+                extendedOam(2),
+                omci(3)
+            }
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event report channel type."
+        ::= { zxAnEventCtrlProfileEntry 3 }
+
+    zxAnEventCtrlProfileRowStatus  OBJECT-TYPE
+        SYNTAX     RowStatus        
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "The row status of this entry."
+        ::= { zxAnEventCtrlProfileEntry 50 }
+        
+    zxAnEventIfCfgTable    OBJECT-TYPE
+        SYNTAX     SEQUENCE OF ZxAnEventIfCfgEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Interface event configuration table."
+        ::= { zxAnEventConfObjects 4 }
+
+    zxAnEventIfCfgEntry OBJECT-TYPE
+        SYNTAX     ZxAnEventIfCfgEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Interface event configuration table entry."
+        INDEX 
+            { 
+                zxAnEventIfCfgRack, 
+                zxAnEventIfCfgShelf,
+                zxAnEventIfCfgSlot, 
+                zxAnEventIfCfgPort,
+                zxAnEventIfCfgOnu, 
+                zxAnEventIfCfgIfType,
+                zxAnEventIfCfgLogicalId
+            }
+        ::= { zxAnEventIfCfgTable 1 }
+        
+    ZxAnEventIfCfgEntry ::= SEQUENCE {
+        zxAnEventIfCfgRack                Integer32,
+        zxAnEventIfCfgShelf               Integer32,
+        zxAnEventIfCfgSlot                Integer32, 
+        zxAnEventIfCfgPort                Integer32,
+        zxAnEventIfCfgOnu                 Integer32, 
+        zxAnEventIfCfgIfType              INTEGER,
+        zxAnEventIfCfgLogicalId           OBJECT IDENTIFIER,
+        zxAnEventIfCfgMaskEnable          INTEGER,
+        zxAnEventIfCfgProfileName         DisplayString,
+        zxAnEventIfCfgRowStatus           RowStatus
+    }
+    
+    zxAnEventIfCfgRack  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Rack No. of the interface."
+        ::= { zxAnEventIfCfgEntry 1 }
+        
+    zxAnEventIfCfgShelf  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Shelf No. of the interface."
+        ::= { zxAnEventIfCfgEntry 2 }
+        
+    zxAnEventIfCfgSlot  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Slot No. of the interface."
+        ::= { zxAnEventIfCfgEntry 3 }
+        
+    zxAnEventIfCfgPort  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Physical port No. of the interface."
+        ::= { zxAnEventIfCfgEntry 4 }
+        
+    zxAnEventIfCfgOnu  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The ONU number. It is 0 in DSL port."
+        ::= { zxAnEventIfCfgEntry 5 }
+        
+    zxAnEventIfCfgIfType  OBJECT-TYPE
+        SYNTAX      INTEGER 
+        {    
+            physicalPort(1),
+            bridgePort(2),
+            ponOnu(3),
+            ponVPort(4),
+            onuUni(5),
+            servicePort(11),
+            vlan(12),
+            card(255)
+        }
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Type of the interface."
+        ::= { zxAnEventIfCfgEntry 6 }    
+        
+    zxAnEventIfCfgLogicalId OBJECT-TYPE 
+        SYNTAX      OBJECT IDENTIFIER
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION   
+            "Logic index of the interface.
+            
+            If zxAnEventConfIfType is 'physicalPort', its value is 0.
+            
+            If zxAnEventConfIfType is 'bridgePort', this object
+            indicates 'pvc', such as oid '1' indicates 'PVC1'.
+            
+            If zxAnEventConfIfType is 'ponOnu', its value is 0.
+            
+            If zxAnEventConfIfType is 'ponVPort', this object
+            indicates 'ponVPort', such as oid '1' indicates 'PortVPort1'.
+            
+            If zxAnEventConfIfType is 'onuUni', this object
+            indicates 'onuSlot.uniId', this type is used for SFUs only.
+            If the ONU slot is not cared about, the onuSlot is 0,
+            such as oid '0.1' indicates 'ONUSlot0.UNIID1'.
+            
+            If zxAnEventConfIfType is 'servicePort', this object
+            indicates 'servicePort', such as oid '1' indicates 'ServicePort1'.
+            
+            If zxAnEventConfIfType is 'vlan', this object indicates
+            'vlanId | svlanId.cvlanId', such as oid '1' indicates 'VLANID1',
+            oid '1.2' indicates 'SVLANID1.CVLANID2'.
+            
+            If zxAnEventConfIfType is 'card', zxAnEventConfPort,
+            zxAnEventConfOnu and zxAnEventConfLogicalId are 0.
+            "
+        ::= { zxAnEventIfCfgEntry 7 }
+    
+    zxAnEventIfCfgMaskEnable OBJECT-TYPE 
+        SYNTAX      INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION   
+            "Enables or disables to mask a specified event for interface."
+        ::= { zxAnEventIfCfgEntry 8 }
+    
+    zxAnEventIfCfgProfileName  OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "Interface event control profile name.
+             When an event control profile is applied to the interface, the 
+             events added to the event control profile will be enabled for the 
+             interface.
+            "
+        ::= { zxAnEventIfCfgEntry 9 }
+        
+    zxAnEventIfCfgRowStatus  OBJECT-TYPE
+        SYNTAX     RowStatus
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "The row status of this entry."
+        ::= { zxAnEventIfCfgEntry 50 }
+    
+    zxAnEventVlanCfgTable    OBJECT-TYPE
+        SYNTAX     SEQUENCE OF ZxAnEventVlanCfgEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "VLAN event configuration table."
+        ::= { zxAnEventConfObjects 5 }
+
+    zxAnEventVlanCfgEntry OBJECT-TYPE
+        SYNTAX     ZxAnEventVlanCfgEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "VLAN event configuration table entry."
+        INDEX 
+            { 
+                zxAnEventVlanCfgVlanId
+            }
+        ::= { zxAnEventVlanCfgTable 1 }
+        
+    ZxAnEventVlanCfgEntry ::= SEQUENCE {
+        zxAnEventVlanCfgVlanId           Integer32,
+        zxAnEventVlanCfgMaskEnable       INTEGER,
+        zxAnEventVlanCfgProfileName      DisplayString,
+        zxAnEventVlanCfgRowStatus        RowStatus
+    }
+    
+    zxAnEventVlanCfgVlanId   OBJECT-TYPE     
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION 
+            " VLAN ID."
+        ::= { zxAnEventVlanCfgEntry 1 }
+    
+    zxAnEventVlanCfgMaskEnable OBJECT-TYPE 
+        SYNTAX      INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION   
+            "Enables or disables to mask a specified event for VLAN ID."
+        ::= { zxAnEventVlanCfgEntry 2 }
+    
+    zxAnEventVlanCfgProfileName  OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "VLAN event control profile name.
+             When an event control profile is applied to the VLAN ID, the 
+             events added to the event control profile will be enabled for
+             the VLAN ID.
+            "
+        ::= { zxAnEventVlanCfgEntry 3 }
+        
+    zxAnEventVlanCfgRowStatus  OBJECT-TYPE
+        SYNTAX     RowStatus
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "The row status of this entry."
+        ::= { zxAnEventVlanCfgEntry 50 } 
+
+--------------------------------------------------------------------------------
+-- 5.Event Reciever
+--------------------------------------------------------------------------------
+
+    zxAnEventRecieverTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnEventRecieverEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of trap destination entries."
+        ::= { zxAnEventRecieverObjects 1 }
+
+    zxAnEventRecieverEntry OBJECT-TYPE
+        SYNTAX ZxAnEventRecieverEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "This entry includes a destination IP address to which traps are 
+            sent for this community."
+        INDEX { zxAnEventReceiverIndex }
+        ::= { zxAnEventRecieverTable 1 }
+
+    ZxAnEventRecieverEntry ::= SEQUENCE {
+        zxAnEventReceiverIndex          Integer32,
+        zxAnEventReceiverIpAddr         IpAddress,
+        zxAnEventReceiverSnmpVer        INTEGER,
+        zxAnEventReceiverCommunity      DisplayString,
+        zxAnEventReceiverEventFormat    INTEGER,
+        zxAnEventReceiverEventType      BITS,
+        zxAnEventReceiverMinEventLevel  INTEGER,
+        zxAnEventReceiverEnable         INTEGER,
+        zxAnEventReceiverIsZteNmsSever  TruthValue,
+        zxAnEventReceiverSecurityLevel  INTEGER,
+        zxAnEventReceiverPort           Integer32,
+        zxAnEventReceiverRowStatus      RowStatus
+    }
+
+    zxAnEventReceiverIndex  OBJECT-TYPE
+        SYNTAX Integer32(1..8)
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "The index of a reciever. "
+        ::= { zxAnEventRecieverEntry 1 }
+
+    zxAnEventReceiverIpAddr  OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The destination address for traps on behalf of this entry."
+        ::= { zxAnEventRecieverEntry 2 }
+
+    zxAnEventReceiverSnmpVer  OBJECT-TYPE
+        SYNTAX  INTEGER 
+            {
+                  snmpV1(1),
+                  snmpV2c(2),
+                  snmpV3(3)
+                }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "It is the snmp version which a reciever expects."
+        DEFVAL { snmpV2c }
+        ::= { zxAnEventRecieverEntry 3 }
+
+    zxAnEventReceiverCommunity  OBJECT-TYPE
+        SYNTAX DisplayString(SIZE(0..30))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The community that a reciever expects."
+        ::= { zxAnEventRecieverEntry 4 }
+
+    zxAnEventReceiverEventFormat  OBJECT-TYPE
+        SYNTAX  INTEGER
+            {
+                snmpTrap(1),
+                snmpInform(2), -- not support now. used in snmpV2&V3 only
+                snmpTrapForPccw(3)
+            }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "It is the event format which a reciever expects.
+            Trap is a event sent to manager and no confirm is needed.
+            But inform need the confirm from a manager.
+            The value of snmpTrapForPccw(3) is only supported
+            by PCCW MSAG5200V3."
+        DEFVAL { snmpTrap }            
+        ::= { zxAnEventRecieverEntry 5 }
+
+    zxAnEventReceiverEventType  OBJECT-TYPE
+        SYNTAX BITS {
+                     equipmentEvent(0),
+                     qualityOfServiceEvent(1),
+                     communicationsEvent(2),
+                     environmentEvent(3),
+                     processingErrorEvent(4)
+                    }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The event type that a reciever expects.
+             
+            The event type are defined in ITU-T X.733.
+            
+            -  equipment event type: 
+                An event of this type is principally 
+            associated with an equipment fault;
+             
+            -  quality of service event type: 
+                An event of this type is
+             principally associated with a degradation in the quality of a service;
+             
+            -  communications event type: 
+                An event of this type is principally
+             associated with the procedures and/or processes required to convey 
+             information from one point to another;
+            
+            -  environmental event type:
+                An event of this type is principally 
+            associated with a condition relating to an enclosure in which the 
+            equipment resides.
+
+            -  processing error event type: 
+                An event of this type is 
+            principally associated with a software or processing fault;
+            "
+        DEFVAL { { equipmentEvent,qualityOfServiceEvent,communicationsEvent,
+                environmentEvent,processingErrorEvent  } }
+        ::= { zxAnEventRecieverEntry 6 }
+
+    zxAnEventReceiverMinEventLevel  OBJECT-TYPE
+        SYNTAX INTEGER {
+                     critical(0),
+                     major(1),
+                     minor(2),
+                     warning(3),
+                     indeterminate(4),
+                     cleared(5),
+                     notification(6)
+                    }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The min event level that a reciever expects.If the actual event 
+            level is more serious then this value,the event will be sent to 
+            Event Reciever. For example,if this value is cleared(5),all the 
+            events that the level in critical(0),major(1),minor(2),warning(3),
+            indeterminate(4) and cleared(5) will be sent,but notification will 
+            not be sent.
+            
+            The event levels are defined in ITU-T X.733.
+            
+           -  critical: The Critical severity level indicates that a service 
+             affecting condition has occurred and an immediate corrective action
+             is required.  Such a severity can be reported, for example, when 
+             a managed object becomes totally out of service and its capability 
+             must be restored. 
+             
+           -   major: The Major severity level indicates that a service 
+            affecting condition has developed and an urgent corrective action 
+            is required.  Such a severity can be reported, for example, when 
+            there is a severe degradation in the capability of the managed 
+            object and its full capability must be restored. 
+            
+           -   minor: The Minor severity level indicates the existence of 
+            a non-service affecting fault condition and that corrective action 
+            should be taken in order to prevent a more serious (for example, 
+            service affecting) fault. Such a severity can be reported, 
+            for example, when the detected alarm condition is not currently 
+            degrading the capacity of the managed object. 
+            
+           -   warning: The Warning severity level indicates the detection of 
+            a potential or impending service affecting fault, before any 
+            significant effects have been felt. Action should be taken to 
+            further diagnose (if necessary) and correct the problem in order 
+            to prevent it from becoming a more serious service affecting fault.
+            
+           -   cleared: The Cleared severity level indicates the clearing of 
+            one or more previously reported alarms. This alarm clears all 
+            alarms for this managed object that have the same Alarm type,
+            Probable cause and Specific problems (if given).  
+            Multiple associated notifications may be cleared by using 
+            the Correlated notifications parameter (defined below).
+            This Recommendation | International Standard does not require that
+            the clearing of previously reported alarms be reported.  
+            Therefore, a managing system cannot assume that the absence of
+            an alarm with the Cleared severity level means that the condition
+            that caused the generation of previous alarms is still present.  
+               Managed object definers shall state if, and under which 
+            conditions, the Cleared severity level is used.
+               
+            -  indeterminate: The Indeterminate severity level indicates that 
+            the severity level cannot be determined. 
+
+
+            -  notification: The notification severity level indicates that 
+            only a infomation to be report and it is either a fault or 
+            a potential fault. 
+
+            "
+        DEFVAL { notification }
+        ::= { zxAnEventRecieverEntry 7 }
+            
+
+    zxAnEventReceiverEnable  OBJECT-TYPE
+        SYNTAX INTEGER
+            {
+                enable(1),
+                disable(2)
+            }                
+                
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Enable or disable a reciever to recieve the event."
+        DEFVAL { enable }
+        ::= { zxAnEventRecieverEntry 8 }
+
+    zxAnEventReceiverIsZteNmsSever  OBJECT-TYPE
+        SYNTAX  TruthValue 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "If or not it is a zte's nms.
+            true(1): it is a zte's nms;
+            false(2): it is not a zte's nms.
+            "
+        ::= { zxAnEventRecieverEntry 9 }
+
+    zxAnEventReceiverSecurityLevel OBJECT-TYPE
+        SYNTAX  INTEGER { noAuthNoPriv(1),
+                          authNoPriv(2),
+                          authPriv(3)
+                         }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION  
+            "A level of security at which SNMP messages can be
+             sent or with which operations are being processed;
+             in particular, one of:
+             noAuthNoPriv - without authentication and without privacy,
+             authNoPriv   - with authentication but without privacy,
+             authPriv     - with authentication and with privacy.
+             These three values are ordered such that
+             noAuthNoPriv is less than authNoPriv and
+             authNoPriv is less than authPriv.
+             "
+       ::= { zxAnEventRecieverEntry 10 }
+       
+    zxAnEventReceiverPort OBJECT-TYPE
+        SYNTAX      Integer32(1..65535) 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION  
+            "The port number of the event receiver."
+        DEFVAL  { 162 }
+        ::= { zxAnEventRecieverEntry 11 }
+
+    zxAnEventReceiverRowStatus  OBJECT-TYPE
+        SYNTAX RowStatus 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "This entry's row status."
+        ::= { zxAnEventRecieverEntry 15 }
+
+    zxAnEventSyslogTable  OBJECT-TYPE
+        SYNTAX      SEQUENCE  OF  ZxAnEventSyslogEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "syslog host config table."
+        ::=  { zxAnEventSyslogObjects  1 }
+
+    zxAnEventSyslogEntry  OBJECT-TYPE
+        SYNTAX      ZxAnEventSyslogEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in zxAnEventSyslogTable."
+        INDEX       {  zxAnEventSyslogSvrIpAddr  }
+        ::=  { zxAnEventSyslogTable 1 }
+
+    ZxAnEventSyslogEntry  ::=  SEQUENCE {
+        zxAnEventSyslogSvrIpAddr       IpAddress,
+        zxAnEventSyslogSvrPort         Integer32,    
+        zxAnEventSyslogType            BITS,
+        zxAnEventSyslogMinAlarmLevel   INTEGER,
+        zxAnEventSyslogEnable          INTEGER,
+        zxAnEventSyslogSnmpOperType    INTEGER,
+        zxAnEventSyslogRowStatus       RowStatus
+        }  
+          
+    zxAnEventSyslogSvrIpAddr  OBJECT-TYPE 
+        SYNTAX             IpAddress
+        MAX-ACCESS         not-accessible
+        STATUS             current
+        DESCRIPTION      
+             "The syslog server ip address. "
+        ::=  {  zxAnEventSyslogEntry  1  }                   
+
+    zxAnEventSyslogSvrPort  OBJECT-TYPE 
+        SYNTAX           Integer32
+        MAX-ACCESS       read-create
+        STATUS           current
+        DESCRIPTION      
+             "The syslog destination udp port. " 
+        DEFVAL { 514 }
+        ::=  {  zxAnEventSyslogEntry  2  }        
+    
+    zxAnEventSyslogType  OBJECT-TYPE 
+        SYNTAX BITS {
+                     cmdlog(0),
+                     snmplog(1),
+                     debugmsg(2),
+                     alarmlog(3)
+                    }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The syslog type that a reciever expects. "
+        DEFVAL { { cmdlog,snmplog,debugmsg,alarmlog} }
+        ::= { zxAnEventSyslogEntry 3 }       
+
+    zxAnEventSyslogMinAlarmLevel  OBJECT-TYPE 
+        SYNTAX           INTEGER{
+            major(1),
+            minor(2),
+            warning(3),
+            indeterminate(4),
+            cleared(5),
+            notification(6)
+        }
+        MAX-ACCESS       read-create
+        STATUS           current
+        DESCRIPTION      
+            "Enable/Disable the snmp log in syslog. " 
+        DEFVAL { notification }
+        ::=  {  zxAnEventSyslogEntry  4  }        
+
+    zxAnEventSyslogEnable  OBJECT-TYPE 
+        SYNTAX           INTEGER{
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS       read-create
+        STATUS           current
+        DESCRIPTION      
+            "Enable/Disable the syslog config. " 
+        DEFVAL { enable }
+        ::=  {  zxAnEventSyslogEntry  5  }        
+        
+    zxAnEventSyslogSnmpOperType  OBJECT-TYPE 
+        SYNTAX           INTEGER{
+            all(1),
+            get(2),
+            set(3)
+        }
+        MAX-ACCESS       read-create
+        STATUS           current
+        DESCRIPTION      
+            "For snmp, specify the operation type that the receiver expects." 
+        DEFVAL { set }
+        ::=  {  zxAnEventSyslogEntry  6  }        
+        
+
+    zxAnEventSyslogRowStatus  OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     ""
+        ::=  {  zxAnEventSyslogEntry  30  }
+
+   zxAnEventSyslogGlobalObjects OBJECT IDENTIFIER ::= {zxAnEventSyslogObjects 2}
+   
+   zxAnEventSyslogFacility  OBJECT-TYPE 
+        SYNTAX           Integer32(0..23)
+        MAX-ACCESS       read-write
+        STATUS           current
+        DESCRIPTION      
+          "The syslog message facility. The priority value of PRI is calculated 
+          by first multiplying the Facility number by 8 and then adding the 
+          numerical value of the Severity.             
+             
+            Numerical Code       Facility             
+            0              kernel messages
+            1              user-level messages
+            2              mail system
+            3              system daemons
+            4              security/authorization messages (note 1)
+            5              messages generated internally by syslogd
+            6              line printer subsystem
+            7              network news subsystem
+            8              UUCP subsystem
+            9              clock daemon (note 2)
+            10             security/authorization messages (note 1)
+            11             FTP daemon
+            12             NTP subsystem
+            13             log audit (note 1)
+            14             log alert (note 1)
+            15             clock daemon (note 2)
+            16             local use 0  (local0)
+            17             local use 1  (local1)
+            18             local use 2  (local2)
+            19             local use 3  (local3)
+            20             local use 4  (local4)
+            21             local use 5  (local5)
+            22             local use 6  (local6)
+            23             local use 7  (local7)     
+            
+            More information, please refer to rfc3164.  
+            " 
+        ::=  {  zxAnEventSyslogGlobalObjects  1  }      
+        
+    zxAnEventSyslogSeverity  OBJECT-TYPE 
+        SYNTAX           Integer32(0..7)
+        MAX-ACCESS       read-write
+        STATUS           current
+        DESCRIPTION      
+          "The syslog message severity, The priority value of PRI is calculated 
+          by first multiplying the Facility number by 8 and then adding the 
+          numerical value of the Severity.             
+                          
+           Numerical Code       Severity          
+            0             Emergency: system is unusable
+            1             Alert: action must be taken immediately
+            2             Critical: critical conditions
+            3             Error: error conditions
+            4             Warning: warning conditions
+            5             Notice: normal but significant condition
+            6             Informational: informational messages
+            7             Debug: debug-level messages    
+            
+            More information, please refer to rfc3164.  
+            " 
+        ::=  {  zxAnEventSyslogGlobalObjects  2  }    
+        
+    zxAnEventSyslogSourcePort   OBJECT-TYPE 
+        SYNTAX           Integer32(0..65535)
+        MAX-ACCESS       read-write
+        STATUS           current
+        DESCRIPTION      
+             "The syslog source udp port. "
+        ::=  {  zxAnEventSyslogGlobalObjects  3  }  
+ 
+--------------------------------------------------------------------------------
+-- 7.Event Definition
+--------------------------------------------------------------------------------
+        
+    zxAnEventDefineTable    OBJECT-TYPE
+        SYNTAX SEQUENCE OF ZxAnEventDefineEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Event definition table."
+        ::= { zxAnEventDefineObjects 2 }
+
+    zxAnEventDefineEntry OBJECT-TYPE
+        SYNTAX ZxAnEventDefineEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Event definition table entry."
+        INDEX { zxAnEventDefineCode, zxAnEventDefineReportChannelType }
+        ::= { zxAnEventDefineTable 1 }
+
+    ZxAnEventDefineEntry ::= SEQUENCE {
+        zxAnEventDefineCode              Integer32,
+        zxAnEventDefineReportChannelType INTEGER,
+        zxAnEventDefineName              DisplayString,
+        zxAnEventDefineStandardAlarmCode Integer32,
+        zxAnEventDefineEventType         BITS,
+        zxAnEventDefineAdminStatus       INTEGER,
+        zxAnEventDefineMaskEnable        INTEGER,
+        zxAnEventDefineSendingDelay      INTEGER,
+        zxAnEventDefineSendingLimit      INTEGER,
+        zxAnEventDefineReversalEnable    INTEGER
+    }
+    
+    zxAnEventDefineCode  OBJECT-TYPE
+        SYNTAX     Integer32
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event or alarm code."
+        ::= { zxAnEventDefineEntry 1 }
+        
+    zxAnEventDefineReportChannelType  OBJECT-TYPE
+        SYNTAX     INTEGER
+            {
+                snmp(1),
+                ponExtendedOam(2),
+                ponOmci(3)
+            }
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event report channel type.
+             snmp(1)           - event is reported to NMS by SNMP.
+             ponExtendedOam(2) - event is reported to NMS by EPON extend OAM.
+             ponOmci(3)        - event is reported to NMS by GPON OMIC.
+            "
+        ::= { zxAnEventDefineEntry 2 }
+        
+    zxAnEventDefineName  OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "Event name."
+        ::= { zxAnEventDefineEntry 3 }        
+    
+    zxAnEventDefineStandardAlarmCode  OBJECT-TYPE
+        SYNTAX     Integer32
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "Standard alarm code is just used by events of EPON extend OAM or
+             GPON OMCI.
+             Value 0 means SNMP trap."
+        ::= { zxAnEventDefineEntry 4 }
+        
+    zxAnEventDefineEventType  OBJECT-TYPE
+        SYNTAX BITS 
+            {
+                equipmentEvent(0),
+                qualityOfServiceEvent(1),
+                communicationsEvent(2),
+                environmentEvent(3),
+                processingErrorEvent(4)
+            }
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "The event type are defined in ITU-T X.733.
+            
+            -  equipment event type: 
+               An event of this type is principally associated with an 
+               equipment fault;
+             
+            -  quality of service event type: 
+               An event of this type is principally associated with a 
+               degradation in the quality of a service;
+             
+            -  communications event type: 
+               An event of this type is principally associated with the 
+               procedures and/or processes required to convey information 
+               from one point to another;
+            
+            -  environmental event type:
+               An event of this type is principally associated with a 
+               condition relating to an enclosure in which the equipment 
+               resides.
+
+            -  processing error event type: 
+               An event of this type is principally associated with a 
+               software or processing fault;
+            "
+        ::= { zxAnEventDefineEntry 5 }
+        
+    zxAnEventDefineAdminStatus  OBJECT-TYPE
+        SYNTAX     INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Enables or disables a specified event.
+             If disable(2), event will not be pushed into alarm pool and 
+             discarded directly.
+            "
+        ::= { zxAnEventDefineEntry 6 }
+        
+    zxAnEventDefineMaskEnable  OBJECT-TYPE
+        SYNTAX     INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Enable or disable the event mask.
+             If enable(1), event will be pushed into alarm pool, but not be 
+             reported to NMS. At the same time, a message will be sent to NMS 
+             to restore the event that has been reported.
+             
+             As disable(2), event stored in alarm pool will be reported to NMS.
+            "
+        ::= { zxAnEventDefineEntry 7 }
+        
+    zxAnEventDefineSendingDelay  OBJECT-TYPE
+        SYNTAX     INTEGER(0..1800)
+        UNITS      "seconds"
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Event sending delay.
+             Value 0 means event is sent without delay.
+             
+             This object is used to prevent that event and restoring event occur 
+             frequently in a short time.
+            "
+        DEFVAL  { 0 }
+        ::= { zxAnEventDefineEntry 8 }
+        
+    zxAnEventDefineSendingLimit  OBJECT-TYPE
+        SYNTAX     INTEGER(0..50)
+        UNITS      "seconds"
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Limit the number of specified event sending per second.
+             Value 0 means no limit.
+             
+             This object is used to prevent sending too many events to NMS at 
+             the same time.
+            "
+        DEFVAL  { 10 }
+        ::= { zxAnEventDefineEntry 9 }
+    
+    zxAnEventDefineReversalEnable  OBJECT-TYPE
+        SYNTAX     INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Enable or disable alarm reversal.
+             If enable(1), device will not report the alarm generated by an 
+             unused service or managed entity. 
+             But if the service or managed entity is not idle,then the alarming 
+             process will be normal.
+            "
+        ::= { zxAnEventDefineEntry 10 }
+   
+   
+--------------------------------------------------------------------------------
+-- 8.Event Reporting Control Objects
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Event Reporting Control Profile Table 
+--------------------------------------------------------------------------------
+    
+    zxAnEventRptCtrlProfileTable    OBJECT-TYPE
+        SYNTAX     SEQUENCE OF ZxAnEventRptCtrlProfileEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event control profile table. "
+        ::= { zxAnEventReportCtrlObjects 1 }
+
+    zxAnEventRptCtrlProfileEntry OBJECT-TYPE
+        SYNTAX     ZxAnEventRptCtrlProfileEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event reporting control profile table entry."
+        INDEX { zxAnEventRptCtrlPrfName }
+        ::= { zxAnEventRptCtrlProfileTable 1 }        
+    
+    ZxAnEventRptCtrlProfileEntry ::= SEQUENCE {
+        zxAnEventRptCtrlPrfName                 DisplayString,  
+        zxAnEventRptCtrlPrfRowStatus            RowStatus
+    }
+
+    zxAnEventRptCtrlPrfName  OBJECT-TYPE
+        SYNTAX      DisplayString(SIZE(1..32))
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Event control profile name."
+        ::= { zxAnEventRptCtrlProfileEntry 1 }
+
+
+    zxAnEventRptCtrlPrfRowStatus  OBJECT-TYPE
+        SYNTAX     RowStatus        
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "The row status of this entry.
+                        
+            The supported actions of this conceptual row only include:
+            'createAndGo' and 'destroy'.
+
+            To create a row in this table, a manager must set this object to 
+            createAndGo(4), and must comply with the multi-variables binding 
+            rule described in zxAnEventRptCtrlProfileEntry.
+    
+            To delete a row in this table, a manager must set this object to 
+            destroy(6). 
+             
+            To query this object, the agent always returns active(1)."
+        ::= { zxAnEventRptCtrlProfileEntry 50 }
+
+--------------------------------------------------------------------------------
+-- Event Reporting Control Profile Rule Table
+--------------------------------------------------------------------------------
+
+    zxAnEventRptCtrlProfileRuleTable    OBJECT-TYPE
+        SYNTAX     SEQUENCE OF ZxAnEventRptCtrlProfileRuleEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event control profile rule table. "
+        ::= { zxAnEventReportCtrlObjects 2 }
+
+    zxAnEventRptCtrlProfileRuleEntry OBJECT-TYPE
+        SYNTAX     ZxAnEventRptCtrlProfileRuleEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event reporting control profile rule table entry. 
+            
+             When a manager wants to create a control profile rule, it must 
+             comply with the multi-variables usage rule that all the mib 
+             variables related to same fuction must be in one snmp set 
+             operation, the variables have two type: mandatory and optional.
+       
+             Mandatory variables must be in the one snmp set operation.
+             Optional variables may be in the one snmp set operation with the 
+             mandatory variables, but must not be used alone.                    
+             
+             create or modify a event code's mask rule 
+             
+                - mandatory:
+                zxAnEventRptCtrlEventCode,
+                zxAnEventRptCtrlAdminStatus
+                -optional
+                none "             
+             
+        INDEX  { zxAnEventRptCtrlPrfName, zxAnEventRptCtrlPrfRuleIndex }
+        ::= { zxAnEventRptCtrlProfileRuleTable 1 }        
+    
+    ZxAnEventRptCtrlProfileRuleEntry ::= SEQUENCE {        
+        zxAnEventRptCtrlPrfRuleIndex            Integer32,
+        zxAnEventRptCtrlEventCode               Integer32,        
+        zxAnEventRptCtrlAdminStatus             INTEGER,
+        zxAnEventRptCtrlPrfRuleRowStatus        RowStatus
+    }
+
+    zxAnEventRptCtrlPrfRuleIndex  OBJECT-TYPE
+        SYNTAX      Integer32(1..32)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Event control profile rule index."
+        ::= { zxAnEventRptCtrlProfileRuleEntry 1 }
+        
+    zxAnEventRptCtrlEventCode  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Event code."
+        ::= { zxAnEventRptCtrlProfileRuleEntry 2 }
+        
+
+    zxAnEventRptCtrlAdminStatus  OBJECT-TYPE
+        SYNTAX      INTEGER { 
+            nalm(1),
+            nalmQI(2)
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Defined in M.3100 Amendment 3 [M.3100 Amd3], there are five
+             ARC states: nalm, nalmQI.
+        
+           
+                nalm:       Alarm reporting is turned off (i.e., not allowed).
+                nalmQI:     nalm - Qualified Inhibit. Alarm reporting is
+                            turned off until the managed entity is qualified
+                            problem-free for an optional persistence interval.
+                            Problem-free means that the condition corresponding
+                            to the specified alarm type is cleared.
+                       
+             nalm may transition to alm, nalmQI or nalmTI by management request.
+        
+             nalmQI may transition to nalm or alm by management request.
+        
+             Further details of ARC state transitions are defined in Figure 3
+             of M.3100 Amd3 [M.3100 Amd3].
+        
+             According to the requirements in M.3100 Amd3, a resource
+             supporting the ARC feature shall support the alm state and at
+             least one of the nalm, nalmTI, and nalmQI states. 
+                     
+             The arcState object controls the alarm reporting state of a
+             resource. Note that the state alm (alarm reporting is allowed) is
+             not listed in the enumeration of the value of this object. However,
+             this state is implicitly supported by the mib.
+             Once a resource enters the normal reporting mode (i.e., in the alm
+             state) for the specified alarm type, the corresponding
+             row will be automatically deleted from the arc table.
+             Also the manual setting of arcState to alm can be achieved through
+             setting the RowStatus object to 'destroy'.        
+           "
+        ::= { zxAnEventRptCtrlProfileRuleEntry 21 }
+
+    zxAnEventRptCtrlPrfRuleRowStatus  OBJECT-TYPE
+        SYNTAX     RowStatus        
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "The row status of this entry.
+            
+            The state of this conceptual row only support 
+            'not exist' and  'active'.
+            The action of this conceptual row only support
+            'createAndGo' and 'destroy'.
+            
+            To create a row in this table, a manager must
+            set this object to createAndGo(4), and must comply 
+            with the multi-variables usage rules in 
+            zxAnEventRptCtrlProfileRuleEntry
+            description.
+    
+            To delete a row in this table, a manager must
+            set this object to destroy(6). 
+             
+            To query this object, always return 1."
+        ::= { zxAnEventRptCtrlProfileRuleEntry 50 }
+                             
+--------------------------------------------------------------------------------
+-- Event Reporting Control Resource Table
+--------------------------------------------------------------------------------
+
+    zxAnEventRptCtrlResourceTable    OBJECT-TYPE
+        SYNTAX     SEQUENCE OF ZxAnEventRptCtrlResourceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event control profile table. "
+        ::= { zxAnEventReportCtrlObjects 3 }
+
+    zxAnEventRptCtrlResourceEntry OBJECT-TYPE
+        SYNTAX     ZxAnEventRptCtrlResourceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "Event reporting control profile table entry."
+        INDEX { zxAnEventRptCtrlResId }
+        ::= { zxAnEventRptCtrlResourceTable 1 }        
+    
+    ZxAnEventRptCtrlResourceEntry ::= SEQUENCE {
+        zxAnEventRptCtrlResId              ResourceId,
+        zxAnEventRptCtrlResPrfName         DisplayString, 
+        zxAnEventRptCtrlResRowStatus       RowStatus
+    }
+
+    zxAnEventRptCtrlResId  OBJECT-TYPE
+        SYNTAX      ResourceId
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The resource id is of ResourceId type, indicates the 
+             resource id of a event."
+        ::= { zxAnEventRptCtrlResourceEntry 1 }
+
+    zxAnEventRptCtrlResPrfName  OBJECT-TYPE
+        SYNTAX      DisplayString(SIZE(1..32))
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Event control profile name.
+             When the event control profile is applied to a resource id, 
+             the profile name should not be 0 length."
+        ::= { zxAnEventRptCtrlResourceEntry 2 }
+        
+    zxAnEventRptCtrlResRowStatus  OBJECT-TYPE
+        SYNTAX     RowStatus        
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "The row status of this entry.
+            
+            The state of this conceptual row only support 
+            'not exist' and  'active'.
+            The action of this conceptual row only support
+            'createAndGo' and 'destroy'.
+            
+            To create a row in this table, a manager must
+            set this object to createAndGo(4), and must comply 
+            with the multi-variables usage rules in 
+            zxAnEventRptCtrlResourceEntry
+            description.
+    
+            To delete a row in this table, a manager must
+            set this object to destroy(6). 
+             
+            To query this object, always return 1."
+        ::= { zxAnEventRptCtrlResourceEntry 50 }
+                         
+--------------------------------------------------------------------------------
+-- 6.Trap
+--------------------------------------------------------------------------------
+
+
+    zxAnEventRequestCurrentEventId NOTIFICATION-TYPE
+        STATUS  current
+        DESCRIPTION
+            "The message will be sent to manager to get which EventId should be 
+            used in an agent when it starts.And the manager will set 
+            zxAnEventCurrentEventId after recieving this message."
+        ::= { zxAnEventTrapObjects 1 }
+
+
+    zxAnEventNmsHelloTrap NOTIFICATION-TYPE
+        STATUS  current
+        DESCRIPTION
+            "It is used to send heartbeat message to zte's nms server.And it 
+            needn't to be confirmed. "
+        ::= { zxAnEventTrapObjects 2 }
+
+ 
+    zxAnEventReceiverDeleteNotify NOTIFICATION-TYPE
+        OBJECTS { zxAnEventReceiverIpAddr  }
+        STATUS  current
+        DESCRIPTION
+            "The message will be sent to manager when an event receiver is deleted. "
+        ::= { zxAnEventTrapObjects 3 } 
+END
+    

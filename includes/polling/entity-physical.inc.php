@@ -1,12 +1,11 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
+ * @package    observium
+ * @subpackage poller
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -51,7 +50,7 @@ if (is_device_mib($device, 'CISCO-CAT6K-CROSSBAR-MIB')) {
     }
 
     // Remove/Update Entity state
-    foreach (dbFetch('SELECT * FROM `entPhysical-state` WHERE `device_id` = ?', [$device['device_id']]) as $entity) {
+    foreach (dbFetchRows('SELECT * FROM `entPhysical-state` WHERE `device_id` = ?', [$device['device_id']]) as $entity) {
         if (!isset($entPhysical_state[$entity['entPhysicalIndex']][$entity['subindex']][$entity['group']][$entity['key']])) {
             dbDelete('entPhysical-state', '`device_id` = ? AND `entPhysicalIndex` = ? AND `subindex` = ? AND `group` = ? AND `key` = ?',
                      [$device['device_id'], $entity['entPhysicalIndex'], $entity['subindex'], $entity['group'], $entity['key']]);

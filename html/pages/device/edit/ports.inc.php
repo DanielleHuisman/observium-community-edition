@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -79,8 +79,8 @@ if ($readonly && $vars['ignoreport']) {
                                     id="alerted-toggle" title="Toggle alerting on all currently-alerted ports">Enabled &
                                 Down
                             </button>
-                            <button class="btn btn-xs" value="Disabled" id="down-select"
-                                    title="Disable alerting on all currently-down ports">Disabled
+                            <button class="btn btn-xs" value="All Down" id="down-select"
+                                    title="Disable alerting on all currently-down ports">All Down
                             </button>
                         </td>
                         <td class="text-center">
@@ -124,7 +124,7 @@ if ($readonly && $vars['ignoreport']) {
                             $port = array_merge($port, $ports_attribs['port'][$port['port_id']]);
                         }
 
-                        echo('<tr class="' . $port['row_class'] . ' vertical-align">');
+                        echo('<tr class="' . $port['row_class'] . ' vertical-align" data-name="port_' . $port['port_id'] . '">');
                         echo('<td class="state-marker"></td>');
                         echo("<td>" . $port['ifIndex'] . "</td>");
                         echo('<td style="vertical-align: top;"><span class="entity">' . generate_entity_link('port', $port) . '</span><br />' . escape_html($port['ifAlias']) . '</td>');
@@ -237,7 +237,7 @@ if ($readonly && $vars['ignoreport']) {
     <script type="text/javascript">
 
         $('#disable-toggle').click(function (event) {
-            // invert selection on all disable buttons
+            // invert selection on all disabled buttons
             event.preventDefault();
             $('[name$="[disabled]"]').each(function () {
                 $(this).bootstrapToggle('toggle');
@@ -257,7 +257,8 @@ if ($readonly && $vars['ignoreport']) {
             event.preventDefault();
             $('.error').each(function () {
                 var name = $(this).attr('data-name');
-                if (name) {
+                if (name.match("^port_")) {
+                    //console.log(name);
                     // get the interface number from the object name
                     var port_id = name.split('_')[1];
                     // find its corresponding checkbox and toggle it

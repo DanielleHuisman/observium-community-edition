@@ -1,0 +1,1244 @@
+-- Copyright (C) 2006-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fsdvmrp.mib,v 1.9 2012/09/07 09:52:05 siva Exp $
+
+-- To Support the Ipv4 multicast MIB (RFC#2932) new tables dvmrpIpMRTable
+-- and dvmrpIpMNextHopTable and new objects are added to dvmrpInterfaceTable.
+
+ 
+ ARICENT-DVMRP-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+     MODULE-IDENTITY, OBJECT-TYPE,
+     Integer32, Counter32, Gauge32, enterprises,
+     IpAddress, TimeTicks,Counter64        FROM SNMPv2-SMI
+     DisplayString, RowStatus, 
+     TEXTUAL-CONVENTION           FROM SNMPv2-TC
+     MODULE-COMPLIANCE, OBJECT-GROUP   FROM SNMPv2-CONF
+     InterfaceIndex, InterfaceIndexOrZero  FROM IF-MIB
+     IANAipRouteProtocol,
+     IANAipMRouteProtocol                  FROM IANA-RTPROTO-MIB;
+     
+
+ dvmrpMIB MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com"
+	 DESCRIPTION " Proprietary MIB Support for DVMRP"
+	 REVISION "201209050000Z"
+	 DESCRIPTION " Proprietary MIB Support for DVMRP"
+::= { enterprises futuresoftware(2076) 60}
+
+      Integer8 ::= TEXTUAL-CONVENTION
+	 DISPLAY-HINT "d1"
+	 STATUS	      current
+	 DESCRIPTION
+	   "integer of one byte"
+	 SYNTAX	      Integer32 (1..256)
+
+     Integer16 ::= TEXTUAL-CONVENTION
+	 DISPLAY-HINT "d2"
+	 STATUS	      current
+	 DESCRIPTION
+	   "integer of two byte"
+	 SYNTAX	      Integer32 (1..65536)
+
+
+ --dvmrpMIBObjects OBJECT IDENTIFIER ::= { dvmrpMIB 1 }
+ --dvmrp		 OBJECT IDENTIFIER ::= { dvmrpMIBObjects 1 }
+ dvmrpScalar OBJECT IDENTIFIER ::= { dvmrpMIB 1 }
+ dvmrp		 OBJECT IDENTIFIER ::= { dvmrpMIB 2 }
+
+ --Integer8 ::= INTEGER(1..256)
+ --Integer16 ::= INTEGER(1..65536)
+
+ dvmrpVersionString OBJECT-TYPE
+     SYNTAX	DisplayString
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The router's DVMRP version information."
+     ::= { dvmrpScalar 1 }
+
+ dvmrpGenerationId OBJECT-TYPE
+     SYNTAX	Integer32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The generation identifier for the routing process.  This is
+	     used by neighboring routers to detect whether the DVMRP
+	     routing table should be resent."
+     ::= { dvmrpScalar 2 }
+
+ dvmrpNumRoutes OBJECT-TYPE
+     SYNTAX	Gauge32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The number of entries in the routing table.  This can
+	     be used to monitor the routing table size to detect
+	     illegal advertisements of unicast routes."
+     ::= { dvmrpScalar 3 }
+
+ dvmrpReachableRoutes OBJECT-TYPE
+     SYNTAX	Gauge32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The number of entries in the routing table with non
+	     infinite metrics.	This can be used to detect network
+	     partitions by observing the ratio of reachable routes
+	     to total routes."
+     ::= { dvmrpScalar 4 }
+
+ dvmrpStatus OBJECT-TYPE
+     SYNTAX	INTEGER { 
+                          up (1),
+                          down (2)
+			} 
+     MAX-ACCESS read-write
+     STATUS	current
+     DESCRIPTION
+	     "This object is used to bring DVMRP UP. "
+     ::= { dvmrpScalar 5 }
+
+ dvmrpLogEnabled OBJECT-TYPE
+     SYNTAX	Integer32(1..5)
+     MAX-ACCESS read-write
+     STATUS	current
+     DESCRIPTION
+	     "This object is used to control the logging of error messages"
+     ::= { dvmrpScalar 6  }
+
+ dvmrpLogMask OBJECT-TYPE
+     SYNTAX	Integer32 (1..1023)
+     MAX-ACCESS read-write
+     STATUS	current
+     DESCRIPTION
+	     "This object is used to control the logging of error messages
+	     specific to any module.The 9 LSBs of this object is a mask for
+	     the modules which require the logging of messages."
+     ::= { dvmrpScalar 7 }
+
+dvmrpPruneLifeTime OBJECT-TYPE
+     SYNTAX	Integer32 (1..7200)
+     MAX-ACCESS read-write
+     STATUS	current
+     DESCRIPTION
+	     "This object represents the Prune Life Time configuration value
+              in secs "
+     DEFVAL	{ 50 }
+          ::= { dvmrpScalar 8 }
+
+
+ -- The DVMRP Interface Table
+
+ dvmrpInterfaceTable OBJECT-TYPE
+     SYNTAX	SEQUENCE OF DvmrpInterfaceEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The (conceptual) table listing the router's multicast-
+	     capable interfaces."
+     ::= { dvmrp 9 }
+
+ dvmrpInterfaceEntry OBJECT-TYPE
+     SYNTAX	DvmrpInterfaceEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "An entry (conceptual row) in the dvmrpInterfaceTable.
+	     This row augments ipMRouteInterfaceEntry in the IP
+	     Multicast MIB, where the threshold object resides."
+     INDEX	{ dvmrpInterfaceIfIndex }
+     ::= { dvmrpInterfaceTable 1 }
+
+ DvmrpInterfaceEntry ::= SEQUENCE {
+     dvmrpInterfaceIfIndex             InterfaceIndex, 
+     dvmrpInterfaceStatus              RowStatus,
+     dvmrpInterfaceLocalAddress	      IpAddress,
+     dvmrpInterfaceMetric	      Integer32,
+     dvmrpInterfaceRcvBadPkts	      Counter32,
+     dvmrpInterfaceRcvBadRoutes	      Counter32,
+     dvmrpInterfaceTtl                Integer32,
+     dvmrpInterfaceProtocol           IANAipMRouteProtocol,
+     dvmrpInterfaceRateLimit          Integer32,
+     dvmrpInterfaceInMcastOctets      Counter32,
+     dvmrpInterfaceOutMcastOctets     Counter32,
+     dvmrpInterfaceHCInMcastOctets    Counter64,
+     dvmrpInterfaceHCOutMcastOctets   Counter64 }
+
+ dvmrpInterfaceIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The ifIndex value of this DVMRP interface."
+    ::= { dvmrpInterfaceEntry 1 }
+
+ dvmrpInterfaceStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The status of this entry.  Creating the entry enables DVMRP 
+            on the interface; destroying the entry disables DVMRP on the
+            interface."
+    ::= { dvmrpInterfaceEntry 2 }
+
+ dvmrpInterfaceLocalAddress OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The IP address this system will use as a source
+	     address on this interface.	 On unnumbered interfaces,
+	     it must be the same value as dvmrpInterfaceLocalAddress
+	     for some interface on the system."
+     ::= { dvmrpInterfaceEntry 3 }
+
+ dvmrpInterfaceMetric OBJECT-TYPE
+     SYNTAX	Integer32 (1..31)
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The distance metric for this interface which is used to
+	     calculate distance vectors."
+     DEFVAL	{ 1 }
+     ::= { dvmrpInterfaceEntry 4 }
+
+ dvmrpInterfaceRcvBadPkts OBJECT-TYPE
+     SYNTAX	Counter32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The number of DVMRP packets received on the interface
+	     by the DVMRP process which were subsequently discarded
+	     as invalid (e.g. invalid packet format, or a route
+	     report from an unknown neighbor)."
+     ::= { dvmrpInterfaceEntry 5 }
+
+ dvmrpInterfaceRcvBadRoutes OBJECT-TYPE
+     SYNTAX	Counter32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The number of routes, in valid DVMRP packets, which
+	     were ignored because the entry was invalid."
+     ::= { dvmrpInterfaceEntry 6 }
+
+ dvmrpInterfaceTtl OBJECT-TYPE
+    SYNTAX     Integer32 (0..255)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The datagram TTL threshold for the interface. Any IP
+            multicast datagrams with a TTL less than this threshold will
+            not be forwarded out the interface. The default value of 0
+            means all multicast packets are forwarded out the
+            interface."
+    ::= { dvmrpInterfaceEntry 7 }
+
+ dvmrpInterfaceProtocol OBJECT-TYPE
+    SYNTAX     IANAipMRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing protocol running on this interface."
+    ::= { dvmrpInterfaceEntry 8}
+
+ dvmrpInterfaceRateLimit OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The rate-limit, in kilobits per second, of forwarded
+            multicast traffic on the interface.  A rate-limit of 0
+            indicates that no rate limiting is done."
+    DEFVAL     { 0 }
+    ::= { dvmrpInterfaceEntry 9}
+
+ dvmrpInterfaceInMcastOctets OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have arrived
+            on the interface, including framing characters.  This object
+            is similar to ifInOctets in the Interfaces MIB, except that
+            only multicast packets are counted."
+    ::= { dvmrpInterfaceEntry 10}
+
+ dvmrpInterfaceOutMcastOctets OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have been
+            sent on the interface."
+    ::= { dvmrpInterfaceEntry 11}
+
+ dvmrpInterfaceHCInMcastOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have arrived
+            on the interface, including framing characters.  This object
+            is a 64-bit version of dvmrpInterfaceInMcaestOctets.  It
+            is similar to ifHCInOctets in the Interfaces MIB, except
+            that only multicast packets are counted.  "
+    ::= { dvmrpInterfaceEntry 12}
+
+ dvmrpInterfaceHCOutMcastOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have been
+             sent on the interface. This object is a 64-bit version of
+             dvmrpInterfaceOutMcastOctets."
+    ::= { dvmrpInterfaceEntry 13}
+
+ -- The DVMRP Neighbor Table
+
+ dvmrpNeighborTable OBJECT-TYPE
+     SYNTAX	SEQUENCE OF DvmrpNeighborEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The (conceptual) table listing the router's DVMRP
+	     neighbors, as discovered by receiving DVMRP messages."
+     ::= { dvmrp 10 }
+
+ dvmrpNeighborEntry OBJECT-TYPE
+     SYNTAX	DvmrpNeighborEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "An entry (conceptual row) in the dvmrpNeighborTable."
+     INDEX	{ dvmrpNeighborAddress }
+     ::= { dvmrpNeighborTable 1 }
+
+ DvmrpNeighborEntry ::= SEQUENCE {
+     dvmrpNeighborIfIndex	  InterfaceIndex,
+     dvmrpNeighborAddress	  IpAddress,
+     dvmrpNeighborUpTime	  TimeTicks,
+     dvmrpNeighborExpiryTime	  TimeTicks,
+     dvmrpNeighborGenerationId	  Integer32,
+     dvmrpNeighborMajorVersion	  Integer32,
+     dvmrpNeighborMinorVersion	  Integer32,
+     --dvmrpNeighborCapabilities    BITS,
+     dvmrpNeighborCapabilities	  INTEGER,
+     dvmrpNeighborRcvRoutes	  Counter32,
+     dvmrpNeighborRcvBadPkts	  Counter32,
+     dvmrpNeighborRcvBadRoutes	  Counter32,
+     dvmrpNeighborAdjFlag	  INTEGER}
+
+ dvmrpNeighborIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of ifIndex for the interface used to reach this
+            DVMRP neighbor."
+    ::= { dvmrpNeighborEntry 1 }
+
+ dvmrpNeighborAddress OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The IP address of the DVMRP neighbor for which this entry
+	     contains information."
+     ::= { dvmrpNeighborEntry 2 }
+
+ dvmrpNeighborUpTime OBJECT-TYPE
+     SYNTAX	TimeTicks
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The time since this DVMRP neighbor (last) became a neighbor
+	     of the local router."
+     ::= { dvmrpNeighborEntry 3 }
+
+ dvmrpNeighborExpiryTime OBJECT-TYPE
+     SYNTAX	TimeTicks
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The minimum time remaining before this DVMRP neighbor will
+	     be aged out."
+     ::= { dvmrpNeighborEntry 4 }
+
+ dvmrpNeighborGenerationId OBJECT-TYPE
+     SYNTAX	Integer32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The neighboring router's generation identifier."
+     ::= { dvmrpNeighborEntry 5 }
+
+
+ dvmrpNeighborMajorVersion OBJECT-TYPE
+     SYNTAX	Integer32 (0..255)
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The neighboring router's major DVMRP version number."
+     ::= { dvmrpNeighborEntry 6 }
+
+ dvmrpNeighborMinorVersion OBJECT-TYPE
+     SYNTAX	Integer32 (0..255)
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The neighboring router's minor DVMRP version number."
+     ::= { dvmrpNeighborEntry 7 }
+
+ dvmrpNeighborCapabilities OBJECT-TYPE
+    -- SYNTAX	  BITS {
+     SYNTAX	INTEGER (0..15) 
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "This object describes the neighboring router's
+	      capabilities.  The leaf bit indicates that the neighbor has
+	      only one interface with neighbors.  The prune bit indicates
+	      that the neighbor supports pruning.  The generationID bit
+	      indicates that the neighbor sends its generationID in Probe
+	      messages.	 The mtrace bit indicates that the neighbor can
+	      handle mtrace requests."
+     ::= { dvmrpNeighborEntry 8 }
+
+ dvmrpNeighborRcvRoutes OBJECT-TYPE
+     SYNTAX	Counter32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The total number of routes received in valid DVMRP
+	     packets received from this neighbor.  This can be used to
+	     diagnose problems such as unicast route injection, as
+	     well as giving an indication of the level of DVMRP
+	     route exchange activity."
+     ::= { dvmrpNeighborEntry 9 }
+
+ dvmrpNeighborRcvBadPkts OBJECT-TYPE
+     SYNTAX	Counter32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The number of packet received from this neighbor which
+	     were discarded as invalid."
+     ::= { dvmrpNeighborEntry 10 }
+
+ dvmrpNeighborRcvBadRoutes OBJECT-TYPE
+     SYNTAX	Counter32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The number of routes, in valid DVMRP packets received
+	     from this neighbor, which were ignored because the entry
+	     was invalid."
+     ::= { dvmrpNeighborEntry 11 }
+
+ dvmrpNeighborAdjFlag OBJECT-TYPE
+     SYNTAX	INTEGER { established (0), notEstablished (1) }
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "Flag which indicates the presence of the router's Interface  
+         address in the probe message received from the neighbor."
+     ::= { dvmrpNeighborEntry 12 }
+
+
+ -- The DVMRP Route Table
+
+ dvmrpRouteTable OBJECT-TYPE
+     SYNTAX	SEQUENCE OF DvmrpRouteEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The table of routes learned through DVMRP route exchange."
+     ::= { dvmrp 11 }
+
+ dvmrpRouteEntry OBJECT-TYPE
+     SYNTAX	DvmrpRouteEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "An entry (conceptual row) containing the multicast routing
+	     information used by DVMRP in place of the unicast routing
+	     information."
+     INDEX	{ dvmrpRouteSource, dvmrpRouteSourceMask }
+     ::= { dvmrpRouteTable 1 }
+
+ DvmrpRouteEntry ::= SEQUENCE {
+     dvmrpRouteSource		  IpAddress,
+     dvmrpRouteSourceMask	  IpAddress,
+     dvmrpRouteUpstreamNeighbor	  IpAddress,
+     dvmrpRouteIfIndex	      InterfaceIndex,
+     dvmrpRouteMetric		  Integer32,
+     dvmrpRouteExpiryTime	  TimeTicks,
+     dvmrpRouteUpTime		  TimeTicks,
+     dvmrpRouteStatus             Integer32 }
+
+
+ dvmrpRouteSource OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The network address which when combined with the
+	     corresponding value of dvmrpRouteSourceMask identifies the
+	     sources for which this entry contains multicast routing
+	     information."
+     ::= { dvmrpRouteEntry 1 }
+
+ dvmrpRouteSourceMask OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The network mask which when combined with the corresponding
+	     value of dvmrpRouteSource identifies the sources for which
+	     this entry contains multicast routing information."
+     ::= { dvmrpRouteEntry 2 }
+
+ dvmrpRouteUpstreamNeighbor OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The address of the upstream neighbor (e.g., RPF neighbor)
+	     from which IP datagrams from these sources are received."
+     ::= { dvmrpRouteEntry 3 }
+
+ dvmrpRouteIfIndex OBJECT-TYPE
+     SYNTAX	InterfaceIndex
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The value of Interface Index for the interface on which IP
+ datagrams
+	     sent by these sources are received."
+     ::= { dvmrpRouteEntry 4 }
+
+ dvmrpRouteMetric OBJECT-TYPE
+     SYNTAX	Integer32 (1..32)
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The distance in hops to the source subnet."
+     ::= { dvmrpRouteEntry 5 }
+
+
+ dvmrpRouteExpiryTime OBJECT-TYPE
+     SYNTAX	TimeTicks
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The minimum amount of time remaining before this entry will
+	     be aged out."
+     ::= { dvmrpRouteEntry 6 }
+
+ dvmrpRouteUpTime OBJECT-TYPE
+     SYNTAX	TimeTicks
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The time since the route represented by this entry was
+	     learned by the router."
+     ::= { dvmrpRouteEntry 7 }
+
+ dvmrpRouteStatus OBJECT-TYPE
+     SYNTAX	Integer32
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The route entry state "
+     ::= { dvmrpRouteEntry 8 }
+
+ -- The DVMRP Routing Next Hop Table
+
+ dvmrpRouteNextHopTable OBJECT-TYPE
+     SYNTAX	SEQUENCE OF DvmrpRouteNextHopEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The (conceptual) table containing information on the next
+	     hops on outgoing interfaces for routing IP multicast
+	     datagrams."
+     ::= { dvmrp 12 }
+
+ dvmrpRouteNextHopEntry OBJECT-TYPE
+     SYNTAX	DvmrpRouteNextHopEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "An entry (conceptual row) in the list of next hops on
+	     outgoing interfaces to which IP multicast datagrams from
+	     particular sources are routed."
+     INDEX	{ dvmrpRouteNextHopSource, dvmrpRouteNextHopSourceMask,
+		  dvmrpRouteNextHopIfIndex }
+     ::= { dvmrpRouteNextHopTable 1 }
+
+ DvmrpRouteNextHopEntry ::= SEQUENCE {
+     dvmrpRouteNextHopSource		 IpAddress,
+     dvmrpRouteNextHopSourceMask	 IpAddress,
+     dvmrpRouteNextHopIfIndex	     InterfaceIndex,
+     dvmrpRouteNextHopType		 INTEGER, 
+     dvmrpRouteNextHopDesigForw		 INTEGER,
+     dvmrpRouteNextHopDepNbrs         DisplayString}
+
+ dvmrpRouteNextHopSource OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The network address which when combined with the
+	     corresponding value of dvmrpRouteNextHopSourceMask
+	     identifies the sources for which this entry specifies
+	     a next hop on an outgoing interface."
+     ::= { dvmrpRouteNextHopEntry 1 }
+
+ dvmrpRouteNextHopSourceMask OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The network mask which when combined with the corresponding
+	     value of dvmrpRouteNextHopSource identifies the sources for
+	     which this entry specifies a next hop on an outgoing
+	     interface."
+     ::= { dvmrpRouteNextHopEntry 2 }
+
+ dvmrpRouteNextHopIfIndex OBJECT-TYPE
+     SYNTAX	InterfaceIndex
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The Interface Index value of the interface for the outgoing 
+              interface for this next hop."
+     ::= { dvmrpRouteNextHopEntry 3 }
+
+ dvmrpRouteNextHopType OBJECT-TYPE
+     SYNTAX	INTEGER { leaf(1), branch(2) }
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "Type is leaf if no downstream dependent neighbors exist on
+	     the outgoing virtual interface.  Otherwise, type is branch."
+     ::= { dvmrpRouteNextHopEntry 4 }
+  
+ dvmrpRouteNextHopDesigForw OBJECT-TYPE
+     SYNTAX	INTEGER { true(0), false(1) }
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "This object describes the whether the router is the designated
+              forwarder or not"
+     ::= { dvmrpRouteNextHopEntry 5 }
+
+  dvmrpRouteNextHopDepNbrs OBJECT-TYPE
+     SYNTAX	DisplayString
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "This object describes the whether the router is the designated
+              forwarder or not"
+     ::= { dvmrpRouteNextHopEntry 6 }
+
+ -- The DVMRP Forwarding Table
+
+ dvmrpForwardTable OBJECT-TYPE
+     SYNTAX	SEQUENCE OF DvmrpForwardEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The table listing the router's DVMRP forwarding table entries"
+     ::= { dvmrp 13 }
+
+ dvmrpForwardEntry OBJECT-TYPE
+     SYNTAX	DvmrpForwardEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "An entry (conceptual row) in the dvmrpForwardTable."
+     INDEX	{ dvmrpSourceNetwork, dvmrpGroupAddress }
+     ::= { dvmrpForwardTable 1 }
+
+ DvmrpForwardEntry ::= SEQUENCE {
+     dvmrpSourceNetwork	          IpAddress,
+     dvmrpGroupAddress            IpAddress,
+     dvmrpForwardUpstreamNeighbor IpAddress,
+     dvmrpForwardInIfIndex        InterfaceIndex, 
+     dvmrpForwardInIfState        INTEGER, 
+     dvmrpForwardExpiryTime	  TimeTicks,
+     dvmrpForwardTblStatus        INTEGER}
+
+ dvmrpSourceNetwork OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The Dvmrp network address."
+     ::= { dvmrpForwardEntry 1 }
+
+ dvmrpGroupAddress OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "This object gives the Group address to which the packet is 
+              forwarded."
+     ::= { dvmrpForwardEntry 2 }
+
+ dvmrpForwardUpstreamNeighbor OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	     "The address of the upstream neighbor (RPF neighbor)
+	     from which IP datagrams from these sources are received."
+    ::= { dvmrpForwardEntry 3 }
+
+ dvmrpForwardInIfIndex OBJECT-TYPE 
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	     "The Interface Index of the upstream neighbor (RPF neighbor)
+	     from which IP datagrams from these sources are received."
+    ::= { dvmrpForwardEntry 4 }
+
+ dvmrpForwardInIfState OBJECT-TYPE 
+    SYNTAX     INTEGER {  graftAckReceived (5),
+                          waitingGraftAck(6),
+                          normal(7),
+                          pruned(8),
+                          dataOnPrunedIface(9),
+                          localNetwork (10)
+                       }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	     "The Interface State of the upstream neighbor (RPF neighbor)
+	     from which IP datagrams from these sources are received."
+    ::= { dvmrpForwardEntry 5 }
+
+ dvmrpForwardExpiryTime OBJECT-TYPE
+     SYNTAX	TimeTicks
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The minimum time remaining before this forward entry will
+              age out."
+     ::= { dvmrpForwardEntry 6 }
+     
+ dvmrpForwardTblStatus OBJECT-TYPE
+     SYNTAX	INTEGER { active(1), inactive (2) }
+     MAX-ACCESS read-only
+     STATUS	current
+     DESCRIPTION
+	     "The status of the forward entry."
+     ::= { dvmrpForwardEntry 7 }
+
+ -- The DVMRP Pruned Neibours Table
+ dvmrpForwardPruneNbrTable OBJECT-TYPE
+     SYNTAX	SEQUENCE OF DvmrpForwardPruneNbrEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The table listing the router's DVMRP forwarding table entries"
+     ::= { dvmrp 14 }
+
+ dvmrpForwardPruneNbrEntry OBJECT-TYPE
+     SYNTAX	DvmrpForwardPruneNbrEntry
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "An entry (conceptual row) in the dvmrpForwardTable."
+     INDEX	{ dvmrpForwardSourceNetwork, dvmrpForwardGroupAddress,
+                  dvmrpForwardIfIndex, dvmrpForwardPruneNeighbor }
+     ::= { dvmrpForwardPruneNbrTable 1 }
+
+ DvmrpForwardPruneNbrEntry ::= SEQUENCE {
+     dvmrpForwardSourceNetwork	  IpAddress,
+     dvmrpForwardGroupAddress     IpAddress,
+     dvmrpForwardIfIndex          InterfaceIndex, 
+     dvmrpForwardPruneNeighbor    IpAddress,
+     dvmrpForwardNbrPruneTime     TimeTicks}
+
+ dvmrpForwardSourceNetwork OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "The Dvmrp network address."
+     ::= { dvmrpForwardPruneNbrEntry 1 }
+
+ dvmrpForwardGroupAddress OBJECT-TYPE
+     SYNTAX	IpAddress
+     MAX-ACCESS not-accessible
+     STATUS	current
+     DESCRIPTION
+	     "This object gives the Group address to which the packet is 
+              forwarded."
+     ::= { dvmrpForwardPruneNbrEntry 2 }
+
+ dvmrpForwardIfIndex OBJECT-TYPE 
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	     "The Interface Index of the upstream neighbor (RPF neighbor)
+	     from which IP datagrams from these sources are received."
+    ::= { dvmrpForwardPruneNbrEntry 3 }
+
+ dvmrpForwardPruneNeighbor OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	     "The address of the dependent neighbor from which 
+              prune is received for particular Entry."
+    ::= { dvmrpForwardPruneNbrEntry 4 }
+
+dvmrpForwardNbrPruneTime OBJECT-TYPE
+    SYNTAX     TimeTicks 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	     "The Value of prune time sent by the dependent neighbor."
+    ::= { dvmrpForwardPruneNbrEntry 5 }
+
+dvmrpIpMRTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF DvmrpIpMREntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table containing multicast routing
+            information for IP datagrams sent by particular sources to
+            the IP multicast groups known to this router."
+    ::= { dvmrp 15 }
+
+dvmrpIpMREntry OBJECT-TYPE
+    SYNTAX     DvmrpIpMREntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) containing the multicast routing
+            information for IP datagrams from a particular source and
+            addressed to a particular IP multicast group address.
+            Discontinuities in counters in this entry can be detected by
+            observing the value of dvmrpIpMUpTime."
+    INDEX      { dvmrpIpMRGroup,
+                 dvmrpIpMRSource,
+                 dvmrpIpMRSourceMask }
+    ::= { dvmrpIpMRTable 1 }
+
+DvmrpIpMREntry ::= SEQUENCE {
+    dvmrpIpMRGroup                 IpAddress,
+    dvmrpIpMRSource                IpAddress,
+    dvmrpIpMRSourceMask            IpAddress,
+    dvmrpIpMRUpstreamNeighbor      IpAddress,
+    dvmrpIpMRInIfIndex             InterfaceIndexOrZero,
+    dvmrpIpMRUpTime                TimeTicks,
+    dvmrpIpMRExpiryTime            TimeTicks,
+    dvmrpIpMRPkts                  Counter32,
+    dvmrpIpMRDifferentInIfPackets  Counter32,
+    dvmrpIpMROctets                Counter32,
+    dvmrpIpMRProtocol              IANAipMRouteProtocol,
+    dvmrpIpMRRtProto               IANAipRouteProtocol,
+    dvmrpIpMRRtAddress             IpAddress,
+    dvmrpIpMRRtMask                IpAddress,
+    dvmrpIpMRRtType                INTEGER,
+    dvmrpIpMRHCOctets              Counter64
+}
+
+dvmrpIpMRGroup OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group address for which this entry
+            contains multicast routing information."
+    ::= { dvmrpIpMREntry 1 }
+
+dvmrpIpMRSource OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+
+            "The network address which when combined with the
+            corresponding value of dvmrpIpMSourceMask identifies the
+            sources for which this entry contains multicast routing
+            information."
+    ::= { dvmrpIpMREntry 2 }
+
+dvmrpIpMRSourceMask OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The network mask which when combined with the corresponding
+            value of dvmrpIpMSource identifies the sources for which
+            this entry contains multicast routing information."
+    ::= { dvmrpIpMREntry 3 }
+
+dvmrpIpMRUpstreamNeighbor OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address of the upstream neighbor (e.g., RPF neighbor)
+            from which IP datagrams from these sources to this multicast
+            address are received, or 0.0.0.0 if the upstream neighbor is
+            unknown."
+    ::= { dvmrpIpMREntry 4 }
+
+dvmrpIpMRInIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndexOrZero
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of ifIndex for the interface on which IP
+            datagrams sent by these sources to this multicast address
+            are received.  A value of 0 indicates that datagrams are not
+            subject to an incoming interface check, but may be accepted
+            on multiple interfaces."
+    ::= { dvmrpIpMREntry 5 }
+
+dvmrpIpMRUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since the multicast routing information
+            represented by this entry was learned by the router."
+    ::= { dvmrpIpMREntry 6 }
+
+dvmrpIpMRExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The minimum amount of time remaining before this entry will
+            be aged out.  The value 0 indicates that the entry is not
+            subject to aging."
+    ::= { dvmrpIpMREntry 7 }
+
+dvmrpIpMRPkts OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of packets which this router has received from
+            these sources and addressed to this multicast group
+            address."
+    ::= { dvmrpIpMREntry 8 }
+
+dvmrpIpMRDifferentInIfPackets OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of packets which this router has received from
+            these sources and addressed to this multicast group address,
+            which were dropped because they were not received on the
+            interface indicated by dvmrpIpMInIfIndex.  Packets which are
+            not subject to an incoming interface check are not counted."
+    ::= { dvmrpIpMREntry 9 }
+
+dvmrpIpMROctets OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets contained in IP datagrams which were
+            received from these sources and addressed to this multicast
+            group address, and which were forwarded by this router."
+    ::= { dvmrpIpMREntry 10 }
+
+dvmrpIpMRProtocol OBJECT-TYPE
+    SYNTAX     IANAipMRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+
+            "The multicast routing protocol via which this multicast
+            forwarding entry was learned."
+    ::= { dvmrpIpMREntry 11 }
+
+dvmrpIpMRRtProto OBJECT-TYPE
+    SYNTAX     IANAipRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing mechanism via which the route used to find the
+            upstream or parent interface for this multicast forwarding
+            entry was learned.  Inclusion of values for routing
+            protocols is not intended to imply that those protocols need
+            be supported."
+    ::= { dvmrpIpMREntry 12 }
+
+dvmrpIpMRRtAddress OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address portion of the route used to find the upstream
+            or parent interface for this multicast forwarding entry."
+    ::= { dvmrpIpMREntry 13 }
+
+dvmrpIpMRRtMask OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The mask associated with the route used to find the upstream
+            or parent interface for this multicast forwarding entry."
+    ::= { dvmrpIpMREntry 14 }
+
+dvmrpIpMRRtType OBJECT-TYPE
+    SYNTAX     INTEGER {
+                unicast (1),  -- Unicast route used in multicast RIB
+                multicast (2) -- Multicast route
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The reason the given route was placed in the (logical)
+            multicast Routing Information Base (RIB).  A value of
+            unicast means that the route would normally be placed only
+            in the unicast RIB, but was placed in the multicast RIB
+            (instead or in addition) due to local configuration."
+    ::= { dvmrpIpMREntry 15 }
+
+dvmrpIpMRHCOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets contained in IP datagrams which were
+            received from these sources and addressed to this multicast
+            group address, and which were forwarded by this router.
+            This object is a 64-bit version of dvmrpIpMOctets."
+    ::= { dvmrpIpMREntry 16 }
+
+dvmrpIpMNextHopTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF DvmrpIpMNextHopEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table containing information on the next-
+            hops on outgoing interfaces for routing IP multicast
+            datagrams.  Each entry is one of a list of next-hops on
+            outgoing interfaces for particular sources sending to a
+            particular multicast group address."
+    ::= { dvmrp 16 }
+
+dvmrpIpMNextHopEntry OBJECT-TYPE
+    SYNTAX     DvmrpIpMNextHopEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the list of next-hops on
+            outgoing interfaces to which IP multicast datagrams from
+            particular sources to a IP multicast group address are
+            routed.  Discontinuities in counters in this entry can be
+            detected by observing the value of dvmrpIpMUpTime."
+    INDEX      { dvmrpIpMNextHopGroup, dvmrpIpMNextHopSource,
+                 dvmrpIpMNextHopSourceMask, dvmrpIpMNextHopIfIndex,
+                 dvmrpIpMNextHopAddress }
+    ::= { dvmrpIpMNextHopTable 1 }
+
+DvmrpIpMNextHopEntry ::= SEQUENCE {
+    dvmrpIpMNextHopGroup              IpAddress,
+    dvmrpIpMNextHopSource             IpAddress,
+    dvmrpIpMNextHopSourceMask         IpAddress,
+    dvmrpIpMNextHopIfIndex            InterfaceIndex,
+    dvmrpIpMNextHopAddress            IpAddress,
+    dvmrpIpMNextHopState              INTEGER,
+    dvmrpIpMNextHopUpTime             TimeTicks,
+    dvmrpIpMNextHopExpiryTime         TimeTicks,
+    dvmrpIpMNextHopProtocol           IANAipMRouteProtocol,
+    dvmrpIpMNextHopPkts               Counter32
+}
+
+dvmrpIpMNextHopGroup OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group for which this entry specifies a
+            next-hop on an outgoing interface."
+    ::= { dvmrpIpMNextHopEntry 1 }
+
+dvmrpIpMNextHopSource OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The network address which when combined with the
+            corresponding value of dvmrpIpMNextHopSourceMask identifies
+            the sources for which this entry specifies a next-hop on an
+            outgoing interface."
+    ::= { dvmrpIpMNextHopEntry 2 }
+
+dvmrpIpMNextHopSourceMask OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The network mask which when combined with the corresponding
+            value of dvmrpIpMNextHopSource identifies the sources for
+            which this entry specifies a next-hop on an outgoing
+            interface."
+    ::= { dvmrpIpMNextHopEntry 3 }
+
+dvmrpIpMNextHopIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+
+            "The ifIndex value of the interface for the outgoing
+            interface for this next-hop."
+    ::= { dvmrpIpMNextHopEntry 4 }
+
+dvmrpIpMNextHopAddress OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address of the next-hop specific to this entry.  For
+            most interfaces, this is identical to dvmrpIpMNextHopGroup.
+            NBMA interfaces, however, may have multiple next-hop
+            addresses out a single outgoing interface."
+    ::= { dvmrpIpMNextHopEntry 5 }
+
+dvmrpIpMNextHopState OBJECT-TYPE
+    SYNTAX     INTEGER { pruned(1), forwarding(2) }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "An indication of whether the outgoing interface and next-
+            hop represented by this entry is currently being used to
+            forward IP datagrams.  The value 'forwarding' indicates it
+            is currently being used; the value 'pruned' indicates it is
+            not."
+    ::= { dvmrpIpMNextHopEntry 6 }
+
+dvmrpIpMNextHopUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since the multicast routing information
+            represented by this entry was learned by the router."
+    ::= { dvmrpIpMNextHopEntry 7 }
+
+dvmrpIpMNextHopExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The minimum amount of time remaining before this entry will
+            be aged out.  If dvmrpIpMNextHopState is pruned(1), the
+            remaining time until the prune expires and the state reverts
+            to forwarding(2).  Otherwise, the remaining time until this
+            entry is removed from the table.  The time remaining may be
+            copied from dvmrpIpMExpiryTime if the protocol in use for
+            this entry does not specify next-hop timers.  The value 0
+            indicates that the entry is not subject to aging."
+    ::= { dvmrpIpMNextHopEntry 8 }
+
+dvmrpIpMNextHopProtocol OBJECT-TYPE
+    SYNTAX     IANAipMRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing mechanism via which this next-hop was learned."
+    ::= { dvmrpIpMNextHopEntry 9 }
+
+dvmrpIpMNextHopPkts OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of packets which have been forwarded using this
+            route."
+    ::= { dvmrpIpMNextHopEntry 10 }
+
+ -- conformance information
+
+ dvmrpMIBConformance OBJECT IDENTIFIER ::= { dvmrpMIB 3 }
+
+ dvmrpMIBCompliances OBJECT IDENTIFIER ::= { dvmrpMIBConformance 1 }
+
+ dvmrpMIBGroups	     OBJECT IDENTIFIER ::= { dvmrpMIBConformance 2 }
+
+
+ -- compliance statements
+
+ dvmrpMIBCompliance MODULE-COMPLIANCE
+     STATUS  current
+     DESCRIPTION
+	     "The compliance statement for the DVMRP MIB."
+     MODULE  -- this module
+	 MANDATORY-GROUPS { dvmrpGeneralGroup, dvmrpInterfaceGroup,
+	     dvmrpNeighborGroup, dvmrpRoutingGroup
+	 }
+
+     ::= { dvmrpMIBCompliances 1 }
+
+
+ -- units of conformance
+
+ dvmrpGeneralGroup OBJECT-GROUP
+     OBJECTS { dvmrpVersionString, dvmrpGenerationId,
+	       dvmrpNumRoutes, dvmrpReachableRoutes
+	     }
+     STATUS  current
+     DESCRIPTION
+	     "A collection of objects used to describe general DVMRP
+	     configuration information."
+     ::= { dvmrpMIBGroups 2 }
+
+ dvmrpInterfaceGroup OBJECT-GROUP
+     OBJECTS { dvmrpInterfaceLocalAddress, dvmrpInterfaceMetric,
+	       dvmrpInterfaceRcvBadPkts, dvmrpInterfaceRcvBadRoutes
+	     }
+     STATUS  current
+     DESCRIPTION
+	     "A collection of objects used to describe DVMRP interface
+	     configuration and statistics."
+     ::= { dvmrpMIBGroups 3 }
+
+ dvmrpNeighborGroup OBJECT-GROUP
+     OBJECTS { dvmrpNeighborUpTime, dvmrpNeighborExpiryTime,
+	       dvmrpNeighborGenerationId,
+	       dvmrpNeighborMajorVersion, dvmrpNeighborMinorVersion,
+	       dvmrpNeighborCapabilities, dvmrpNeighborRcvRoutes,
+	       dvmrpNeighborRcvBadPkts, dvmrpNeighborRcvBadRoutes
+	     }
+     STATUS  current
+     DESCRIPTION
+	     "A collection of objects used to describe DVMRP peer
+	     configuration and statistics."
+     ::= { dvmrpMIBGroups 4 }
+
+ dvmrpRoutingGroup OBJECT-GROUP
+     OBJECTS { dvmrpRouteUpstreamNeighbor, dvmrpRouteIfIndex,
+	       dvmrpRouteMetric, dvmrpRouteExpiryTime,
+	       dvmrpRouteUpTime, dvmrpRouteNextHopType
+	     }
+     STATUS  current
+     DESCRIPTION
+	     "A collection of objects used to store the DVMRP
+	     routing table."
+     ::= { dvmrpMIBGroups 5 }
+ END

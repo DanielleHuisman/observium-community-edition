@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
+ * @package    observium
+ * @subpackage poller
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -24,7 +24,7 @@ if ($oid_to_cache = dbFetchColumn($query, [$device['device_id'], '^\.?[0-9]+(\.[
 
 $sql = "SELECT * FROM `processors` WHERE `device_id` = ?";
 
-foreach (dbFetchRows($sql, [$device['device_id']]) as $processor) {
+foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $processor) {
     // echo("Processor " . $processor['processor_descr'] . " ");
 
     $processor['processor_oid'] = '.' . ltrim($processor['processor_oid'], '.'); // Fix first dot in oid
@@ -41,18 +41,14 @@ foreach (dbFetchRows($sql, [$device['device_id']]) as $processor) {
     }
 
     $unit = NULL;
-    // FIXME. This is mostly derp way for connect MIB name in poller.
-    // Currently I need to add support for definition mib polling
-    // New discover_processor_ng() will added soon, than this compat code will removed!
-    if (str_contains($processor['processor_type'], 'CPULoad')) {
-        foreach (get_device_mibs_permitted($device) as $mib) {
-            if (isset($config['mibs'][$mib]['processor'][$processor['processor_type']])) {
-                $def = $config['mibs'][$mib]['processor'][$processor['processor_type']];
-                // Units, see: LANCOM-GS2310PPLUS-MIB
-                $unit = isset($def['unit']) ? $def['unit'] : NULL;
-                break;
-            }
-        }
+
+    // Definition based poller
+    if (!empty($processor['processor_mib']) && !empty($processor['processor_object']) &&
+        isset($config['mibs'][$processor['processor_mib']]['processor'][$processor['processor_object']])) {
+
+        $def = $config['mibs'][$processor['processor_mib']]['processor'][$processor['processor_object']];
+        // Units, see: LANCOM-GS2310PPLUS-MIB
+        $unit = $def['unit'] ?? NULL;
     }
 
     $proc = snmp_fix_numeric($proc, $unit);
@@ -78,13 +74,13 @@ foreach (dbFetchRows($sql, [$device['device_id']]) as $processor) {
     }
 
     // Update RRD
-    rrdtool_update_ng($device, 'processor', ['usage' => $proc], $processor['processor_type'] . "-" . $processor['processor_index']);
+    rrdtool_update_ng($device, 'processor', [ 'usage' => $proc ], get_processor_rrd($device, $processor, FALSE));
 
     // Update SQL State
     dbUpdate(['processor_usage' => $proc, 'processor_polled' => time()], 'processors', '`processor_id` = ?', [$processor['processor_id']]);
 
     // Check alerts
-    check_entity('processor', $processor, ['processor_usage' => $proc]);
+    check_entity('processor', $processor, [ 'processor_usage' => $proc ]);
 
     $table_row    = [];
     $table_row[]  = $processor['processor_descr'];

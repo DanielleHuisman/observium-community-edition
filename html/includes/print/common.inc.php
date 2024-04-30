@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -60,6 +60,9 @@ function build_table($array, $options = [])
             switch ($type) {
                 case 'unixtime':
                     $value2 = format_unixtime($value2);
+                    break;
+                case 'prettytime':
+                    $value2 = generate_tooltip_time($value2, 'ago');
                     break;
                 case 'device':
                     $value2 = generate_device_link($value2);
@@ -116,6 +119,9 @@ function build_table_row($array, $options = [])
         for ($i = 0; $i <= $cols; $i++) {
             $value = $values[$i];
             switch ($options[$key]) {
+                case 'prettytime':
+                    $value = generate_tooltip_time($value, 'ago');
+                    break;
                 case 'unixtime':
                     $value = format_unixtime($value);
                     break;
@@ -192,7 +198,7 @@ function print_refresh($vars)
                'list'    => $refresh_array];
 
     if ($refresh_allowed && $refresh_time) {
-        register_html_resource('meta', ['http-equiv' => 'refresh', 'content' => $refresh_time]);
+        register_html_meta('refresh', $refresh_time, 'http-equiv');
         //echo('  <meta http-equiv="refresh" content="'.$refresh_time.'" />' . "\n");
         $return['nexttime'] = time() + $refresh_time; // Add unixtime for next refresh
     }
@@ -209,25 +215,37 @@ function print_refresh($vars)
  * @return string $string
  */
 
-function generate_table_header($header = [], $vars = [])
-{
+function generate_table_header($header = [], $vars = []) {
 
     // Store current $vars sort variables
-    $sort       = $vars['sort'];
+    if (safe_empty($vars) || (isset($vars['show_sort']) && get_var_false($vars['show_sort']))) {
+        // disable sorting, when empty vars, because unknown current page
+        $sort = FALSE;
+    } else {
+        $sort = $vars['sort'];
+    }
     $sort_order = strtolower($vars['sort_order']);
-    if (!in_array($sort_order, ['asc', 'desc', 'reset'])) {
+    if (!in_array($sort_order, [ 'asc', 'desc', 'reset' ])) {
         $sort_order = 'asc';
     }
 
-    // Reset current $vars sort variables
-    unset($vars['sort'], $vars['sort_order']);
-
-    $output = '<thead' . (isset($header['class']) ? ' class="' . $header['class'] . '"' : '') .
-              (isset($header['style']) ? ' style="' . $header['style'] . '"' : '') .
-              (isset($vars['show_header']) && !$vars['show_header'] ? 'style="line-height: 0; visibility: collapse;"' : '') . '>';
+    if (isset($vars['show_header']) && get_var_false($vars['show_header'])) {
+        // Override style as invisible
+        $header['style'] = 'line-height: 0; visibility: collapse;';
+    }
+    $output = '  <thead' . ( (isset($header['class']) && !is_array($header['class'])) ? ' class="' . $header['class'] . '"' : '') .
+              (isset($header['style']) ? ' style="' . $header['style'] . '"' : '') . '>' . PHP_EOL;
 
     $output .= '    <tr>' . PHP_EOL;
 
+    // Reset current $vars sort variables
+    unset($vars['sort'], $vars['sort_order'], $vars['show_header']);
+
+    // skip html data
+    if(isset($header['class']) && !is_array($header['class'])) {
+        unset($header['class']);
+    }
+    unset($header['style']);
     //r($header);
 
     // Loop each column generating a <th> element
@@ -235,14 +253,8 @@ function generate_table_header($header = [], $vars = [])
 
         //if (in_array($id, ['class', 'group', 'style'])) { continue; } // skip html metadata
 
-        if ($id === 'class' || $id === 'style') {
-            continue;
-        } // skip html data
-
-        $fields = []; // Empty array for fields
-
         if (empty($col) || !is_array($col)) {
-            $col = [$id => $col];
+            $col = [ $id => $col ];
         } // If col is not an array, make it one
 
         if ($id === 'state-marker') {
@@ -250,6 +262,7 @@ function generate_table_header($header = [], $vars = [])
         }  // Hard code handling of state-marker
 
         // Loop each field and generate an <a> element
+        $fields = []; // Empty array for fields
         foreach ($col as $field_id => $field) {
 
             if ($field_id === 'class' || $field_id === 'style' || $field_id === 'subfields') {
@@ -263,7 +276,8 @@ function generate_table_header($header = [], $vars = [])
             }
 
         }
-        $output .= '      <th' . (isset($col['class']) ? ' class="' . $col['class'] . '"' : '') . '>';
+        $output .= '      <th' . (isset($col['class']) ? ' class="' . $col['class'] . '"' : '') .
+                    (isset($col['style']) ? ' style="' . $col['style'] . '"' : '') . '>';
         $output .= implode(' / ', $fields);
         $output .= '</th>' . PHP_EOL;
     }
@@ -276,44 +290,53 @@ function generate_table_header($header = [], $vars = [])
 
 }
 
-function generate_table_header_field($field_id, $field, $vars, $sort, $sort_order)
-{
+function generate_table_header_field($field_id, $field, $vars, $sort, $sort_order) {
 
-    if (empty($field)) {                                  // No label, generate empty column header.
-        $return = '';
-    } elseif (is_numeric($field_id) && !is_array($field)) {   // Label without id, generate simple column header
-        $return = $field;
+    if (empty($field)) {
+        // No label, generate empty column header.
+        return '';
+    }
+    if (is_numeric($field_id) && !is_array($field)) {
+        // Label without id, generate simple column header
+        return $field;
+    }
+
+    if (!is_array($field)) {
+        $field = [ 'label' => $field ];
+    }
+
+    // Sorting fields
+    if (!isset($field['label'])) {
+        $field['label'] = $field[0];
+    }
+
+    if ($sort === FALSE) {
+        // Sorting forced to disable
+        $return = $field['label'];
     } else {
-        if (!is_array($field)) {
-            $field = ['label' => $field];
-        }
-        if (!isset($field['label'])) {
-            $field['label'] = $field[0];
-        }
-
         if ($sort == $field_id) {
             $field['label'] = '<span class="text-primary" style="font-style: italic">' . $field['label'] . '</span>';
             if ($sort_order === 'asc') {
-                $new_vars       = ['sort' => $field_id, 'sort_order' => 'desc'];
-                $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-up"></i>';
+                $new_vars = [ 'sort' => $field_id, 'sort_order' => 'desc' ];
+                $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-up"></i>'; // glyphicon-triangle-top
             } else {
-                $new_vars       = ['sort' => NULL, 'sort_order' => NULL];
-                $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-down"></i>';
+                $new_vars = [ 'sort' => NULL, 'sort_order' => NULL ];
+                $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-down"></i>'; // glyphicon-triangle-bottom
             }
         } else {
-            $new_vars = ['sort' => $field_id];
+            $new_vars = [ 'sort' => $field_id ];
         }
         $return = '<a href="' . generate_url($vars, $new_vars) . '">' . $field['label'] . $field['caret'] . '</a>';
+    }
 
-        // Generate slash separated links for subfields
-        if (isset($field['subfields'])) {
-            $subfields = [];
-            foreach ($field['subfields'] as $subfield_id => $subfield) {
-                //r($subfield); r($subfield_id);
-                $subfields[] = generate_table_header_field($subfield_id, $subfield, $vars, $sort, $sort_order);
-            }
-            $return .= ' [' . implode(" / ", $subfields) . ']';
+    // Generate slash separated links for subfields
+    if (isset($field['subfields'])) {
+        $subfields = [];
+        foreach ($field['subfields'] as $subfield_id => $subfield) {
+            //r($subfield); r($subfield_id);
+            $subfields[] = generate_table_header_field($subfield_id, $subfield, $vars, $sort, $sort_order);
         }
+        $return .= ' [' . implode(" / ", $subfields) . ']';
     }
 
     return $return;
@@ -321,6 +344,9 @@ function generate_table_header_field($field_id, $field, $vars, $sort, $sort_orde
 }
 
 /**
+ * WARNING.
+ * Deprecated, convert to generate_table_header().
+ *
  * Helper function for generate table header with sort links
  * This used in other print_* functions
  *
@@ -331,108 +357,31 @@ function generate_table_header_field($field_id, $field, $vars, $sort, $sort_orde
  */
 function get_table_header($cols, $vars = [])
 {
-    // Always clean sort vars
-    $sort       = $vars['sort'];
-    $sort_order = strtolower($vars['sort_order']);
-    if (!in_array($sort_order, ['asc', 'desc', 'reset'])) {
-        $sort_order = 'asc';
-    }
-    unset($vars['sort'], $vars['sort_order']);
-
-    if (isset($vars['show_header']) && !$vars['show_header']) {
-        // Do not show any table header if show_header == FALSE
-        $string = '  <thead style="line-height: 0; visibility: collapse;">' . PHP_EOL;
-    } else {
-        $string = '  <thead>' . PHP_EOL;
-    }
-    $string .= '    <tr>' . PHP_EOL;
+    // Convert to new format for generate_table_header()
+    $new_cols = [];
     foreach ($cols as $id => $col) {
         if (is_array($col)) {
-            $name  = $col[0];
-            $style = ' ' . $col[1]; // Column styles/classes
-        } else {
-            $name  = $col;
-            $style = '';
-        }
-        $string .= '      <th' . $style . '>';
-        if ($name == NULL) {
-            $string .= '';         // Column without Name and without Sort
-        } elseif (is_intnum($id) || str_contains($id, "!")) {
-            $string .= $name;      // Column without Sort
-        } elseif (!empty($vars) || $sort) {
-            // Sort order cycle: asc -> desc -> reset
-            if ($sort == $id) {
-                switch ($sort_order) {
-                    case 'desc':
-                        $name       .= '&nbsp;&nbsp;<i class="small glyphicon glyphicon-triangle-top"></i>';
-                        $sort_array = [];
-                        //$vars['sort_order'] = 'reset';
-                        break;
-                    case 'reset':
-                        //unset($vars['sort'], $vars['sort_order']);
-                        $sort_array = [];
-                        break;
-                    default:
-                        // ASC
-                        $name       .= '&nbsp;&nbsp;<i class="small glyphicon glyphicon-triangle-bottom"></i>';
-                        $sort_array = ['sort' => $id, 'sort_order' => 'desc'];
-                    //$vars['sort_order'] = 'desc';
-                }
-            } else {
-                $sort_array = ['sort' => $id];
+            if (str_contains($col[1], 'state-marker')) {
+                $new_cols['state-marker'] = '';
+                continue;
             }
-            $string .= '<a href="' . generate_url($vars, $sort_array) . '">' . $name . '</a>'; // Column now sorted (selected)
+            if (empty($col)) {
+                $new_cols[$id] = [ NULL ];
+                continue;
+            }
+            $new_cols[$id] = [ $id => $col[0] ];
+            if (str_starts_with($col[1], 'class=')) {
+                $new_cols[$id]['class'] = preg_replace('/^class=(["\'])(.+?)\1/', '$2', $col[1]);
+            }
+            if (str_starts_with($col[1], 'style=')) {
+                $new_cols[$id]['style'] = preg_replace('/^style=(["\'])(.+?)\1/', '$2', $col[1]);
+            }
         } else {
-            $string .= $name;      // Sorting is not available (if vars empty or FALSE)
+            $new_cols[$id] = [ $id => $col ];
         }
-        $string .= '</th>' . PHP_EOL;
-    }
-    $string .= '    </tr>' . PHP_EOL;
-    $string .= '  </thead>' . PHP_EOL;
-
-    return $string;
-}
-
-function print_button_group($data, $return = FALSE)
-{
-    $data              = [
-      'id'    => 'rule_actions',
-      'name'  => 'Rule actions',
-      'size'  => 'xs', // xs, sm, lg
-      'class' => ''
-    ];
-    $data['rows'][0][] = '';
-
-    $button_group_start = '      <div';
-    if ($data['id']) {
-        $button_group_start .= ' id="' . $data['id'] . '"';
-    }
-    if ($data['name']) {
-        $button_group_start .= ' aria-label="' . $data['name'] . '"';
     }
 
-    $button_group_class = 'btn-group';
-    if ($data['size']) {
-        $button_group_class .= ' btn-group-' . $data['size'];
-    }
-    if ($data['class']) {
-        $button_group_class .= ' ' . $data['class'];
-    }
-    $button_group_start .= ' class="' . $button_group_class . '"';
-    $button_group_start .= ' role="group">' . PHP_EOL;
-
-    /*
-        <div class="btn-group btn-group-xs" role="group" aria-label="Rule actions">
-          <a class="btn btn-default" role="group" title="Edit" href="#modal-edit_syslog_rule_'.$la['la_id'].'" data-toggle="modal"><i class="icon-cog text-muted"></i></a>
-          <a class="btn btn-danger"  role="group" title="Delete" href="#modal-delete_syslog_rule_'.$la['la_id'].'" data-toggle="modal"><i class="icon-trash"></i></a>
-        </div>
-     */
-    $button_group_end = '      </div>' . PHP_EOL;
-
-    if ($return) {
-        return $button_group_start . $button_group . $button_group_end;
-    }
-    echo $button_group_start . $button_group . $button_group_end;
+    return generate_table_header($new_cols, $vars);
 }
 
 function print_error_permission($text = NULL, $escape = TRUE)
@@ -526,22 +475,43 @@ function get_label_group($params = [], $opt = [], $escape = TRUE)
  *
  * @return string Generated html
  */
-function get_button_group($params = [], $opt = [], $escape = TRUE)
-{
-    $html = '<div class="btn-group"';
-    if ($opt['style']) {
-        $html .= ' style="' . $opt['style'] . '"';
+function generate_button_group($params = [], $opt = [], $escape = TRUE) {
+    $class = 'btn-group';
+    if ($opt['class']) {
+        $class .= ' ' . $opt['class'];
     }
-    $html .= '>' . PHP_EOL;
+
+    if ($opt['size']) {
+        $class .= ' btn-group-' . $opt['size'];
+    } elseif (!str_contains($class, 'btn-group-')) {
+        // default size xs
+        $class .= ' btn-group-xs';
+    }
+    $buttons_start = '    <div class="'.$class.'" role="group"';
+    if ($opt['id']) {
+        $buttons_start .= ' id="' . $opt['id'] . '"';
+    }
+    if ($opt['style']) {
+        $buttons_start .= ' style="' . $opt['style'] . '"';
+    }
+    if ($opt['title']) {
+        $buttons_start .= ' aria-label="' . $opt['title'] . '"';
+    } elseif ($opt['label']) {
+        $buttons_start .= ' aria-label="' . $opt['label'] . '"';
+    }
+    $buttons_start .= '>' . PHP_EOL;
 
     $html_params = [];
     foreach ($params as $param_id => $param) {
         // If param is just string, convert to simple group
         if (is_string($param)) {
-            $param = ['text' => $param, 'event' => 'default'];
+            $param = [ 'text' => $param, 'event' => 'default' ];
         }
 
-        $html_param = ' <div id="' . $param_id . '"'; // open span
+        $html_param = '      <a role="group"'; // open
+        if ($param_id && !is_numeric($param_id)) {
+            $html_param .= ' id="' . $param_id . '"';
+        }
         // Item style
         if ($param['style']) {
             $html_param .= ' style="' . $param['style'] . '"';
@@ -564,22 +534,33 @@ function get_button_group($params = [], $opt = [], $escape = TRUE)
             // Default
             $html_param .= ' class="btn btn-default"';
         }
-        // Icons?
-        // any custom data attribs?
+        if ($param['title']) {
+            $html_param .= ' title="' . $param['title'] . '"';
+        }
+        if ($param['url']) {
+            $html_param .= ' href="' . $param['url'] . '"';
+        }
+        // any custom data attribs
+        if ($param['attribs']) {
+            $html_param .= generate_html_attribs($param['attribs']);
+        }
         $html_param .= '>';
+        if ($param['icon']) {
+            $html_param .= get_icon($param['icon']);
+        }
         // Item text
         if ($param['text']) {
             $html_param .= (bool)$escape ? escape_html($param['text']) : $param['text'];
         }
-        $html_param .= '</div>'; // close span
+        $html_param .= '</a>'; // close
 
         $html_params[] = $html_param;
     }
 
-    $html .= implode(PHP_EOL, $html_params) . PHP_EOL;
-    $html .= '</div>' . PHP_EOL;
+    $html = implode(PHP_EOL, $html_params) . PHP_EOL;
+    $buttons_end = '    </div>' . PHP_EOL;
 
-    return $html;
+    return $buttons_start . $html . $buttons_end;
 }
 
 /**
@@ -638,10 +619,10 @@ function get_icon($icon, $class = '', $attribs = [])
         return $icon;
     }
 
-    $icon = trim(strtolower($icon));
+    $icon = strtolower(trim($icon));
 
     // Use the defined icon if available, else check for an empty icon and return an empty string
-    $icon = isset($config['icon'][$icon]) ? $config['icon'][$icon] : ($icon ?: '');
+    $icon = $config['icon'][$icon] ?? ($icon ?: '');
 
     // Handle emoji styled icons
     if (preg_match('/^:[\w\-_]+:$/', $icon) || is_intnum($icon)) {
@@ -649,12 +630,20 @@ function get_icon($icon, $class = '', $attribs = [])
     }
 
     // Append glyphicon main class if these icons are used
-    if (str_starts($icon, 'glyphicon-')) {
+    if (str_starts_with($icon, 'glyphicon-')) {
         $icon = 'glyphicon ' . $icon;
     }
+    /* elseif (str_starts_with($icon, 'icon-')) {
+        // Compat old (3.x) fontawesome classes with new (6.x)
+        // Brands
+        if (preg_match(OBS_PATTERN_FONTAWESOME_BRANDS, $icon)) {
+            $icon = 'icon-brands ' . $icon;
+        }
+        //$icon .= ' icon-sm';
+    } */
 
     // Initialize the 'class' key in $attribs if not already set and merge additional classes
-    $attribs['class'] = array_merge([$icon], (array)$class, isset($attribs['class']) ? $attribs['class'] : []);
+    $attribs['class'] = array_merge([$icon], (array)$class, $attribs['class'] ?? []);
 
     return '<i ' . generate_html_attribs($attribs) . '></i>';
 }

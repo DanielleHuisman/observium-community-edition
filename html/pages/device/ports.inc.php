@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -21,15 +21,6 @@ if ($vars['view'] === 'graphs' || $vars['view'] === 'minigraphs') {
 if (!$vars['view']) {
     $vars['view'] = trim($config['ports_page_default'], '/');
 }
-
-/* Already set in device page
-$link_array = array('page'    => 'device',
-                    'device'  => $device['device_id'],
-                    'tab' => 'ports');
-
-$filters_array = (isset($vars['filters'])) ? $vars['filters'] : array('deleted' => TRUE);
-$link_array['filters'] = $filters_array;
-*/
 
 $navbar = ['brand' => "Ports", 'class' => "navbar-narrow"];
 
@@ -105,50 +96,21 @@ foreach (['graphs', 'minigraphs'] as $type) {
 }
 
 // Quick filters
-function is_filtered()
-{
-    global $filters_array, $port;
 
-    return ($filters_array['up'] && $port['ifOperStatus'] == 'up' && $port['ifAdminStatus'] == 'up' && !$port['ignore'] && !$port['deleted']) ||
-           ($filters_array['down'] && $port['ifOperStatus'] != 'up' && $port['ifAdminStatus'] == 'up') ||
-           ($filters_array['shutdown'] && $port['ifAdminStatus'] == 'down') ||
-           ($filters_array['ignored'] && $port['ignore']) ||
-           ($filters_array['deleted'] && $port['deleted']);
-}
+if (isset($vars['view']) && in_array($vars['view'], [ 'basic', 'details', 'graphs', 'minigraphs' ])) {
 
-if (isset($vars['view']) && in_array($vars['view'], ['basic', 'details', 'graphs', 'minigraphs'])) {
-    // List filters
-    $filter_options = ['up'       => 'Hide UP',
-                       'down'     => 'Hide DOWN',
-                       'shutdown' => 'Hide SHUTDOWN',
-                       'ignored'  => 'Hide IGNORED',
-                       'deleted'  => 'Hide DELETED'];
-    // To be or not to be
-    $filters_array['all'] = TRUE;
-    foreach ($filter_options as $option => $text) {
-        $filters_array['all'] = $filters_array['all'] && $filters_array[$option];
-        $option_all[$option]  = TRUE;
-    }
-    $filter_options['all'] = ($filters_array['all']) ? 'Reset ALL' : 'Hide ALL';
-
-    // Generate filtered links
-    $navbar['options_right']['filters']['text'] = 'Quick Filters';
-    foreach ($filter_options as $option => $text) {
-        $option_array                                                      = array_merge($filters_array, [$option => TRUE]);
-        $navbar['options_right']['filters']['suboptions'][$option]['text'] = $text;
-        if ($filters_array[$option]) {
-            $navbar['options_right']['filters']['class']                        .= ' active';
-            $navbar['options_right']['filters']['suboptions'][$option]['class'] = 'active';
-            if ($option === 'all') {
-                $option_array = ['disabled' => FALSE];
-            } else {
-                $option_array[$option] = FALSE;
+    // Add filter by ifType
+    $extra = [];
+    foreach (dbFetchColumn('SELECT DISTINCT `ifType` FROM `ports` WHERE `device_id` = ? AND `deleted` = ?', [ $device['device_id'], 0 ]) as $iftype) {
+        foreach ($config['port_types'] as $port_type => $type_entry) {
+            if (in_array($iftype, $type_entry['iftype'], TRUE)) {
+                $extra[] = $port_type;
+                continue 2;
             }
-        } elseif ($option === 'all') {
-            $option_array = $option_all;
         }
-        $navbar['options_right']['filters']['suboptions'][$option]['url'] = generate_url($vars, ['filters' => $option_array]);
     }
+
+    $filters_array = navbar_ports_filter($navbar, $vars, array_unique($extra));
 }
 
 print_navbar($navbar);
@@ -160,11 +122,14 @@ if ($vars['view'] === 'minigraphs') {
     echo '<div class="row">';
     unset ($seperator);
 
-    // FIXME - FIX THIS. UGLY.
-    foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? ORDER BY `ifIndex`", [$device['device_id']]) as $port) {
-        if (is_filtered()) {
-            continue;
-        }
+    $sql   = "SELECT *, `ports`.`port_id` as `port_id`";
+    $sql   .= " FROM  `ports`";
+    //$sql   .= " WHERE `device_id` = ? ORDER BY `ifIndex` ASC";
+    //$ports = dbFetchRows($sql, [$device['device_id']]);
+    //r(generate_where_clause('`device_id` = ?', build_ports_where_filter($device, $filters_array)));
+    $sql   .= generate_where_clause('`device_id` = ?' , build_ports_where_filter($device, $filters_array)) . " ORDER BY `ifIndex` ASC";
+
+    foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $port) {
 
         print_port_minigraph($port, $graph_type);
     }
@@ -181,63 +146,31 @@ if ($vars['view'] === 'minigraphs') {
 
     $i = "1";
 
-    // Make the port caches available easily to this code.
-    global $port_cache, $port_index_cache;
-
     $sql   = "SELECT *, `ports`.`port_id` as `port_id`";
     $sql   .= " FROM  `ports`";
-    $sql   .= " WHERE `device_id` = ? ORDER BY `ifIndex` ASC";
-    $ports = dbFetchRows($sql, [$device['device_id']]);
+    //$sql   .= " WHERE `device_id` = ? ORDER BY `ifIndex` ASC";
+    //$ports = dbFetchRows($sql, [$device['device_id']]);
+    //r(generate_where_clause('`device_id` = ?', build_ports_where_filter($device, $filters_array)));
+    $sql   .= generate_where_clause('`device_id` = ?' , build_ports_where_filter($device, $filters_array)) . " ORDER BY `ifIndex` ASC";
+    $ports = dbFetchRows($sql, [ $device['device_id'] ]);
+
+    //r($ports);
 
     // Sort ports, sharing code with global ports page.
     include($config['html_dir'] . "/includes/port-sort.inc.php");
 
-    // As we've dragged the whole database, lets pre-populate our caches :)
-    foreach ($ports as $port) {
-        $port_cache[$port['port_id']]                           = $port;
-        $port_index_cache[$port['device_id']][$port['ifIndex']] = $port;
-    }
+    /* As we've dragged the whole database, lets pre-populate our caches :) */
+    //foreach ($ports as $port) {
+    //    $port_cache[$port['port_id']]                           = $port;
+    //    $port_index_cache[$port['device_id']][$port['ifIndex']] = @$port_cache[$port['port_id']];
+    //}
+
 
     // Collect port IDs and ifIndexes who has adsl/cbqos/pagp/ip and other.
-    $cache['ports_option'] = [];
-    $ext_tables            = ['ports_adsl', 'ports_cbqos', 'mac_accounting', 'neighbours'];
-    if ($port_details) {
-        $ext_tables = array_merge($ext_tables, ['ipv4_addresses', 'ipv6_addresses', 'pseudowires']);
-        // Here stored ifIndex!
-        //$cache['ports_option']['ports_pagp']       = dbFetchColumn("SELECT `pagpGroupIfIndex` FROM `ports`   WHERE `device_id` = ? GROUP BY `pagpGroupIfIndex`", array($device['device_id'])); // PAGP removed
-        $cache['ports_option']['ports_stack_low']  = dbFetchColumn("SELECT `port_id_low`  FROM `ports_stack` WHERE `device_id` = ? AND `port_id_high` != ? AND `ifStackStatus` = ? GROUP BY `port_id_low`", [$device['device_id'], 0, 'active']);
-        $cache['ports_option']['ports_stack_high'] = dbFetchColumn("SELECT `port_id_high` FROM `ports_stack` WHERE `device_id` = ? AND `port_id_low`  != ? AND `ifStackStatus` = ? GROUP BY `port_id_high`", [$device['device_id'], 0, 'active']);
-    }
+    cache_ports_tables($device, $vars);
+    //r(array_filter_key($cache, 'ports_', 'starts'));
+    //r($cache['ports_stack']);
 
-    //$where = ' IN ('.implode(',', array_keys($port_cache)).')';
-    //$where = generate_query_values_and(array_keys($port_cache), 'port_id');
-    //$where = generate_query_permitted(array('ports', 'devices'));
-    foreach ($ext_tables as $table) {
-
-        $ext_where = [];
-
-        // Here stored port_id!
-        $sql = "SELECT DISTINCT `port_id` FROM `$table`";
-        if ($table === 'neighbours') {
-            // Show only active neighbours
-            $ext_where[] = '`active` = 1 ';
-        } elseif ($table === 'ports_adsl') {
-            // FIXME. adsl table still not have device_id
-            $cache['ports_option'][$table] = dbFetchColumn($sql . generate_where_clause(generate_query_permitted_ng(['ports'])));
-            continue;
-        }
-
-        $cache['ports_option'][$table] = dbFetchColumn($sql . generate_where_clause($cache['where']['ports_permitted'], $ext_where));
-
-        //r("SELECT DISTINCT `port_id` FROM `$table` WHERE 1 " . generate_query_permitted(array('ports', 'devices')));
-
-    }
-
-    $cache['ports_vlan'] = []; // Cache port vlans
-    foreach (dbFetchRows('SELECT * FROM `ports_vlans` AS PV LEFT JOIN vlans AS V ON PV.`vlan` = V.`vlan_vlan` AND PV.`device_id` = V.`device_id`
-                       WHERE PV.`device_id` = ? ORDER BY PV.`vlan`', [$device['device_id']]) as $entry) {
-        $cache['ports_vlan'][$entry['port_id']][$entry['vlan']] = $entry;
-    }
 
     echo generate_box_open();
     echo '<table class="' . $table_class . ' table-hover">' . PHP_EOL;
@@ -272,9 +205,6 @@ if ($vars['view'] === 'minigraphs') {
     echo '<tbody>' . PHP_EOL;
 
     foreach ($ports as $port) {
-        if (is_filtered()) {
-            continue;
-        }
 
         print_port_row($port, $vars);
     }
@@ -284,7 +214,5 @@ if ($vars['view'] === 'minigraphs') {
 }
 
 register_html_title("Ports");
-
-unset($where, $ext_tables, $cache['ports_option'], $cache['ports_vlan']);
 
 // EOF

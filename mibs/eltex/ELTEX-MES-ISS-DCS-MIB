@@ -1,0 +1,582 @@
+ELTEX-MES-ISS-DCS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32
+                FROM SNMPv2-SMI
+        TruthValue, DisplayString, TEXTUAL-CONVENTION
+                FROM SNMPv2-TC
+        eltMesIss
+                FROM ELTEX-MES-ISS-MIB
+        ifIndex
+                FROM IF-MIB
+        VlanId
+                FROM Q-BRIDGE-MIB
+        RowStatus
+                FROM SNMPv2-TC;
+
+eltMesIssDcsMIB MODULE-IDENTITY
+        LAST-UPDATED "202108180000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "MIB extensions for configuring informational options."
+        REVISION "202108180000Z"
+        DESCRIPTION
+                "Added tables:
+                    eltMesIssDcsPortOptionTable
+                    eltMesIssDcsVlanOptionTable"
+        REVISION "202005190000Z"
+        DESCRIPTION "Added DHCPv4 Relay protocol."
+        REVISION "201908140000Z"
+        DESCRIPTION
+                "MIB was fully reworked.
+                Added tables:
+                    eltMesIssDcsCircuitIdUserDefinedTable
+                    eltMesIssDcsOption82Table
+                    eltMesIssDcsCircuitIdTr101Table
+
+                Deleted objects:
+                    eltMesIssDcsOpt82Enabled
+                    eltMesIssDcsDhcpv4Opt82Enabled
+                    eltMesIssDcsDhcpv6Opt82Enabled
+                    eltMesIssDcsPiaOpt82Enabled"
+        REVISION "201905020000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 13 }
+
+
+-- ##################### TEXTUAL-CONVENTION ########################
+
+EltMesIssDcsProtocol ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Control protocols."
+    SYNTAX  INTEGER {
+        dhcpv4(1),
+        dhcpv6(2),
+        pppoeia(3),
+        dhcpv4-relay(4)
+    }
+
+EltMesIssDcsOptionFormat ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Control format types."
+    SYNTAX  INTEGER {
+        tr101(1),
+        userdefined(2)
+    }
+
+EltMesIssDcsOptionDataEncoding ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Encoding data settings."
+    SYNTAX  INTEGER {
+        ascii(1),
+        binary(2)
+    }
+
+EltMesIssDcsCircuitIdTr101Format ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Special pre-defined settings for tr101 format.
+         Each of the arguments is consist of few sub-arguments combinations:
+             p - port
+             v - vlan
+             s - slot."
+    SYNTAX  INTEGER {
+        sp(1),
+        sv(2),
+        pv(3),
+        spv(4)
+    }
+
+EltMesIssDcsCircuitIdTr101Delimiter ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Delimiter types.
+         std - default tr101 delimiter (s/p:v) where s - slot, p - port, v - vlan.
+         hash - #
+         dot - .
+         comma - ,
+         semicolon - ;
+         slash - /
+         space - just a space symbol."
+    SYNTAX  INTEGER {
+         std(1),
+         hash(2),
+         dot(3),
+         comma(4),
+         semicolon(5),
+         slash(6),
+         space(7)
+    }
+
+-- #################################################################
+
+-- Top level MIB structure
+
+   eltMesIssDcsObjects       OBJECT IDENTIFIER ::= { eltMesIssDcsMIB 1 }
+
+-- MIB Groups
+
+   eltMesIssDcsGlobals       OBJECT IDENTIFIER ::= { eltMesIssDcsObjects 1 }
+
+
+eltMesIssDcsOption82Table OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssDcsOption82Entry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table configures option 82 for specific protocol."
+    ::= { eltMesIssDcsGlobals 1 }
+
+eltMesIssDcsOption82Entry OBJECT-TYPE
+   SYNTAX      EltMesIssDcsOption82Entry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+        "An entry contains configuration of option 82 for specific protocol."
+   INDEX { eltMesIssDcsOption82ProtocolType }
+   ::= { eltMesIssDcsOption82Table 1 }
+
+EltMesIssDcsOption82Entry ::=
+    SEQUENCE {
+        eltMesIssDcsOption82ProtocolType       EltMesIssDcsProtocol,
+        eltMesIssDcsOption82Enabled            TruthValue,
+        eltMesIssDcsOption82CircuitIdFormat    EltMesIssDcsOptionFormat
+    }
+
+eltMesIssDcsOption82ProtocolType OBJECT-TYPE
+    SYNTAX      EltMesIssDcsProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Specifies for which protocol option 82 will be configured."
+    ::= { eltMesIssDcsOption82Entry 1 }
+
+eltMesIssDcsOption82Enabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the admin status of the option 82 (or 18 and 37 for DHCPv6)
+         for features which has been choosen in eltMesIssDcsOption82ProtocolType field.
+         If this fields value is 'enabled' the packet processor adds option
+         into packets. If circuitId or remoteId hasn't been configured the
+         default strings will be addded into packet."
+    DEFVAL  { false }
+    ::= { eltMesIssDcsOption82Entry 2 }
+
+eltMesIssDcsOption82CircuitIdFormat OBJECT-TYPE
+    SYNTAX      EltMesIssDcsOptionFormat
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures option format. If its tr101 - data in packet would be stored in this
+         format '%s/%p:%v' where s - slot, p - port, v - vlan.
+         Use eltMesIssDcsCircuitIdTr101Table to configure tr101 format."
+    DEFVAL  { tr101 }
+    ::= { eltMesIssDcsOption82Entry 3 }
+
+-- ################### Displaying format #######################################
+
+eltMesIssDcsCircuitIdTr101Table OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssDcsCircuitIdTr101Entry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table configures CircuitId in tr101 format."
+    ::= { eltMesIssDcsGlobals 2 }
+
+eltMesIssDcsCircuitIdTr101Entry OBJECT-TYPE
+   SYNTAX      EltMesIssDcsCircuitIdTr101Entry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+        "An entry contains configuration of specific tr101 parameters."
+   INDEX { eltMesIssDcsCircuitIdTr101Index }
+   ::= { eltMesIssDcsCircuitIdTr101Table 1 }
+
+EltMesIssDcsCircuitIdTr101Entry ::=
+    SEQUENCE {
+        eltMesIssDcsCircuitIdTr101Index            EltMesIssDcsProtocol,
+        eltMesIssDcsCircuitIdTr101AccessNodeId     DisplayString,
+        eltMesIssDcsCircuitIdTr101Format           EltMesIssDcsCircuitIdTr101Format,
+        eltMesIssDcsCircuitIdTr101Delimiter        EltMesIssDcsCircuitIdTr101Delimiter
+    }
+
+eltMesIssDcsCircuitIdTr101Index OBJECT-TYPE
+    SYNTAX      EltMesIssDcsProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This field specifies the table index."
+    ::= { eltMesIssDcsCircuitIdTr101Entry 1 }
+
+eltMesIssDcsCircuitIdTr101AccessNodeId OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..63))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field specifies special identifier string which will be added to the packet.
+         If this field is empty - nothing will be added to the packet."
+    DEFVAL  { "" }
+    ::= { eltMesIssDcsCircuitIdTr101Entry 2 }
+
+eltMesIssDcsCircuitIdTr101Format OBJECT-TYPE
+    SYNTAX      EltMesIssDcsCircuitIdTr101Format
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field configures which one of the pre-defined settings will be used in packet.
+         Available presets:
+             pv = port + vlan
+             sp = slot + port
+             spv = slot + port + vlan
+             sv = slot + vlan
+         The pre-defined settings are divided by delimiter. Default delimiter is slot/port:vlan.
+         Use eltMesIssDcsCircuitIdTr101Delimiter to configure delimiter."
+    DEFVAL  { spv }
+    ::= { eltMesIssDcsCircuitIdTr101Entry 3 }
+
+eltMesIssDcsCircuitIdTr101Delimiter OBJECT-TYPE
+    SYNTAX      EltMesIssDcsCircuitIdTr101Delimiter
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field configures delimiter for tr101 format of option 82."
+    DEFVAL  { std }
+    ::= { eltMesIssDcsCircuitIdTr101Entry 4 }
+
+-- ############################################################################
+
+
+eltMesIssDcsCircuitIdUserDefinedTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssDcsCircuitIdUserDefinedEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table configures CircuitId as user-defined format."
+    ::= { eltMesIssDcsGlobals 3 }
+
+eltMesIssDcsCircuitIdUserDefinedEntry OBJECT-TYPE
+   SYNTAX      EltMesIssDcsCircuitIdUserDefinedEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+        "An entry contains configuration of specific user-defined parameters."
+   INDEX { eltMesIssDcsCircuitIdUserDefinedIndex }
+   ::= { eltMesIssDcsCircuitIdUserDefinedTable 1 }
+
+EltMesIssDcsCircuitIdUserDefinedEntry ::=
+    SEQUENCE {
+        eltMesIssDcsCircuitIdUserDefinedIndex              EltMesIssDcsProtocol,
+        eltMesIssDcsCircuitIdUserDefinedString             DisplayString,
+        eltMesIssDcsCircuitIdUserDefinedDataEncoding       EltMesIssDcsOptionDataEncoding,
+        eltMesIssDcsCircuitIdUserDefinedSubtypesEnabled    TruthValue
+    }
+
+eltMesIssDcsCircuitIdUserDefinedIndex OBJECT-TYPE
+    SYNTAX      EltMesIssDcsProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This field specifies the table index."
+    ::= { eltMesIssDcsCircuitIdUserDefinedEntry 1 }
+
+eltMesIssDcsCircuitIdUserDefinedString OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..63))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures user-defined option 82 string globally as a template.
+         Specify circuit identifier string template:
+             <%a: ip-address of the system in format A.B.C.D>,
+             <%c: client mac>,
+             <%h: hostname>,
+             <%p: short port name (fa 0/1)>,
+             <%P: long port name (fa 1/0/1)>,
+             <%t: port type>,
+             <%m: mac-address of port in format H-H-H-H-H-H>,
+             <%M: mac-address of system in format H-H-H-H-H-H>,
+             <%u: unit number>,
+             <%s: slot number>,
+             <%i: port ifIndex>,
+             <%v: vlan id>,
+             <%: single %>."
+    DEFVAL  { "%h %p %v" }
+    ::= { eltMesIssDcsCircuitIdUserDefinedEntry 2 }
+
+eltMesIssDcsCircuitIdUserDefinedDataEncoding OBJECT-TYPE
+    SYNTAX      EltMesIssDcsOptionDataEncoding
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field configures in which encoding format data would be added into a packet.
+         If it's ASCII all data will be added as a string, if binary - all numeric values
+         will be converted to the raw format."
+    DEFVAL  { ascii }
+    ::= { eltMesIssDcsCircuitIdUserDefinedEntry 3 }
+
+eltMesIssDcsCircuitIdUserDefinedSubtypesEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures subtype enable status.
+         If this field is in the true state, packet processor adds 2 more bytes to the packet
+         аfter suboption type and length.
+         First byte means circuit/remote id type and second means length of
+         circuit/remote id data.
+
+                       circuit/
+         suboption     remote id
+            type        type
+             +           +
+             |   length  |  length
+          +--v--+-----+--v--+-----+----------------------------------+
+          |     |N + 2|     |  N  |                                  |
+          +-----+-----+-----+-----+----------------------------------+
+             1     1     1     1                    N
+            byte  byte  byte  byte                bytes
+
+          Suboption type can be:
+              1 for Circuit Id
+              2 for Remote Id
+
+          Circuit Id type can be:
+              0 for tr101 format (e.g. vlan, slot, port)
+              1 for ASCII string
+
+          Remote Id type can be:
+              0 for MAC address
+              1 for ASCII string or hostname
+         "
+    DEFVAL  { false }
+    ::= { eltMesIssDcsCircuitIdUserDefinedEntry 4 }
+
+-- ############################################################################
+
+eltMesIssDcsRemoteIdUserDefinedTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssDcsRemoteIdUserDefinedEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table configures RemoteId as user-defined format."
+    ::= { eltMesIssDcsGlobals 4 }
+
+eltMesIssDcsRemoteIdUserDefinedEntry OBJECT-TYPE
+   SYNTAX      EltMesIssDcsRemoteIdUserDefinedEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+        "An entry contains configuration of specific user-defined parameters."
+   INDEX { eltMesIssDcsRemoteIdUserDefinedIndex }
+   ::= { eltMesIssDcsRemoteIdUserDefinedTable 1 }
+
+EltMesIssDcsRemoteIdUserDefinedEntry ::=
+    SEQUENCE {
+        eltMesIssDcsRemoteIdUserDefinedIndex              EltMesIssDcsProtocol,
+        eltMesIssDcsRemoteIdUserDefinedString             DisplayString,
+        eltMesIssDcsRemoteIdUserDefinedDataEncoding       EltMesIssDcsOptionDataEncoding,
+        eltMesIssDcsRemoteIdUserDefinedSubtypesEnabled    TruthValue
+    }
+
+eltMesIssDcsRemoteIdUserDefinedIndex OBJECT-TYPE
+    SYNTAX      EltMesIssDcsProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This field specifies the table index."
+    ::= { eltMesIssDcsRemoteIdUserDefinedEntry 1 }
+
+eltMesIssDcsRemoteIdUserDefinedString OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..63))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures user-defined option 82 string globally as a template.
+         Specify circuit identifier string template:
+             <%a: ip-address of the system in format A.B.C.D>,
+             <%c: client mac>,
+             <%h: hostname>,
+             <%p: short port name (fa 0/1)>,
+             <%P: long port name (fa 1/0/1)>,
+             <%t: port type>,
+             <%m: mac-address of port in format H-H-H-H-H-H>,
+             <%M: mac-address of system in format H-H-H-H-H-H>,
+             <%u: unit number>,
+             <%s: slot number>,
+             <%i: port ifIndex>,
+             <%v: vlan id>,
+             <%: single %>."
+    DEFVAL  { "%h %p %v" }
+    ::= { eltMesIssDcsRemoteIdUserDefinedEntry 2 }
+
+eltMesIssDcsRemoteIdUserDefinedDataEncoding OBJECT-TYPE
+    SYNTAX      EltMesIssDcsOptionDataEncoding
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field configures in which encoding format data would be added into a packet.
+         If it's ASCII all data will be added as a string, if binary - all numeric values
+         will be converted to the raw format."
+    DEFVAL  { ascii }
+    ::= { eltMesIssDcsRemoteIdUserDefinedEntry 3 }
+
+eltMesIssDcsRemoteIdUserDefinedSubtypesEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures subtype enable status.
+         If this field is in the true state, packet processor adds 2 more bytes to the packet
+         аfter suboption type and length.
+         First byte means circuit/remote id type and second means length of
+         circuit/remote id data.
+
+                       circuit/
+         suboption     remote id
+            type        type
+             +           +
+             |   length  |  length
+          +--v--+-----+--v--+-----+----------------------------------+
+          |     |N + 2|     |  N  |                                  |
+          +-----+-----+-----+-----+----------------------------------+
+             1     1     1     1                    N
+            byte  byte  byte  byte                bytes
+
+          Suboption type can be:
+              1 for Circuit Id
+              2 for Remote Id
+
+          Circuit Id type can be:
+              0 for tr101 format (e.g. vlan, slot, port)
+              1 for ASCII string
+
+          Remote Id type can be:
+              0 for MAC address
+              1 for ASCII string or hostname
+         "
+    DEFVAL  { false }
+    ::= { eltMesIssDcsRemoteIdUserDefinedEntry 4 }
+
+-- ############################################################################
+
+eltMesIssDcsPortInfoOptTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssDcsPortInfoOptEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table configures info option for specific protocol."
+    ::= { eltMesIssDcsGlobals 5 }
+
+eltMesIssDcsPortInfoOptEntry OBJECT-TYPE
+   SYNTAX      EltMesIssDcsPortInfoOptEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+        "An entry contains configuration of info option for specific protocol."
+   INDEX { ifIndex, eltMesIssDcsPortInfoOptProtocolType }
+   ::= { eltMesIssDcsPortInfoOptTable 1 }
+
+EltMesIssDcsPortInfoOptEntry ::=
+    SEQUENCE {
+        eltMesIssDcsPortInfoOptProtocolType       EltMesIssDcsProtocol,
+        eltMesIssDcsPortInfoOptEnabled            TruthValue
+    }
+
+eltMesIssDcsPortInfoOptProtocolType OBJECT-TYPE
+    SYNTAX      EltMesIssDcsProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Specifies for which protocol info option will be configured."
+    ::= { eltMesIssDcsPortInfoOptEntry 1 }
+
+eltMesIssDcsPortInfoOptEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the admin status of the information option
+         for features which has been chosen in protocol type field and specific
+         interface.
+         If this fields value is 'enabled' the packet processor adds option
+         into packets from this interface. If circuitId or remoteId hasn't been
+         configured the default strings will be added into packet."
+    DEFVAL  { false }
+    ::= { eltMesIssDcsPortInfoOptEntry 2 }
+
+-- ############################################################################
+
+eltMesIssDcsVlanInfoOptTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssDcsVlanInfoOptEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table configures info option for specific protocol."
+    ::= { eltMesIssDcsGlobals 6 }
+
+eltMesIssDcsVlanInfoOptEntry OBJECT-TYPE
+   SYNTAX      EltMesIssDcsVlanInfoOptEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+        "An entry contains configuration of info option for specific protocol."
+   INDEX { eltMesIssDcsVlanInfoOptVlanId, eltMesIssDcsVlanInfoOptProtocolType }
+   ::= { eltMesIssDcsVlanInfoOptTable 1 }
+
+EltMesIssDcsVlanInfoOptEntry ::=
+    SEQUENCE {
+        eltMesIssDcsVlanInfoOptVlanId             VlanId,
+        eltMesIssDcsVlanInfoOptProtocolType       EltMesIssDcsProtocol,
+        eltMesIssDcsVlanInfoOptEnabled            TruthValue,
+        eltMesIssDcsVlanInfoOptRowStatus          RowStatus
+    }
+
+eltMesIssDcsVlanInfoOptVlanId  OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the VLAN ID associated with this entry."
+    ::= { eltMesIssDcsVlanInfoOptEntry 1 }
+
+eltMesIssDcsVlanInfoOptProtocolType OBJECT-TYPE
+    SYNTAX      EltMesIssDcsProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Specifies for which protocol info option will be configured."
+    ::= { eltMesIssDcsVlanInfoOptEntry 2 }
+
+eltMesIssDcsVlanInfoOptEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the admin status of the information option
+         for features which has been chosen in protocol type field and specific
+         interface.
+         If this fields value is 'enabled' the packet processor adds option
+         into packets from this interface. If circuitId or remoteId hasn't been
+         configured the default strings will be added into packet."
+    DEFVAL  { false }
+    ::= { eltMesIssDcsVlanInfoOptEntry 3 }
+
+eltMesIssDcsVlanInfoOptRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "RowStatus for DCS VLAN option table. Allowed values are
+         CreateAndWait, Active and Destroy."
+    ::= { eltMesIssDcsVlanInfoOptEntry 4 }
+
+-- ############################################################################
+
+
+END

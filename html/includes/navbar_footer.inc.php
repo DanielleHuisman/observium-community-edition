@@ -59,12 +59,19 @@
                                 ?>
                                 <a href="<?php echo(generate_url(['page' => 'overview'])); ?>"
                                    class="dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">
-                                    <?php get_icon('alert'); ?> <b class="caret"></b></a>
+                                    <?php echo(get_icon('alert')); ?> <b class="caret"></b></a>
                                 <div class="<?php echo($div_class); ?>" style="width: 700px; max-height: 500px; z-index: 2000; padding: 10px 10px 0px;">
 
                                     <h3>Notifications</h3>
                                     <?php
+                                    //r($notifications);
                                     foreach ($notifications as $notification) {
+                                        if (isset($notification['markdown']) && $notification['markdown']) {
+                                            $notification['text'] = get_markdown($notification['text'], TRUE, TRUE);
+                                            if (isset($notification['title'])) {
+                                                $notification['title'] = get_markdown($notification['title'], TRUE, TRUE);
+                                            }
+                                        }
                                         // FIXME handle severity parameter with colour or icon?
                                         if (isset($config['syslog']['priorities'][$notification['severity']])) {
                                             // Numeric severity to string
@@ -73,7 +80,7 @@
                                         echo('<div width="100%" class="alert alert-' . $notification['severity'] . '">');
                                         $notification_title = '';
                                         if (isset($notification['unixtime'])) {
-                                            $timediff           = $GLOBALS['config']['time']['now'] - $notification['unixtime'];
+                                            $timediff           = get_time() - $notification['unixtime'];
                                             $notification_title .= format_uptime($timediff, "short-3") . ' ago: ';
                                         }
                                         if (isset($notification['title'])) {

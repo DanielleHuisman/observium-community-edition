@@ -70,7 +70,7 @@ if (empty($config['email']['from'])) {
     $headers['Return-Path'] = 'observium@' . $localhost;
 } else {
     // Validate configured mail from
-    foreach (parse_email($config['email']['from']) as $from => $from_name) {
+    foreach(parse_email($config['email']['from']) as $from => $from_name) {
         $headers['From']        = (empty($from_name) ? $from : '"' . $from_name . '" <' . $from . '>'); // From:
         $headers['Return-Path'] = $from;
         break; // use only first entry
@@ -90,7 +90,7 @@ $rcpts      = implode(', ', $rcpts);
 $headers['To']      = $rcpts_full;            // To:
 $headers['Subject'] = $message_tags['TITLE']; // Subject:
 // ID and Date, leave it before X- headers
-$headers['Message-ID'] = '<' . md5(uniqid(time())) . '@' . $localhost . '>';
+$headers['Message-ID'] = '<' . md5(uniqid(time(), TRUE)) . '@' . $localhost . '>';
 $headers['Date']       = $time_rfc;
 
 $headers['X-Priority'] = 3;                                           // Mail priority
@@ -109,8 +109,13 @@ $mime = new Mail_mime(['head_charset' => 'utf-8',
                        'html_charset' => 'utf-8',
                        'eol'          => PHP_EOL]);
 
+// Mail text footer
+$message_tags['FOOTER'] = "\n\nE-mail sent to: $rcpts\n" .
+                          "E-mail sent at: $time_sent\n\n" .
+                          "-- \n" . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "\n" . OBSERVIUM_URL . "\n";
+
 // Generate Mail text in both plain text and html
-$message['text'] = simple_template('email_text', $message_tags, ['is_file' => TRUE]);
+$message['text'] = simple_template('email_text', $message_tags, [ 'is_file' => TRUE ]);
 
 $message_tags_html               = $message_tags;
 $message_tags_html['CONDITIONS'] = nl2br(escape_html($message_tags['CONDITIONS']));
@@ -125,13 +130,13 @@ if (is_array($graphs) && count($graphs)) {
     foreach ($graphs as $key => $graph) {
         $cid = random_string(16);
         // Unencode data uri tag to file content
-        [$gmime, $base64] = explode(';', $graph['data'], 2);
+        [ $gmime, $base64 ] = explode(';', $graph['data'], 2);
         $gmime  = substr($gmime, 5);
         $base64 = substr($base64, 7);
         //print_vars(substr($graph['data'], 0, 20));
         //print_vars($gmime);
         //print_vars(substr($base64, 0, 20));
-        $mime -> addHTMLImage(base64_decode($base64), $gmime, $cid . '.png', FALSE, $cid);
+        $mime->addHTMLImage(base64_decode($base64), $gmime, $cid . '.png', FALSE, $cid);
 
         $message_tags_html['ENTITY_GRAPHS'] .= '<h4>' . $graph['type'] . '</h4>';
         $message_tags_html['ENTITY_GRAPHS'] .= '<a href="' . $graph['url'] . '"><img src="cid:' . $cid . '"></a><br />';
@@ -139,8 +144,13 @@ if (is_array($graphs) && count($graphs)) {
 }
 //print_vars($message_tags_html);
 
+// Mail html footer
+$message_tags_html['FOOTER'] = "\n<br /><p style=\"font-size: 11px;\">E-mail sent to: $rcpts<br />\n" .
+                               "E-mail sent at: $time_sent</p>\n" .
+                               '<div style="font-size: 11px; color: #999;">-- <br /><a href="' .
+                               OBSERVIUM_URL . '">' . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "</a></div>\n";
 
-$message['html'] = simple_template('email_html', $message_tags_html, ['is_file' => TRUE]);
+$message['html'] = simple_template('email_html', $message_tags_html, [ 'is_file' => TRUE ]);
 unset($message_tags_html);
 
 foreach ($message as $part => $part_body) {
@@ -148,21 +158,10 @@ foreach ($message as $part => $part_body) {
         case 'text':
         case 'txt':
         case 'plain':
-            $part_body .= "\n\nE-mail sent to: $rcpts\n";
-            $part_body .= "E-mail sent at: $time_sent\n\n";
-            $part_body .= "-- \n" . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "\n" . OBSERVIUM_URL . "\n";
-            $mime -> setTXTBody($part_body);
+            $mime->setTXTBody($part_body);
             break;
         case 'html':
-            $part_footer = "\n<br /><p style=\"font-size: 11px;\">E-mail sent to: $rcpts<br />\n";
-            $part_footer .= "E-mail sent at: $time_sent</p>\n";
-            $part_footer .= '<div style="font-size: 11px; color: #999;">-- <br /><a href="' . OBSERVIUM_URL . '">' . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "</a></div>\n";
-            if (stripos($part_body, '</body>')) {
-                $part_body = str_ireplace('</body>', $part_footer . '</body>', $part_body);
-            } else {
-                $part_body .= $part_footer;
-            }
-            $mime -> setHTMLBody($part_body);
+            $mime->setHTMLBody($part_body);
             break;
         //case 'image':
         //  break;
@@ -170,21 +169,21 @@ foreach ($message as $part => $part_body) {
         //  break;
     }
 }
-$body = $mime -> get();
+$body = $mime->get();
 
 // Prepare headers
 foreach ($headers as $name => $value) {
-    $headers[$name] = $mime -> encodeHeader($name, $value, 'utf-8', 'quoted-printable');
+    $headers[$name] = $mime->encodeHeader($name, $value, 'utf-8', 'quoted-printable');
 }
-$headers = $mime -> headers($headers);
+$headers = $mime->headers($headers);
 //var_dump($headers);
 
 // Create mailer instance
-$mail = Mail ::factory($backend, $mail_params);
+$mail = Mail::factory($backend, $mail_params);
 // Sending email
-$status = $mail -> send($rcpts, $headers, $body);
+$status = $mail->send($rcpts, $headers, $body);
 
-if (PEAR ::isError($status)) {
+if (PEAR::isError($status)) {
     //print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
     $notify_status['success'] = FALSE;
     $notify_status['error']   = $status -> getMessage();

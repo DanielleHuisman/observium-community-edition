@@ -1,0 +1,742 @@
+ZXPW-TDM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+  MODULE-IDENTITY, OBJECT-TYPE,
+  Integer32, Unsigned32
+     FROM SNMPv2-SMI
+
+  TEXTUAL-CONVENTION, TruthValue,  RowStatus, StorageType,
+   TimeStamp
+     FROM SNMPv2-TC
+
+  InterfaceIndexOrZero
+     FROM IF-MIB
+
+  DisplayString
+     FROM RFC1213-MIB
+
+  zxPwIndex
+     FROM ZXPW-STD-MIB
+
+  zxPwCTDM
+        FROM ZTE-MASTER-MIB
+  ;
+
+-- The TDM MIB
+
+    zxPwCTDMMIB MODULE-IDENTITY
+        LAST-UPDATED "200605150000Z"  -- May 15, 2006
+        ORGANIZATION    "Zhongxing Telcom Co. Ltd."
+        CONTACT-INFO    "Zhongxing Telcom Co. Ltd.
+                         E-mail: info@mail.zte.com.cn
+                         http  : www.zte.com.cn or www.zhongxing.com"    
+        DESCRIPTION
+            "This MIB contains managed object definitions for
+             encapsulating TDM (T1,E1, T3, E3, NxDS0) as
+             pseudo-wires over packet-switching networks (PSN).
+      
+             This MIB supplements the ZXPW-STD-MIB as in: Zelig, D.,
+             Nadeau,T. 'Pseudo Wire (PW) Management Information Base'.
+             The ZXPW-STD-MIB contains structures and MIB associations
+             generic to Pseudo-Wire (PW) emulation. PW-specific
+             MIBs (such as this) contain config and stats for specific
+             PW types.
+            "
+      ::= { zxPwCTDM 2 }      
+    
+    -- Local Textual conventions
+    PwTDMCfgIndex ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+           "Index into any of the relevant pwCXXXCfgTable."
+        SYNTAX      Unsigned32
+    
+    -- Tables, Scalars
+    zxPwCTDMObjects       OBJECT IDENTIFIER
+                                 ::= { zxPwCTDMMIB 1 }
+    -- Notifications
+    -- pwCTDMNotifications OBJECT IDENTIFIER ::= { pwCTDMMIB 2 }
+    
+    -- Conformance
+    -- pwCTDMConformance   OBJECT IDENTIFIER ::= { pwCTDMMIB 3 }
+    
+    -- TDM PW table
+    
+    zxPwCTDMTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF ZxPwCTDMEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "This table contains basic information including ifIndex,
+             and pointers to entries in the relevant TDM config
+             tables for this TDM PW."
+        ::= { zxPwCTDMObjects 1 }
+    
+    zxPwCTDMEntry OBJECT-TYPE
+        SYNTAX        ZxPwCTDMEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "This table is indexed by the same index that was
+             created for the associated entry in the PW Table
+             (in the ZXPW-STD-MIB).
+        
+               - The zxPwIndex.
+        
+             An entry is created in this table by the agent for every
+             entry in the zxPwTable with a zxPwType equal to one of the
+             following:
+             e1Satop(17), t1Satop(18), e3Satop(19), t3Satop(20),
+             basicCesPsn(21), basicTdmIp(22),  tdmCasCesPsn(23),
+             tdmCasTdmIp(24)."        
+        INDEX  { zxPwIndex }    
+        ::= { zxPwCTDMTable 1 }
+    
+    ZxPwCTDMEntry ::= SEQUENCE {       
+        zxPwCTDMRate                      Integer32,
+        zxPwCTDMIfIndex                   InterfaceIndexOrZero,
+        zxPwCGenTDMCfgIndex               PwTDMCfgIndex,
+        zxPwCRelTDMCfgIndex               PwTDMCfgIndex,
+    
+        zxPwCTDMConfigError               BITS,
+        zxPwCTDMTimeElapsed               Integer32,
+        zxPwCTDMValidIntervals            Integer32,
+        zxPwCTDMValidDayIntervals         Integer32,
+        zxPwCTDMCurrentIndications        BITS,
+        zxPwCTDMLatchedIndications        BITS,
+        zxPwCTDMLastEsTimeStamp           TimeStamp    
+    }
+    
+    zxPwCTDMRate OBJECT-TYPE
+        SYNTAX     Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The parameter represents the bit-rate of the TDM service
+             in multiples of the 'basic' 64 Kbit/s rate. It complements
+             the definition of zxPwType used in ZXPW-STD-MIB.
+             For structure-agnostic the following should be used:
+             a) Satop E1 - 32
+             b) Satop T1 emulation:
+                i)   MUST be set to 24 in the basic emulation mode
+                ii)  MUST be set to 25 for the 'Octet-aligned T1'
+                     emulation mode
+             c) Satop E3 - 535
+             d) Satop T3 - 699
+             For all kinds of structure-aware emulation, this parameter
+             MUST be set to N where N is the number of DS0 channels
+             in the corresponding attachment circuit."
+        REFERENCE
+            "See [TDMCP-EXT]"
+        DEFVAL { 32 }
+        ::= { zxPwCTDMEntry 1 }
+    
+    zxPwCTDMIfIndex OBJECT-TYPE
+        SYNTAX        InterfaceIndexOrZero
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This is a unique index within the ifTable. It represents
+             the interface index of the full link or the interface
+             index for the bundle holding the group of
+             time slots to be transmitted via this PW connection.
+        
+             A value of zero indicates an interface index that has yet
+             to be determined.
+             Once set, if the TDM ifIndex is (for some reason) later
+             removed, the agent SHOULD delete the associated PW rows
+             (e.g., this zxPwCTDMTable entry). If the agent does not
+             delete the rows,  the agent MUST set this object to
+             zero."
+        ::= { zxPwCTDMEntry 2 }
+    
+    zxPwCGenTDMCfgIndex OBJECT-TYPE
+        SYNTAX        PwTDMCfgIndex
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "Index to the generic parameters in the TDM configuration
+             table that appears in this MIB module. It is likely that
+             multiple TDM PWs of the same characteristic will share
+             a single TDM Cfg entry."
+        REFERENCE
+            "Used by MAP"       
+        ::= { zxPwCTDMEntry 3 }
+    
+    zxPwCRelTDMCfgIndex OBJECT-TYPE
+        SYNTAX        PwTDMCfgIndex
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "Index to the relevant TDM configuration table entry
+             that appears in one of the related MIB modules
+             such as TDMoIP or CESoPSN. It is likely that
+             multiple TDM PWs of the same characteristic will share
+             a single configuration entry of the relevant type.
+             The value 0 implies no entry in other related MIB"
+        ::= { zxPwCTDMEntry 4 }
+    
+    zxPwCTDMConfigError OBJECT-TYPE
+        SYNTAX BITS {
+              other(0),
+              tdmTypeIncompatible(1),
+              peerRtpIncompatible(2),
+              peerPayloadSizeIncompatible(3)
+        }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Any of the bits are set if the local configuration is
+             not compatible with the peer configuration as available
+             from the various parameters options.
+        
+            -tdmTypeIncompatible bit is set if the local configuration
+             is not carrying the same TDM type as the peer configuration.
+        
+             -peerRtpIncompatible bit is set if the local configuration
+             is configured to send RTP packets for this PW, and the
+             remote is not capable of accepting RTP packets.
+        
+             -peerPayloadSizeIncompatible bit is set if the local
+             configuration is not carrying the same Payload Size as the
+             peer configuration.  "
+        ::= { zxPwCTDMEntry 5}
+    
+    zxPwCTDMTimeElapsed OBJECT-TYPE
+        SYNTAX  Integer32 (1..900)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of seconds, including partial seconds,
+             that have elapsed since the beginning of the current
+             measurement period. If, for some reason, such as an
+             adjustment in the system's time-of-day clock, the
+             current interval exceeds the maximum value, the
+             agent will return the maximum value."
+        ::= { zxPwCTDMEntry 6}
+    
+    zxPwCTDMValidIntervals OBJECT-TYPE
+        SYNTAX  Integer32 (0..96)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of previous 15-minute intervals for which data
+             was collected.
+             An agent with TDM capability must be capable of supporting
+             at least n intervals. The minimum value of n is 4, The
+             default of n is 32 and the maximum value of n is 96.
+             The value will be <n> unless the measurement was (re-)
+             started within the last (<n>*15) minutes, in which case
+             the value will be the number of complete 15 minute
+             intervals for which the agent has at least some data.
+             In certain cases(e.g., in the case where the agent is
+             a proxy) it is possible that some intervals are unavailable.
+             In this case, this interval is the maximum interval number
+             for which data is available. "
+        ::= { zxPwCTDMEntry 7}
+    
+    zxPwCTDMValidDayIntervals OBJECT-TYPE
+        SYNTAX  Integer32 (0..30)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of previous days for which data
+             was collected.
+             An agent with TDM capability must be capable of supporting
+             at least n intervals. The minimum value of n is 1, The
+             default of n is 1 and the maximum value of n is 30."
+        ::= { zxPwCTDMEntry 8}
+    
+    zxPwCTDMCurrentIndications OBJECT-TYPE
+        SYNTAX BITS {
+              other(0),
+              strayPacket(1),
+              malformedPacket(2),
+              excessivePktLossRate(3),
+              bufferOverrun(4),
+              bufferUnderrun(5),
+              remotePktLoss(6),
+              pktMisOrder(7),
+              packetLoss(8),
+              tdmFault(9)
+        }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The following defects should be detected and reported
+             upon request:
+        
+             -Stray packets MAY be detected by the PSN and multiplexing
+             layers. Stray packets MUST be discarded by the CE-bound IWF
+             and their detection MUST NOT affect mechanisms for detection
+             of packet loss.
+        
+             -Malformed packets are detected by mismatch between the
+             expected packet size (taking the value of the L bit into
+             account) and the actual packet size inferred from the PSN and
+             multiplexing layers. Malformed in-order packets MUST be
+             discarded by the CE-bound IWF and replacement data generated
+             as for lost packets.
+        
+             -Excessive packet loss rate is detected by computing the
+             average packet loss rate over the value of
+             zxPwCTDMAvePktLossTimeWindow and comparing it with a
+             preconfigured threshold [SATOP].
+        
+             -Buffer overrun is detected in the normal operation state
+             when the CE bound IWF's jitter buffer cannot accommodate
+             newly arrived packets.
+        
+             -Remote packet loss is indicated by reception of packets with
+             their R bit set.
+        
+             -Packet misorder is detected by looking at the Sequence
+             number provided by the control word.
+        
+             -TDM Fault, if L bit in the control word is set, it indicates
+             that TDM data carried in the payload is invalid due an
+             attachment circuit fault.  When the L bit is set the payload
+             MAY be omitted in order to conserve bandwidth.
+        
+             Note: the algorithm used to capture these indications
+             is implementation specific."
+        ::= { zxPwCTDMEntry 9}
+    
+    zxPwCTDMLatchedIndications OBJECT-TYPE
+        SYNTAX BITS {
+              other(0),
+              staryPacket(1),
+              malformedPacket(2),
+              excessivePktLossRate(3),
+              bufferOverrun(4),
+              bufferUnderrun(5),
+              remotePktLoss(6),
+              pktMisOrder(7),
+              packetLoss(8),
+              tdmFault(9)
+        
+        }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The state of TDM indicators when the TDM PW last declared
+             an error second (either as ES, SES or a second with
+             errors inside a UAS) condition. At this time, only LOPS
+             can create a failure. Since indicators other than LOPS are
+             useful, all are latched here. For bit definitions, see
+             zxPwCTDMCurrentIndications above.
+        
+             Note: the algorithm used to latch these indications when
+             entering a defect state is implementation specific."
+        ::= { zxPwCTDMEntry 10}
+    
+    zxPwCTDMLastEsTimeStamp OBJECT-TYPE
+        SYNTAX      TimeStamp
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of sysUpTime at the most recent occasion at
+             which the TDM PW entered the ES or SES state."
+        ::= { zxPwCTDMEntry 11}
+    
+    -- End of TDM PW table
+    
+    -- PW Generic TDM PW Configuration Table
+    
+    zxPwCTDMCfgIndexNext OBJECT-TYPE
+      SYNTAX            Unsigned32
+      MAX-ACCESS        read-only
+      STATUS            current
+      DESCRIPTION
+          "This object contains the value to be used for
+           zxPwCTDMCfgIndex when creating entries in the
+           zxPwCTDMCfgTable. The value 0 indicates that no
+           unassigned entries are available.  To obtain the
+           value of zxPwCTDMCfgIndexNext for a new entry in the
+           zxPwCTDMCfgTable, the manager issues a management
+           protocol retrieval operation. The agent will
+           determine through its local policy when this
+           index value will be made available for reuse."
+      ::= { zxPwCTDMObjects 2 }
+    
+    
+    zxPwCTDMCfgTable   OBJECT-TYPE
+        SYNTAX           SEQUENCE OF ZxPwCTDMCfgEntry
+        MAX-ACCESS       not-accessible
+        STATUS           current
+        DESCRIPTION
+            "This table contains a set of parameters that may be
+             referenced by one or more TDM PWs in zxPwCTDMTable."
+        
+        ::= { zxPwCTDMObjects 3 }
+    
+    zxPwCTDMCfgEntry   OBJECT-TYPE
+        SYNTAX           ZxPwCTDMCfgEntry
+        MAX-ACCESS       not-accessible
+        STATUS           current
+        DESCRIPTION
+            "These parameters define the characteristics of a
+             TDM PW. They are grouped here to ease NMS burden.
+             Once an entry is created here it may be re-used
+             by many PWs."        
+        INDEX  { zxPwCTDMCfgIndex }
+        ::= { zxPwCTDMCfgTable 1 }
+    
+    ZxPwCTDMCfgEntry ::= SEQUENCE {
+        zxPwCTDMCfgIndex                    PwTDMCfgIndex,
+        zxPwCTDMCfgRowStatus                RowStatus,
+        zxPwCTDMCfgConfErr                  BITS,
+        zxPwCTDMCfgPayloadSize              Unsigned32,
+        zxPwCTDMCfgPktReorder               TruthValue,
+        zxPwCTDMCfgRtpHdrUsed               TruthValue,
+        zxPwCTDMCfgJtrBfrDepth              Unsigned32,
+        zxPwCTDMCfgPayloadSuppression       INTEGER,
+    
+        zxPwCTDMCfgConsecPktsInSynch        Unsigned32,
+    
+        zxPwCTDMCfgConsecMissPktsOutSynch   Unsigned32,
+        zxPwCTDMCfgSetUp2SynchTimeOut       Unsigned32,
+    
+        zxPwCTDMCfgPktReplacePolicy         INTEGER,
+    
+        zxPwCTDMCfgAvePktLossTimeWindow     Integer32,
+        zxPwCTDMCfgExcessivePktLossThreshold   Unsigned32,
+    
+        zxPwCTDMCfgAlarmThreshold           Unsigned32,
+        zxPwCTDMCfgClearAlarmThreshold      Unsigned32,
+        zxPwCTDMCfgMissingPktsToSes         Unsigned32,
+    
+        zxPwCTDMCfgTimestampMode            INTEGER,
+        zxPwCTDMCfgQueueSize                Unsigned32,
+        zxPwCTDMCfgName                     DisplayString,
+        zxPwCTDMCfgSSRC                     Unsigned32,
+        zxPwCTDMCfgStorageType              StorageType
+        }
+    
+    zxPwCTDMCfgIndex   OBJECT-TYPE
+        SYNTAX        PwTDMCfgIndex
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "Index to an entry in this table. The value is a copy of the
+             assigned zxPwCTDMCfgIndexNext"
+        ::= { zxPwCTDMCfgEntry 1 }
+    
+    zxPwCTDMCfgRowStatus    OBJECT-TYPE
+        SYNTAX               RowStatus
+        MAX-ACCESS           read-create
+        STATUS               current
+        DESCRIPTION
+            "Object used for creating, modifying, and deleting
+             a row from this table. The following objects should not be
+             modified if the entry is in used and the status is active:
+             zxPwCTDMCfgPayloadSize, zxPwCTDMCfgRtpHdrUsed,
+             zxPwCTDMCfgJtrBfrDepth, and zxPwCTDMCfgPayloadSuppression.
+             The row should not be deleted if the entry is in used"       
+        ::= { zxPwCTDMCfgEntry 2 }
+    
+    zxPwCTDMCfgConfErr OBJECT-TYPE
+        SYNTAX BITS {
+              other(0),
+              payloadSize(1),
+              jtrBfrDepth(2)
+        }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Various configuration errors. Illegal settings within
+             the zxPwCTDMCfg table."
+        ::= { zxPwCTDMCfgEntry 3 }
+    
+    zxPwCTDMCfgPayloadSize OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The value of this object indicates the PayLoad Size (in bytes)
+             to be defined during the PW setUp. Upon TX, implementation
+             must be capable of carrying that amount of bytes.
+             Upon RX, when the LEN field is set to 0, the payload of
+             packet  MUST assume this size, and if the actual
+             packet size is inconsistent with this length,
+             the packet MUST be considered to be malformed. "
+        REFERENCE
+            "Used by MAP"       
+        ::= { zxPwCTDMCfgEntry 4 }
+    
+    zxPwCTDMCfgPktReorder OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "If set True: as CE bound packets are queued in the
+             jitter buffer, out of order packets are re-ordered. The
+             maximum sequence number differential (i.e., the range in
+             which re-sequencing can occur) is dependant on the depth
+             of the jitter buffer. See zxPwCTDMCfgJtrBfrDepth.
+        
+             NOTE: Some implementations may not support this feature.
+             The agent is then required to set this to False."
+        REFERENCE
+            "Used by MAP"       
+        ::= { zxPwCTDMCfgEntry 5 }
+    
+    zxPwCTDMCfgRtpHdrUsed OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "If set to False: an RTP header is not pre-pended to the
+             TDM packet."
+        REFERENCE
+            "See [SATOP],Used by MAP"
+        DEFVAL { false }
+        ::= { zxPwCTDMCfgEntry 6 }
+    
+    zxPwCTDMCfgJtrBfrDepth OBJECT-TYPE
+        SYNTAX        Unsigned32
+        UNITS         "microsecond"
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The size of this buffer SHOULD be locally
+             configured to allow accommodation to the PSN-specific packet
+             delay variation.
+        
+             If configured to a value not supported by the
+             implementation, the agent MUST return an error code
+             'jtrBfrDepth' in 'pwCTDMConfigError '
+        
+             NOTE: jitter buffers are a limited resource to
+             be managed. The actual size should be at least twice as big
+             as the value of zxPwCTDMCfgJtrBfrDepth "
+        REFERENCE
+            "Used by MAP"       
+        DEFVAL { 3000 }        
+        ::= { zxPwCTDMCfgEntry 7 }
+    
+    zxPwCTDMCfgPayloadSuppression  OBJECT-TYPE
+        SYNTAX        INTEGER
+            {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Selecting 'enable' means: Payload suppression is allowed.
+             Payload MAY be omitted in order to conserve bandwidth.
+             Selecting 'disable' means: no suppresion under any
+             condition."
+        REFERENCE
+            "Used by MAP"         
+        DEFVAL { disable }
+        ::= { zxPwCTDMCfgEntry 8 }
+    
+    zxPwCTDMCfgConsecPktsInSynch          OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The number of consecutive packets with sequential
+             sequence numbers that are required to exit the
+             LOPS state."
+        REFERENCE
+            "See [SATOP],Used by MAP"
+        DEFVAL { 2 }
+        ::= { zxPwCTDMCfgEntry 9 }
+    
+    zxPwCTDMCfgConsecMissPktsOutSynch  OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The number of consecutive missing packets that are
+             required to enter the LOPS state."
+        REFERENCE
+            "See [SATOP],Used by MAP"
+        DEFVAL { 10 }
+        ::= { zxPwCTDMCfgEntry 10 }
+    
+    zxPwCTDMCfgSetUp2SynchTimeOut OBJECT-TYPE
+        SYNTAX        Unsigned32
+        UNITS         "millisecond"
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The amount of time the host should wait before declaring the
+             pseudo wire in down state,  if the number of consecutive
+             TDM packets that have been received after changing the
+             adminstrative status to up and after finalization of
+             signaling (if supported) between the two PEs is smaller
+             than zxPwCTDMCfgConsecPktsInSynch. Once the the pw has
+             OperStatus of 'up' this parameter is no longer valid. This
+             parameter is defined to ensure that the host does not
+             prematurely inform failure of the pw. In particular pw 'down'
+             notifications should not be sent before expiration of this
+             timer. This parameter is valid only after adminisrative
+             changes of the status of the pw. If the pw fails due to
+             network impairments a 'down' notification should be sent."
+        DEFVAL {5000}
+        ::= { zxPwCTDMCfgEntry 11 }
+    
+    zxPwCTDMCfgPktReplacePolicy OBJECT-TYPE
+        SYNTAX        INTEGER
+            {
+               ais (1),
+               implementationSpecific(2) --could be
+                                         --user defined
+            }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This parameter determines the value to be played when CE bound
+             packets have over/underflow the jitter buffer, or are missing
+             for any reason. This byte pattern is sent (played) on
+             the TDM line."
+        REFERENCE
+            "Used by MAP"         
+        DEFVAL { 1 } -- Play AIS
+        ::= { zxPwCTDMCfgEntry 12 }
+    
+    zxPwCTDMCfgAvePktLossTimeWindow OBJECT-TYPE
+        SYNTAX        Integer32
+        UNITS         "millisecond"
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The length of time over which the average packet
+             loss rate should be computed to detect Excessive packet
+             loss rate"
+        ::= { zxPwCTDMCfgEntry 13}
+    
+    zxPwCTDMCfgExcessivePktLossThreshold OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Excessive packet loss rate is detected by computing the
+             average packetloss rate over a zxPwCTDMCfgAvePktLossTimeWindow
+             amount of time and comparing it with this threshold value. "
+        ::= { zxPwCTDMCfgEntry 14 }    
+    
+    zxPwCTDMCfgAlarmThreshold OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Alarms are only reported when the defect state persists
+             for the length of time specified by this object.
+             The object's unit is millisec"
+        REFERENCE "Used by MAP"      
+        DEFVAL { 2500 }     
+        ::= { zxPwCTDMCfgEntry 15 }
+    
+    zxPwCTDMCfgClearAlarmThreshold OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Alarm MUST be cleared after the corresponding defect is
+             undetected for the amount of time specified by this object.
+             The object's unit is millisec"
+        REFERENCE "Used by MAP"           
+        DEFVAL { 10000 }       
+        ::= { zxPwCTDMCfgEntry 16 }
+    
+    zxPwCTDMCfgMissingPktsToSes OBJECT-TYPE
+        SYNTAX        Unsigned32
+        UNITS         "seconds"
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Number of missing packets detected (consecutive or not)
+             within a 1 second window to cause a Severely Error
+             Second (SES) to be counted."
+        DEFVAL { 3 }
+        ::= { zxPwCTDMCfgEntry 17 }
+    
+    zxPwCTDMCfgTimestampMode  OBJECT-TYPE
+        SYNTAX        INTEGER
+                       {
+                        notApplicable (1),
+                        absolute      (2),
+                        differential  (3)
+                       }
+        
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Timestamp generation MAY be used in one of the following
+             modes:
+             1. Absolute mode: the PSN-bound IWF sets timestamps
+              using the clock recovered from the incoming TDM attachment
+              circuit. As a consequence, the timestamps are closely
+              correlated with the sequence numbers. All TDM implementations
+              that support usage of the RTP header MUST support this mode.
+             2. Differential mode: Both IWFs have access to a common high-
+              quality timing source, and this source is used for timestamp
+              generation. Support of this mode is OPTIONAL. "
+        REFERENCE
+            "Used by MAP"
+        ::= { zxPwCTDMCfgEntry 18 }
+      
+    zxPwCTDMCfgQueueSize OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The actual queue size is the 'zxPwCTDMCfgQueueSize' power of 2.
+             The range of this object is from 1 to 10. But when resequencing,
+              the maximum value is 7."
+        REFERENCE
+            "Used by MAP"        
+        ::= { zxPwCTDMCfgEntry 19 }
+      
+    zxPwCTDMCfgName OBJECT-TYPE
+        SYNTAX         DisplayString ( SIZE(1..64) )
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION
+            " "
+        ::= { zxPwCTDMCfgEntry 20 }  
+        
+    zxPwCTDMCfgSSRC OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION
+            "This object must be set when zxPwCTDMCfgRtpHdrUsed is 'TRUE'."
+        ::= { zxPwCTDMCfgEntry 21 }   
+       
+    zxPwCTDMCfgStorageType  OBJECT-TYPE
+        SYNTAX            StorageType
+        MAX-ACCESS        read-create
+        STATUS            current
+        DESCRIPTION
+            "This variable indicates the storage type for this
+             row."
+        ::= { zxPwCTDMCfgEntry 22 }
+
+    zxPwCTDMGlobalObjects
+        OBJECT IDENTIFIER ::= { zxPwCTDMObjects 50 }
+    
+    zxPwCTDMCompatible  OBJECT-TYPE 
+        SYNTAX      BITS 
+            {
+                structuredCes(0)
+            }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION   
+            "The PW TDM compatibility.
+             The bit value 1 means the function represented by this bit is 
+             supported by this equipment. 
+             bit 0: value 1 means support to config structured CES.
+             
+             NOTE: No recommended to display it in NMS." 
+        ::=  {  zxPwCTDMGlobalObjects  1  }
+
+-- END of Table
+
+END

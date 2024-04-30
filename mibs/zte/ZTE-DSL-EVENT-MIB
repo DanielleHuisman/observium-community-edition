@@ -1,0 +1,255 @@
+
+-- File Name : ZTE-DSL-EVENT-MIB.mib
+-- Date      : Mon Oct 17 14:13:24 GMT+08:00 2005
+-- Author    : ZTE Nms dept.
+
+--
+-- Zte Dsl SYS-CTRL Mib 
+-- 
+-- 
+
+ZTE-DSL-EVENT-MIB	DEFINITIONS ::= BEGIN
+	IMPORTS		
+        zte,zxDsl 
+			FROM ZTE-DSL-MIB
+		RowStatus, DisplayString
+			FROM SNMPv2-TC
+		DisplayString, ifIndex
+			FROM RFC1213-MIB
+		MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, IpAddress, TimeTicks, 
+		Counter32, Gauge32, Integer32, Unsigned32
+			FROM SNMPv2-SMI
+		SnmpAdminString
+			FROM SNMP-FRAMEWORK-MIB;	
+
+	zxDslEventMib	MODULE-IDENTITY
+		LAST-UPDATED	"200404151500Z"
+		ORGANIZATION	"ZTE Corporation"
+		CONTACT-INFO	"ma ke
+                  Mail: zte@zte.com.cn
+                  Tel : 021-68896477"
+		DESCRIPTION		"This MIB defines zte dsl managed objects."
+		::=  {  zxDsl  37  }	
+		
+
+    zxDslEventObjects     OBJECT IDENTIFIER ::= {zxDslEventMib 1}
+    zxDslEventTrapObjects OBJECT IDENTIFIER ::= {zxDslEventMib 2}		
+
+
+    zxDslTrapSendEnable OBJECT-TYPE 
+       SYNTAX             INTEGER  
+          { 
+              enable(1), 
+              disable(2)
+          } 
+       MAX-ACCESS       read-write
+       STATUS           current
+       DESCRIPTION      "Enable/disable the function of sending trap to a 
+                        snmp manager."
+       DEFVAL { enable }
+       ::=  {  zxDslEventObjects  1  }	
+	
+	
+
+------------------------------------------------------------------------------
+-- 1.1 Event System Mgmt
+------------------------------------------------------------------------------
+
+    zxDslEventCurrentEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to indicate the current EventId.
+            When the agent start,this object is 0 and the agent should send a
+            trap to manager to request which eventId should be used by this 
+            agent.After time out,the agent begin to use it to manage the event."
+
+        DEFVAL { 0 }
+        ::= { zxDslEventObjects 2 }
+
+
+
+    
+------------------------------------------------------------------------------
+--  1.2 Event Confirmation  
+------------------------------------------------------------------------------
+
+-- IMPORTANT!! 
+-- The mechanism of trap confirmation
+------------------------------------------------------------------------------
+-- The trap confirmation is often needed when the trap is a important 
+-- event.And this function will avoid the defect of a trap because SNMP trap is
+-- based on UDP and has no confirmation, that is,a agent broadcasts a tarp and 
+-- dosen't care if a target manager has recieved this trap.
+-- 
+-- This mib defines the mechanism of trap confirmation to enforce 
+-- the reliability of trap recieving.
+-- 
+--   1.The main skill in this mechanism is that the trap community is used to 
+--     bring information about confirmation.
+--   2.The information in a trap community includes the real community,
+--     eventId of this trap and the key word to indiacte if this trap need 
+--     confirmation 
+--   3.The syntax of information in a trap community is as following.
+-- 
+--    real community + '@eventId='+ eventId + '@level=' + eventLevel + '@confirm'
+-- 
+--     The community is divided into some fields by symbol '@'.These fields are
+-- 
+--       real community    :the actual community in this trap
+--       eventId           :the event Id of this trap,it's a index of a event.
+--                          The value style is a name-value pair,such as 
+--                          "eventId=145"
+--       event level       :the event level of this trap,it's a dispaly string 
+--                          and the available values are:
+--                             critical,
+--                             major,
+--                             minor,
+--                             warning,
+--                             indeterminate,
+--                             cleared,
+--                             notification
+--
+--                          The value style is a name-value pair,such as 
+--                          "level=cleared"
+
+--       confirm           :If this field exist,this trap should be confirmed by
+--                          a manager.
+--                          The value style is a key word,such as "confirm"
+-- 
+-- 
+--     Examples of a trap community,  
+--         1) a trap community with confirmation
+--           public@eventId=1022@level=critical@confirm
+-- 
+--         2) a trap community without confirmation
+--           public@eventId=1022@level=critical
+-- 
+-- 
+-- 
+--    4.The procedures of trap sending and confirming
+-- 
+--         1) The agent sends a trap with community including key word "confirm".
+--            And begin to wait for the manager's confirmation.
+--         2) The manager recieves this trap and anaylizes its community.If the 
+--            key word "confirm" is found,the manager get eventId and event 
+--            level from this community.
+--         3) The manager sets eventId to agent's zxDslEventConfirmEventId if 
+--            event level isn't "cleared".
+--         4) The manager sets eventId to agent's zxDslEventConfirmClearedEventId
+--            if  event level is "cleared".
+--         5) When zxDslEventConfirmEventId or zxDslEventConfirmClearedEventId is 
+--            set,the agent should take this event as confirmed event and finishes
+--            the waiting process for confirmation.
+--         6) If the agent dosen't recieved the confirmation after firt time out,
+--            then go to procedure 1) until retry times is reached.
+--         7) After above procedures,the process of trap sending and confirming 
+--            is over.
+--
+------------------------------------------------------------------------------
+
+    zxDslEventConfirmEventId OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The non cleard Event Id to be confirmed by a snmp manager.
+            When a manager recieve a trap with confirmation information,
+            then the manager should set this mib object to inform the agent
+            that this manager has got this event.And then the agent should 
+            remove this event from a unconfirmed event queue."
+        ::= { zxDslEventObjects 3 }
+
+
+
+------------------------------------------------------------------------------
+--  2.3 Event Synchronization  
+------------------------------------------------------------------------------
+    zxDslEventSynchUnconfirmedEvents OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to excute a process to report the unconfirmed events 
+            again.
+            When this object is set,the agent should resend traps of these 
+            unconfirmed events.And these traps still need to be confirmed by 
+            a manager."
+        ::= { zxDslEventObjects 4 }
+
+
+    zxDslEventCurrUnconfirmedEventCounter OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of current unconfirmed event."
+        ::= { zxDslEventObjects 5 }
+
+
+
+
+------------------------------------------------------------------------------
+--  2.4 Nms Hello Trap
+------------------------------------------------------------------------------
+
+    zxDslEventNmsHelloTrapMgmt  OBJECT IDENTIFIER  ::= { zxDslEventObjects 6 }
+
+    zxDslEventNmsHelloTrapEnable OBJECT-TYPE
+        SYNTAX INTEGER
+            {
+                enable(1),
+                disable(2)
+            }                
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Enable or disable the sending Hello Trap to NMS server.
+            When it is enabled,the agent should send Hello Trap to NMS server 
+            anytime and its period of sending is zxDslEventNmsHelloTrapInterval."
+        DEFVAL { disable }
+        ::= { zxDslEventNmsHelloTrapMgmt 1 }
+
+    zxDslEventNmsHelloTrapInterval OBJECT-TYPE
+        SYNTAX      Integer32(1..600)
+        UNITS       "second" 
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Interval of sending Hello Trap to NMS server."
+        DEFVAL { 120 }
+        ::= { zxDslEventNmsHelloTrapMgmt 2 }
+
+
+--------------------------------------------------------------------------------
+-- definition of sysctrl traps.
+
+
+    zxDslDisabledTrapSend      NOTIFICATION-TYPE
+            STATUS  current
+            DESCRIPTION
+                " Notification of disabled the function of sending trap to 
+                a snmp manager."
+            ::= { zxDslEventTrapObjects 1 }
+
+
+    zxDslEnabledTrapSend      NOTIFICATION-TYPE
+            STATUS  current
+            DESCRIPTION
+                " Notification of enabled the function of sending trap to 
+                a snmp manager."
+            ::= { zxDslEventTrapObjects 2 }
+
+
+    -- NmsHelloTrap comes from ROS AN mib 
+    zxAnEventNmsHelloTrap NOTIFICATION-TYPE
+        STATUS  current
+        DESCRIPTION
+            "It is used to send heartbeat message to zte's nms server.And it 
+            needn't to be confirmed. "
+        ::= { zte 1015 190 6 2 }
+
+
+END
+

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -147,56 +147,63 @@ function build_counter_query($vars, $query_count = FALSE)
         }
     }
 
-    $sql .= " WHERE `counter_deleted` = 0";
-
     // Build query
+    $where_array = [];
     foreach ($vars as $var => $value) {
         switch ($var) {
             case "group":
             case "group_id":
                 $values = get_group_entities($value);
-                $sql    .= generate_query_values_and($values, 'counters.counter_id');
+                $where_array[] = generate_query_values($values, 'counters.counter_id');
                 break;
+
             case 'device_group_id':
             case 'device_group':
                 $values = get_group_entities($value, 'device');
-                $sql    .= generate_query_values_and($values, 'counters.device_id');
+                $where_array[] = generate_query_values($values, 'counters.device_id');
                 break;
+
             case "device":
             case "device_id":
-                $sql .= generate_query_values_and($value, 'counters.device_id');
+                $where_array[] = generate_query_values($value, 'counters.device_id');
                 break;
+
             case "id":
             case "counter_id":
-                $sql .= generate_query_values_and($value, 'counters.counter_id');
+                $where_array[] = generate_query_values($value, 'counters.counter_id');
                 break;
+
             case "entity_id":
-                $sql .= generate_query_values_and($value, 'counters.measured_entity');
+                $where_array[] = generate_query_values($value, 'counters.measured_entity');
                 break;
+
             case "entity_type":
-                $sql .= generate_query_values_and($value, 'counters.measured_class');
+                $where_array[] = generate_query_values($value, 'counters.measured_class');
                 break;
+
             case 'entity_state':
             case "measured_state":
-                $sql .= build_entity_measured_where('counter', ['measured_state' => $value]);
+                $where_array[] = generate_query_entity_measured('counter', [ 'measured_state' => $value ]);
                 break;
+
             case 'class':
             case "counter_class":
-                $sql .= generate_query_values_and($value, 'counter_class');
+                $where_array[] = generate_query_values($value, 'counter_class');
                 break;
+
             case "descr":
             case "counter_descr":
-                $sql .= generate_query_values_and($value, 'counters.counter_descr', '%LIKE%');
+                $where_array[] = generate_query_values($value, 'counters.counter_descr', '%LIKE%');
                 break;
             case "event":
             case "counter_event":
-                $sql .= generate_query_values_and($value, 'counter_event');
+                $where_array[] = generate_query_values($value, 'counter_event');
                 break;
         }
     }
-    // $sql .= $GLOBALS['cache']['where']['devices_permitted'];
+    $where_array[] = '`counter_deleted` = 0';
 
-    $sql .= generate_query_permitted(['device', 'counter']);
+    $sql .= generate_where_clause($where_array, generate_query_permitted_ng([ 'device', 'counter' ]));
 
     // If need count, just return sql without sorting
     if ($query_count) {
@@ -207,26 +214,25 @@ function build_counter_query($vars, $query_count = FALSE)
 
     switch ($vars['sort']) {
         case 'device':
-            //$sql .= ' ORDER BY `hostname` ' . $sort_order;
             $sql .= generate_query_sort('hostname', $sort_order);
             break;
+
         case 'descr':
         case 'event':
         case 'value':
         case 'rate':
         case 'rate_hour':
         case 'last_change':
-            //$sql .= ' ORDER BY `counter_' . $vars['sort'] . '` ' . $sort_order;
             $sql .= generate_query_sort('counter_' . $vars['sort'], $sort_order);
             break;
+
         default:
             // $sql .= ' ORDER BY `hostname` '.$sort_order.', `counter_descr` '.$sort_order;
             //$sql .= generate_query_sort([ 'hostname', 'counter_descr' ], $sort_order);
     }
 
     if (isset($vars['pageno'])) {
-        $start = $vars['pagesize'] * ($vars['pageno'] - 1);
-        $sql   .= ' LIMIT ' . $start . ',' . $vars['pagesize'];
+        $sql .= generate_query_limit($vars);
     }
 
     return $sql;
@@ -329,23 +335,23 @@ function generate_counter_row($counter, $vars)
 
     if ($counter['counter_event'] && is_numeric($counter['counter_value'])) {
         $graph_array           = [];
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = $counter['counter_id'];
         $graph_array['type']   = "counter_graph";
         $graph_array['width']  = 80;
         $graph_array['height'] = 20;
         $graph_array['bg']     = 'ffffff00';
-        $graph_array['from']   = $config['time']['day'];
+        $graph_array['from']   = get_time('day');
         $mini_graph            = generate_graph_tag($graph_array);
 
         $graph_array           = [];
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = $counter['counter_id'];
         $graph_array['type']   = "counter_rate";
         $graph_array['width']  = 80;
         $graph_array['height'] = 20;
         $graph_array['bg']     = 'ffffff00';
-        $graph_array['from']   = $config['time']['day'];
+        $graph_array['from']   = get_time('day');
         $mini_graph            .= generate_graph_tag($graph_array);
 
     } else {
@@ -404,7 +410,7 @@ function generate_counter_row($counter, $vars)
     $row .= '        <td style="width: 180px; text-align: right;">' . generate_entity_link('counter', $counter, $mini_graph, NULL, FALSE) . '</td>';
 
     if ($vars['tab'] != 'overview') {
-        $row .= '        <td style="white-space: nowrap">' . ($counter['counter_last_change'] == '0' ? 'Never' : generate_tooltip_link(NULL, format_uptime(($config['time']['now'] - $counter['counter_last_change']), 'short-2') . ' ago', format_unixtime($counter['counter_last_change']))) . '</td>';
+        $row .= '        <td style="white-space: nowrap">' . ($counter['counter_last_change'] == '0' ? 'Never' : generate_tooltip_link(NULL, format_uptime((get_time('now') - $counter['counter_last_change']), 'short-2') . ' ago', format_unixtime($counter['counter_last_change']))) . '</td>';
         $table_cols++;
         $row .= '        <td style="text-align: right;"><strong>' . generate_tooltip_link('', $counter['counter_event'], $counter['event_descr'], $counter['event_class']) . '</strong></td>';
         $table_cols++;
@@ -425,7 +431,7 @@ function generate_counter_row($counter, $vars)
 
     // Set to TRUE if this counter in time based format (ie lifetime)
     $format_time = isset($config['counter_types'][$counter['counter_class']]['format']) &&
-                   str_contains_array($config['counter_types'][$counter['counter_class']]['format'], 'time');
+                   str_contains($config['counter_types'][$counter['counter_class']]['format'], 'time');
     $rates       = [];
     // FIXME. Probably do not show rates for time based counters?.. (it's always around 1s/5m/1h)
     if (!$format_time) {
@@ -462,14 +468,14 @@ function generate_counter_row($counter, $vars)
         <td colspan="' . $table_cols . '">';
 
         $graph_array         = [];
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $counter['counter_id'];
         $graph_array['type'] = 'counter_' . $vars['graph'];
 
         $row .= generate_graph_row($graph_array, TRUE);
 
         $graph_array         = [];
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = $counter['counter_id'];
         $graph_array['type'] = 'counter_rate';
 

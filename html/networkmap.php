@@ -94,8 +94,6 @@ if (!$_SESSION['authenticated']) {
 
     //$cache['where']['devices_permitted'] = generate_query_permitted(['device'], ['device_table' => 'D']);
     foreach (dbFetchRows($sql . $where . ' GROUP BY `device_id` ORDER BY `neighbours_count` DESC', $params) as $device) {
-        //foreach (dbFetch("SELECT D.*, COUNT(L.`port_id`) FROM `devices` AS D LEFT JOIN (`ports` AS I, `neighbours` AS L) ON (D.`device_id` = I.`device_id` AND I.port_id = L.port_id) ". $where . $cache['where']['devices_permitted'] . " GROUP BY D.hostname ORDER BY COUNT(L.port_id) DESC", NULL, TRUE) as $device)
-        //{
 
         $device_name = device_name($device);
 
@@ -105,8 +103,8 @@ if (!$_SESSION['authenticated']) {
             //$links_group[$link['device_id']][$link['port_id']][$link['remote_port']][$index] = $link['remote_hostname'] . '[' . nicecase($link['protocol']) . ']';
             $links_group[$link['device_id']][$link['port_id']][$link['remote_port']]++;
         }
-        //$links = dbFetch("SELECT * FROM ports AS I, neighbours AS L WHERE I.device_id = ? AND L.port_id = I.port_id ORDER BY L.remote_hostname", array($device['device_id']));
-        if (safe_count($links)) {
+
+        if (!safe_empty($links)) {
             $ranktype = substr($device_name, 0, 2);
             //$ranktype2 = substr($device_name, 0, 3);
             //if (!strncmp($device_name, "c", 1) && !strstr($device_name, "kalooga"))

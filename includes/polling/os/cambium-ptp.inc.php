@@ -10,13 +10,7 @@
  *
  */
 
-if (is_device_mib($device, 'CAMBIUM-PTP800-MIB')) {
-    $version  = snmp_get_oid($device, 'softwareVersion.0', 'CAMBIUM-PTP800-MIB');
-    $hardware = snmp_get_oid($device, 'productName.0', 'CAMBIUM-PTP800-MIB');
-} elseif (is_device_mib($device, 'MOTOROLA-PTP-MIB')) {
-    $version  = snmp_get_oid($device, 'softwareVersion.0', 'MOTOROLA-PTP-MIB');
-    $hardware = snmp_get_oid($device, 'productName.0', 'MOTOROLA-PTP-MIB');
-} else {
+if (!$hardware) {
     $hardware = get_model_param($device, 'hardware', $poll_device['sysObjectID']);
 }
 

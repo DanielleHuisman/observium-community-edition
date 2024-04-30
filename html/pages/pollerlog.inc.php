@@ -20,9 +20,6 @@ register_html_title("Poller/Discovery Timing");
 
 // Generate cache of Pollers
 $pollers = [ 0 => [ 'poller_name' => "Default", 'poller_id' => 0 ]];
-foreach (dbFetchRows("SELECT * FROM `pollers`") as $entry) {
-    $pollers[$entry['poller_id']] = $entry;
-}
 
 $navbar = ['brand' => "Poller", 'class' => "navbar-narrow"];
 
@@ -32,8 +29,11 @@ if ($_SESSION['userlevel'] >= 7) {
 $navbar['options']['devices']['text'] = 'Per-Device';
 $navbar['options']['modules']['text'] = 'Per-Module';
 
-//if (dbFetchCell("SELECT COUNT(*) FROM `pollers`"))
 if (OBS_DISTRIBUTED) {
+
+    foreach (dbFetchRows("SELECT *, UNIX_TIMESTAMP() - UNIX_TIMESTAMP(`timestamp`) AS `lasttime` FROM `pollers`") as $entry) {
+        $pollers[$entry['poller_id']] = $entry;
+    }
 
     $navbar['options']['pollers']['text'] = 'Partitions';
 
@@ -243,8 +243,8 @@ if ($vars['view'] === "modules") {
         //                     //'operation' => 'poll',
         //                     'width'  => 1158,
         //                     'height' => 100,
-        //                     'from'   => $config['time']['week'],
-        //                     'to'     => $config['time']['now'],
+        //                     'from'   => get_time('week'),
+        //                     'to'     => get_time('now'),
         //                     );
         //echo(generate_graph_tag($graph_array));
         //echo "<h3>Poller wrapper Total time</h3>";
@@ -356,7 +356,7 @@ if ($vars['view'] === "modules") {
         ' . $row['last_polled_timetaken'] . 's
       </td>
       <!-- <td>' . format_timestamp($row['last_polled']) . ' </td> -->
-      <td>' . format_uptime($config['time']['now'] - strtotime($row['last_polled']), 'shorter') . ' ago</td>');
+      <td>' . format_uptime(get_time('now') - strtotime($row['last_polled']), 'shorter') . ' ago</td>');
 
         // Discovery times
         echo('
@@ -367,7 +367,7 @@ if ($vars['view'] === "modules") {
         ' . $row['last_discovered_timetaken'] . 's
       </td>
       <!-- <td>' . format_timestamp($row['last_discovered']) . '</td> -->
-      <td>' . format_uptime($config['time']['now'] - strtotime($row['last_discovered']), 'shorter') . ' ago</td> ');
+      <td>' . format_uptime(get_time('now') - strtotime($row['last_discovered']), 'shorter') . ' ago</td> ');
 
         if (safe_empty($vars['poller_id'])) {
             echo '
@@ -415,10 +415,12 @@ if ($vars['view'] === "modules") {
     echo '<table class="' . OBS_CLASS_TABLE_STRIPED . '">' . PHP_EOL;
 
     echo get_table_header([
-                            ['ID', 'style="width: 20px;"'],
-                            ['Poller Name', 'style="width: 10%;"'],
-                            ['Host ID / Uname', 'style="width: 30%;"'],
-                            'Assigned Devices'
+                            [ 'ID', 'style="width: 20px;"' ],
+                            [ 'Poller Name', 'style="width: 8%;"' ],
+                            [ 'Host ID / Uname', 'style="width: 30%;"' ],
+                            [ 'Version', 'style="width: 80px;"' ],
+                            'Assigned Devices',
+                            [ 'Polled (ago)', 'style="width: 80px;"' ],
                           ]);
     //echo '<tr><td>Poller Name</td><td>Assigned Devices</td></tr>';
 
@@ -427,16 +429,39 @@ if ($vars['view'] === "modules") {
         echo '<tr>';
         echo '<td class="entity-name">' . $poller['poller_id'] . '</td>';
         echo '<td class="entity-name">' . $poller['poller_name'] . '</td>';
-        echo '<td><small>' . $poller['host_id'] . '<br /><i>' . $poller['host_uname'] . '</i></small></td>';
-        echo '<td>';
+        if ($poller['device_id']) {
+            echo '<td><small>' . $poller['host_id'] . ' (' . generate_device_link($poller['device_id']) . ')<br /><i>' .
+                generate_device_link($poller['device_id'], $poller['host_uname']) . '</i></small></td>';
+        } else {
+            echo '<td><small>' . $poller['host_id'] . '<br /><i>' . $poller['host_uname'] . '</i></small></td>';
+        }
+        $poller_version = explode(' ', $poller['poller_version'])[0];
+        $poller_revision = explode('.', $poller_version)[2];
+        if ((get_obs_attrib('latest_rev') - $poller_revision) >= $config['version_check_revs']) {
+            echo '<td><span class="label label-error">' . $poller_version . '</span></td>';
+        } elseif (abs(OBSERVIUM_REV - $poller_revision) >= $config['version_check_revs']) {
+            echo '<td><span class="label label-warning">' . $poller_version . '</span></td>';
+        } else {
+            echo '<td><span class="label">' . $poller_version . '</span></td>';
+        }
 
+        echo '<td>';
         foreach (dbFetchRows("SELECT * FROM `devices` WHERE `poller_id` = ?", [$poller['poller_id']]) as $device) {
             $device_list[] = generate_device_link($device);
         }
 
+        $pollers[$poller['poller_id']]['devices'] = count($device_list);
         echo implode(', ', $device_list);
-
         echo '</td>';
+
+        if ($poller['lasttime'] < 3600) {
+            // Use dynamic counter
+            $poller_refresh = 'poller_'.$poller['poller_id'].'_refresh';
+            register_html_resource('script', 'time_refresh("'.$poller_refresh.'", '.$poller['lasttime'].', 1)');
+            echo '<td><span id="'.$poller_refresh.'"></span></td>';
+        } else {
+            echo '<td>' . format_uptime($poller['lasttime']) . '</td>';
+        }
         echo '</tr>';
     }
 
@@ -445,6 +470,10 @@ if ($vars['view'] === "modules") {
     echo generate_box_close();
 
     foreach ($pollers as $poller) {
+        if (!$poller['devices']) {
+            // poller not have associated device, skip graphs
+            continue;
+        }
         echo generate_box_open(['header-border' => TRUE, 'title' => 'Poller Wrapper (' . $poller['poller_name'] . ') History']);
 
         //r($poller);

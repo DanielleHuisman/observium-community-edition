@@ -1,0 +1,596 @@
+------------------------------------------------------------------------------
+--
+--  File         : sys.mi2
+--  Description  : 
+--  Version      :  
+--  Date         : March 3, 2003
+-- 	Copyright    : 2003 by maipu (sichuan) communication technology co.,ltd.
+--					All rights reserved.
+--
+-- $Id:
+-- 
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+MAIPU-VRRP-MIB DEFINITIONS ::= BEGIN
+
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Counter32, Gauge32,
+        Integer32, Unsigned32, TimeTicks,IpAddress,Counter64
+        	                                    FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, TruthValue, MacAddress, 
+	RowStatus, DisplayString, DateAndTime 
+                                                 FROM SNMPv2-TC
+        MODULE-COMPLIANCE, OBJECT-GROUP         
+        	FROM SNMPv2-CONF        
+        mpMgmt
+        	FROM MAIPU-SMI
+        ObjectName, ObjectSyntax, NetworkAddress
+                FROM RFC1155-SMI;
+
+
+
+vrrpMib             	MODULE-IDENTITY
+                    		LAST-UPDATED 	"0703161444Z"
+                    		ORGANIZATION 	"四川迈普数据通信股份有限公司,
+                    		             	 Maipu (Sichuan) Communication Technology Co. LTD."
+                    		CONTACT-INFO
+                    			"编 写 人:  ???
+                    			 联系地址：四川省 成都市 高新区 九兴大道16号
+                    			 邮    编：    610041
+                    			 电    话：
+                    			 传    真：
+                    			 电子邮件： ????"
+                    		DESCRIPTION
+                      			""
+                    		::= { mpMgmt  95 }
+
+
+
+
+------------------------------------------------------------------------------
+vrrpNotifications   	OBJECT IDENTIFIER ::= { vrrpMib 1 }
+
+vrrpNewMaster       	NOTIFICATION-TYPE
+                    		OBJECTS {
+                    		         vrrpOperVrId,
+                    		         vrrpOperIfName,
+                    		         vrrpOperMasterIpAddr
+                    		        }
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The newMaster trap indicates that the sending agent         has transitioned to 'Master' state."
+                    		::= { vrrpNotifications 1 }
+
+vrrpAuthFail        	NOTIFICATION-TYPE
+                    		OBJECTS {
+                    		         vrrpOperVrId,
+                    		         vrrpOperIfName
+                    		        }
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"认证失败"
+                    		::= { vrrpNotifications 2 }
+
+vrrpInconsistentIP  	NOTIFICATION-TYPE
+                    		OBJECTS {
+                    		         vrrpOperVrId,
+                    		         vrrpOperIfName,
+                    		         vrrpOperVrIP
+                    		        }
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"收到的地址与本地IP不一致，相关收到的IP在描述中给出"
+                    		::= { vrrpNotifications 3 }
+
+
+------------------------------------------------------------------------------
+vrrpOperations      	OBJECT IDENTIFIER ::= { vrrpMib 2 }
+
+vrrpNodeVersion     	OBJECT-TYPE
+                    		SYNTAX  Integer32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This value identifies the particular version of the VRRP supported by this node."
+                    		::= { vrrpOperations 1 }
+
+vrrpNotificationCntl	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			         enabled     (1),
+                    			          disabled    (2)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Indicates whether the VRRP-enabled router will generate SNMP traps for events defined in this MIB. 'Enabled' results in SNMP traps; 'disabled', no traps are sent."
+                    		::= { vrrpOperations 2 }
+
+vrrpTrackTable      	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   VrrpTrackEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Track table for a VRRP router。"
+                    		::= { vrrpOperations 3 }
+
+vrrpTrackEntry      	OBJECT-TYPE
+                    		SYNTAX  VrrpTrackEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Track table for a VRRP router。"
+                    		INDEX  { vrrpTrackVrId, vrrpTrackIfName, vrrpTrackObjectName }
+                    		::= { vrrpTrackTable 1 }
+
+VrrpTrackEntry      	::= SEQUENCE {
+                    			vrrpTrackVrId          Integer32,
+                    			vrrpTrackIfName        DisplayString,
+                    			vrrpTrackObjectName    DisplayString,
+                    			vrrpTrackState         INTEGER,
+                    			vrrpTrackPriDecrement   Unsigned32,
+                    			vrrpTrackRowStatus     RowStatus
+                    	             }
+
+
+vrrpTrackVrId       	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..255)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object contains the Virtual Router Identifier (VRID)."
+                    		::= { vrrpTrackEntry 1 }
+
+vrrpTrackIfName     	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..40))
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object contains the interface name where vrrp is configured."
+                    		::= { vrrpTrackEntry 2 }
+
+vrrpTrackObjectName 	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..40))
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object contains the interface name where vrrp tracked."
+                    		::= { vrrpTrackEntry 3 }
+
+vrrpTrackState      	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			         up(1),
+                    			          down(2)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The current state of the object tracked."
+                    		::= { vrrpTrackEntry 4 }
+
+vrrpTrackPriDecrement	OBJECT-TYPE
+                    		SYNTAX  Unsigned32(1..255)
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object specifies the priority to be used for track.vrrp will change its priority when vrrpTrackState changed."
+                    		::= { vrrpTrackEntry 5 }
+
+vrrpTrackRowStatus  	OBJECT-TYPE
+                    		SYNTAX  RowStatus
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The row status variable, used in accordance to installation and removal conventions for conceptual rows. The rowstatus of a currently active row in the vrrpOperTable is constrained by the operational state of the corresponding virtual router. When `vrrpOperRowStatus' is set to active(1), no other objects in the conceptual row, with the exception of `vrrpOperAdminState', can be modified. Prior to setting the `vrrpOperRowStatus' object from `active' to a different value, the `vrrpOperAdminState' object must be set to `down' and the `vrrpOperState' object be transitioned to `initialize'. To create a row in this table, a manager sets this object to either createAndGo(4) or createAndWait(5). Until instances of all corresponding columns are appropriately configured, the value of the corresponding instance of the `vrrpOperRowStatus' column will be read as notReady(3). In particular, a newly created row cannot be made active(1) until (minimally) the corresponding instance of `vrrpOperVrId' has
+ been set and there is at least one active row in the `vrrpAssoIpAddrTable' defining an associated IP address for the virtual router."
+                    		::= { vrrpTrackEntry 6 }
+
+vrrpOperTable       	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF  VrrpOperEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Operations table for a VRRP router which consists of a sequence (i.e., one or more conceptual rows) of 'vrrpOperEntry' items."
+                    		::= { vrrpOperations 4 }
+
+vrrpOperEntry       	OBJECT-TYPE
+                    		SYNTAX  VrrpOperEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Operations table for a VRRP router which consists of a sequence (i.e., one or more conceptual rows) of 'vrrpOperEntry' items."
+                    		INDEX  { vrrpOperVrId, vrrpOperIfName }
+                    		::= { vrrpOperTable 1 }
+
+VrrpOperEntry       	::= SEQUENCE {
+                    			vrrpOperVrId           Integer32,
+                    			vrrpOperIfName         DisplayString,
+                    			vrrpOperVrIP           IpAddress,
+                    			vrrpOperVirtualMacAddr   PhysAddress,
+                    			vrrpOperState          INTEGER,
+                    			vrrpOperPriority       Integer32,
+                    			vrrpOperMasterIpAddr   IpAddress,
+                    			vrrpOperAuthType       INTEGER,
+                    			vrrpOperAuthKey        DisplayString,
+                    			vrrpOperAdvertisementInterval   Integer32,
+                    			vrrpOperPreemptMode    TruthValue,
+                    			vrrpOperVirtualRouterUpTime   TimeStamp,
+                    			vrrpOperProtocol       INTEGER,
+                    			vrrpOperRowStatus      RowStatus
+                    	             }
+
+
+vrrpOperVrId        	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..255)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object contains the Virtual Router Identifier (VRID)."
+                    		::= { vrrpOperEntry 1 }
+
+vrrpOperIfName      	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..40))
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object contains the interface name where vrrp is configured."
+                    		::= { vrrpOperEntry 2 }
+
+vrrpOperVrIP        	OBJECT-TYPE
+                    		SYNTAX  IpAddress
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The virtual IP address of the virtual router."
+                    		::= { vrrpOperEntry 3 }
+
+vrrpOperVirtualMacAddr	OBJECT-TYPE
+                    		SYNTAX  PhysAddress
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The virtual MAC address of the virtual router. Although this object can be derived from the 'vrrpOperVrId' object, it is defined so that it is easily obtainable by a management application and can be included in VRRP-related SNMP traps."
+                    		::= { vrrpOperEntry 4 }
+
+vrrpOperState       	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			         initialize(1),
+                    			          backup(2),
+                    			          master(3)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The current state of the virtual router. This object has three defined values: - `initialize', which indicates that all the virtual router is waiting for a startup event. - `backup', which indicates the virtual router is monitoring the availability of the master router. - `master', which indicates that the virtual router is forwarding packets for IP addresses that are associated with this router. Setting the `vrrpOperAdminState' object (below) initiates transitions in the value of this object."
+                    		::= { vrrpOperEntry 5 }
+
+vrrpOperPriority    	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..254)
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object specifies the priority to be used for the virtual router master election process. Higher values imply higher priority. A priority of '0', although not settable, is sent by the master router to indicate that this router has ceased to participate in VRRP and a backup virtual router should transition  to become a new master. A priority of 255 is used for the router that owns the associated IP address(es).  default is 100."
+                    		::= { vrrpOperEntry 6 }
+
+vrrpOperMasterIpAddr	OBJECT-TYPE
+                    		SYNTAX  IpAddress
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The master router's real (primary) IP address. This is the IP address listed as the source in VRRP advertisement last received by this virtual router."
+                    		::= { vrrpOperEntry 7 }
+
+vrrpOperAuthType    	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			         noAuthentication(1),
+                    			          simpleTextPassword(2)
+                    			        }
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Authentication type used for VRRP protocol exchanges between virtual routers. This value of this object is the same for a given ifIndex. New enumerations to this list can only be added via a new RFC on the standards track. deault is 1."
+                    		::= { vrrpOperEntry 8 }
+
+vrrpOperAuthKey     	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..8))
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The Authentication Key. This object is set according to the value of the 'vrrpOperAuthType' object ('simpleTextPassword' or 'ipAuthenticationHeader'). If the length of the value is less than 16 octets, the agent will left adjust and zero fill to 16 octets. The value of this object is the same for a given ifIndex. When read, vrrpOperAuthKey always returns an Octet String of length zero."
+                    		::= { vrrpOperEntry 9 }
+
+vrrpOperAdvertisementInterval	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..255)
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The time interval, in seconds, between sending advertisement messages. Only the master router sends VRRP advertisements.
+                    			 Default is 3."
+                    		::= { vrrpOperEntry 10 }
+
+vrrpOperPreemptMode 	OBJECT-TYPE
+                    		SYNTAX  TruthValue
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Controls whether a higher priority virtual router will preempt a lower priority master. Default is true."
+                    		::= { vrrpOperEntry 11 }
+
+vrrpOperVirtualRouterUpTime	OBJECT-TYPE
+                    		SYNTAX  TimeStamp
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This is the value of the `sysUpTime' object when this virtual router (i.e., the `vrrpOperState') transitioned out of `initialized'."
+                    		::= { vrrpOperEntry 12 }
+
+vrrpOperProtocol    	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			         ip (1),
+                    			          bridge (2),
+                    			          decnet (3),
+                    			          other (4)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The particular protocol being controlled by this Virtual Router. New enumerations to this list can only be added via a new RFC on the standards track."
+                    		::= { vrrpOperEntry 13 }
+
+vrrpOperRowStatus   	OBJECT-TYPE
+                    		SYNTAX  RowStatus
+                    		MAX-ACCESS  read-create
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The row status variable, used in accordance to installation and removal conventions for conceptual rows. The rowstatus of a currently active row in the vrrpOperTable is constrained by the operational state of the corresponding virtual router. When `vrrpOperRowStatus' is set to active(1), no other objects in the conceptual row, with the exception of `vrrpOperAdminState', can be modified. Prior to setting the `vrrpOperRowStatus' object from `active' to a different value, the `vrrpOperAdminState' object must be set to `down' and the `vrrpOperState' object be transitioned to `initialize'. To create a row in this table, a manager sets this object to either createAndGo(4) or createAndWait(5). Until instances of all corresponding columns are appropriately configured, the value of the corresponding instance of the `vrrpOperRowStatus' column will be read as notReady(3). In particular, a newly created row cannot be made active(1) until (minimally) the corresponding instance of `vrrpOperVrId' has
+ been set and there is at least one active row in the `vrrpAssoIpAddrTable' defining an associated IP address for the virtual router."
+                    		::= { vrrpOperEntry 14 }
+
+
+------------------------------------------------------------------------------
+vrrpStatistics      	OBJECT IDENTIFIER ::= { vrrpMib 3 }
+
+vrrpRouterChecksumErrors	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets received with an invalid VRRP checksum value."
+                    		::= { vrrpStatistics 1 }
+
+vrrpRouterVersionErrors	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets received with an unknown or unsupported version number."
+                    		::= { vrrpStatistics 2 }
+
+vrrpRouterVrIdErrors	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets received with an invalid VRID for this virtual router."
+                    		::= { vrrpStatistics 3 }
+
+vrrpRouterStatsTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF  VrrpRouterStatsEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Table of virtual router statistics."
+                    		::= { vrrpStatistics 4 }
+
+vrrpRouterStatsEntry	OBJECT-TYPE
+                    		SYNTAX  VrrpRouterStatsEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Table of virtual router statistics."
+                    		INDEX  { vrrpStatsVrId,  vrrpStatsIfName }
+                    		::= { vrrpRouterStatsTable 1 }
+
+VrrpRouterStatsEntry	::= SEQUENCE {
+                    			vrrpStatsVrId          Integer32,
+                    			vrrpStatsIfName        DisplayString,
+                    			vrrpStatsBecomeMaster   Counter32,
+                    			vrrpStatsAdvertiseRcvd   Counter32,
+                    			vrrpStatsAdvertiseIntervalErrors   Counter32,
+                    			vrrpStatsAuthFailures   Counter32,
+                    			vrrpStatsIpTtlErrors   Counter32,
+                    			vrrpStatsPriorityZeroPktsRcvd   Counter32,
+                    			vrrpStatsPriorityZeroPktsSent   Counter32,
+                    			vrrpStatsInvalidTypePktsRcvd   Counter32,
+                    			vrrpStatsInvalidAuthType   Counter32,
+                    			vrrpStatsAuthTypeMismatch   Counter32,
+                    			vrrpStatsPacketLengthErrors   Counter32
+                    	             }
+
+
+vrrpStatsVrId       	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..255)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"This object contains the Virtual Router Identifier (VRID)."
+                    		::= { vrrpRouterStatsEntry 1 }
+
+vrrpStatsIfName     	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..40))
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			""
+                    		::= { vrrpRouterStatsEntry 2 }
+
+vrrpStatsBecomeMaster	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of times that this virtual router's state has transitioned to MASTER."
+                    		::= { vrrpRouterStatsEntry 3 }
+
+vrrpStatsAdvertiseRcvd	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP advertisements received by this virtual router."
+                    		::= { vrrpRouterStatsEntry 4 }
+
+vrrpStatsAdvertiseIntervalErrors	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP advertisement packets received for which the advertisement interval is different than the one configured for the local virtual router."
+                    		::= { vrrpRouterStatsEntry 5 }
+
+vrrpStatsAuthFailures	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets received that do not pass the authentication check."
+                    		::= { vrrpRouterStatsEntry 6 }
+
+vrrpStatsIpTtlErrors	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets received by the virtual router with IP TTL (Time-To-Live) not equal to 255."
+                    		::= { vrrpRouterStatsEntry 7 }
+
+vrrpStatsPriorityZeroPktsRcvd	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets received by the virtual router with a priority of '0'."
+                    		::= { vrrpRouterStatsEntry 8 }
+
+vrrpStatsPriorityZeroPktsSent	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of VRRP packets sent by the virtual router with a priority of '0'."
+                    		::= { vrrpRouterStatsEntry 9 }
+
+vrrpStatsInvalidTypePktsRcvd	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The number of VRRP packets received by the virtual router with an invalid value in the 'type' field."
+                    		::= { vrrpRouterStatsEntry 10 }
+
+vrrpStatsInvalidAuthType	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of packets received with an unknown authentication type."
+                    		::= { vrrpRouterStatsEntry 11 }
+
+vrrpStatsAuthTypeMismatch	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of packets received with 'Auth Type' not equal to the locally configured authentication method (`vrrpOperAuthType')."
+                    		::= { vrrpRouterStatsEntry 12 }
+
+vrrpStatsPacketLengthErrors	OBJECT-TYPE
+                    		SYNTAX  Counter32
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The total number of packets received with a packet length less than the length of the VRRP header."
+                    		::= { vrrpRouterStatsEntry 13 }
+
+
+------------------------------------------------------------------------------
+vrrpConformance     	OBJECT IDENTIFIER ::= { vrrpMib 4 }
+
+
+------------------------------------------------------------------------------
+vrrpMIBCompliances  	OBJECT IDENTIFIER ::= { vrrpConformance 1 }
+
+vrrpMIBCompliance   	MODULE-COMPLIANCE
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The core compliance statement for all VRRP implementations. 'SETable values are from 1 to 255.'"
+                    			MODULE  -- this module
+                    		MANDATORY-GROUPS {
+                    			          vrrpOperGroup,
+                    			          vrrpStatsGroup
+                    		                 }
+
+                    		::= { vrrpMIBCompliances 1 }
+
+------------------------------------------------------------------------------
+vrrpMIBGroups       	OBJECT IDENTIFIER ::= { vrrpConformance 2 }
+
+vrrpOperGroup       	OBJECT-GROUP
+                    		OBJECTS {
+                    		         vrrpNodeVersion,
+                    		         vrrpNotificationCntl,
+                    		         vrrpOperVirtualMacAddr,
+                    		         vrrpOperState,
+                    		         vrrpOperPriority,
+                    		         vrrpOperMasterIpAddr,
+                    		         vrrpOperAuthType,
+                    		         vrrpOperAuthKey,
+                    		         vrrpOperAdvertisementInterval,
+                    		         vrrpOperPreemptMode,
+                    		         vrrpOperVirtualRouterUpTime,
+                    		         vrrpOperProtocol,
+                    		         vrrpOperRowStatus
+                    		         -- vrrpAssoIpAddrRowStatus
+                    		        }
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Conformance group for VRRP operations."
+                    		::= { vrrpMIBGroups 1 }
+
+vrrpStatsGroup      	OBJECT-GROUP
+                    		OBJECTS {
+                    		         vrrpRouterChecksumErrors,
+                    		         vrrpRouterVersionErrors,
+                    		         vrrpRouterVrIdErrors,
+                    		         vrrpStatsBecomeMaster,
+                    		         vrrpStatsAdvertiseRcvd,
+                    		         vrrpStatsAdvertiseIntervalErrors,
+                    		         vrrpStatsAuthFailures,
+                    		         vrrpStatsIpTtlErrors,
+                    		         -- vrrpStatsInterfaceErrors,
+                    		         vrrpStatsPriorityZeroPktsRcvd,
+                    		         vrrpStatsPriorityZeroPktsSent,
+                    		         vrrpStatsInvalidAuthType,
+                    		         vrrpStatsAuthTypeMismatch,
+                    		         vrrpStatsPacketLengthErrors
+                    		        }
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Conformance group for VRRP statistics."
+                    		::= { vrrpMIBGroups 2 }
+
+
+
+END
+------------------------------------------------------------------------------
+-- ============================================================================
+-- $Log: mpVrrp.mib,v $
+-- Revision 1.1  2010/06/21 11:18:46  liyh
+-- first commit
+--
+--
+--
+-- ============================================================================
+
+

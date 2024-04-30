@@ -1,0 +1,507 @@
+ELTEX-MES-ISS-AAA-MIB DEFINITIONS ::= BEGIN
+
+-- Title:      ELTEX AAA Private MIB
+-- Version:    1.1
+-- Date:       05 Jun 2020
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Unsigned32
+            FROM SNMPv2-SMI
+        OBJECT-GROUP
+            FROM SNMPv2-CONF
+        TruthValue, DisplayString, RowStatus
+            FROM SNMPv2-TC
+        eltMesIss
+            FROM ELTEX-MES-ISS-MIB
+        mcTrapDescr
+            FROM ELTEX-SMI-ACTUAL;
+
+eltMesIssAaaMIB MODULE-IDENTITY
+        LAST-UPDATED "202208030000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "AAA MIB definitions."
+        REVISION "202208030000Z"
+        DESCRIPTION "Added AAA method 'none'."
+        REVISION "202202150000Z"
+        DESCRIPTION "Added AAA chain feature for WEB."
+        REVISION "202107020000Z"
+        DESCRIPTION "Implemented AAA methods lists."
+        REVISION "202010290000Z"
+        DESCRIPTION "Added remote command authorization."
+        REVISION "202006050000Z"
+        DESCRIPTION "Added TACACS attributes."
+        REVISION "201901310000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 7 }
+
+eltMesIssAaaObjects              OBJECT IDENTIFIER ::= { eltMesIssAaaMIB 1 }
+eltMesIssAaaNotifications        OBJECT IDENTIFIER ::= { eltMesIssAaaMIB 2 }
+
+eltMesIssAaaGlobalConfig         OBJECT IDENTIFIER ::= { eltMesIssAaaObjects 1 }
+eltMesIssAaaLineConfig           OBJECT IDENTIFIER ::= { eltMesIssAaaObjects 2 }
+eltMesIssAaaWebConfig            OBJECT IDENTIFIER ::= { eltMesIssAaaObjects 3 }
+
+eltMesIssAaaTacacsGlobalConfig   OBJECT IDENTIFIER ::= { eltMesIssAaaGlobalConfig 2 }
+eltMesIssAaaRadiusGlobalConfig   OBJECT IDENTIFIER ::= { eltMesIssAaaGlobalConfig 3 }
+eltMesIssAaaMethodGlobalConfig   OBJECT IDENTIFIER ::= { eltMesIssAaaGlobalConfig 6 }
+
+eltMesIssAaaNotificationsPrefix  OBJECT IDENTIFIER ::= { eltMesIssAaaNotifications 0 }
+
+-- eltMesIssAaaEnableAuthentication OBJECT-TYPE ::= { eltMesIssAaaTacacsGlobalConfig 1 }
+eltMesIssAaaTacacsAttrConfig     OBJECT IDENTIFIER ::= { eltMesIssAaaTacacsGlobalConfig 2 }
+
+-- ========================================================================== --
+--                            Textual Conventions                             --
+-- ========================================================================== --
+
+EltMesIssAaaAuthenticationMethod ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Authentication method."
+    SYNTAX  INTEGER {
+        local(1),
+        remoteRadius(2),
+        remoteTacacs(3),
+        none(4)
+    }
+
+EltMesIssAaaAuthenticationModeType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Authentication mode. Break stops the process of
+         authentication on first failure, chain passes through
+         the whole list."
+    SYNTAX  INTEGER {
+        chain(1),
+        break(2)
+    }
+
+EltMesIssAaaLineType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    SYNTAX  INTEGER {
+        console(1),
+        telnet(2),
+        ssh(3)
+    }
+
+EltMesIssAaaTacacsAuthenticationType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Tacacs authentication type."
+    SYNTAX  INTEGER {
+        ascii(1),
+        pap(2)
+    }
+
+EltMesIssAaaAuthorizationMethod ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Authorization method."
+    SYNTAX  INTEGER {
+        local(1),
+        remoteTacacs(2),
+        tacacsFallbackToLocal(3),
+        global(255)
+    }
+
+-- ========================================================================== --
+--                               Global Objects                               --
+-- ========================================================================== --
+
+eltMesIssAaaEnableAuthentication OBJECT-TYPE
+    SYNTAX EltMesIssAaaAuthenticationMethod
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Configures the mechanism by which the user enable has to be
+        authenticated for accessing to manage the switch. Authentication
+        is done either locally or in the remote side through a RADIUS Server or TACACS.
+        If Authentication is configured as radiusFallbackToLocal or tacacsFallbackToLocal
+        then Local authentication  provides a back door or a secondary option
+        for authentication if the server fails."
+    DEFVAL  { local }
+    ::= { eltMesIssAaaGlobalConfig 1 }
+
+eltMesIssAaaTacacsAuthenticationType OBJECT-TYPE
+    SYNTAX      EltMesIssAaaTacacsAuthenticationType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures TACACS authentication type."
+    DEFVAL  { pap }
+    ::= { eltMesIssAaaTacacsGlobalConfig 1 }
+
+eltMesIssAaaAuthenticationMode OBJECT-TYPE
+    SYNTAX EltMesIssAaaAuthenticationModeType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configures the authentication mode (chain or break)
+         switch uses to pass through the configured authentication
+         lists of methods."
+    DEFVAL  { break }
+    ::= { eltMesIssAaaGlobalConfig 5 }
+
+-- ========================================================================== --
+--                             Method list table                              --
+-- ========================================================================== --
+
+eltMesIssAaaMethodListTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaMethodListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table specifies all methods list per method name."
+    ::= { eltMesIssAaaMethodGlobalConfig 1 }
+
+eltMesIssAaaMethodListEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAaaMethodListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The row definition for this table."
+    INDEX { eltMesIssAaaMethodListName,
+            eltMesIssAaaAuthenticationMethodIndex }
+    ::= { eltMesIssAaaMethodListTable 1 }
+
+EltMesIssAaaMethodListEntry ::= SEQUENCE {
+    eltMesIssAaaMethodListName               DisplayString,
+    eltMesIssAaaAuthenticationMethodIndex    INTEGER (1..4),
+    eltMesIssAaaMethodType                   EltMesIssAaaAuthenticationMethod,
+    eltMesIssAaaMethodRowStatus              RowStatus
+}
+
+eltMesIssAaaMethodListName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(3..20))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Methods' List Name"
+    ::= { eltMesIssAaaMethodListEntry 1 }
+
+eltMesIssAaaAuthenticationMethodIndex OBJECT-TYPE
+    SYNTAX      INTEGER (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Method type index in list.
+         The smallest index has the highest priority."
+    ::= { eltMesIssAaaMethodListEntry 2 }
+
+eltMesIssAaaMethodType  OBJECT-TYPE
+    SYNTAX      EltMesIssAaaAuthenticationMethod
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Method type that will be used in the methods'
+         list."
+    ::= { eltMesIssAaaMethodListEntry 3 }
+
+eltMesIssAaaMethodRowStatus     OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Method status in the list."
+    ::= { eltMesIssAaaMethodListEntry 4 }
+
+-- ========================================================================== --
+--                                Line Config                                 --
+-- ========================================================================== --
+
+eltMesIssAaaLineLoginAuthenticationTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaLineLoginAuthenticationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of login authentication mechanisms for line."
+    ::= { eltMesIssAaaLineConfig 1 }
+
+eltMesIssAaaLineLoginAuthenticationEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineLoginAuthenticationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "An entry containing login authentication mechanism for line."
+    INDEX { eltMesIssAaaLineLoginAuthenticationLineType }
+    ::= { eltMesIssAaaLineLoginAuthenticationTable 1 }
+
+EltMesIssAaaLineLoginAuthenticationEntry ::=  SEQUENCE {
+        eltMesIssAaaLineLoginAuthenticationLineType
+            EltMesIssAaaLineType,
+        eltMesIssAaaLineLoginMethodListName
+            DisplayString
+    }
+
+eltMesIssAaaLineLoginAuthenticationLineType OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    ::= { eltMesIssAaaLineLoginAuthenticationEntry 1 }
+
+eltMesIssAaaLineLoginMethodListName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(3..20))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Login authentication name of the list of methods for line."
+    ::= { eltMesIssAaaLineLoginAuthenticationEntry 2 }
+
+eltMesIssAaaLineEnableAuthenticationTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaLineEnableAuthenticationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of enable authentication mechanisms for line."
+    ::= { eltMesIssAaaLineConfig 2 }
+
+eltMesIssAaaLineEnableAuthenticationEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineEnableAuthenticationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "An entry containing enable authentication mechanism for line."
+    INDEX { eltMesIssAaaLineEnableAuthenticationLineType }
+    ::= { eltMesIssAaaLineEnableAuthenticationTable 1 }
+
+EltMesIssAaaLineEnableAuthenticationEntry ::=
+    SEQUENCE {
+        eltMesIssAaaLineEnableAuthenticationLineType
+            EltMesIssAaaLineType,
+        eltMesIssAaaLineEnableMethodListName
+            DisplayString
+    }
+
+eltMesIssAaaLineEnableAuthenticationLineType OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    ::= { eltMesIssAaaLineEnableAuthenticationEntry 1 }
+
+eltMesIssAaaLineEnableMethodListName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(3..20))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable authentication name of the list of methods for line."
+    ::= { eltMesIssAaaLineEnableAuthenticationEntry 2 }
+
+eltMesIssAaaLineIdleTimeoutTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaLineIdleTimeoutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of idle timeout configuration for line"
+    ::= { eltMesIssAaaLineConfig 3 }
+
+eltMesIssAaaLineIdleTimeoutEntry OBJECT-TYPE
+   SYNTAX      EltMesIssAaaLineIdleTimeoutEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "An entry containing idle timeout for line."
+   INDEX { eltMesIssAaaLineIdleTimeoutLineType }
+   ::= { eltMesIssAaaLineIdleTimeoutTable 1 }
+
+EltMesIssAaaLineIdleTimeoutEntry ::=
+    SEQUENCE {
+        eltMesIssAaaLineIdleTimeoutLineType
+            EltMesIssAaaLineType,
+        eltMesIssLineIdleTimeout
+            Unsigned32
+    }
+
+eltMesIssAaaLineIdleTimeoutLineType OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    ::= { eltMesIssAaaLineIdleTimeoutEntry 1 }
+
+eltMesIssLineIdleTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..18000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Idle timeout for line."
+    DEFVAL  { 1800 }
+    ::= { eltMesIssAaaLineIdleTimeoutEntry 2 }
+
+-- ========================================================================== --
+--                         WEB authentication config                          --
+-- ========================================================================== --
+
+eltMesIssAaaWebLoginMethodListName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(3..20))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Login authentication name of the list of methods for WEB."
+    ::= { eltMesIssAaaWebConfig 1 }
+
+-- ========================================================================== --
+--                  Commands Authorization Rule Global table                  --
+-- ========================================================================== --
+
+eltMesIssAaaCommandAuthorizationTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaCommandAuthorizationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of command authorization mechanisms per privilege level."
+    ::= { eltMesIssAaaGlobalConfig 4 }
+
+eltMesIssAaaCommandAuthorizationEntry OBJECT-TYPE
+   SYNTAX      EltMesIssAaaCommandAuthorizationEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "An entry containing command authorization mechanism per privilege level."
+   INDEX { eltMesIssAaaCommandAuthorizationPrivilege }
+   ::= { eltMesIssAaaCommandAuthorizationTable 1 }
+
+EltMesIssAaaCommandAuthorizationEntry ::=
+    SEQUENCE {
+        eltMesIssAaaCommandAuthorizationPrivilege
+            Unsigned32 (1..15),
+        eltMesIssAaaCommandAuthorizationMethod
+            EltMesIssAaaAuthorizationMethod
+    }
+
+eltMesIssAaaCommandAuthorizationPrivilege OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..15)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "User privilege level."
+    ::= { eltMesIssAaaCommandAuthorizationEntry 1 }
+
+eltMesIssAaaCommandAuthorizationMethod OBJECT-TYPE
+    SYNTAX      EltMesIssAaaAuthorizationMethod
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Authorization method for privilege."
+    DEFVAL  { local }
+    ::= { eltMesIssAaaCommandAuthorizationEntry 2 }
+
+-- ========================================================================== --
+--                    Commands Authorization Rule per line                    --
+-- ========================================================================== --
+
+eltMesIssAaaLineCommandAuthorizationTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaLineCommandAuthorizationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of command authorization mechanisms for line."
+    ::= { eltMesIssAaaLineConfig 4 }
+
+eltMesIssAaaLineCommandAuthorizationEntry OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineCommandAuthorizationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing command authorization mechanism for line."
+    INDEX { eltMesIssAaaLineCommandAuthorizationLineType }
+    ::= { eltMesIssAaaLineCommandAuthorizationTable 1 }
+
+EltMesIssAaaLineCommandAuthorizationEntry ::=
+    SEQUENCE {
+        eltMesIssAaaLineCommandAuthorizationLineType
+            EltMesIssAaaLineType,
+        eltMesIssAaaLineCommandAuthorizationMethod
+            EltMesIssAaaAuthorizationMethod
+    }
+
+eltMesIssAaaLineCommandAuthorizationLineType OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    ::= { eltMesIssAaaLineCommandAuthorizationEntry 1 }
+
+eltMesIssAaaLineCommandAuthorizationMethod OBJECT-TYPE
+    SYNTAX      EltMesIssAaaAuthorizationMethod
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Authorization method for line."
+    DEFVAL  { global }
+    ::= { eltMesIssAaaLineCommandAuthorizationEntry 2 }
+
+-- ========================================================================== --
+--                             TACACS attributes                              --
+-- ========================================================================== --
+
+eltMesIssAaaTacacsAttrPortConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssAaaTacacsAttrPortConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of TACACS attributes configuring mechanism."
+    ::= { eltMesIssAaaTacacsAttrConfig 1 }
+
+eltMesIssAaaTacacsAttrPortConfigEntry OBJECT-TYPE
+   SYNTAX      EltMesIssAaaTacacsAttrPortConfigEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "An entry containing TACACS attributes configuring
+      mechanism."
+   INDEX { eltMesIssAaaTacacsAttrPortLineType }
+   ::= { eltMesIssAaaTacacsAttrPortConfigTable 1 }
+
+EltMesIssAaaTacacsAttrPortConfigEntry ::=
+    SEQUENCE {
+        eltMesIssAaaTacacsAttrPortLineType
+            EltMesIssAaaLineType,
+        eltMesIssAaaTacacsAttrPortFormat
+            OCTET STRING
+    }
+
+eltMesIssAaaTacacsAttrPortLineType OBJECT-TYPE
+    SYNTAX      EltMesIssAaaLineType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    ::= { eltMesIssAaaTacacsAttrPortConfigEntry 1 }
+
+eltMesIssAaaTacacsAttrPortFormat OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..255))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "User defined string to use as port attribute
+        in TACACS packets. Specify port
+        string template:
+             <%n: line session index>,
+             <%%: single %>."
+    ::= { eltMesIssAaaTacacsAttrPortConfigEntry 2 }
+
+-- ========================================================================== --
+--                               Notifications                                --
+-- ========================================================================== --
+
+eltMesIssAaaUserTrap NOTIFICATION-TYPE
+    OBJECTS   { mcTrapDescr }
+    STATUS current
+    DESCRIPTION
+        "A eltMesIssAaaUserTrap is generated when user
+         connects/rejects/disconnects from the session."
+    ::= { eltMesIssAaaNotificationsPrefix 1 }
+
+END
+

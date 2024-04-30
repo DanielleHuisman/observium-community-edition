@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -17,19 +17,23 @@ $cache_item       = get_cache_item('data');
 if (!ishit_cache_item($cache_item)) {
 
     // Devices
-    $cache['devices'] = ['id'        => [],
-                         'hostname'  => [],
-                         'permitted' => [],
-                         'ignored'   => [],
-                         'down'      => [],
-                         'up'        => [],
-                         'disabled'  => []];
+    $cache['devices'] = [
+        'id'        => [],
+        'hostname'  => [],
+        'permitted' => [],
+        'ignored'   => [],
+        'down'      => [],
+        'up'        => [],
+        'disabled'  => []
+    ];
 
-    $cache['devices']['stat'] = ['count'    => 0,
-                                 'up'       => 0,
-                                 'down'     => 0,
-                                 'ignored'  => 0,
-                                 'disabled' => 0];
+    $cache['devices']['stat'] = [
+        'count'    => 0,
+        'up'       => 0,
+        'down'     => 0,
+        'ignored'  => 0,
+        'disabled' => 0
+    ];
 
     // This code fetches all devices and fills the cache array.
     // This means device_by_id_cache actually never has to do any queries by itself, it'll always get the
@@ -46,106 +50,109 @@ if (!ishit_cache_item($cache_item)) {
     $cache['maint'] = cache_alert_maintenance();
 
 
-    $select = "`device_id`, `hostname`, `status`, `disabled`, `type`, `ignore`, `ignore_until`, `last_polled_timetaken`, `last_discovered_timetaken`";
+    $select = "`device_id`, `hostname`, `status`, `disabled`, `type`, `ignore`, `ignore_until`, `last_polled_timetaken`, `last_discovered_timetaken`, `devices`.`location`";
 
     if ($GLOBALS['config']['geocoding']['enable']) {
-        $devices_query = "SELECT " . $select . ",devices_locations.* FROM `devices` LEFT JOIN `devices_locations` USING (`device_id`) ORDER BY `hostname`;";
+        $select .= ', `devices_locations`.`location_country`, `devices_locations`.`location_state`, `devices_locations`.`location_county`, `devices_locations`.`location_city`';
+        $devices_query = "SELECT " . $select . " FROM `devices` LEFT JOIN `devices_locations` USING (`device_id`) ORDER BY `hostname`;";
     } else {
-        $devices_query = "SELECT " . $select . ",devices.location FROM `devices` ORDER BY `hostname`;";
+        $devices_query = "SELECT " . $select . " FROM `devices` ORDER BY `hostname`;";
     }
 
     foreach (dbFetchRows($devices_query) as $device) {
-        if (device_permitted($device['device_id'])) {
+        if (!device_permitted($device['device_id'])) {
+            continue;
+        }
 
-            // Initialize types and device_locations if not already set
-            if (!isset($cache['devices']['types'][$device['type']])) {
-                $cache['devices']['types'][$device['type']] = ['up' => 0, 'down' => 0, 'disabled' => 0, 'ignored' => 0, 'count' => 0];
+        // Initialize types and device_locations if not already set
+        if (!isset($cache['devices']['types'][$device['type']])) {
+            $cache['devices']['types'][$device['type']] = [ 'up' => 0, 'down' => 0, 'disabled' => 0, 'ignored' => 0, 'count' => 0 ];
+        }
+
+        $cache['devices']['permitted'][]                        = (int)$device['device_id']; // Collect IDs for permitted
+        $cache['devices']['hostname'][$device['hostname']]      = (int)$device['device_id'];
+        $cache['devices']['hostname_map'][$device['device_id']] = $device['hostname'];
+
+        //if (empty($device['device_id'])) { r($device); }
+
+        if ($device['disabled']) {
+            $cache['devices']['stat']['disabled']++;
+            $cache['devices']['disabled'][] = (int)$device['device_id']; // Collect IDs for disabled
+            if (!$GLOBALS['config']['web_show_disabled']) {
+                continue;
             }
+            // Stat for disabled collect after web_show_disabled
+            $cache['devices']['types'][$device['type']]['disabled']++;
+        }
 
-            $cache['devices']['permitted'][]                        = $device['device_id']; // Collect IDs for permitted
-            $cache['devices']['hostname'][$device['hostname']]      = $device['device_id'];
-            $cache['devices']['hostname_map'][$device['device_id']] = $device['hostname'];
-
-            if ($device['disabled']) {
-                $cache['devices']['stat']['disabled']++;
-                $cache['devices']['disabled'][] = $device['device_id']; // Collect IDs for disabled
-                if (!$GLOBALS['config']['web_show_disabled']) {
-                    continue;
-                }
-                // Stat for disabled collect after web_show_disabled
-                $cache['devices']['types'][$device['type']]['disabled']++;
-            }
-
-            if ($device['ignore'] || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > time())) {
-                $cache['devices']['stat']['ignored']++;
-                $cache['devices']['ignored'][] = $device['device_id']; // Collect IDs for ignored
-                $cache['devices']['types'][$device['type']]['ignored']++;
+        if ($device['ignore'] || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > time())) {
+            $cache['devices']['stat']['ignored']++;
+            $cache['devices']['ignored'][] = (int)$device['device_id']; // Collect IDs for ignored
+            $cache['devices']['types'][$device['type']]['ignored']++;
+        } else {
+            if ($device['status']) {
+                $cache['devices']['stat']['up']++;
+                $cache['devices']['types'][$device['type']]['up']++;
+                $cache['devices']['up'][] = (int)$device['device_id'];
             } else {
-                if ($device['status']) {
-                    $cache['devices']['stat']['up']++;
-                    $cache['devices']['types'][$device['type']]['up']++;
-                    $cache['devices']['up'][] = $device['device_id'];
-                } else {
-                    $cache['devices']['stat']['down']++;
-                    $cache['devices']['types'][$device['type']]['down']++;
-                    $cache['devices']['down'][] = $device['device_id'];
-                }
+                $cache['devices']['stat']['down']++;
+                $cache['devices']['types'][$device['type']]['down']++;
+                $cache['devices']['down'][] = (int)$device['device_id'];
+            }
+        }
+
+        $cache['devices']['stat']['count']++;
+
+        $cache['devices']['timers']['polling']   += $device['last_polled_timetaken'];
+        $cache['devices']['timers']['discovery'] += $device['last_discovered_timetaken'];
+
+        $cache['devices']['types'][$device['type']]['count']++;
+
+        if (!isset($cache['device_locations'][$device['location']])) {
+            $cache['device_locations'][$device['location']] = 0;
+        }
+        $cache['device_locations'][$device['location']]++;
+
+        if (isset($config['geocoding']['enable']) && $config['geocoding']['enable']) {
+            $country_code = (string)$device['location_country'];
+            $state        = (string)$device['location_state'];
+            $county       = (string)$device['location_county'];
+            $city         = (string)$device['location_city'];
+            $location     = (string)$device['location'];
+
+            $location_levels = [
+                'location_country' => &$cache['locations']['entries'][$country_code],
+            ];
+
+            // Unknown locations without city & state
+            $no_city = in_array($country_code, [ 'Unknown', '' ], TRUE) || ($city === 'Unknown' && $state === 'Unknown');
+
+            if (!empty($config['location_countries_with_counties']) && in_array($country_code, $config['location_countries_with_counties'])) {
+                $location_levels['location_county'] = &$cache['locations']['entries'][$country_code]['entries'][$county];
+                $location_levels['location_city']   = &$cache['locations']['entries'][$country_code]['entries'][$county]['entries'][$city];
+                $location_levels['location']        = &$cache['locations']['entries'][$country_code]['entries'][$county]['entries'][$city]['entries'][$location];
+            } elseif (!empty($config['location_countries_with_counties_and_states']) && in_array($country_code, $config['location_countries_with_counties_and_states'])) {
+                $location_levels['location_state']  = &$cache['locations']['entries'][$country_code]['entries'][$state];
+                $location_levels['location_county'] = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$county];
+                $location_levels['location_city']   = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$county]['entries'][$city];
+                $location_levels['location']        = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$county]['entries'][$city]['entries'][$location];
+            } elseif (!$no_city) {
+                $location_levels['location_state'] = &$cache['locations']['entries'][$country_code]['entries'][$state];
+                $location_levels['location_city']  = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$city];
+                $location_levels['location']       = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$city]['entries'][$location];
+            } else {
+                // Simple menu with Country -> Location
+                $location_levels['location']       = &$cache['locations']['entries'][$country_code]['entries'][$location];
             }
 
-            $cache['devices']['stat']['count']++;
-
-            $cache['devices']['timers']['polling']   += $device['last_polled_timetaken'];
-            $cache['devices']['timers']['discovery'] += $device['last_discovered_timetaken'];
-
-            $cache['devices']['types'][$device['type']]['count']++;
-
-            if (!isset($cache['device_locations'][$device['location']])) {
-                $cache['device_locations'][$device['location']] = 0;
-            }
-            $cache['device_locations'][$device['location']]++;
-
-            if (isset($config['geocoding']['enable']) && $config['geocoding']['enable']) {
-                $country_code = (string)$device['location_country'];
-                $state        = (string)$device['location_state'];
-                $county       = (string)$device['location_county'];
-                $city         = (string)$device['location_city'];
-                $location     = (string)$device['location'];
-
-                $location_levels = [
-                  'location_country' => &$cache['locations']['entries'][$country_code],
-                ];
-
-                // Unknown locations without city & state
-                $no_city = in_array($country_code, [ 'Unknown', '' ], TRUE) || ($city === 'Unknown' && $state === 'Unknown');
-
-                if (!empty($config['location_countries_with_counties']) && in_array($country_code, $config['location_countries_with_counties'])) {
-                    $location_levels['location_county'] = &$cache['locations']['entries'][$country_code]['entries'][$county];
-                    $location_levels['location_city']   = &$cache['locations']['entries'][$country_code]['entries'][$county]['entries'][$city];
-                    $location_levels['location']        = &$cache['locations']['entries'][$country_code]['entries'][$county]['entries'][$city]['entries'][$location];
-                } elseif (!empty($config['location_countries_with_counties_and_states']) && in_array($country_code, $config['location_countries_with_counties_and_states'])) {
-                    $location_levels['location_state']  = &$cache['locations']['entries'][$country_code]['entries'][$state];
-                    $location_levels['location_county'] = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$county];
-                    $location_levels['location_city']   = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$county]['entries'][$city];
-                    $location_levels['location']        = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$county]['entries'][$city]['entries'][$location];
-                } elseif (!$no_city) {
-                    $location_levels['location_state'] = &$cache['locations']['entries'][$country_code]['entries'][$state];
-                    $location_levels['location_city']  = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$city];
-                    $location_levels['location']       = &$cache['locations']['entries'][$country_code]['entries'][$state]['entries'][$city]['entries'][$location];
-                } else {
-                    // Simple menu with Country -> Location
-                    $location_levels['location']       = &$cache['locations']['entries'][$country_code]['entries'][$location];
+            foreach ($location_levels as $level => &$entry) {
+                if (!isset($entry['count'])) {
+                    $entry['count'] = 0;
                 }
-
-                foreach ($location_levels as $level => &$entry) {
-                    if (!isset($entry['count'])) {
-                        $entry['count'] = 0;
-                    }
-                    $entry['count']++;
-                    $entry['level'] = $level;
-                }
-                unset($entry);
+                $entry['count']++;
+                $entry['level'] = $level;
             }
-
+            unset($entry);
         }
     }
 
@@ -183,43 +190,43 @@ if (!ishit_cache_item($cache_item)) {
 
     $where_permitted = generate_query_permitted_ng(['device', 'port']);
 
-    $where_permitted_hide   = [$where_permitted];
+    $where_permitted_hide   = [ $where_permitted ];
     $where_permitted_hide[] = "`deleted` = 0";
 
     // Deleted
     $cache['ports']['deleted']         = dbFetchColumn("SELECT `port_id` FROM `ports`" . generate_where_clause($where_permitted, "`deleted` = 1"));
-    $cache['ports']['stat']['deleted'] = count($cache['ports']['deleted']);
+    $cache['ports']['stat']['deleted'] = safe_count($cache['ports']['deleted']);
 
     // Devices disabled
-    if (isset($cache['devices']['disabled']) && count($cache['devices']['disabled']) > 0) {
-        $cache['ports']['device_disabled'] = dbFetchColumn("SELECT `port_id` FROM `ports` " . generate_where_clause($where_permitted, generate_query_values_ng($cache['devices']['disabled'], 'device_id')));
+    if (isset($cache['devices']['disabled']) && !safe_empty($cache['devices']['disabled'])) {
+        $cache['ports']['device_disabled'] = dbFetchColumn("SELECT `port_id` FROM `ports` " . generate_where_clause($where_permitted, generate_query_values($cache['devices']['disabled'], 'device_id')));
         if (!$config['web_show_disabled']) {
-            $where_permitted_hide[] = generate_query_values_ng($cache['devices']['disabled'], 'device_id', '!=');
+            $where_permitted_hide[] = generate_query_values($cache['devices']['disabled'], 'device_id', '!=');
         }
     }
 
     // Devices ignored
     $where_devices_ignored = '';
-    if (isset($cache['devices']['ignored']) && count($cache['devices']['ignored']) > 0) {
-        $cache['ports']['device_ignored'] = dbFetchColumn("SELECT `port_id` FROM `ports`" . generate_where_clause($where_permitted_hide, generate_query_values_ng($cache['devices']['ignored'], 'device_id')));
-        $where_permitted_hide[]           = generate_query_values_ng($cache['devices']['ignored'], 'device_id', '!=');
-        $where_devices_ignored            = generate_query_values_ng($cache['devices']['ignored'], 'device_id');
+    if (isset($cache['devices']['ignored']) && !safe_empty($cache['devices']['ignored'])) {
+        $cache['ports']['device_ignored'] = dbFetchColumn("SELECT `port_id` FROM `ports`" . generate_where_clause($where_permitted_hide, generate_query_values($cache['devices']['ignored'], 'device_id')));
+        $where_permitted_hide[]           = generate_query_values($cache['devices']['ignored'], 'device_id', '!=');
+        $where_devices_ignored            = generate_query_values($cache['devices']['ignored'], 'device_id');
     }
-    $cache['ports']['stat']['device_ignored'] = count($cache['ports']['device_ignored']);
+    $cache['ports']['stat']['device_ignored'] = safe_count($cache['ports']['device_ignored']);
 
     // Ports poll disabled
     $cache['ports']['poll_disabled']         = dbFetchColumn("SELECT `port_id` FROM `ports`" . generate_where_clause($where_permitted_hide, "`disabled` = '1'"));
-    $cache['ports']['stat']['poll_disabled'] = count($cache['ports']['poll_disabled']);
+    $cache['ports']['stat']['poll_disabled'] = safe_count($cache['ports']['poll_disabled']);
 
     // Ports ignored
     $cache['ports']['ignored']         = dbFetchColumn("SELECT `port_id` FROM `ports`" . generate_where_clause($where_permitted_hide, "`ignore` = '1'"));
-    $cache['ports']['stat']['ignored'] = count($cache['ports']['ignored']);
+    $cache['ports']['stat']['ignored'] = safe_count($cache['ports']['ignored']);
 
     $where_permitted_hide[] = "`ignore` = 0";
 
     // Ports errored
     $cache['ports']['errored']         = dbFetchColumn("SELECT `port_id` FROM `ports`" . generate_where_clause($where_permitted_hide, "`ifAdminStatus` = 'up' AND (`ifOperStatus` = 'up' OR `ifOperStatus` = 'testing') AND (`ifOutErrors_delta` > 0 OR `ifInErrors_delta` > 0)"));
-    $cache['ports']['stat']['errored'] = count($cache['ports']['errored']);
+    $cache['ports']['stat']['errored'] = safe_count($cache['ports']['errored']);
 
     // Ports counts
     $cache['ports']['stat']['count']    = dbFetchCell("SELECT COUNT(*) FROM `ports`" . generate_where_clause($where_permitted_hide));
@@ -418,7 +425,7 @@ if (!ishit_cache_item($cache_item)) {
     $microtime_start = microtime(TRUE);
 
     $query_where   = [];
-    $query_where[] = generate_query_permitted_ng(['device', 'sensor']);
+    $query_where[] = generate_query_permitted_ng([ 'device', 'sensor' ]);
     $query_where[] = "`sensor_deleted` = 0";
 
     if (!$config['web_show_disable']) {
@@ -725,7 +732,7 @@ FROM alert_table
       $cache['routing']['bgp']['up'] = 0;
       $cache['routing']['bgp']['down'] = 0;
 
-      $cache['routing']['bgp']['last_seen'] = $config['time']['now'];
+      $cache['routing']['bgp']['last_seen'] = get_time();
       foreach (dbFetchRows('SELECT `device_id`,`bgpPeer_id`,`local_as`,`bgpPeerState`,`bgpPeerAdminStatus`,`bgpPeerRemoteAs` FROM `bgpPeers`'  . generate_where_clause(generate_query_permitted_ng(array('device')))) as $bgp) {
         if (!$config['web_show_disabled']) {
           if ($cache['devices']['id'][$bgp['device_id']]['disabled']) { continue; }
@@ -801,13 +808,13 @@ FROM alert_table
         $cache['routing']['ospf']['count']     = $ospf_data['count'];
         $cache['routing']['ospf']['up']        = $ospf_data['up'];
         $cache['routing']['ospf']['down']      = $ospf_data['down'];
-        $cache['routing']['ospf']['last_seen'] = $config['time']['now'];
+        $cache['routing']['ospf']['last_seen'] = get_time();
     }
 
     /*
     if (isset($config['enable_ospf']) && $config['enable_ospf'])
     {
-      $cache['routing']['ospf']['last_seen'] = $config['time']['now'];
+      $cache['routing']['ospf']['last_seen'] = get_time();
       foreach (dbFetchRows("SELECT `device_id`, `ospfAdminStat` FROM `ospf_instances`"  . generate_where_clause(generate_query_permitted_ng(['device']))) as $ospf)
       {
         if (!$config['web_show_disabled'])
@@ -930,7 +937,7 @@ unset($cache_item);
 //print_vars(get_cache_items('__wui'));
 //print_vars(get_cache_stats());
 
-$cache_data_time = microtime(TRUE) - $cache_data_start;
+$cache_data_time = elapsed_time($cache_data_start);
 
 // EOF
 

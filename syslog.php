@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -26,8 +26,6 @@ $maint        = cache_alert_maintenance();
 $config_unixtime = get_time();
 
 $_SESSION['userlevel'] = 10; // Hardcode this to max to ensure links and the like are created
-
-$i = 1;
 
 if (isset($config['syslog']['fifo']) && $config['syslog']['fifo'] !== FALSE) {
     // FIFO configured, try to grab logs from it
@@ -52,7 +50,7 @@ while ($line = fgets($s)) {
     $new_rules = get_obs_attrib('syslog_rules_changed');
     // Also detect if MySQL server has gone away
     if (empty($new_rules)) {
-        if (dbErrorNo() === 2006 && function_exists('dbPing') && dbPing() === FALSE) {
+        if (function_exists('dbPing') && dbErrorNo() === 2006 && dbPing() === FALSE) {
             // MySQL server has gone away
             print_error('MySQL server has gone away. Need restart for script syslog.php');
             exit(1);
@@ -98,13 +96,6 @@ while ($line = fgets($s)) {
             // Disabled during update
             exit(0);
         }
-    }
-
-    // What is do this? :O
-    $i++;
-
-    if ($i > 10) {
-        $i = 1;
     }
 }
 

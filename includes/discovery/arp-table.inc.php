@@ -157,7 +157,7 @@ foreach ($old_table as $vrf_name => $entry1) {
     }
 }
 if (!safe_empty($remove_mac_ids)) {
-    dbDelete('ip_mac', generate_query_values_ng($remove_mac_ids, 'mac_id'));
+    dbDelete('ip_mac', generate_query_values($remove_mac_ids, 'mac_id'));
 }
 echo(PHP_EOL);
 

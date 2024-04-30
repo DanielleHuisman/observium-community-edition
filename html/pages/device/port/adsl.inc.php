@@ -16,7 +16,7 @@ if (is_file($rrdfile)) {
 
     echo('<table class="table table-striped  table-condensed">');
 
-    $graph_array['to'] = $config['time']['now'];
+    $graph_array['to'] = get_time();
     $graph_array['id'] = $port['port_id'];
 
     echo('<tr><td>');

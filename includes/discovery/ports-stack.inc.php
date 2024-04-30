@@ -4,19 +4,33 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 // FIXME. Add here discovery CISCO-STACK-MIB::portTable, CISCO-PAGP-MIB::pagpProtocolConfigTable
 // FIXME. Need rename db schema port_id_high -> port_ifIndex_high, port_id_low -> port_ifIndex_low
 
-$query          = 'SELECT * FROM `ports_stack` WHERE `device_id` = ?';
+$stack_db_dup   = [];
 $stack_db_array = [];
-foreach (dbFetchRows($query, [$device['device_id']]) as $entry) {
+foreach (dbFetchRows('SELECT * FROM `ports_stack` WHERE `device_id` = ?', [$device['device_id']]) as $entry) {
+    if (isset($stack_db_array[$entry['port_id_high']][$entry['port_id_low']])) {
+        $stack_db_dup[] = $entry['port_stack_id'];
+        continue;
+    }
     $stack_db_array[$entry['port_id_high']][$entry['port_id_low']] = $entry;
+}
+if (!safe_empty($stack_db_dup)) {
+    print_debug('Found '.count($stack_db_dup).' duplicate ports stack entries, cleaning..');
+    dbDelete('ports_stack', generate_query_values($stack_db_dup, 'port_stack_id'));
+}
+
+// Generate ifIndex -> port_id cache
+$idx_id = [];
+foreach (dbFetchRows("SELECT `ifIndex`, `port_id` FROM ports WHERE `device_id` = ?", [$device['device_id']]) as $port) {
+    $idx_id[$port['ifIndex']] = $port['port_id'];
 }
 
 $ifmib_stack  = FALSE;
@@ -44,6 +58,10 @@ if (is_device_mib($device, 'IF-MIB')) {
                         }
                     }
 
+                    if ($port_ifIndex_low == 0 || $port_ifIndex_high == 0 || !isset($idx_id[$port_ifIndex_low]) || !isset($idx_id[$port_ifIndex_high])) {
+                        continue;
+                    }
+
                     $ifStackStatus = $entry_low['ifStackStatus'];
                     //if ($ifStackStatus === 'notInService') { continue; } // FIXME. Skip inactive entries
                     if ($ifStackStatus === 'notInService' && ($port_ifIndex_low == 0 || $port_ifIndex_high == 0)) {
@@ -54,11 +72,15 @@ if (is_device_mib($device, 'IF-MIB')) {
                     // Set stacks found by IF-MIB
                     $ifmib_stack = TRUE;
 
-                    // Store valid for others
-                    $valid[$module][$port_ifIndex_high][$port_ifIndex_low] = $ifStackStatus;
+                    // Get port_id for upper and lower layer ports
+                    $port_id_high = $idx_id[$port_ifIndex_high];
+                    $port_id_low  = $idx_id[$port_ifIndex_low];
 
-                    if (isset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low])) {
-                        if ($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]['ifStackStatus'] == $ifStackStatus) {
+                    // Store valid for others
+                    $valid[$module][$port_id_high][$port_id_low] = $ifStackStatus;
+
+                    if (isset($stack_db_array[$port_id_high][$port_id_low])) {
+                        if ($stack_db_array[$port_id_high][$port_id_low]['ifStackStatus'] == $ifStackStatus) {
                             //echo('.');
                             $GLOBALS['module_stats'][$module]['unchanged']++;
                         } else {
@@ -67,7 +89,7 @@ if (is_device_mib($device, 'IF-MIB')) {
                             //echo('U');
                             $GLOBALS['module_stats'][$module]['updated']++;
                         }
-                        unset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]);
+                        unset($stack_db_array[$port_id_high][$port_id_low]);
                     } else {
                         // $update_array = array('device_id'     => $device['device_id'],
                         //                       'port_id_high'  => $port_ifIndex_high,
@@ -76,8 +98,8 @@ if (is_device_mib($device, 'IF-MIB')) {
                         //dbInsert($update_array, 'ports_stack');
                         $insert_array[] = [
                           'device_id'     => $device['device_id'],
-                          'port_id_high'  => $port_ifIndex_high,
-                          'port_id_low'   => $port_ifIndex_low,
+                          'port_id_high'  => $port_id_high,
+                          'port_id_low'   => $port_id_low,
                           'ifStackStatus' => $ifStackStatus
                         ];
                         $GLOBALS['module_stats'][$module]['added']++;
@@ -121,11 +143,19 @@ if (!$ifmib_stack && is_device_mib($device, 'IEEE8023-LAG-MIB') &&
             continue;
         }
 
-        // Store valid for others
-        $valid[$module][$port_ifIndex_high][$port_ifIndex_low] = $ifStackStatus;
+        if ($port_ifIndex_low == 0 || $port_ifIndex_high == 0 || !isset($idx_id[$port_ifIndex_low]) || !isset($idx_id[$port_ifIndex_high])) {
+            continue;
+        }
 
-        if (isset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low])) {
-            if ($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]['ifStackStatus'] == $ifStackStatus) {
+        // Get port_id for upper and lower layer ports
+        $port_id_high = $idx_id[$port_ifIndex_high];
+        $port_id_low  = $idx_id[$port_ifIndex_low];
+
+        // Store valid for others
+        $valid[$module][$port_id_high][$port_id_low] = $ifStackStatus;
+
+        if (isset($stack_db_array[$port_id_high][$port_id_low])) {
+            if ($stack_db_array[$port_id_high][$port_id_low]['ifStackStatus'] == $ifStackStatus) {
                 //echo('.');
                 $GLOBALS['module_stats'][$module]['unchanged']++;
             } else {
@@ -134,7 +164,7 @@ if (!$ifmib_stack && is_device_mib($device, 'IEEE8023-LAG-MIB') &&
                 //echo('U');
                 $GLOBALS['module_stats'][$module]['updated']++;
             }
-            unset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]);
+            unset($stack_db_array[$port_id_high][$port_id_low]);
         } else {
             // $update_array = array('device_id'     => $device['device_id'],
             //                       'port_id_high'  => $port_ifIndex_high,
@@ -143,8 +173,8 @@ if (!$ifmib_stack && is_device_mib($device, 'IEEE8023-LAG-MIB') &&
             //dbInsert($update_array, 'ports_stack');
             $insert_array[] = [
               'device_id'     => $device['device_id'],
-              'port_id_high'  => $port_ifIndex_high,
-              'port_id_low'   => $port_ifIndex_low,
+              'port_id_high'  => $port_id_high,
+              'port_id_low'   => $port_id_low,
               'ifStackStatus' => $ifStackStatus
             ];
             $GLOBALS['module_stats'][$module]['added']++;
@@ -189,9 +219,7 @@ if (is_device_mib($device, 'HUAWEI-IF-EXT-MIB')) {
             if (!is_numeric($port_ifIndex_low) || $entry_low['hwTrunkValidEntry'] === 'invalid') {
                 continue;
             }
-            if (isset($valid[$module][$port_ifIndex_high][$port_ifIndex_low])) {
-                print_debug("Skipped already exist Port Stack $port_ifIndex_high.$port_ifIndex_low:");
-                print_debug_vars($entry_low);
+            if (!isset($idx_id[$port_ifIndex_low], $idx_id[$port_ifIndex_high]) || $port_ifIndex_low == 0 || $port_ifIndex_high == 0) {
                 continue;
             }
 
@@ -201,23 +229,33 @@ if (is_device_mib($device, 'HUAWEI-IF-EXT-MIB')) {
             $ifStackStatus = $entry_low['hwTrunkRowStatus'];
             //if ($ifStackStatus !== 'active') { continue; } // Skip inactive entries
 
-            // Store valid for others
-            $valid[$module][$port_ifIndex_high][$port_ifIndex_low] = $ifStackStatus;
+            // Get port_id for upper and lower layer ports
+            $port_id_high = $idx_id[$port_ifIndex_high];
+            $port_id_low  = $idx_id[$port_ifIndex_low];
 
-            if (isset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low])) {
-                if ($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]['ifStackStatus'] == $ifStackStatus) {
+            if (isset($valid[$module][$port_id_high][$port_id_low])) {
+                print_debug("Skipped already exist Port Stack $port_ifIndex_high.$port_ifIndex_low:");
+                print_debug_vars($entry_low);
+                continue;
+            }
+
+            // Store valid for others
+            $valid[$module][$port_id_high][$port_id_low] = $ifStackStatus;
+
+            if (isset($stack_db_array[$port_id_high][$port_id_low])) {
+                if ($stack_db_array[$port_id_high][$port_id_low]['ifStackStatus'] == $ifStackStatus) {
                     $GLOBALS['module_stats'][$module]['unchanged']++;
                 } else {
                     $update_array = ['ifStackStatus' => $ifStackStatus];
                     dbUpdate($update_array, 'ports_stack', '`port_stack_id` = ?', [$entry_low['port_stack_id']]);
                     $GLOBALS['module_stats'][$module]['updated']++;
                 }
-                unset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]);
+                unset($stack_db_array[$port_id_high][$port_id_low]);
             } else {
                 $insert_array[] = [
                   'device_id'     => $device['device_id'],
-                  'port_id_high'  => $port_ifIndex_high,
-                  'port_id_low'   => $port_ifIndex_low,
+                  'port_id_high'  => $port_id_high,
+                  'port_id_low'   => $port_id_low,
                   'ifStackStatus' => $ifStackStatus
                 ];
                 $GLOBALS['module_stats'][$module]['added']++;
@@ -233,10 +271,10 @@ if (count($insert_array)) {
 }
 
 $delete_array = [];
-foreach ($stack_db_array as $port_ifIndex_high => $array) {
-    foreach ($array as $port_ifIndex_low => $entry) {
-        print_debug('DELETE STACK: ' . $device['device_id'] . ' ' . $port_ifIndex_low . ' ' . $port_ifIndex_high);
-        //dbDelete('ports_stack', '`device_id` =  ? AND port_id_high = ? AND port_id_low = ?', array($device['device_id'], $port_ifIndex_high, $port_ifIndex_low));
+foreach ($stack_db_array as $port_id_high => $array) {
+    foreach ($array as $port_id_low => $entry) {
+        print_debug('DELETE STACK: ' . $device['device_id'] . ' ' . $port_id_low . ' ' . $port_id_high);
+        //dbDelete('ports_stack', '`device_id` = ? AND port_id_high = ? AND port_id_low = ?', array($device['device_id'], $port_ifIndex_high, $port_ifIndex_low));
         //echo('-');
         $delete_array[] = $entry['port_stack_id'];
         $GLOBALS['module_stats'][$module]['deleted']++;
@@ -245,11 +283,9 @@ foreach ($stack_db_array as $port_ifIndex_high => $array) {
 // MultiDelete old entries
 if (count($delete_array)) {
     print_debug_vars($delete_array);
-    dbDelete('ports_stack', generate_query_values_ng($delete_array, 'port_stack_id'));
+    dbDelete('ports_stack', generate_query_values($delete_array, 'port_stack_id'));
 }
 
 unset($insert_array, $update_array, $delete_array);
 
 echo(PHP_EOL);
-
-// EOF

@@ -1,0 +1,294 @@
+ELTEX-MES-ISS-SYSTEM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE, MODULE-IDENTITY
+            FROM SNMPv2-SMI
+    TruthValue, DisplayString
+            FROM SNMPv2-TC
+    eltMesIss
+            FROM ELTEX-MES-ISS-MIB
+    mcTrapDescr
+            FROM ELTEX-SMI;
+
+
+eltMesIssSystemMIB MODULE-IDENTITY
+    LAST-UPDATED "202301300000Z"
+    ORGANIZATION "Eltex Enterprise, Ltd."
+    CONTACT-INFO
+            "eltex-co.ru"
+    DESCRIPTION
+            "MIB extensions for ISS system."
+    REVISION "202301300000Z"
+    DESCRIPTION
+            "Added eltMesIssSysDescr object"
+    REVISION "202206090000Z"
+    DESCRIPTION
+            "Added eltMesIssSysStartupType object"
+    REVISION "202104280000Z"
+    DESCRIPTION
+            "Added eltMesIssSysReloadRequestLoggingEnable,
+             eltMesIssSysReloadRequestTrap objects"
+    REVISION "202102050000Z"
+    DESCRIPTION
+            "Added write access to
+             eltMesIssSysBootVarImageStateAfterReboot object"
+    REVISION "202005080000Z"
+    DESCRIPTION "Added eltMesIssSysBootVar object."
+    REVISION "201910150000Z"
+    DESCRIPTION "Initial revision."
+    ::= { eltMesIss 18 }
+
+-- Textual Conventions
+
+EltMesIssSysDelayedReloadMode ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Delayed reload controls.
+            -reloadIn - sets timer to reload in time interval
+            -reloadAt - allows reload switch at specific time or date
+            -noReload - cancels pending reload."
+    SYNTAX  INTEGER {
+        reloadIn(1),
+        reloadAt(2),
+        noReload(3)
+    }
+
+EltMesIssSysImageType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Image types."
+    SYNTAX INTEGER {
+        image(1),
+        boot(2),
+        preloader(3)
+}
+
+EltMesIssSysImageState ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Boot priority."
+    SYNTAX INTEGER {
+        active(1),
+        inactive(2)
+}
+
+-- Top level MIB structure
+
+eltMesIssSysObjects        OBJECT IDENTIFIER ::= { eltMesIssSystemMIB 1 }
+eltMesIssSysNotifications  OBJECT IDENTIFIER ::= { eltMesIssSystemMIB 2 }
+
+-- MIB Groups
+
+eltMesIssSysGlobals        OBJECT IDENTIFIER ::= { eltMesIssSysObjects 1 }
+
+eltMesIssSysReloadParams   OBJECT IDENTIFIER ::= { eltMesIssSysGlobals 1 }
+eltMesIssSysLoggingParams  OBJECT IDENTIFIER ::= { eltMesIssSysGlobals 2 }
+eltMesIssSysBootVar        OBJECT IDENTIFIER ::= { eltMesIssSysGlobals 3 }
+
+-- Low level Mib structure
+
+eltMesIssSysNotificationsPrefix  OBJECT IDENTIFIER ::= { eltMesIssSysNotifications 0 }
+
+-- -----------------------------------------------------------------------------
+-- System reload configuration
+-- -----------------------------------------------------------------------------
+
+eltMesIssDelayReloadTime OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..40))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used for requesting a delayed reload of the device in a
+         specific desired time, should be configured in one of the following
+         formats:
+         -in case of 'reloadIn':'hhh:mm'
+         -in case of 'reloadAt':'hh:mm:ss dd MM'
+         Changing this value after another delayed restart was confirmed
+         will cause restarting of existing timer with previous value
+         of eltMesIssDelayReloadAction."
+    ::= { eltMesIssSysReloadParams 1 }
+
+eltMesIssDelayReloadAction OBJECT-TYPE
+    SYNTAX      EltMesIssSysDelayedReloadMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used for requesting a delayed reload of the device in a
+         specific desired time. Changing this value after another delayed
+         restart was confirmed will cause stopping of existing timer and
+         purification of eltMesIssDelayReloadTime."
+    DEFVAL  { noReload }
+    ::= { eltMesIssSysReloadParams 2 }
+
+-- -----------------------------------------------------------------------------
+-- System logging configuration
+-- -----------------------------------------------------------------------------
+
+eltMesIssSysClearDebugLogs OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting this variable to true erases debug log files.
+         On read returns true, if erasing succeeded or false,
+         if error occured from the last erasing."
+    ::= { eltMesIssSysLoggingParams 1 }
+
+eltMesIssSysReloadRequestLoggingEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable or disable reload request logging"
+    DEFVAL      { true }
+    ::= { eltMesIssSysLoggingParams 2 }
+
+eltMesIssSysStartupType OBJECT-TYPE
+    SYNTAX      INTEGER { coldstart(0), warmstart(1), undefined(2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "System startup type and last reload cause.
+         Can be coldstart, which is caused by hardware,
+         warmstart, caused by software,
+         or undefined if system restoration is in progress."
+    ::= { eltMesIssSysLoggingParams 3 }
+
+-- -----------------------------------------------------------------------------
+-- System boot variables
+-- -----------------------------------------------------------------------------
+
+eltMesIssSysBootVarTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltBootVarEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The table contains information about boot variables."
+    ::=  { eltMesIssSysBootVar 1 }
+
+eltMesIssSysBootVarEntry OBJECT-TYPE
+    SYNTAX      EltBootVarEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The entry contains information about images."
+    INDEX  { eltMesIssSysBootVarImageType, 
+             eltMesIssSysBootVarImageState }
+    ::= { eltMesIssSysBootVarTable 1 }
+
+EltBootVarEntry ::= SEQUENCE {
+        eltMesIssSysBootVarImageType                EltMesIssSysImageType,
+        eltMesIssSysBootVarImageState               EltMesIssSysImageState,
+        eltMesIssSysBootVarValid                    TruthValue,
+        eltMesIssSysBootVarVersion                  DisplayString,
+        eltMesIssSysBootVarCommit                   DisplayString,
+        eltMesIssSysBootVarBuild                    DisplayString,
+        eltMesIssSysBootVarMd5Digest                DisplayString,
+        eltMesIssSysBootVarTime                     DisplayString,
+        eltMesIssSysBootVarImageStateAfterReboot    EltMesIssSysImageState
+}
+
+-- Keys
+
+eltMesIssSysBootVarImageType OBJECT-TYPE
+    SYNTAX      EltMesIssSysImageType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This field contains the type of image."
+    ::= { eltMesIssSysBootVarEntry 1 }
+
+eltMesIssSysBootVarImageState OBJECT-TYPE
+    SYNTAX      EltMesIssSysImageState
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Active or inactive image priority."
+    ::= { eltMesIssSysBootVarEntry 2 }
+
+-- Values
+
+eltMesIssSysBootVarValid OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The validity state of an existing image."
+    ::= { eltMesIssSysBootVarEntry 3 }
+
+eltMesIssSysBootVarVersion OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Software version number."
+    ::= { eltMesIssSysBootVarEntry 4 }
+
+eltMesIssSysBootVarCommit OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "First 8 symbols of Git commit hash."
+    ::= { eltMesIssSysBootVarEntry 5 }
+
+eltMesIssSysBootVarBuild OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Software incremental build number. An empty string means
+         that this field is not supported by image type."
+    ::= { eltMesIssSysBootVarEntry 6 }
+
+eltMesIssSysBootVarMd5Digest OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "MD5 digest of software file."
+    ::= { eltMesIssSysBootVarEntry 7 }
+
+eltMesIssSysBootVarTime OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Software build time."
+    ::= { eltMesIssSysBootVarEntry 8 }
+
+eltMesIssSysBootVarImageStateAfterReboot OBJECT-TYPE
+    SYNTAX      EltMesIssSysImageState
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Active or inactive state of image after reboot.
+         This variable can be changed only for 'image(1)' image types."
+    ::= { eltMesIssSysBootVarEntry 9 }
+
+-- -----------------------------------------------------------------------------
+-- System description configuration
+-- -----------------------------------------------------------------------------
+
+eltMesIssSysDescr OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A textual description of the entity. This value include the custom
+         description of the system. It is mandatory that this only contain
+         printable ASCII characters."
+    ::= { eltMesIssSysGlobals 4 }
+
+-- ------------------
+-- Notifications   --
+-- ------------------
+
+eltMesIssSysReloadRequestTrap NOTIFICATION-TYPE
+    OBJECTS   { mcTrapDescr }
+    STATUS current
+    DESCRIPTION
+        "eltMesIssSysReloadRequestTrap is sent when a reboot request is made."
+    ::= { eltMesIssSysNotificationsPrefix 1 }
+
+END

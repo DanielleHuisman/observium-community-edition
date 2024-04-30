@@ -4,39 +4,11 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
-
-if (is_device_mib($device, 'CISCO-CONFIG-MAN-MIB')) {
-    // Check Cisco configuration age
-
-    $oids       = 'sysUpTime.0 ccmHistoryRunningLastChanged.0 ccmHistoryRunningLastSaved.0 ccmHistoryStartupLastChanged.0';
-    $data       = snmp_get_multi_oid($device, $oids, [], 'SNMPv2-MIB:CISCO-CONFIG-MAN-MIB', NULL, OBS_SNMP_ALL_TIMETICKS);
-    $config_age = $data[0];
-
-    foreach ($config_age as $key => $val) {
-        $config_age[$key] = $val / 100;
-    }
-
-    $RunningLastChanged   = $config_age['sysUpTime'] - $config_age['ccmHistoryRunningLastChanged'];
-    $RunningLastChangedTS = time() - $RunningLastChanged;
-    $RunningLastSaved     = $config_age['sysUpTime'] - $config_age['ccmHistoryRunningLastSaved'];
-    $RunningLastSavedTS   = time() - $RunningLastSaved;
-    $StartupLastChanged   = $config_age['sysUpTime'] - $config_age['ccmHistoryStartupLastChanged'];
-    $StartupLastChangedTS = time() - $StartupLastChanged;
-
-    $sysUptimeTS = time() - $config_age['sysUpTime'];
-
-    $os_additional_info['Cisco configuration ages'] = [
-      'sysUptime' => format_unixtime($sysUptimeTS) . ' | ' . format_uptime($config_age['sysUpTime']),
-      'Running'   => format_unixtime($RunningLastChangedTS) . ' | ' . format_uptime($RunningLastChanged),
-      'Saved'     => format_unixtime($RunningLastSavedTS) . ' | ' . format_uptime($RunningLastSaved),
-      'Startup'   => format_unixtime($StartupLastChangedTS) . ' | ' . format_uptime($StartupLastChanged),
-    ];
-}
 
 $sysDescr = preg_replace('/\s+/', ' ', $poll_device['sysDescr']); // Replace all spaces and newline to single space
 // Generic IOS/IOS-XE/IES/IOS-XR sysDescr
@@ -78,10 +50,10 @@ if (preg_match('/^Cisco IOS Software(?: \[\S+?\])?, .+? Software \((?:[^\-]+\-(?
 
     if (str_contains($matches['hw2'], ' ')) {
         // NXOS 32-bit -> 32-bit
-        [, $features] = explode(' ', $matches['hw2'], 2);
+        $features = explode(' ', $matches['hw2'], 2)[1];
     } elseif (str_contains($matches['hw2'], '-')) {
         // n7000-s2-dk9 -> s2-dk9
-        [, $features] = explode('-', $matches['hw2'], 2);
+        $features = explode('-', $matches['hw2'], 2)[1];
     }
     $version = $matches['version'];
 } elseif (preg_match('/Software \(\w+-(?<features>\w+)-\w\),.+?Version (?<version>[^, ]+),(?:[\w ]+)? RELEASE SOFTWARE/', $sysDescr, $matches)) {
@@ -108,6 +80,7 @@ if (preg_match('/^Cisco IOS Software(?: \[\S+?\])?, .+? Software \((?:[^\-]+\-(?
 
 // All other Cisco devices
 if (is_array($entPhysical)) {
+    print_debug_vars($entPhysical);
     if (is_module_enabled($device, 'inventory', 'discovery')) {
         if ($entPhysical['entPhysicalClass'] === 'stack') {
             // If it's stacked device try get chassis instead
@@ -181,6 +154,8 @@ if ($hardware) {
       '/^[Cc]isco\s*(\d)/'                      => '\1',            // Cisco 7604   -> 7604
       '/^cisco([a-z])/i'                        => '\1',            // ciscoASR9010 -> ASR9010
       '/^cat(?:alyst)?(\d{4}[CGX]?)(\w+)(.)$/i' => 'WS-C\1-\2-\3',  // cat296048TCS -> WS-C2960-48TC-S
+      '/^ACE\-?(\w+)\-?K9/'                     => 'ACE \1',        // ACE4710K9    -> ACE 4710
+      '/^ACE\-?(\w+)/'                          => 'ACE \1'         // ACE4710      -> ACE 4710
     ];
     $hardware      = array_preg_replace($cisco_replace, $hardware);
 }

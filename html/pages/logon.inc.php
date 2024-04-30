@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -17,6 +17,7 @@
     <div class="row" style="margin-top: 50px;">
         <div class="col-sm-12 col-md-10 col-md-offset-1 col-lg-8 col-lg-offset-2 col-xl-6 col-xl-offset-3">
             <div class="box box-solid" <?php if (TRUE) {
+                // FIXME. Need reduce image on small screen
                 echo 'style="background-image: url(\'images/hamster-login.png\');  background-position: left 10px top -65px; background-repeat: no-repeat;"';
             } ?> >
                 <div class="login-box" <?php if (isset($config['web']['logo'])) {
@@ -28,13 +29,13 @@
                         <div class="col-xs-8 col-sm-8 col-md-8">
                             <?php
                             $form = [
-                              'type'     => 'horizontal',
-                              'id'       => 'logonform',
-                              //'space'   => '20px',
-                              //'title'   => 'Logon',
-                              //'icon'    => 'oicon-key',
-                              'class'    => NULL, // Use empty class here, to not add additional divs
-                              'fieldset' => ['logon' => 'Please log in:'],
+                                'type'     => 'horizontal',
+                                'id'       => 'logonform',
+                                //'space'   => '20px',
+                                //'title'   => 'Logon',
+                                //'icon'    => 'oicon-key',
+                                'class'    => NULL, // Use empty class here, to not add additional divs
+                                'fieldset' => ['logon' => 'Please log in:'],
                             ];
 
                             // Reset form url without logon message
@@ -43,40 +44,44 @@
                             }
 
                             $form['row'][0]['username'] = [
-                              'type'        => 'text',
-                              'fieldset'    => 'logon',
-                              'name'        => 'Username',
-                              'placeholder' => '',
-                              'class'       => 'input-xlarge',
-                              //'width'       => '95%',
-                              'value'       => ''];
+                                'type'         => 'text',
+                                'fieldset'     => 'logon',
+                                'name'         => 'Username',
+                                'placeholder'  => '',
+                                'class'        => 'input-xlarge',
+                                'style'        => 'max-width: 110%;',
+                                'value'        => ''
+                            ];
                             $form['row'][1]['password'] = [
-                              'type'         => 'password',
-                              'fieldset'     => 'logon',
-                              'name'         => 'Password',
-                              'autocomplete' => TRUE,
-                              'placeholder'  => '',
-                              'class'        => 'input-xlarge',
-                              //'width'       => '95%',
-                              'value'        => ''];
+                                'type'         => 'password',
+                                'fieldset'     => 'logon',
+                                'name'         => 'Password',
+                                'autocomplete' => TRUE,
+                                'placeholder'  => '',
+                                'class'        => 'input-xlarge',
+                                'style'        => 'max-width: 110%;',
+                                'value'        => ''
+                            ];
                             if ($config['login_remember_me'] && OBS_ENCRYPT) {
                                 $form['row'][2]['remember'] = [
-                                  'type'        => 'checkbox',
-                                  'fieldset'    => 'logon',
-                                  'placeholder' => 'Remember my login'];
+                                    'type'        => 'checkbox',
+                                    'fieldset'    => 'logon',
+                                    'placeholder' => 'Remember my login'
+                                ];
                             }
                             $form['row'][3]['submit'] = [
-                              'type'      => 'submit',
-                              'name'      => 'Log in',
-                              'icon'      => 'icon-lock',
-                              //'right'       => TRUE,
-                              'div_class' => 'controls',
-                              'class'     => 'btn-large'];
+                                'type'      => 'submit',
+                                'name'      => 'Log in',
+                                'icon'      => 'icon-lock',
+                                //'right'       => TRUE,
+                                'div_class' => 'controls',
+                                'class'     => 'btn-large'
+                            ];
 
                             print_form($form);
                             unset($form);
 
-                            // Get and decrypt logout message
+                            // Get and decrypt a logout message
                             if (isset($_GET['lm']) && $auth_message = decrypt($_GET['lm'], OBSERVIUM_PRODUCT . OBSERVIUM_VERSION)) {
                                 //print_vars($_GET['lm']);
                                 //print_vars($auth_message);

@@ -1,0 +1,370 @@
+ELTEX-MES-ISS-QOS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Counter32
+                FROM SNMPv2-SMI
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        RowStatus, TEXTUAL-CONVENTION, TruthValue
+                FROM SNMPv2-TC
+        eltMesIss
+                FROM ELTEX-MES-ISS-MIB
+        fsQoSMeterEntry
+                FROM ARICENT-QOS-MIB
+        ifIndex
+                FROM IF-MIB
+        fsQosHwCpuRateLimitEntry, fsQosHwCpuQId, fsQosHwCpuMaxRate
+                FROM ARICENT-QOS-MIB;
+
+eltMesIssQoSMIB MODULE-IDENTITY
+        LAST-UPDATED "201901180000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "Access Control List Meters MIB definitions."
+        REVISION "201901180000Z"
+        DESCRIPTION "Added eltMesIssQoSTrustMode object."
+        REVISION "201812180000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 5 }
+
+-- Textual Conventions
+
+EltMesIssQoSTrustMode ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Specifies QoS trust mode."
+    SYNTAX  INTEGER {
+        none(1),
+        cos(2),
+        dscp(3),
+        cos-dscp(4)
+    }
+
+EltMesIssMeterUnits ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Meter units."
+    SYNTAX  INTEGER {
+        bytes(1),
+        packets(2)
+    }
+
+EltMesIssQoSRemarkPortDefaultCosSource ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This type describes the source of the default CoS value when adding
+         outer tag to the packet.
+         If none(1) source is specified, then the CoS value will be 0.
+         If user-priority(2) source is specified, then the CoS value will be
+         copied from internal packet priority, which is decided on receiving it.
+         If inner-vlanPri(3) is specified, the CoS value will be copied from
+         inner tag. If packet is inner-untagged, the default egress CoS value
+         will be 0."
+    SYNTAX  INTEGER {
+        none(1),
+        user-priority(2),
+        inner-vlanPri(3)
+    }
+
+-- Top level MIB structure
+
+eltMesIssQoSObjects         OBJECT IDENTIFIER ::= { eltMesIssQoSMIB 1 }
+eltMesIssQoSNotifications   OBJECT IDENTIFIER ::= { eltMesIssQoSMIB 2 }
+
+-- MIB Groups
+
+eltMesIssQoSGlobals         OBJECT IDENTIFIER ::= { eltMesIssQoSObjects 1 }
+eltMesIssQoSMetering        OBJECT IDENTIFIER ::= { eltMesIssQoSObjects 2 }
+eltMesIssQoSTrafficMgmt     OBJECT IDENTIFIER ::= { eltMesIssQoSObjects 3 }
+eltMesIssQoSRemarking       OBJECT IDENTIFIER ::= { eltMesIssQoSObjects 4 }
+eltMesIssQoSInterfaces      OBJECT IDENTIFIER ::= { eltMesIssQoSObjects 5 }
+eltMesIssQoSCpuRateControl  OBJECT IDENTIFIER ::= { eltMesIssQoSObjects 6 }
+
+eltMesIssQoSNotificationsPrefix OBJECT IDENTIFIER ::= { eltMesIssQoSNotifications 0 }
+
+-- --------------------------------------------------------------------------
+-- QoS global objects
+-- --------------------------------------------------------------------------
+
+eltMesIssQoSTrustMode OBJECT-TYPE
+    SYNTAX     EltMesIssQoSTrustMode
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "This scalar defines the global QoS trust operation mode."
+    ::= { eltMesIssQoSGlobals 1 }
+
+-- --------------------------------------------------------------------------
+-- QoS Meter Table Extension
+-- --------------------------------------------------------------------------
+
+eltMesIssQoSMeterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssQoSMeterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the FsQoSMeterTable table."
+    ::= { eltMesIssQoSMetering 1 }
+
+eltMesIssQoSMeterEntry OBJECT-TYPE
+    SYNTAX      EltMesIssQoSMeterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry appears in this table for each ACL/QOS meter."
+    AUGMENTS { fsQoSMeterEntry }
+    ::= { eltMesIssQoSMeterTable 1 }
+
+EltMesIssQoSMeterEntry ::=
+    SEQUENCE {
+        eltMesIssQoSMeterUnits
+            EltMesIssMeterUnits
+    }
+
+eltMesIssQoSMeterUnits OBJECT-TYPE
+    SYNTAX      EltMesIssMeterUnits
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Meter units. Supports byte mode or packet mode for
+        each meter."
+    DEFVAL { bytes }
+    ::= { eltMesIssQoSMeterEntry 1 }
+
+-- --------------------------------------------------------------------------
+-- QoS Port Trust Table
+-- --------------------------------------------------------------------------
+eltMesIssQoSPortTrustModeTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssQoSPortTrustModeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains QoS trust mode configuration for an interface."
+    ::= { eltMesIssQoSTrafficMgmt 1 }
+
+eltMesIssQoSPortTrustModeEntry OBJECT-TYPE
+    SYNTAX      EltMesIssQoSPortTrustModeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry appears in this table for each interface."
+    INDEX { ifIndex }
+    ::= { eltMesIssQoSPortTrustModeTable 1 }
+
+EltMesIssQoSPortTrustModeEntry ::=
+    SEQUENCE {
+        eltMesIssQoSPortTrustMode
+            EltMesIssQoSTrustMode
+    }
+
+eltMesIssQoSPortTrustMode OBJECT-TYPE
+    SYNTAX      EltMesIssQoSTrustMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "QoS trust mode on specific interface."
+    DEFVAL { none }
+    ::= { eltMesIssQoSPortTrustModeEntry 1 }
+
+-- --------------------------------------------------------------------------
+-- QoS Remarking
+-- --------------------------------------------------------------------------
+eltMesIssQoSRemarkPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssQoSRemarkPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains QoS remarking configuration per interface."
+    ::= { eltMesIssQoSRemarking 1 }
+
+eltMesIssQoSRemarkPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssQoSRemarkPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry appears in this table for each interface."
+    INDEX { ifIndex }
+    ::= { eltMesIssQoSRemarkPortTable 1 }
+
+EltMesIssQoSRemarkPortEntry ::=
+    SEQUENCE {
+        eltMesIssQoSRemarkPortCosEnable
+            TruthValue,
+        eltMesIssQoSRemarkPortDscpEnable
+            TruthValue,
+        eltMesIssQoSRemarkPortDefaultCosSource
+            EltMesIssQoSRemarkPortDefaultCosSource
+    }
+
+eltMesIssQoSRemarkPortCosEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable CoS remarking for packets transmitted from the interface."
+    DEFVAL { false }
+    ::= { eltMesIssQoSRemarkPortEntry 1 }
+
+eltMesIssQoSRemarkPortDscpEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable DSCP remarking for packets transmitted from the interface."
+    DEFVAL { false }
+    ::= { eltMesIssQoSRemarkPortEntry 2 }
+
+eltMesIssQoSRemarkPortDefaultCosSource OBJECT-TYPE
+    SYNTAX      EltMesIssQoSRemarkPortDefaultCosSource
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Changes the source of the default egress CoS value."
+    DEFVAL { none }
+    ::= { eltMesIssQoSRemarkPortEntry 3 }
+
+-- --------------------------------------------------------------------------
+-- QoS Utilization
+-- --------------------------------------------------------------------------
+
+eltMesIssQoSIfUtilizationTable OBJECT-TYPE
+   SYNTAX  SEQUENCE  OF EltMesIssQoSIfUtilizationEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+    "Switch ports utilization configuration and information."
+   ::=  { eltMesIssQoSInterfaces 1 }
+
+eltMesIssQoSIfUtilizationEntry OBJECT-TYPE
+   SYNTAX  EltMesIssQoSIfUtilizationEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+    "Defines the contents of each line in the eltMesIssQoSIfUtilizationTable table."
+   INDEX   { eltMesIssQoSIfUtilizationIfIndex, eltMesIssQoSIfUtilizationInterval }
+   ::=  { eltMesIssQoSIfUtilizationTable 1 }
+
+EltMesIssQoSIfUtilizationEntry ::= SEQUENCE {
+        eltMesIssQoSIfUtilizationIfIndex        INTEGER,
+        eltMesIssQoSIfUtilizationInterval       INTEGER,
+        eltMesIssQoSIfUtilizationInPkts         Counter32,
+        eltMesIssQoSIfUtilizationInRate         Counter32,
+        eltMesIssQoSIfUtilizationOutPkts        Counter32,
+        eltMesIssQoSIfUtilizationOutRate        Counter32
+        }
+
+eltMesIssQoSIfUtilizationIfIndex OBJECT-TYPE
+   SYNTAX  INTEGER
+   MAX-ACCESS  not-accessible
+   STATUS  current
+   DESCRIPTION
+          "A unique value for each interface.  Its value
+          ranges between 1 and the value of ifNumber.  The
+          value for each interface must remain constant at
+          least from one re-initialization of the entity's
+          network management system to the next re-
+          initialization."
+   ::= { eltMesIssQoSIfUtilizationEntry 1 }
+
+eltMesIssQoSIfUtilizationInterval OBJECT-TYPE
+   SYNTAX  INTEGER
+   MAX-ACCESS  not-accessible
+   STATUS  current
+   DESCRIPTION
+          "A time in seconds for which interface
+          utilization is calculated. Supported values are 5, 60 and 300."
+   ::= { eltMesIssQoSIfUtilizationEntry 2 }
+
+eltMesIssQoSIfUtilizationInPkts OBJECT-TYPE
+   SYNTAX  Counter32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+          "The total number of all (UC, MC and BC) packets
+          received on the interface during last utilization interval."
+  ::= { eltMesIssQoSIfUtilizationEntry 3 }
+
+eltMesIssQoSIfUtilizationInRate OBJECT-TYPE
+   SYNTAX  Counter32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+          "The inbound rate in kbps
+          on the interface during last utilization interval."
+  ::= { eltMesIssQoSIfUtilizationEntry 4 }
+
+eltMesIssQoSIfUtilizationOutPkts OBJECT-TYPE
+   SYNTAX  Counter32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+          "The total number of all (UC, MC and BC) packets
+          sent out of the interface during last utilization interval."
+  ::= { eltMesIssQoSIfUtilizationEntry 5 }
+
+eltMesIssQoSIfUtilizationOutRate OBJECT-TYPE
+   SYNTAX  Counter32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+          "The outbound rate in kbps
+          on the interface during last utilization interval."
+  ::= { eltMesIssQoSIfUtilizationEntry 6 }
+
+-- --------------------------------------------------------------------------
+-- QoS CPU rate control
+-- --------------------------------------------------------------------------
+eltMesIssQoSCpuRateLimitTable OBJECT-TYPE
+   SYNTAX  SEQUENCE  OF EltMesIssQoSCpuRateLimitEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+    "QoS CPU rate-limit table"
+   ::=  { eltMesIssQoSCpuRateControl 1 }
+
+eltMesIssQoSCpuRateLimitEntry OBJECT-TYPE
+   SYNTAX  EltMesIssQoSCpuRateLimitEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+    "QoS CPU rate-limit entry"
+   AUGMENTS { fsQosHwCpuRateLimitEntry }
+   ::=  { eltMesIssQoSCpuRateLimitTable 1 }
+
+EltMesIssQoSCpuRateLimitEntry ::= SEQUENCE {
+        eltMesIssQoSCpuRateLimitLoggingEnable   TruthValue,
+        eltMesIssQoSCpuRateLimitTrapEnable      TruthValue
+    }
+
+eltMesIssQoSCpuRateLimitLoggingEnable OBJECT-TYPE
+   SYNTAX  TruthValue
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+          "Disable or enable cpu rate-limit logging"
+  DEFVAL { false }
+  ::= { eltMesIssQoSCpuRateLimitEntry 1 }
+
+eltMesIssQoSCpuRateLimitTrapEnable OBJECT-TYPE
+   SYNTAX  TruthValue
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+          "Disable or enable cpu rate-limit traps"
+  DEFVAL { false }
+  ::= { eltMesIssQoSCpuRateLimitEntry 2 }
+
+-- --------------------------------------------------------------------------
+-- QoS CPU rate control threshold
+-- --------------------------------------------------------------------------
+eltMesIssQoSCpuRateLimitTrap NOTIFICATION-TYPE
+    OBJECTS   {fsQosHwCpuQId, fsQosHwCpuMaxRate}
+    STATUS    current
+    DESCRIPTION
+        "A eltMesIssQoSCpuRateLimitTrap is generated when
+         exceeded threshold value for CPU queue input rate."
+    ::= { eltMesIssQoSNotificationsPrefix 1 }
+
+END

@@ -77,7 +77,7 @@ if (is_array($dashboard)) {
           //'status_donuts'  => "Status Donuts",  // broke
           'syslog'           => 'Syslog',
           'syslog_alerts'    => 'Syslog Alerts',
-          //'weathermap'          => 'Network Weathermap',
+          //'wmap'             => 'Network Weathermap',
           'eventlog'         => 'Eventlog']];
 
         $form = ['id'    => 'add_widget',

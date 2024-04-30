@@ -1,0 +1,395 @@
+DC-OAMM-MIB DEFINITIONS ::= BEGIN
+
+-- The OAM MANAGEMENT COMPONENT MIB
+
+-- PRODUCT-SHORT-NAME OAMM
+
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    enterprises, Unsigned32,
+    Integer32
+                                      FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP
+                                      FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION,
+    TruthValue, RowStatus
+                                      FROM SNMPv2-TC
+
+    MjStatus,
+    AdminStatus,
+    OperStatus,
+    BaseOperStatus
+                                      FROM DC-MASTER-TC;
+
+-- The Mib Identifier for the set of MIBs defined in this asn1 file.
+  oammMib MODULE-IDENTITY
+    LAST-UPDATED "201412210000Z"  -- December 21, 2014
+    ORGANIZATION "MRV Communications."
+    CONTACT-INFO
+            "For technical support, please contact your service channel"
+    DESCRIPTION  "DC-OAM Management component MIB."
+    -- Revision history
+      REVISION     "201412210000Z"  -- December 21, 2014
+      DESCRIPTION
+        "Initial edition."
+    ::= { opx 14 }
+          -- The value 112 matches the PRD_OAMM constant.
+
+nbase                      OBJECT IDENTIFIER ::= { enterprises 629 }
+opx                      OBJECT IDENTIFIER ::= { nbase 10 }
+
+-- Top level components of this MIB module.
+
+  oammObjects OBJECT IDENTIFIER ::= { oammMib 1 } -- OAMM tables
+  oammConformance OBJECT IDENTIFIER ::= { oammMib 2 }
+
+-------------------------------------------------------------------------------
+
+--
+-- Textual conventions
+--
+
+  OammMjIfId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The type of interface to which a join applies."
+    SYNTAX      INTEGER {
+                  ifAtgI3(696844288),       -- Interface IF_ATG_I3
+                  ifAtgFri(697761792),      -- Interface IF_ATG_FRI
+                  ifAtgBfdi(1518338048),    -- Interface IF_ATG_BFDI
+                  ifAtgLpi(1904214016),     -- Interface IF_ATG_LPI
+                  ifAtgPmi(1988100096)      -- Interface IF_ATG_PMI
+                }
+
+-------------------------------------------------------------------------------
+
+--
+-- DC-OAM Management component Entity Table.
+--
+-- This is the top-level MIB for DC-OAM Management component.  It controls creation and global
+-- configuration of DC-OAM Management component.
+--
+
+  oammEntTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME OAMM_ENT
+    SYNTAX      SEQUENCE OF OammEntEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry in this table represents a DC-OAM Management component entity."
+    ::= { oammObjects 1 }
+
+  oammEntEntry OBJECT-TYPE
+    SYNTAX      OammEntEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry represents a DC-OAM Management component entity."
+    INDEX { oammEntApplIndex }
+    ::= { oammEntTable 1 }
+
+  OammEntEntry ::= SEQUENCE {
+      oammEntApplIndex               Unsigned32,
+      oammEntRowStatus               RowStatus,
+      oammEntAdminStatus             AdminStatus,
+      oammEntOperStatus              BaseOperStatus,
+      oammEntEnableTrapSupport       TruthValue,
+      oammEntFriBufferPoolSize       Integer32,
+      oammEntRescheduleLimit         Integer32
+    }
+
+  oammEntApplIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies a DC-OAM Management component entity."
+    ::= { oammEntEntry 1 }
+
+  oammEntRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this DC-OAM Management component Entity Table entry, used to
+                 create and destroy table entries."
+    ::= { oammEntEntry 2 }
+
+  oammEntAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this DC-OAM Management component entity, used to
+                 activate and deactivate DC-OAM Management component."
+    DEFVAL      { adminStatusUp }
+    ::= { oammEntEntry 3 }
+
+  oammEntOperStatus OBJECT-TYPE
+    SYNTAX      BaseOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this DC-OAM Management component entity."
+    ::= { oammEntEntry 4 }
+
+  oammEntEnableTrapSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Set this object to 'true' to enable trap support in DC-OAM Manager."
+    DEFVAL        { false }
+    ::= { oammEntEntry 5 }
+
+  oammEntFriBufferPoolSize OBJECT-TYPE
+    SYNTAX      Integer32 (1..200)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of the FRI buffer pool.
+
+                 This determines the maximum number of buffers that can
+                 exist at once for the FRI pool.  DC-OAM Manager does not
+                 use pre-allocated pools, so the maximum number of buffers
+                 is also limited by memory availability, and so this number
+                 does not relate directly to memory usage.
+
+                 Buffer pools provide flow control, which is useful in
+                 ensuring efficient operation of the overall system.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-OAM Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 1 }
+    ::= { oammEntEntry 6 }
+
+  oammEntRescheduleLimit OBJECT-TYPE
+    SYNTAX       Integer32 (1..2147483647)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION "The maximum number of different objects that can be
+                 processed in a single schedule.
+
+                 When subcomponents are scheduled by receipt of an IPS or a
+                 timer pop, that IPS can cause more work than can be
+                 performed in a reasonable time without blocking the
+                 N-BASE.  Subcomponents handle this by breaking off
+                 processing when they hit a processing limit.
+
+                 Higher values increase the processing efficiency of
+                 DC-OAM Manager instances, but can cause the scheduler to
+                 be blocked for excessive periods, causing timers to pop
+                 late.  Lower values have the reverse effects.
+
+                 This field is not suitable for network administrators.
+                 This field cannot be changed after initial creation of the
+                 entity.  Instead of changing this field, create a new
+                 DC-OAM Manager entity with the new value and destroy the
+                 old entity."
+    DEFVAL      { 1000 }
+    ::= { oammEntEntry 7 }
+
+-------------------------------------------------------------------------------
+
+--
+-- DC-OAM Management component Master Join Table.
+--
+-- This table controls which entities DC-OAM Management component should join to as
+-- master.  Each join is represented by a row in this table.  The status of
+-- each join is represented by a read-only object within each row.
+--
+
+  oammMjTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME OAMM_MJ
+    SYNTAX      SEQUENCE OF OammMjEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "This table controls which entities the DC-OAM Management component should join to
+                 as master.  Each join is represented by a row
+                 in this table.  The status of each join is represented
+                 by a read-only object within each row.
+
+                 DC-MPLS OAM Manager requires a single join of type
+                 AMB_OAMM_MJ_I3 in order for it to go operStatusUp.
+
+                 Additional joins must be programmed in order to support
+                 specific DC-MPLS OAM manager function.
+
+                 - A single join of type AMB_OAMM_MJ_FRI is required if
+                   DC-MPLS OAM Manager is to report faults status as
+                   determined by OAM function.
+
+                 - One or more joins of type AMB_OAMM_MJ_BFDI must be
+                   programmed to enable DC-MPLS OAM Manager to intitiate BFD
+                   sessions.
+
+                 - One or more joins of type AMB_OAMM_MJ_LPI must be
+                   programmed to enable DC-MPLS OAM Manager to intitiate LSP
+                   Ping transactions.
+
+                 - One or more joins of type AMB_OAMM_MJ_PMI must be
+                   programmed to enable DC-MPLS OAM Manager to intitiate
+                   Performance Monitoring sessions."
+    ::= { oammObjects 2 }
+
+  oammMjEntry OBJECT-TYPE
+    SYNTAX      OammMjEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Represents a join for which DC-OAM Management component master."
+    INDEX { oammMjApplIndex,
+            oammMjInterfaceId,
+            oammMjPartnerType,
+            oammMjPartnerIndex,
+            oammMjSubIndex }
+    ::= { oammMjTable 1 }
+
+  OammMjEntry ::= SEQUENCE {
+      oammMjApplIndex                Unsigned32,
+      oammMjInterfaceId              OammMjIfId,
+      oammMjPartnerType              Unsigned32,
+      oammMjPartnerIndex             Unsigned32,
+      oammMjSubIndex                 Unsigned32,
+      oammMjRowStatus                RowStatus,
+      oammMjAdminStatus              AdminStatus,
+      oammMjOperStatus               OperStatus,
+      oammMjJoinStatus               MjStatus
+    }
+
+  oammMjApplIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies a DC-OAM Management component entity."
+    ::= { oammMjEntry 1 }
+
+  oammMjInterfaceId OBJECT-TYPE
+    SYNTAX      OammMjIfId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies the interface required of this master join."
+    ::= { oammMjEntry 2 }
+
+  oammMjPartnerType OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies the type of entity to join to.  This is only used
+                 if oammMjInterfaceId is AMB_OAMM_MJ_LPI, in which case it must
+                 be set to one of AMB_OAMM_TYPE_LSP_PING_PROTOCOL or
+                 AMB_OAMM_TYPE_QUERY_LSP_RSP depending on whether the partner
+                 will be providing LSP Ping Protocol function or processing
+                 Query LSP messages.  For all other values of
+                 oammMjInterfaceId, this field must be set to
+                 AMB_OAMM_TYPE_NONE."
+    ::= { oammMjEntry 3 }
+
+  oammMjPartnerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The entity index of the partner to join to."
+    ::= { oammMjEntry 4 }
+
+  oammMjSubIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "This index field is currently unused and MUST be set to zero."
+    ::= { oammMjEntry 5 }
+
+  oammMjRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this DC-OAM Management component Master Join Table
+                 entry, used to create and destroy table entries."
+    ::= { oammMjEntry 6 }
+
+  oammMjAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The administrative status of this master join, used
+                 to start and stop the join."
+    DEFVAL      { adminStatusUp }
+    ::= { oammMjEntry 7 }
+
+  oammMjOperStatus OBJECT-TYPE
+    SYNTAX      OperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this master join."
+    ::= { oammMjEntry 8 }
+
+  oammMjJoinStatus OBJECT-TYPE
+    SYNTAX      MjStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The status of the master join."
+    ::= { oammMjEntry 9 }
+
+------------------------------------------------------------------
+-- Module Conformance Statement
+------------------------------------------------------------------
+
+oammGroups
+    OBJECT IDENTIFIER ::= { oammConformance 1 }
+
+oammCompliances
+    OBJECT IDENTIFIER ::= { oammConformance 2 }
+
+--
+-- Full Compliance
+--
+
+oammModuleFullCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The Module is implemented with support
+        for read-create.  In other
+        words, both monitoring and configuration
+        are available when using this MODULE-COMPLIANCE."
+
+    MODULE -- this module
+        MANDATORY-GROUPS    { oammGeneralGroup
+                            }
+
+    ::= { oammCompliances 1 }
+
+--
+-- Read-Only Compliance
+--
+
+oammModuleReadOnlyCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The Module is implemented with support
+        for read-only.  In other words, only monitoring
+        is available by implementing this MODULE-COMPLIANCE."
+
+    MODULE -- this module
+        MANDATORY-GROUPS    { oammGeneralGroup
+                            }
+
+    ::= { oammCompliances 2 }
+-- units of conformance
+
+oammGeneralGroup OBJECT-GROUP
+    OBJECTS {
+    oammEntRowStatus,
+    oammEntAdminStatus,
+    oammEntOperStatus,
+    oammEntEnableTrapSupport,
+    oammEntFriBufferPoolSize,
+    oammEntRescheduleLimit,
+    oammMjRowStatus,
+    oammMjAdminStatus,
+    oammMjOperStatus,
+    oammMjJoinStatus
+    }
+    STATUS current
+    DESCRIPTION
+        "Objects that apply to all MPLS MP MIB implementations."
+
+    ::= { oammGroups 1 }
+
+-------------------------------------------------------------------------------
+END

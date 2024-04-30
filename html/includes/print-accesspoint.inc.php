@@ -24,13 +24,13 @@ echo("</td><td width=100>");
 
 echo("</td><td width=150>");
 $ap['graph_type'] = "accesspoints_numasoclients";
-echo(generate_ap_link($ap, "<img src='graph.php?type=" . $ap['graph_type'] . "&amp;id=" . $ap['accesspoint_id'] . "&amp;from=" . $config['time']['day'] . "&amp;to=" . $config['time']['now'] . "&amp;width=100&amp;height=20&amp;legend=no&amp;bg=" . str_replace("#", "", $row_colour) . "'>"));
+echo(generate_ap_link($ap, "<img src='graph.php?type=" . $ap['graph_type'] . "&amp;id=" . $ap['accesspoint_id'] . "&amp;from=" . get_time('day') . "&amp;to=" . get_time('now') . "&amp;width=100&amp;height=20&amp;legend=no&amp;bg=" . str_replace("#", "", $row_colour) . "'>"));
 echo("<br>\n");
 $ap['graph_type'] = "accesspoints_radioutil";
-echo(generate_ap_link($ap, "<img src='graph.php?type=" . $ap['graph_type'] . "&amp;id=" . $ap['accesspoint_id'] . "&amp;from=" . $config['time']['day'] . "&amp;to=" . $config['time']['now'] . "&amp;width=100&amp;height=20&amp;legend=no&amp;bg=" . str_replace("#", "", $row_colour) . "'>"));
+echo(generate_ap_link($ap, "<img src='graph.php?type=" . $ap['graph_type'] . "&amp;id=" . $ap['accesspoint_id'] . "&amp;from=" . get_time('day') . "&amp;to=" . get_time('now') . "&amp;width=100&amp;height=20&amp;legend=no&amp;bg=" . str_replace("#", "", $row_colour) . "'>"));
 echo("<br>\n");
 $ap['graph_type'] = "accesspoints_interference";
-echo(generate_ap_link($ap, "<img src='graph.php?type=" . $ap['graph_type'] . "&amp;id=" . $ap['accesspoint_id'] . "&amp;from=" . $config['time']['day'] . "&amp;to=" . $config['time']['now'] . "&amp;width=100&amp;height=20&amp;legend=no&amp;bg=" . str_replace("#", "", $row_colour) . "'>"));
+echo(generate_ap_link($ap, "<img src='graph.php?type=" . $ap['graph_type'] . "&amp;id=" . $ap['accesspoint_id'] . "&amp;from=" . get_time('day') . "&amp;to=" . get_time('now') . "&amp;width=100&amp;height=20&amp;legend=no&amp;bg=" . str_replace("#", "", $row_colour) . "'>"));
 echo("<br>\n");
 
 echo("</td><td width=120>");
@@ -54,7 +54,7 @@ if ($vars['tab'] == "accesspoint") {
 
         $graph_array['height'] = "100";
         $graph_array['width']  = "215";
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = $ap['accesspoint_id'];
         $graph_array['type']   = $key;
 

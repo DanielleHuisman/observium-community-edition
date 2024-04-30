@@ -1,0 +1,835 @@
+------------------------------------------------------------------------------
+--
+--  File         : maipuWredMIB.mib
+--  Description  : Maipu Weighted Random Early Detection MIB file.
+--  Version      : 1.00
+--  Date         : December 26, 2009
+-- 	Copyright    : 2009 by Maipu Communication Technology Co., LTD.
+--					All rights reserved.
+--
+-- $Id:
+-- 
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+MAIPU-WRED-MIB DEFINITIONS ::= BEGIN
+
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, enterprises, Counter32, Gauge32,
+          Integer32, Unsigned32, TimeTicks,IpAddress,Counter64
+            FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, TruthValue, MacAddress,
+          RowStatus, DisplayString, DateAndTime
+            FROM SNMPv2-TC
+        MODULE-COMPLIANCE, OBJECT-GROUP
+            FROM SNMPv2-CONF
+        mpMgmt
+            FROM MAIPU-SMI;
+
+
+maipu               	OBJECT IDENTIFIER ::= { enterprises 5651 }
+mpMgmt2             	OBJECT IDENTIFIER ::= { maipu 6 }
+mpRouterTech        	OBJECT IDENTIFIER ::= { mpMgmt2 2 }
+mpRtQoSv2           	OBJECT IDENTIFIER ::= { mpRouterTech 3 }
+
+
+
+maipuWredMIB        	MODULE-IDENTITY
+                    		LAST-UPDATED 	"0912261021Z"
+                    		ORGANIZATION 	"Maipu Communication Technology Co., LTD."
+                    		CONTACT-INFO
+                    			""
+                    		DESCRIPTION
+                      			"Maipu Weighted Random Early Detection MIB"
+                    		::= { mpRtQoSv2  2 }
+
+
+
+
+------------------------------------------------------------------------------
+maipuWredMIBObjects 	OBJECT IDENTIFIER ::= { maipuWredMIB 1 }
+
+
+------------------------------------------------------------------------------
+mpWredConfig        	OBJECT IDENTIFIER ::= { maipuWredMIBObjects 1 }
+
+mpWredGroupCfgTable 	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF  MpWredGroupCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED Group global configuration."
+                    		::= { mpWredConfig 1 }
+
+mpWredGroupCfgEntry 	OBJECT-TYPE
+                    		SYNTAX  MpWredGroupCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED Group global configuration."
+                    		INDEX  { mpWredGroupCfgName }
+                    		::= { mpWredGroupCfgTable 1 }
+
+MpWredGroupCfgEntry 	::= SEQUENCE {
+                    			mpWredGroupCfgName     DisplayString,
+                    			mpWredGroupCfgDscpPrec   INTEGER,
+                    			mpWredGroupCfgExponWeight   Integer32
+                    	             }
+
+
+mpWredGroupCfgName  	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..255))
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"WRED group Name."
+                    		::= { mpWredGroupCfgEntry 1 }
+
+mpWredGroupCfgDscpPrec	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			          precedence(1),
+                    			          dscp(2),
+                    			          discardClass(3),
+                    			          l2Cos(4),
+                    			          atmClp(5),
+                    			          mplsExp(6),
+                    			          redDefault(7),
+                    			          redUserDefault(8)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The classification mechanism used by WRED."
+                    		::= { mpWredGroupCfgEntry 2 }
+
+mpWredGroupCfgExponWeight	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..16)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The decay factor for the queue average calculation. The decay 
+                    			factor is equal to raising 2 to the power of N, where N could 
+                    			be up to 16. The smaller the number, the faster it decays."
+                    		::= { mpWredGroupCfgEntry 3 }
+
+
+------------------------------------------------------------------------------
+mpWredGroupPrecCfgTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF  MpWredGroupPrecCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED Group configuration values with respect to the 
+                    			IP precedence of packets."
+                    		::= { mpWredConfig 2 }
+
+mpWredGroupPrecCfgEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredGroupPrecCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED Group configuration values with respect to the 
+                    			IP precedence of packets."
+                    		INDEX  { mpWredGroupCfgName,  mpWredGroupPrecCfgValue }
+                    		::= { mpWredGroupPrecCfgTable 1 }
+
+MpWredGroupPrecCfgEntry	::= SEQUENCE {
+                    			mpWredGroupPrecCfgValue   Integer32,
+                    			mpWredGroupPrecCfgMinThreshold   Unsigned32,
+                    			mpWredGroupPrecCfgMaxThreshold   Unsigned32,
+                    			mpWredGroupPrecCfgPktDropProb   Integer32
+                    	             }
+
+
+mpWredGroupPrecCfgValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredGroupPrecCfgEntry 1 }
+
+mpWredGroupPrecCfgMinThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Minimum threshold in number of packets. When the average queue 
+                    			length reaches this number, WRED begins to drop packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredGroupPrecCfgEntry 2 }
+
+mpWredGroupPrecCfgMaxThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Maximum threshold in number of packets. When the average queue 
+                    			length exceeds this number, WRED drops all packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredGroupPrecCfgEntry 3 }
+
+mpWredGroupPrecCfgPktDropProb	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..65536)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Denominator for the fraction of packets dropped when the average 
+                    			queue depth is MaxThreshold. For example, if the denominator is 
+                    			10, one out of every 10 packets is dropped when the average queue 
+                    			is at the MaxThreshold."
+                    		::= { mpWredGroupPrecCfgEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredInterfaceCfgTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredInterfaceCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED global configuration variables for main and sub 
+                    			interfaces."
+                    		::= { mpWredConfig 3 }
+
+mpWredInterfaceCfgEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredInterfaceCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED global configuration variables for main and sub 
+                    			interfaces."
+                    		INDEX  { ifIndex }
+                    		::= { mpWredInterfaceCfgTable 1 }
+
+MpWredInterfaceCfgEntry	::= SEQUENCE {
+                    			mpWredIFCfgGroupName   DisplayString,
+                    			mpWredIFCfgDscpPrec   INTEGER,
+                    			mpWredIFCfgExponWeight   Integer32
+                    	             }
+
+
+mpWredIFCfgGroupName	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..255))
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Wred Group name the interface attached. If the interface does 
+                    			not attach a WRED Group but has WRED configurations of its own, 
+                    			this field is NULL."
+                    		::= { mpWredInterfaceCfgEntry 1 }
+
+mpWredIFCfgDscpPrec	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			          precedence(1),
+                    			          dscp(2),
+                    			          discardClass(3),
+                    			          l2Cos(4),
+                    			          atmClp(5),
+                    			          mplsExp(6),
+                    			          redDefault(7),
+                    			          redUserDefault(8)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The classification mechanism used by WRED. This field makes 
+                    			sense only if the interface has WRED configurations of its own 
+                    			instead of attaching a WRED Group."
+                    		::= { mpWredInterfaceCfgEntry 2 }
+
+mpWredIFCfgExponWeight	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..16)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The decay factor for the queue average calculation. This field 
+                    			makes sense only if the interface has WRED configurations of its 
+                    			own instead of attaching a WRED Group."
+                    		::= { mpWredInterfaceCfgEntry 3 }
+
+
+------------------------------------------------------------------------------
+mpWredFrameRelayVCCfgTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredFrameRelayVCCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED global configuration variables for Frame Relay 
+                    			VCs."
+                    		::= { mpWredConfig 4 }
+
+mpWredFrameRelayVCCfgEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredFrameRelayVCCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED global configuration variables for Frame Relay 
+                    			VCs."
+                    		INDEX  { ifIndex,  mpWredFRCfgDLCI }
+                    		::= { mpWredFrameRelayVCCfgTable 1 }
+
+MpWredFrameRelayVCCfgEntry	::= SEQUENCE {
+                    			mpWredFRCfgDLCI           Unsigned32,
+                    			mpWredFRCfgGroupName   DisplayString,
+                    			mpWredFRCfgDscpPrec    INTEGER,
+                    			mpWredFRCfgExponWeight   Integer32
+                    	             }
+
+
+mpWredFRCfgDLCI        	OBJECT-TYPE
+                    		SYNTAX  Unsigned32(0..1007)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"DLCI for the Frame Relay VC."
+                    		::= { mpWredFrameRelayVCCfgEntry 1 }
+
+mpWredFRCfgGroupName	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..255))
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Wred Group name the FR VC attached. If the interface does not 
+                    			attach a WRED Group but has WRED configurations of its own, 
+                    			this field is NULL."
+                    		::= { mpWredFrameRelayVCCfgEntry 2 }
+
+mpWredFRCfgDscpPrec 	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			          precedence(1),
+                    			          dscp(2),
+                    			          discardClass(3),
+                    			          l2Cos(4),
+                    			          atmClp(5),
+                    			          mplsExp(6),
+                    			          redDefault(7),
+                    			          redUserDefault(8)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The classification mechanism used by WRED. This field makes 
+                    			sense only if the FR VC has WRED configurations of its own 
+                    			instead of attaching a WRED Group."
+                    		::= { mpWredFrameRelayVCCfgEntry 3 }
+
+mpWredFRCfgExponWeight	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..16)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The decay factor for the queue average calculation. This field 
+                    			makes sense only if the FR VC has WRED configurations of its own 
+                    			instead of attaching a WRED Group."
+                    		::= { mpWredFrameRelayVCCfgEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredATMPVCCfgTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredATMPVCCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED global configuration variables for ATM PVCs."
+                    		::= { mpWredConfig 5 }
+
+mpWredATMPVCCfgEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredATMPVCCfgEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED global configuration variables for ATM PVCs."
+                    		INDEX  { ifIndex,  mpWredATMCfgVPI,  mpWredATMCfgVCI }
+                    		::= { mpWredATMPVCCfgTable 1 }
+
+MpWredATMPVCCfgEntry	::= SEQUENCE {
+                    			mpWredATMCfgVPI        Unsigned32,
+                    			mpWredATMCfgVCI        Unsigned32,
+                    			mpWredATMCfgGroupName   DisplayString,
+                    			mpWredATMCfgDscpPrec   INTEGER,
+                    			mpWredATMCfgExponWeight   Integer32
+                    	             }
+
+
+mpWredATMCfgVPI     	OBJECT-TYPE
+                    		SYNTAX  Unsigned32(0..4095)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"VPI for the ATM PVC."
+                    		::= { mpWredATMPVCCfgEntry 1 }
+
+mpWredATMCfgVCI     	OBJECT-TYPE
+                    		SYNTAX  Unsigned32(0..65535)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"VCI for the ATM PVC."
+                    		::= { mpWredATMPVCCfgEntry 2 }
+
+mpWredATMCfgGroupName	OBJECT-TYPE
+                    		SYNTAX  DisplayString(SIZE(0..255))
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Wred Group name the ATM PVC attached. If the interface does not 
+                    			attach a WRED Group but has WRED configurations of its own, this 
+                    			field is NULL."
+                    		::= { mpWredATMPVCCfgEntry 3 }
+
+mpWredATMCfgDscpPrec	OBJECT-TYPE
+                    		SYNTAX  INTEGER {
+                    			          precedence(1),
+                    			          dscp(2),
+                    			          discardClass(3),
+                    			          l2Cos(4),
+                    			          atmClp(5),
+                    			          mplsExp(6),
+                    			          redDefault(7),
+                    			          redUserDefault(8)
+                    			        }
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The classification mechanism used by WRED. This field makes 
+                    			sense only if the ATM PVC has WRED configurations of its own 
+                    			instead of attaching a WRED Group."
+                    		::= { mpWredATMPVCCfgEntry 4 }
+
+mpWredATMCfgExponWeight	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..16)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The decay factor for the queue average calculation. This field 
+                    			makes sense only if the ATM PVC has WRED configurations of its 
+                    			own instead of attaching a WRED Group."
+                    		::= { mpWredATMPVCCfgEntry 5 }
+
+
+------------------------------------------------------------------------------
+mpWredCfgInterfacePrecTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredCfgInterfacePrecEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED configuration values with respect to the IP 
+                    			precedence or IP DSCP for main and sub interfaces."
+                    		::= { mpWredConfig 6 }
+
+mpWredCfgInterfacePrecEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredCfgInterfacePrecEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED configuration values with respect to the IP 
+                    			precedence or IP DSCP for main and sub interfaces."
+                    		INDEX  { ifIndex,  mpWredIFPrecCfgValue }
+                    		::= { mpWredCfgInterfacePrecTable 1 }
+
+MpWredCfgInterfacePrecEntry	::= SEQUENCE {
+                    			mpWredIFPrecCfgValue   Integer32,
+                    			mpWredIFPrecCfgMinThreshold   Unsigned32,
+                    			mpWredIFPrecCfgMaxThreshold   Unsigned32,
+                    			mpWredIFPrecCfgPktDropProb   Integer32
+                    	             }
+
+
+mpWredIFPrecCfgValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredCfgInterfacePrecEntry 1 }
+
+mpWredIFPrecCfgMinThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Minimum threshold in number of packets. When the average queue 
+                    			length reaches this number, WRED begins to drop packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredCfgInterfacePrecEntry 2 }
+
+mpWredIFPrecCfgMaxThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Maximum threshold in number of packets. When the average queue 
+                    			length exceeds this number, WRED drops all packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredCfgInterfacePrecEntry 3 }
+
+mpWredIFPrecCfgPktDropProb	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..65536)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Denominator for the fraction of packets dropped when the average 
+                    			queue depth is MaxThreshold. For example, if the denominator is 
+                    			10, one out of every 10 packets is dropped when the average queue 
+                    			is at the MaxThreshold."
+                    		::= { mpWredCfgInterfacePrecEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredCfgFrameRelayVCPrecTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredCfgFrameRelayVCPrecEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED configuration values with respect to
+                    			 the IP precedence or IP DSCP for Frame Relay VCs."
+                    		::= { mpWredConfig 7 }
+
+mpWredCfgFrameRelayVCPrecEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredCfgFrameRelayVCPrecEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED configuration values with respect to
+                    			 the IP precedence or IP DSCP for Frame Relay VCs."
+                    		INDEX  { ifIndex,  mpWredFRCfgDLCI,  mpWredFRPrecCfgValue }
+                    		::= { mpWredCfgFrameRelayVCPrecTable 1 }
+
+MpWredCfgFrameRelayVCPrecEntry	::= SEQUENCE {
+                    			mpWredFRPrecCfgValue   Integer32,
+                    			mpWredFRPrecCfgMinThreshold   Unsigned32,
+                    			mpWredFRPrecCfgMaxThreshold   Unsigned32,
+                    			mpWredFRPrecCfgPktDropProb   Integer32
+                    	             }
+
+
+mpWredFRPrecCfgValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredCfgFrameRelayVCPrecEntry 1 }
+
+mpWredFRPrecCfgMinThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Minimum threshold in number of packets. When the average queue 
+                    			length reaches this number, WRED begins to drop packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredCfgFrameRelayVCPrecEntry 2 }
+
+mpWredFRPrecCfgMaxThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Maximum threshold in number of packets. When the average queue 
+                    			length exceeds this number, WRED drops all packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredCfgFrameRelayVCPrecEntry 3 }
+
+mpWredFRPrecCfgPktDropProb	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..65536)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Denominator for the fraction of packets dropped when the average 
+                    			queue depth is MaxThreshold. For example, if the denominator is 
+                    			10, one out of every 10 packets is dropped when the average queue 
+                    			is at the MaxThreshold."
+                    		::= { mpWredCfgFrameRelayVCPrecEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredCfgATMPVCPrecTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredCfgATMPVCPrecEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED configuration values with respect to
+                    			 the IP precedence or IP DSCP for ATM PVCs."
+                    		::= { mpWredConfig 8 }
+
+mpWredCfgATMPVCPrecEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredCfgATMPVCPrecEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED configuration values with respect to
+                    			 the IP precedence or IP DSCP for ATM PVCs."
+                    		INDEX  { ifIndex,  mpWredATMCfgVPI,   mpWredATMCfgVCI,  mpWredATMPrecCfgValue }
+                    		::= { mpWredCfgATMPVCPrecTable 1 }
+
+MpWredCfgATMPVCPrecEntry	::= SEQUENCE {
+                    			mpWredATMPrecCfgValue   Integer32,
+                    			mpWredATMPrecCfgMinThreshold   Unsigned32,
+                    			mpWredATMPrecCfgMaxThreshold   Unsigned32,
+                    			mpWredATMPrecCfgPktDropProb   Integer32
+                    	             }
+
+
+mpWredATMPrecCfgValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredCfgATMPVCPrecEntry 1 }
+
+mpWredATMPrecCfgMinThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Minimum threshold in number of packets. When the average queue 
+                    			length reaches this number, WRED begins to drop packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredCfgATMPVCPrecEntry 2 }
+
+mpWredATMPrecCfgMaxThreshold	OBJECT-TYPE
+                    		SYNTAX  Unsigned32
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Maximum threshold in number of packets. When the average queue 
+                    			length exceeds this number, WRED drops all packets with the 
+                    			specified IP precedence."
+                    		::= { mpWredCfgATMPVCPrecEntry 3 }
+
+mpWredATMPrecCfgPktDropProb	OBJECT-TYPE
+                    		SYNTAX  Integer32(1..65536)
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"Denominator for the fraction of packets dropped when the average 
+                    			queue depth is MaxThreshold. For example, if the denominator is 
+                    			10, one out of every 10 packets is dropped when the average queue 
+                    			is at the MaxThreshold."
+                    		::= { mpWredCfgATMPVCPrecEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredStats         	OBJECT IDENTIFIER ::= { maipuWredMIBObjects 2 }
+
+mpWredInterfaceStatTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF  MpWredInterfaceStatEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED status information for main and sub interfaces 
+                    			with respect to the IP precedence or IP DSCP of packets."
+                    		::= { mpWredStats 1 }
+
+mpWredInterfaceStatEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredInterfaceStatEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED status information for main and sub interfaces 
+                    			with respect to the IP precedence or IP DSCP of packets."
+                    		INDEX  { ifIndex,  mpWredIFStatPrecValue }
+                    		::= { mpWredInterfaceStatTable 1 }
+
+MpWredInterfaceStatEntry	::= SEQUENCE {
+                    			mpWredIFStatPrecValue   Integer32,
+                    			mpWredIFStatRandomDropPkt64   Counter64,
+                    			mpWredIFStatTailDropPkt64   Counter64,
+                    			mpWredIFStatTransmitPkt64   Counter64
+                    	             }
+
+
+mpWredIFStatPrecValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredInterfaceStatEntry 1 }
+
+mpWredIFStatRandomDropPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets dropped when the number of packets 
+                    			in the associated queue was greater than the minimum threshold 
+                    			and less than the maximum threshold."
+                    		::= { mpWredInterfaceStatEntry 2 }
+
+mpWredIFStatTailDropPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets dropped when the number of packets 
+                    			in the associated queue was greater than the maximum threshold."
+                    		::= { mpWredInterfaceStatEntry 3 }
+
+mpWredIFStatTransmitPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets transmitted."
+                    		::= { mpWredInterfaceStatEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredFrameRelayVCStatTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF  MpWredFrameRelayVCStatEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED status information for Frame Relay VCs with 
+                    			respect to the IP precedence or IP DSCP of packets."
+                    		::= { mpWredStats 2 }
+
+mpWredFrameRelayVCStatEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredFrameRelayVCStatEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED status information for Frame Relay VCs with 
+                    			respect to the IP precedence or IP DSCP of packets."
+                    		INDEX  { ifIndex,  mpWredFRCfgDLCI,  mpWredFRStatPrecValue }
+                    		::= { mpWredFrameRelayVCStatTable 1 }
+
+MpWredFrameRelayVCStatEntry	::= SEQUENCE {
+                    			mpWredFRStatPrecValue   Integer32,
+                    			mpWredFRStatRandomDropPkt64   Counter64,
+                    			mpWredFRStatTailDropPkt64   Counter64,
+                    			mpWredFRStatTransmitPkt64   Counter64
+                    	             }
+
+
+mpWredFRStatPrecValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredFrameRelayVCStatEntry 1 }
+
+mpWredFRStatRandomDropPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets dropped when the number of packets 
+                    			in the associated queue was greater than the minimum threshold 
+                    			and less than the maximum threshold."
+                    		::= { mpWredFrameRelayVCStatEntry 2 }
+
+mpWredFRStatTailDropPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets dropped when the number of packets 
+                    			in the associated queue was greater than the maximum threshold."
+                    		::= { mpWredFrameRelayVCStatEntry 3 }
+
+mpWredFRStatTransmitPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets transmitted."
+                    		::= { mpWredFrameRelayVCStatEntry 4 }
+
+
+------------------------------------------------------------------------------
+mpWredATMPVCStatTable	OBJECT-TYPE
+                    		SYNTAX  SEQUENCE OF   MpWredATMPVCStatEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED status information for ATM PVCs with respect to 
+                    			the IP precedence or IP DSCP of packets."
+                    		::= { mpWredStats 3 }
+
+mpWredATMPVCStatEntry	OBJECT-TYPE
+                    		SYNTAX  MpWredATMPVCStatEntry
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"A table of WRED status information for ATM PVCs with respect to 
+                    			the IP precedence or IP DSCP of packets."
+                    		INDEX  { ifIndex,  mpWredATMCfgVPI,  mpWredATMCfgVCI,  mpWredATMStatPrecValue }
+                    		::= { mpWredATMPVCStatTable 1 }
+
+MpWredATMPVCStatEntry	::= SEQUENCE {
+                    			mpWredATMStatPrecValue   Integer32,
+                    			mpWredATMStatRandomDropPkt64   Counter64,
+                    			mpWredATMStatTailDropPkt64   Counter64,
+                    			mpWredATMStatTransmitPkt64   Counter64
+                    	             }
+
+
+mpWredATMStatPrecValue	OBJECT-TYPE
+                    		SYNTAX  Integer32(0..63)
+                    		MAX-ACCESS  not-accessible
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The IP precedence or IP DSCP of this entry."
+                    		::= { mpWredATMPVCStatEntry 1 }
+
+mpWredATMStatRandomDropPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets dropped when the number of packets 
+                    			in the associated queue was greater than the minimum threshold 
+                    			and less than the maximum threshold."
+                    		::= { mpWredATMPVCStatEntry 2 }
+
+mpWredATMStatTailDropPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets dropped when the number of packets 
+                    			in the associated queue was greater than the maximum threshold."
+                    		::= { mpWredATMPVCStatEntry 3 }
+
+mpWredATMStatTransmitPkt64	OBJECT-TYPE
+                    		SYNTAX  Counter64
+                    		UNITS  "packets"
+                    		MAX-ACCESS  read-only
+                    		STATUS  current
+                    		DESCRIPTION
+                    			"The 64 bits count of packets transmitted."
+                    		::= { mpWredATMPVCStatEntry 4 }
+
+
+
+END
+------------------------------------------------------------------------------
+-- ============================================================================
+-- $Log: maipuWredMIB.mib,v $
+--
+--
+-- ============================================================================
+
+

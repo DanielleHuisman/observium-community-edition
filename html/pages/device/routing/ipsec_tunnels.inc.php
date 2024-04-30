@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -114,7 +114,7 @@ foreach (dbFetchRows($query, [$device['device_id'], '']) as $tunnel) {
     }
     $tunnel_endpoint = implode('<br />', $tunnel_endpoint);
 
-    $timediff = $GLOBALS['config']['time']['now'] - $tunnel['tunnel_added'];
+    $timediff = get_time() - $tunnel['tunnel_added'];
     echo('<tr class="' . $tunnel['row_class'] . '">
   <td class="state-marker"></td>
   <td>' . generate_popup_link('ip', $tunnel['local_addr']) . '</td>
@@ -140,7 +140,7 @@ foreach (dbFetchRows($query, [$device['device_id'], '']) as $tunnel) {
     }
 
     if ($tunnel['graph']) {
-        $graph_array['to'] = $config['time']['now'];
+        $graph_array['to'] = get_time();
 
         echo('<tr class="' . $tunnel['row_class'] . '">');
         echo('<td colspan="10">');

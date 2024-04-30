@@ -114,7 +114,7 @@ foreach (dbFetchRows("SELECT * FROM `cef_switching` WHERE `device_id` = ?  ORDER
     if ($vars['view'] == "graphs") {
         $graph_array['height'] = "100";
         $graph_array['width']  = "215";
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = $cef['cef_switching_id'];
         $graph_array['type']   = "cefswitching_graph";
 

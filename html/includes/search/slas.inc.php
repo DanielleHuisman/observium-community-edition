@@ -4,15 +4,15 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 /// SEARCH SENSORS
 $results = dbFetchRows("SELECT * FROM `slas` LEFT JOIN `devices` USING (`device_id`)" .
-                       generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '(`sla_target` LIKE ? OR `sla_index` LIKE ? OR `sla_tag` LIKE ?)') .
+                       generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '(`sla_target` LIKE ? OR `sla_index` LIKE ? OR `sla_tag` LIKE ?)') .
                        " ORDER BY `sla_target` LIMIT $query_limit", [$query_param, $query_param, $query_param]);
 
 if (!safe_empty($results)) {

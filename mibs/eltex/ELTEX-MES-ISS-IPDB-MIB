@@ -1,0 +1,307 @@
+ELTEX-MES-ISS-IPDB-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        enterprises, IpAddress, Counter32,
+        Integer32, Unsigned32                    FROM SNMPv2-SMI
+        RowStatus, MacAddress, TruthValue        FROM SNMPv2-TC
+        InterfaceIndex                           FROM IF-MIB
+        eltMesIss                                FROM ELTEX-MES-ISS-MIB
+        fsIpDbBindingEntry,
+        fsIpDbv6BindingEntry                     FROM ARICENT-IPDB-MIB;
+
+eltMesIssIpDbMIB MODULE-IDENTITY
+        LAST-UPDATED "202206100000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "The proprietary MIB module for IPDB module. Used to maintain
+                the hosts IP, MAC & VLAN in a database which will be used to
+                allow/drop the incoming IP traffic on a specific interface."
+        REVISION "202206100000Z"
+        DESCRIPTION
+                "Added IPv6 binding table clearing feature."
+        REVISION "202203170000Z"
+        DESCRIPTION
+                "Added link down action for IP binding."
+        REVISION "202203040000Z"
+        DESCRIPTION
+                "Added IP binding table clearing feature."
+        REVISION "202005210000Z"
+        DESCRIPTION
+                "Added enable/disable for binding limit. From now on when the
+                binding limit value is set to 0 it means that binding is
+                forbidden."
+        REVISION "201902060000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 9 }
+
+-- ========================================================================== --
+--                             groups in the MIB                              --
+-- ========================================================================== --
+
+    eltMesIssIpDbObjects       OBJECT IDENTIFIER ::= { eltMesIssIpDbMIB 1 }
+    eltMesIssIpDbNotifications OBJECT IDENTIFIER ::= { eltMesIssIpDbMIB 2 }
+    eltMesIssIpDbInterfaces    OBJECT IDENTIFIER ::= { eltMesIssIpDbObjects 1 }
+    eltMesIssIpDbBinding       OBJECT IDENTIFIER ::= { eltMesIssIpDbObjects 2 }
+    eltMesIssIpDbv6Binding     OBJECT IDENTIFIER ::= { eltMesIssIpDbObjects 3 }
+
+-- ========================================================================== --
+--                   Per physical interface configurations                    --
+-- ========================================================================== --
+
+eltMesIssIpDbIntfConfTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltMesIssIpDbIntfConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains the interface specific configurations."
+::= { eltMesIssIpDbInterfaces 1 }
+
+eltMesIssIpDbIntfConfEntry OBJECT-TYPE
+    SYNTAX EltMesIssIpDbIntfConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry will contain configurations associated
+         with the interface."
+    INDEX { eltMesIssIpDbIntfConfIndex }
+::= { eltMesIssIpDbIntfConfTable 1 }
+
+EltMesIssIpDbIntfConfEntry ::= SEQUENCE {
+    eltMesIssIpDbIntfConfIndex               InterfaceIndex,
+    eltMesIssIpDbIntfConfBindingLimit        Unsigned32,
+    eltMesIssIpDbIntfConfBindingLimitControl INTEGER
+}
+
+eltMesIssIpDbIntfConfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Interface index to which this table entry is associated."
+::= { eltMesIssIpDbIntfConfEntry 1 }
+
+eltMesIssIpDbIntfConfBindingLimit OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..1024)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The total limit of DHCPv4 binding entries allowed
+         on this interfaces. The value of 0 means that
+         binding is forbidden."
+    DEFVAL  { 0 }
+::= { eltMesIssIpDbIntfConfEntry 2 }
+
+eltMesIssIpDbIntfConfBindingLimitControl OBJECT-TYPE
+    SYNTAX      INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to enable/disable binding limit."
+    DEFVAL      { disabled }
+::= { eltMesIssIpDbIntfConfEntry 3 }
+
+-- ========================================================================== --
+--                     Per physical interface statistics                      --
+-- ========================================================================== --
+
+eltMesIssIpDbIntfStatTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltMesIssIpDbIntfStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains the interface specific
+         statistics."
+::= { eltMesIssIpDbInterfaces 2 }
+
+eltMesIssIpDbIntfStatEntry OBJECT-TYPE
+    SYNTAX EltMesIssIpDbIntfStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry will contain statistics associated with the interface."
+    INDEX { eltMesIssIpDbIntfStatIndex }
+::= { eltMesIssIpDbIntfStatTable 1 }
+
+EltMesIssIpDbIntfStatEntry ::= SEQUENCE {
+    eltMesIssIpDbIntfStatIndex               InterfaceIndex,
+    eltMesIssIpDbIntfStatNoOfStaticBindings  Counter32,
+    eltMesIssIpDbIntfStatNoOfDHCPBindings    Counter32
+}
+
+eltMesIssIpDbIntfStatIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Interface index to which this table entry is associated."
+::= { eltMesIssIpDbIntfStatEntry 1 }
+
+eltMesIssIpDbIntfStatNoOfStaticBindings OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This indicates the total number of static (host, IPv4) bindings
+         for an interface at a given time."
+::= { eltMesIssIpDbIntfStatEntry 2 }
+
+eltMesIssIpDbIntfStatNoOfDHCPBindings OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This indicates the total number of (host, IPv4) bindings
+         configured through DHCPv4 for an interface at a given time."
+::= { eltMesIssIpDbIntfStatEntry 3 }
+
+-- ========================================================================== --
+--                           Per VLAN configuration                           --
+-- ========================================================================== --
+eltMesIssIpDbSrcGuardVlanTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssIpDbSrcGuardVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table allows to configure IP/IPv6 Source Guard on specified VLAN."
+    ::= { eltMesIssIpDbInterfaces 3 }
+
+eltMesIssIpDbSrcGuardVlanEntry OBJECT-TYPE
+    SYNTAX      EltMesIssIpDbSrcGuardVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row instance contains the configuration to enable
+         or disable IP/IPv6 source guard on VLAN."
+    INDEX { eltMesIssIpDbSrcGuardVlanId }
+    ::= { eltMesIssIpDbSrcGuardVlanTable 1 }
+
+EltMesIssIpDbSrcGuardVlanEntry ::= SEQUENCE {
+    eltMesIssIpDbSrcGuardVlanId        Integer32,
+    eltMesIssIpDbSrcGuardVlanStatus    INTEGER,
+    eltMesIssIpDbv6SrcGuardVlanStatus  INTEGER
+}
+
+eltMesIssIpDbSrcGuardVlanId OBJECT-TYPE
+    SYNTAX      Integer32 (1..4094)
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+       "This indicates the VLAN identifier for which the IP/IPv6 source
+        guard configuration is applied."
+    ::= { eltMesIssIpDbSrcGuardVlanEntry 1 }
+
+eltMesIssIpDbSrcGuardVlanStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        enable(1),
+        disable(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the IP source guard status of VLAN."
+    DEFVAL  { disable }
+    ::= { eltMesIssIpDbSrcGuardVlanEntry 2 }
+
+eltMesIssIpDbv6SrcGuardVlanStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        enable(1),
+        disable(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the IPv6 source guard status of VLAN."
+    DEFVAL  { disable }
+    ::= { eltMesIssIpDbSrcGuardVlanEntry 3 }
+
+-- ========================================================================== --
+--                       IPv4 Binding clearing feature                        --
+-- ========================================================================== --
+
+eltMesIssIpDbBindingTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltMesIssIpDbBindingEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table augments the fsIpDbBindingTable."
+    ::= { eltMesIssIpDbBinding 1}
+
+eltMesIssIpDbBindingEntry OBJECT-TYPE
+    SYNTAX      EltMesIssIpDbBindingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This entry augments fsIpDbBindingEntry."
+    AUGMENTS { fsIpDbBindingEntry }
+    ::= { eltMesIssIpDbBindingTable 1 }
+
+EltMesIssIpDbBindingEntry ::= SEQUENCE {
+    eltMesIssIpDbBindingEntryClearFlag TruthValue
+}
+
+eltMesIssIpDbBindingEntryClearFlag OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+         "This object removes specified dynamically learnt (host, IP) Binding entry
+          from the binding table fsIpDbBindingTable, when it is set as 'true'.
+          On clear is done, this object is set to 'false'."
+     DEFVAL { false }
+     ::= { eltMesIssIpDbBindingEntry 1 }
+
+-- ========================================================================== --
+--                   IP binding action by link down on port                   --
+-- ========================================================================== --
+
+eltMesIssIpDbBindingDynamicEntriesPortDownAction OBJECT-TYPE
+     SYNTAX INTEGER  { retain(1),
+                       clear(2) }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+         "The action that is applied for IP binding dynamic entries
+          when a link down event occurred on the client's port."
+    DEFVAL { retain }
+    ::= { eltMesIssIpDbBinding 2 }
+
+-- ========================================================================== --
+--                       IPv6 Binding clearing feature                        --
+-- ========================================================================== --
+
+eltMesIssIpDbv6BindingTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltMesIssIpDbv6BindingEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table augments the fsIpDbv6BindingTable."
+    ::= { eltMesIssIpDbv6Binding 1}
+
+eltMesIssIpDbv6BindingEntry OBJECT-TYPE
+    SYNTAX      EltMesIssIpDbv6BindingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This entry augments fsIpDbv6BindingEntry."
+    AUGMENTS { fsIpDbv6BindingEntry }
+    ::= { eltMesIssIpDbv6BindingTable 1 }
+
+EltMesIssIpDbv6BindingEntry ::= SEQUENCE {
+    eltMesIssIpDbv6BindingEntryClearFlag TruthValue
+}
+
+eltMesIssIpDbv6BindingEntryClearFlag OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+         "This object removes specified dynamically learnt (host, IP) binding entry
+          from the binding table fsIpDbv6BindingTable, when it is set as 'true'.
+          On clear is done, this object is set to 'false'."
+     DEFVAL { false }
+     ::= { eltMesIssIpDbv6BindingEntry 1 }
+
+END

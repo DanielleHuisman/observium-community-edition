@@ -334,7 +334,7 @@ foreach ($oids as $chassis => $transeiver) {
 
         $entry['ifIndex'] = $ifIndex;
         $entry['index']   = $index;
-        $match            = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%']];
+        $match            = [ 'measured_match' => [ 'entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%' ] ];
         $options          = entity_measured_match_definition($device, $match, $entry);
         //print_debug_vars($options);
 
@@ -523,6 +523,15 @@ foreach ($oids as $chassis => $transeiver) {
         $factor = 10000000; // 10 * 1000 * 1000
         $scale  = 1 / $factor;
         if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
+            // tmnxDDMTxOutputPower.1.1292402691 = 2792
+            // tmnxDDMTxOutputPowerLowWarning.1.1292402691 = 1259
+            // tmnxDDMTxOutputPowerLowAlarm.1.1292402691 = 1000
+            // tmnxDDMTxOutputPowerHiWarning.1.1292402691 = 5012
+            // tmnxDDMTxOutputPowerHiAlarm.1.1292402691 = 6310
+
+            // tmnxDDMExternallyCalibrated.1.1292402691 = true
+            // tmnxDDMExtCalTxPowerSlope.1.1292402691 = 256
+            // tmnxDDMExtCalTxPowerOffset.1.1292402691 = 0
             $scale = ($entry['tmnxDDMExtCalTxPowerSlope'] / 256) / $factor;
             if ($entry['tmnxDDMExtCalTxPowerOffset'] != 0) {
                 $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxPowerOffset'] / $factor;
@@ -569,17 +578,31 @@ foreach ($oids as $chassis => $transeiver) {
         $factor = 10000000; // 10 * 1000 * 1000
         $scale  = 1 / $factor;
         if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
-            //FIXME. Dear fucking god.. how this calculated.. how we can poll this????
+            // tmnxDDMRxOpticalPower.1.1292402691 = 1936
+            // tmnxDDMRxOpticalPowerLowWarning.1.1292402691 = 453
+            // tmnxDDMRxOpticalPowerLowAlarm.1.1292402691 = 357
+            // tmnxDDMRxOpticalPowerHiWarning.1.1292402691 = 23145
+            // tmnxDDMRxOpticalPowerHiAlarm.1.1292402691 = 29158
+            // tmnxDDMRxOpticalPowerType.1.1292402691 = average
+            // tmnxDDMExternallyCalibrated.1.1292402691 = true
+            // tmnxDDMExtCalRxPower4.1.1292402691 = 0
+            // tmnxDDMExtCalRxPower3.1.1292402691 = 0
+            // tmnxDDMExtCalRxPower2.1.1292402691 = 2998520959
+            // tmnxDDMExtCalRxPower1.1.1292402691 = 1046360211
+            // tmnxDDMExtCalRxPower0.1.1292402691 = 1070575314
+            $sensor_options['sensor_convert'] = 'tmnx_rx_power'; // added extra oids polling and conversion in sensor_value_scale()
+            // Dear fucking god.. how this calculated.. how we can poll this????
             //  tmnxDDMExtCalRxPower0 +
-            // (tmnxDDMExtCalRxPower1 * tmnxDDMRxOpticalPower) +
+            // (tmnxDDMExtCalRxPower1 * tmnxDDMRxOpticalPower^1) +
             // (tmnxDDMExtCalRxPower2 * tmnxDDMRxOpticalPower^2) +
             // (tmnxDDMExtCalRxPower3 * tmnxDDMRxOpticalPower^3) +
             // (tmnxDDMExtCalRxPower4 * tmnxDDMRxOpticalPower^4)
-            // $scale = ($entry['tmnxDDMExtCalTxPowerSlope'] / 256) / $factor;
-            // if ($entry['tmnxDDMExtCalTxPowerOffset'] != 0)
-            // {
-            //   $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxPowerOffset'] / $factor;
-            // }
+            foreach ([ 'tmnxDDMRxOpticalPower', 'tmnxDDMRxOpticalPowerHiAlarm', 'tmnxDDMRxOpticalPowerHiWarning',
+                       'tmnxDDMRxOpticalPowerLowAlarm', 'tmnxDDMRxOpticalPowerLowWarning' ] as $oid) {
+                $entry[$oid] = value_unit_tmnx_rx_power($entry[$oid], $entry['tmnxDDMExtCalRxPower0'], $entry['tmnxDDMExtCalRxPower1'],
+                                                        $entry['tmnxDDMExtCalRxPower2'], $entry['tmnxDDMExtCalRxPower3'], $entry['tmnxDDMExtCalRxPower4']);
+            }
+            $value = $entry[$oid_name];
         }
         // Limits
         $sensor_options['limit_high']      = $entry['tmnxDDMRxOpticalPowerHiAlarm'] * $scale;

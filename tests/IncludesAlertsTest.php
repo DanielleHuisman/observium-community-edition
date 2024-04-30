@@ -5,8 +5,13 @@ $config['install_dir'] = $base_dir;
 
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/../includes/definitions.inc.php');
+//include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
 include(__DIR__ . '/../includes/functions.inc.php');
 
 class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
@@ -292,6 +297,9 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $list1 = 'sweet,swoot';
     $list2 = array('sweet', 'swoot');
 
+    $test4 = 'on';
+    $list4 = [ 'off', 'offLocked', 'notSet', 0 ];
+
     // in
     $array[] = array( TRUE, $test1, 'list',         $list1);
 
@@ -313,6 +321,8 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array( TRUE, $test2, '!in',          $list2);
     $array[] = array(FALSE, $test3, '!in',          $list1);
     $array[] = array(FALSE, $test3, '!in',          $list2);
+
+      $array[] = array( TRUE, $test4, 'notin',        $list4);
 
     $list1 = '0900,1800';
     $list2 = array('0900', '1800');

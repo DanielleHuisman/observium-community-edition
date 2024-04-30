@@ -1,5 +1,5 @@
 --  =======================================================================
---  File        : oaDevUpgrade.mib
+--  File        : oaUpgrd.mib
 --  Description : Private MIB for Download/Upload software and configuration
 --  By          : Yakov & Reuven
 --  Version     : 0.2
@@ -38,19 +38,20 @@
 
 OA-DEV-UPGRADE-MIB DEFINITIONS ::= BEGIN
 
-        IMPORTS
-
+  IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, enterprises,
-    Integer32,NOTIFICATION-TYPE                  FROM SNMPv2-SMI        -- RFC2578
+    NOTIFICATION-TYPE, Unsigned32                FROM SNMPv2-SMI        -- RFC2578
     MODULE-COMPLIANCE, OBJECT-GROUP,
     NOTIFICATION-GROUP                           FROM SNMPv2-CONF       -- RFC2580
-    DisplayString                                FROM SNMPv2-TC         -- RFC2579
+    TEXTUAL-CONVENTION, DisplayString,
+    DateAndTime                                  FROM SNMPv2-TC         -- RFC2579
+    nbSwitchG1Il                                 FROM OS-COMMON-TC-MIB
     InetAddressType,    InetAddress              FROM INET-ADDRESS-MIB; -- RFC2851
 
  -- RFC2851
 
 oaDevUpgrade  MODULE-IDENTITY
-    LAST-UPDATED "200611080000Z"
+    LAST-UPDATED "201011250000Z"  -- Nov 25, 2010
     ORGANIZATION "MRV Communications, Inc."
     CONTACT-INFO
         "Yakov Vaisman
@@ -61,25 +62,56 @@ oaDevUpgrade  MODULE-IDENTITY
          Reuven Putter
          MRV Communication, Inc
          http://www.mrv.com
-         Email:  rputter@mrv.com
-	"
+         Email:  rputter@mrv.com"
+
     DESCRIPTION
         "Supports information for download/upload device software and/or configuration."
 
     -- Revision history
-
-    REVISION "200611080000Z"
+    REVISION "201011250000Z"  -- Nov 25, 2010
     DESCRIPTION
-        "Initial edition."
+        "Revision 1.1
+         The following MIB objects are added: 
+            1. oaAuditTable:
+             oaAuditAdminStatus,
+             oaAuditOperStatus,
+             oaAuditChecksum,
+             oaAuditChecksumTime,
+             oaAuditValidChecksum,
+             oaAuditValidChecksumTime,
+             oaAuditLastError,
+            2. oaAuditScheduleParams:
+             oaAuditScheduleStart,
+             oaAuditSchedulePeriod,
+             oaAuditScheduleStatus,
+             oaAuditScheduleError,
+             oaAuditMinSchedulePeriod 
+            "
+
+    REVISION "201004260000Z"  -- Apr 26, 2010
+    DESCRIPTION
+        "Revision 1.0
+         New enumaration values are added for the following MIB objects
+            1. localFile for oaDevUpgrProtocolApp
+            2. removeLocalFile for oaDevUpgrAdminStatus
+            3. upgradeFpga for oaDevUpgrType - new row
+            4. downloadFpgaImageFailed for oaDevUpgrErrorStatus"
+
+    REVISION "200904220000Z"  -- Apr 22, 2009
+    DESCRIPTION
+        "Revision 0.2:
+         New enumaration values added to MIB Objects
+             [oaDevUpgrType], [oaDevUpgrProtocolApp] and [oaDevUpgrErrorStatus]
+         New [oaDevConfigAudit] Group of Objects added."
+
+    REVISION "200611080000Z"  -- Nov 8, 2006
+    DESCRIPTION
+        "Initial edition [Revision 0.1]."
     ::= { nbDevGen 20 }
 
 -- ************************************************************
 -- NBase Object Identifier Definition
 -- ************************************************************
-
-nbase              OBJECT IDENTIFIER ::= { enterprises 629 }
-nbSwitchG1         OBJECT IDENTIFIER ::= { nbase 1 }
-nbSwitchG1Il       OBJECT IDENTIFIER ::= { nbSwitchG1 50}
 
 -- GROUPS for General Device Configuration
 nbDeviceConfig     OBJECT IDENTIFIER ::= { nbSwitchG1Il 11}
@@ -87,6 +119,32 @@ nbDevGen           OBJECT IDENTIFIER ::= { nbDeviceConfig 1 }
 
 oaDevUpgrNotifications OBJECT IDENTIFIER ::= { oaDevUpgrade 0 }
 oaDevUpgrConformance   OBJECT IDENTIFIER ::= { oaDevUpgrade 101 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+PeriodicityDateAndTime ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "2d-1d-1d,1d:1d,1d"
+    STATUS       current
+    DESCRIPTION
+            "A periodicity date-time specification.
+
+         field  octets  contents                  range
+         -----  ------  --------                  -----
+           1      1-2   year                      0..65536 (0 - for any periodicity except 'once')
+           2       3    month                     0..12    (0 - for any periodicity except 'once')
+           3       4    day                       0..31    (0 - for any periodicity except 'once' & 'everyMonth')
+           4       5    hour                      0..23    (NA for periodicities 'everyXXHours' & 'everyXXMinutes')
+           5       6    minutes                   0..59
+           6       7    day of Week               0..7     (0   - for any periodicity, except 'everyWeek';
+                                                            1-7 - for periodicity 'everyWeek')
+
+         * Notes:
+         - the value of year is in network-byte order
+
+         For example, Tuesday May 26, 1992 at 1:30 PM
+         EDT would be displayed as: 1992-5-26,13:30,0"
+    SYNTAX  OCTET STRING (SIZE (0 | 7)) 
 
 -- ************************************************************
 -- Objects in the Device's Upgrade Software/Configuration Group
@@ -114,7 +172,7 @@ oaDevUpgrTable         OBJECT-TYPE
          download software version, download/upload system configuration."
     ::= { oaDevUpgrade 2 }
 
-oaDevUpgrEntry		OBJECT-TYPE
+oaDevUpgrEntry      OBJECT-TYPE
     SYNTAX  OaDevUpgrEntry
     MAX-ACCESS   not-accessible
     STATUS       current
@@ -124,33 +182,45 @@ oaDevUpgrEntry		OBJECT-TYPE
     ::= { oaDevUpgrTable 1 }
 
 OaDevUpgrEntry ::= SEQUENCE {
-                      oaDevUpgrType              Integer32,
+                      oaDevUpgrType              INTEGER,
                       oaDevUpgrProtocolApp       INTEGER,
                       oaDevUpgrServerAddressType InetAddressType,
                       oaDevUpgrServerAddress     InetAddress,
                       oaDevUpgrRemoteDir         DisplayString,
                       oaDevUpgrRemoteFileName    DisplayString,
                       oaDevUpgrPeriodicity       INTEGER,
-                      oaDevUpgrPeriodDateTime    OCTET STRING,
+                      oaDevUpgrPeriodDateTime    PeriodicityDateAndTime,
                       oaDevUpgrResetDevice       INTEGER,
                       oaDevUpgrOperStatus        INTEGER,
                       oaDevUpgrAdminStatus       INTEGER,
                       oaDevUpgrUsername          DisplayString,
                       oaDevUpgrPassword          DisplayString,
-                      oaDevUpgrServerAddressText DisplayString
-		}
+                      oaDevUpgrServerAddressText DisplayString,
+                      oaDevUpgrErrorStatus       INTEGER,
+                      oaDevUpgrResetDelay        INTEGER
+       }
 
 oaDevUpgrType          OBJECT-TYPE
-    SYNTAX  Integer32 (1..4)
+    SYNTAX  INTEGER {
+       upgradeSoftware          (1),
+       getStartupConfig         (2),    -- copy to startup-config ...
+       putStartupConfig         (3),    -- copy from startup-config ...
+       getRunningConfig         (4),    -- copy to running-config ... 
+       putRunningConfig         (5),    -- copy from running-config ...
+       resetDevice              (6),    -- reset ...
+       upgradeFpga              (7)     -- upgrade FPGA ...
+    }
     MAX-ACCESS  accessible-for-notify
---    MAX-ACCESS   not-accessible
-
     STATUS       current
     DESCRIPTION
         "The Type of Upgrade (index of the table):
             1=Download the Sw Agent version,
-            2=Download the startup Device Configuration,
-            3=Upload the current Device Configuration"
+            2=Download the Startup Device Configuration,
+            3=Upload the Startup Device Configuration,
+            4=Download the Running Device Configuration,
+            5=Upload the Running Device Configuration,
+            6=Reset Device,
+            7=Download the Fpga version."
     ::= { oaDevUpgrEntry 1 }
 
 oaDevUpgrProtocolApp    OBJECT-TYPE
@@ -158,13 +228,15 @@ oaDevUpgrProtocolApp    OBJECT-TYPE
        other       (1),
        tftpClient  (2),
        ftpClient   (3),
-       sftpClient  (4),
-       scpClient   (5)
+       scpClient   (4),
+       sftpClient  (5),
+       localFile   (6)
     }
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
         "Protocol application used for upgrade operation"
+    DEFVAL { ftpClient }
     ::= { oaDevUpgrEntry 2 }
 
 oaDevUpgrServerAddressType OBJECT-TYPE
@@ -197,7 +269,9 @@ oaDevUpgrRemoteDir   OBJECT-TYPE
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
-        "Download/upload remote directory."
+        "Download/upload remote directory.
+         If oaDevUpgrProtocolApp = localFile, then the object contains name
+         of the local directory used for download/upload operation"
     ::= { oaDevUpgrEntry 5 }
 
 oaDevUpgrRemoteFileName   OBJECT-TYPE
@@ -205,7 +279,9 @@ oaDevUpgrRemoteFileName   OBJECT-TYPE
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
-        "Download/upload remote file name."
+        "Download/upload remote file name.
+         If oaDevUpgrProtocolApp = localFile, then the object contains name
+         of the local file used for download/upload operation"
     ::= { oaDevUpgrEntry 6 }
 
 oaDevUpgrPeriodicity OBJECT-TYPE
@@ -222,30 +298,19 @@ oaDevUpgrPeriodicity OBJECT-TYPE
     ::= { oaDevUpgrEntry 7 }
 
 oaDevUpgrPeriodDateTime   OBJECT-TYPE
-    SYNTAX     OCTET STRING (SIZE (0 | 7 ))
+    SYNTAX     PeriodicityDateAndTime
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
-        "Date and time for upgrade version.
-
-         field  octets  contents                  range
-         -----  ------  --------                  -----
-           1      1-2   year                      0..65536
-           2       3    month                     1..12
-           3       4    day                       1..31
-           4       5    hour                      0..23
-           5       6    minutes                   0..59
-           6       7    day of Week               1..7	 -- used only for everyWeek action
-
-         For example, Tuesday May 26, 1992 at 1:30:15 PM
-         EDT would be displayed as: 1992-5-26,13:30 "
+        "Date and time for upload/download action."
     ::= { oaDevUpgrEntry 8 }
 
 oaDevUpgrResetDevice    OBJECT-TYPE
     SYNTAX  INTEGER  {
                other                       (1),
-               resetDeviceAfterUpgrade     (2),
-               notResetDeviceAfterUpgrade  (3)
+               resetDeviceAfterAction      (2),
+               dontResetDeviceAfterAction  (3),
+               resetDeviceWithDelay        (4)
     }
     MAX-ACCESS  read-write
     STATUS      current
@@ -260,20 +325,21 @@ oaDevUpgrOperStatus  OBJECT-TYPE
                actionInProcess          (3),
                actionCompletedOk        (4),
                actionError              (5),
-               actionCanceled           (6)	
+               actionCanceled           (6)						
     }
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
         "Operational status of download/upload operation."
     ::= { oaDevUpgrEntry 10 }
-		
+        
 oaDevUpgrAdminStatus OBJECT-TYPE
     SYNTAX  INTEGER  {
                none                  (1),
                startNow              (2),
                scheduleAction        (3),
-               cancelScheduledAction (4)
+               cancelScheduledAction (4),
+               removeLocalFile       (5)
     }
     MAX-ACCESS  read-write
     STATUS      current
@@ -286,7 +352,7 @@ oaDevUpgrUsername   OBJECT-TYPE
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
-        "Use the username instead default."
+        "Username."
     ::= { oaDevUpgrEntry 12 }
 
 oaDevUpgrPassword   OBJECT-TYPE
@@ -306,9 +372,379 @@ oaDevUpgrServerAddressText    OBJECT-TYPE
          in the Text format (used in Traps)."
     ::= { oaDevUpgrEntry 14 }
 
+oaDevUpgrErrorStatus    OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               none                        (1),
+               operationNotPermitted       (2),
+               invalidBootPartition        (3),
+               mergeScriptFailure          (4),
+               mergeScriptMissing          (5),
+               invalidAction               (6),
+               missingParameters           (7),
+               serverUnavailable           (8),
+               cannotGetGateway            (9),
+               cannotGetNetworkMask        (10),
+               invalidGetMethod            (11),
+               fileTransferFailure         (12),
+               invalidSoftwareVersionType  (13),
+               mupgradeScriptMissing       (14),
+               invalidConfigFileType       (15),
+               missingRemoteUserParameter  (16),
+               loginFailure                (17),
+               noSuchFile                  (18),
+               cannotSetBootpart           (19),
+               cannotGetBootpart           (20),
+               resetFailure                (21),
+               postResetFailure            (22),
+               wrongUpgrType               (23),
+               emptyFileName               (24),
+               unknownError                (25),
+               startProcessFailed          (26),
+               getPartitionToogleFlagFailed     (27),
+               setPartitionToogleFlagFailed     (28),
+               tooLongCommandError              (29),
+               backupCurrentStartupConfigError  (30),
+               unsupportedAppProtocol           (31),
+               invalidFileFormat                (32),
+               writeRunningConfigFileFailed     (33),
+               downloadFpgaImageFailed          (34)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Specifies the error which occurred (if at all) during the action (used in Traps)."
+    ::= { oaDevUpgrEntry 15 }
+
+oaDevUpgrResetDelay   OBJECT-TYPE
+    SYNTAX  INTEGER (1..600)
+    UNITS       "Seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Delay in seconds for performing reset if oaDevUpgrResetDevice set to resetDeviceWithDelay(4)"
+    DEFVAL { 60 }
+    ::= { oaDevUpgrEntry 16 }
+
+-- **********************************************************
+-- Objects in the Device's Configuration Audit Mechanism
+-- **********************************************************
+
+oaDevConfigAudit OBJECT IDENTIFIER ::= { oaDevUpgrade 10 }
+
+oaDevConfigAuditAdminStatus  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               none                      (1),
+               markCurrentConfigAsValid  (2),
+               compareWithValidConfig    (3),
+               scheduleCompare           (4),
+               cancelScheduledCompare    (5)
+			}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Admin status activates synch operation:
+         2=Mark (now) the current running-configuration as Valid (for 'reference').
+           Can't be scheduled for later execution nor can it be executed priodically.
+         3=Compare (now) the current running-configuration with the Valid one (the 'reference').
+           Can't be scheduled for later execution nor can it be executed priodically.
+         4=Schedule for later execution a compare action (as described in value # 3).
+           Configure scheduled compare action is changed running configuration, so after setting
+           scheduled action the manager should perform set value 'markCurrentConfigAsValid(2)'
+           in order to save the new running configuration as valid
+         5=Cancel a scheduled compare action (as described in value # 4)
+           Cancel  scheduled compare action is changed running configuration, so after cancel
+           scheduled action the manager should perform set value 'markCurrentConfigAsValid(2)'
+           in order to save the new running configuration as valid"
+    DEFVAL { none }
+    ::= { oaDevConfigAudit 1 }
+
+oaDevConfigAuditOperStatus  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               none                       (1),
+               actionInProcess            (2),
+               actionCompletedOk          (3),   
+               actionCompletedWithDiff    (4),
+               actionCouldNotCompleted    (5)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operational status of synch operation:
+         2=Action is running.
+         3=Action completed successfully. 
+         4=Action completed with configuration difference(s).
+         5=Action couldn't complete due to error(s)."
+    DEFVAL { none }
+    ::= { oaDevConfigAudit 2 }
+
+oaDevConfigAuditErrorStatus  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               none                     (1),
+               operationNotPermitted    (2),
+               operationCanceledByUser  (3),
+               getCurrentConfigFailure  (4),
+               compareFailure           (5),
+               configurationChanged     (6),
+               noValidConfiguration     (7),
+               operationInProcess       (8),
+               anotherSchedulerAlreadyActive   (9),
+               noActiveScheduler        (10),
+               addSchedulerError        (11),
+               deleteSchedulerError     (12)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Specifies the error(s) (if at all) during the action (used in Traps)."
+    DEFVAL { none }
+    ::= { oaDevConfigAudit 3 }
+
+oaDevConfigAuditPeriodicity  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               once            (1),
+               everyMonth      (2),
+               everyWeek       (3),
+               everyDay        (4),
+               every12Hours    (5),
+               every8Hours     (6),
+               every6Hours     (7),
+               every4Hours     (8),
+               every2Hours     (9),
+               everyHour       (10),
+               every30Minutes  (11),
+               every15Minutes  (12)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Time period for synch operation."
+    DEFVAL { once }
+    ::= { oaDevConfigAudit 4 }
+
+oaDevConfigAuditStartTime  OBJECT-TYPE
+    SYNTAX  PeriodicityDateAndTime 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Date and time to start the synch operation."
+    ::= { oaDevConfigAudit 5 }
+
+oaDevConfigAuditSchedulerStatus  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               notActive  (1),
+               active     (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operational status of synch scheduler:
+         1=Synch scheduler isn't active.
+         2=Synch scheduler is active."
+    DEFVAL { notActive }
+    ::= { oaDevConfigAudit 6 }
+
+oaDevConfigAuditTrapMode  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               noSendConfigAuditTrap              (1),
+               sendConfAuditTrapOnChangeOnly      (2),
+               sendConfAuditTrapOnChangeOrDiff    (3),
+               sendConfAuditTrapForEachCompare    (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Send Trap mode. This obeject configures trap mode
+         for admin status [oaDevConfigAuditAdminStatus] -
+         markCurrentConfigAsValid or compareWithValidConfig:
+            1=Trap oaDevConfigAuditCompleted is not sent.
+            2=Trap oaDevConfigAuditCompleted is sent in case of status change only.
+            3=Trap oaDevConfigAuditCompleted is sent in case of status change,  
+              error or difference with valid configuration.
+            4=Trap oaDevConfigAuditCompleted is sent for each set object
+              oaDevConfigAuditAdminStatus to markCurrentConfigAsValid
+              or compareWithValidConfig
+         Note: if compare is performed from scheduler, then device always works
+               like in sendConfAuditTrapOnChangeOrDiff(3) mode."
+    DEFVAL { sendConfAuditTrapOnChangeOrDiff }
+    ::= { oaDevConfigAudit 7 }
+
+oaAuditTable         OBJECT-TYPE
+    SYNTAX  SEQUENCE OF OaAuditEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table used for check configuration changes for different features"
+    ::= { oaDevConfigAudit 10 }
+
+oaAuditEntry      OBJECT-TYPE
+    SYNTAX  OaAuditEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "The entry of the table."
+    INDEX { oaAuditSubType }
+    ::= { oaAuditTable 1 }
+
+OaAuditEntry ::= SEQUENCE {
+                          oaAuditSubType         INTEGER,
+                          oaAuditAdminStatus     INTEGER,
+                          oaAuditOperStatus      INTEGER,
+                          oaAuditChecksum        Unsigned32,
+                          oaAuditChecksumTime    DateAndTime,
+                          oaAuditValidChecksum   Unsigned32,
+                          oaAuditValidChecksumTime DateAndTime,
+                          oaAuditLastError       DisplayString
+       }
+
+oaAuditSubType    OBJECT-TYPE
+    SYNTAX  INTEGER {
+       osEthServTable      (1),
+       osEthServFlowTable  (2),
+       osEthServClassTable (3)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Sub Configuration Type"
+    ::= { oaAuditEntry 1 }
+
+oaAuditAdminStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+       none         (1),
+       computeNow   (2),
+       computeValid (3)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Admin Status:
+            computeNow   - compute checksum
+            computeValid - compute checksum and set it as valid
+        "
+    ::= { oaAuditEntry 2 }
+
+oaAuditOperStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+       none              (1),
+       computeInProcess  (2),
+       computeFinishedOK (3),
+       computeError      (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operation Status:
+            computeInProcess  - compute checksum in process
+            computeFinishedOK - checksum computed successfully
+            computeError      - compute checksum failed"
+    ::= { oaAuditEntry 4 }
+
+oaAuditChecksum OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Last computed checksum"
+    ::= { oaAuditEntry 5 }
+
+oaAuditChecksumTime OBJECT-TYPE
+    SYNTAX  DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Last Checksum Time"
+    ::= { oaAuditEntry 6 }
+
+oaAuditValidChecksum OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Valid Checksum"
+    ::= { oaAuditEntry 7 }
+
+oaAuditValidChecksumTime OBJECT-TYPE
+    SYNTAX  DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Valid Checksum Time"
+    ::= { oaAuditEntry 8 }
+
+oaAuditLastError    OBJECT-TYPE
+    SYNTAX       DisplayString (SIZE (2..160))
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Last Error"
+    ::= { oaAuditEntry 100 }
+
+oaAuditScheduleParams OBJECT IDENTIFIER ::= { oaDevConfigAudit 11 }
+
+oaAuditScheduleStart  OBJECT-TYPE
+    SYNTAX  PeriodicityDateAndTime 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Date and time to start of audit configuration for entries in the oaAuditTable"
+    ::= { oaAuditScheduleParams 1 }
+
+oaAuditSchedulePeriod OBJECT-TYPE
+    SYNTAX      INTEGER (1..44640)
+    UNITS       "minutes"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Scheduler interval used for compute checksum for entries in the oaAuditTable"
+    DEFVAL { 1440 }
+    ::= { oaAuditScheduleParams 2 }
+
+oaAuditScheduleStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+               disable  (1),
+               enable   (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Scheduler status"
+    DEFVAL { disable }
+    ::= { oaAuditScheduleParams 3 }
+
+oaAuditScheduleError    OBJECT-TYPE
+    SYNTAX       DisplayString (SIZE (2..160))
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Last Error"
+    ::= { oaAuditScheduleParams 4 }
+
+oaAuditMinSchedulePeriod OBJECT-TYPE
+    SYNTAX      INTEGER (0..44640)
+    UNITS       "minutes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Minimal value of scheduler interval supported by the agent
+         Value 0 means that scheduler isn't supported"
+    ::= { oaAuditScheduleParams 5 }
+
+
+
 -- *******************************************************************
 --  Notification Definition section
 -- ******************************************************************* 
+ 
+oaDevConfigAuditCompleted  NOTIFICATION-TYPE
+      OBJECTS {
+        oaDevConfigAuditAdminStatus,
+        oaDevConfigAuditOperStatus,
+        oaDevConfigAuditErrorStatus
+      }
+      STATUS      current
+      DESCRIPTION
+          "Generated when a synchronization action is completed."
+      ::= { oaDevUpgrNotifications 94 }
  
 oaDevUpgradeStarted NOTIFICATION-TYPE
       OBJECTS {
@@ -329,7 +765,8 @@ oaDevUpgradeFailed NOTIFICATION-TYPE
         oaDevUpgrProtocolApp,
         oaDevUpgrServerAddressText,
         oaDevUpgrRemoteDir,
-        oaDevUpgrRemoteFileName
+        oaDevUpgrRemoteFileName,
+        oaDevUpgrErrorStatus
       }
       STATUS  current
       DESCRIPTION
@@ -346,7 +783,7 @@ oaDevUpgradeCompletedOk NOTIFICATION-TYPE
       }
       STATUS  current
       DESCRIPTION
-          "Generated when a device Upgrade process completed successfully."
+          "Generated when a device Upgrade process comleted successfully."
       ::= { oaDevUpgrNotifications 103 }
 
 -- *******************************************************************
@@ -389,7 +826,31 @@ oaDevUpgrGroup  OBJECT-GROUP
              oaDevUpgrAdminStatus,
              oaDevUpgrUsername,
              oaDevUpgrPassword,
-             oaDevUpgrServerAddressText
+             oaDevUpgrServerAddressText,
+             oaDevUpgrErrorStatus,
+             oaDevUpgrResetDelay,
+
+             oaDevConfigAuditAdminStatus,
+             oaDevConfigAuditOperStatus,
+             oaDevConfigAuditErrorStatus,
+             oaDevConfigAuditPeriodicity,
+             oaDevConfigAuditStartTime,
+             oaDevConfigAuditSchedulerStatus,
+             oaDevConfigAuditTrapMode,
+
+             oaAuditAdminStatus,
+             oaAuditOperStatus,
+             oaAuditChecksum,
+             oaAuditChecksumTime,
+             oaAuditValidChecksum,
+             oaAuditValidChecksumTime,
+             oaAuditLastError,
+
+             oaAuditScheduleStart,
+             oaAuditSchedulePeriod,
+             oaAuditScheduleStatus,
+             oaAuditScheduleError,
+             oaAuditMinSchedulePeriod
             }
     STATUS current 
     DESCRIPTION 
@@ -401,7 +862,8 @@ oaDevUpgrNotificationsGroup  NOTIFICATION-GROUP
 
              oaDevUpgradeStarted,
              oaDevUpgradeFailed,
-             oaDevUpgradeCompletedOk
+             oaDevUpgradeCompletedOk,
+             oaDevConfigAuditCompleted
           }
     STATUS        current
     DESCRIPTION

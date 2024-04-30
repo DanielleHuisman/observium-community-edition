@@ -75,13 +75,20 @@ $ospf_stats = [
   'neighbours' => 0
 ];
 
-$ospf_oids_db = ['ospfRouterId'             => 'ospfv3RouterId', 'ospfAdminStat' => 'ospfv3AdminStatus',
-                 'ospfVersionNumber'        => 'ospfv3VersionNumber', 'ospfAreaBdrRtrStatus' => 'ospfv3AreaBdrRtrStatus',
-                 'ospfASBdrRtrStatus'       => 'ospfv3ASBdrRtrStatus', 'ospfExternLsaCount' => 'ospfv3ExtLsaCount',
-                 'ospfExternLsaCksumSum'    => '', 'ospfTOSSupport' => '',
-                 'ospfOriginateNewLsas'     => 'ospfv3OriginateNewLsas', 'ospfRxNewLsas' => 'ospfv3RxNewLsas',
-                 'ospfExtLsdbLimit'         => 'ospfv3ExtAreaLsdbLimit', 'ospfMulticastExtensions' => '',
-                 'ospfExitOverflowInterval' => 'ospfv3ExitOverflowInterval', 'ospfDemandExtensions' => 'ospfv3DemandExtensions'];
+$ospf_oids_db = ['ospfRouterId'             => 'ospfv3RouterId',
+                 'ospfAdminStat'            => 'ospfv3AdminStatus',
+                 'ospfVersionNumber'        => 'ospfv3VersionNumber',
+                 'ospfAreaBdrRtrStatus'     => 'ospfv3AreaBdrRtrStatus',
+                 'ospfASBdrRtrStatus'       => 'ospfv3ASBdrRtrStatus',
+                 'ospfExternLsaCount'       => 'ospfv3ExtLsaCount',
+                 'ospfExternLsaCksumSum'    => '',
+                 'ospfTOSSupport'           => '',
+                 'ospfOriginateNewLsas'     => 'ospfv3OriginateNewLsas',
+                 'ospfRxNewLsas'            => 'ospfv3RxNewLsas',
+                 'ospfExtLsdbLimit'         => 'ospfv3ExtAreaLsdbLimit',
+                 'ospfMulticastExtensions'  => '',
+                 'ospfExitOverflowInterval' => 'ospfv3ExitOverflowInterval',
+                 'ospfDemandExtensions'     => 'ospfv3DemandExtensions'];
 
 // Loop array of entries and update
 $ospf_instance_id = $ospf_instance_db['ospf_instance_id'];
@@ -145,9 +152,12 @@ $ospf_areas_poll = snmpwalk_cache_oid($device, 'ospfv3AreaEntry', [], 'OSPFV3-MI
 
 $ospf_area_oids = [ /* 'ospfAuthType' => '', */
                     'ospfImportAsExtern'  => 'ospfv3AreaImportAsExtern',
-                    'ospfSpfRuns'         => 'ospfv3AreaSpfRuns', 'ospfAreaBdrRtrCount' => 'ospfv3AreaBdrRtrCount',
-                    'ospfAsBdrRtrCount'   => 'ospfv3AreaAsBdrRtrCount', 'ospfAreaLsaCount' => 'ospfv3AreaScopeLsaCount',
-                    'ospfAreaLsaCksumSum' => 'ospfv3AreaScopeLsaCksumSum', 'ospfAreaSummary' => 'ospfv3AreaSummary',
+                    'ospfSpfRuns'         => 'ospfv3AreaSpfRuns',
+                    'ospfAreaBdrRtrCount' => 'ospfv3AreaBdrRtrCount',
+                    'ospfAsBdrRtrCount'   => 'ospfv3AreaAsBdrRtrCount',
+                    'ospfAreaLsaCount'    => 'ospfv3AreaScopeLsaCount',
+                    'ospfAreaLsaCksumSum' => 'ospfv3AreaScopeLsaCksumSum',
+                    'ospfAreaSummary'     => 'ospfv3AreaSummary',
                     'ospfAreaStatus'      => 'ospfv3AreaRowStatus'];
 
 // Build array of existing entries
@@ -215,7 +225,7 @@ foreach ($ospf_areas_db as $ospf_area_db) {
 }
 // Multi Delete
 if (!safe_empty($db_delete)) {
-    dbDelete('ospf_areas', generate_query_values_ng($db_delete, 'ospf_area_id'));
+    dbDelete('ospf_areas', generate_query_values($db_delete, 'ospf_area_id'));
 }
 
 unset($ospf_areas_db, $ospf_areas_poll, $db_delete);
@@ -245,20 +255,36 @@ OSPFV3-MIB::ospfv3IfLinkLsaCksumSum.6.0 = Gauge32: 40843
  */
 $ospf_ports_poll = snmpwalk_cache_oid($device, 'ospfv3IfEntry', [], 'OSPFV3-MIB');
 
-$ospf_port_oids = ['ospfIfIpAddress'              => 'ospfIfIpAddress', 'ospfAddressLessIf' => 'ospfAddressLessIf', // not really exist
-                   'ospfIfAreaId'                 => 'ospfv3IfAreaId', 'ospfIfType' => 'ospfv3IfType',
-                   'ospfIfAdminStat'              => 'ospfv3IfAdminStatus', 'ospfIfRtrPriority' => 'ospfv3IfRtrPriority',
-                   'ospfIfTransitDelay'           => 'ospfv3IfTransitDelay', 'ospfIfRetransInterval' => 'ospfv3IfRetransInterval',
-                   'ospfIfHelloInterval'          => 'ospfv3IfHelloInterval', 'ospfIfRtrDeadInterval' => 'ospfv3IfRtrDeadInterval',
-                   'ospfIfState'                  => 'ospfv3IfState', 'ospfIfDesignatedRouter' => 'ospfv3IfDesignatedRouter',
-                   'ospfIfBackupDesignatedRouter' => 'ospfv3IfBackupDesignatedRouter', 'ospfIfEvents' => 'ospfv3IfEvents',
-                   'ospfIfStatus'                 => 'ospfv3IfRowStatus', 'ospfIfDemand' => 'ospfv3IfDemand',
+$ospf_port_oids = ['ospfIfIpAddress'              => 'ospfIfIpAddress',
+                   'ospfAddressLessIf'            => 'ospfAddressLessIf', // not really exist
+                   'ospfIfAreaId'                 => 'ospfv3IfAreaId',
+                   'ospfIfType'                   => 'ospfv3IfType',
+                   'ospfIfAdminStat'              => 'ospfv3IfAdminStatus',
+                   'ospfIfRtrPriority'            => 'ospfv3IfRtrPriority',
+                   'ospfIfTransitDelay'           => 'ospfv3IfTransitDelay',
+                   'ospfIfRetransInterval'        => 'ospfv3IfRetransInterval',
+                   'ospfIfHelloInterval'          => 'ospfv3IfHelloInterval',
+                   'ospfIfRtrDeadInterval'        => 'ospfv3IfRtrDeadInterval',
+                   'ospfIfState'                  => 'ospfv3IfState',
+                   'ospfIfDesignatedRouter'       => 'ospfv3IfDesignatedRouter',
+                   'ospfIfBackupDesignatedRouter' => 'ospfv3IfBackupDesignatedRouter',
+                   'ospfIfEvents'                 => 'ospfv3IfEvents',
+                   'ospfIfStatus'                 => 'ospfv3IfRowStatus',
+                   'ospfIfDemand'                 => 'ospfv3IfDemand',
                    /* 'ospfIfPollInterval', 'ospfIfAuthKey', 'ospfIfMulticastForwarding', 'ospfIfAuthType' */];
 
 // Build array of existing entries
-// V3 always have 2 part index, ie: 6.0
-foreach (dbFetchRows('SELECT * FROM `ospf_ports` WHERE `device_id` = ? AND `ospf_port_id` REGEXP ?',
-                     [$device['device_id'], '^[[:digit:]]+\.[[:digit:]]+$']) as $entry) {
+if (get_db_version() < 493) {
+    // CLEANME. Remove after CE 24.xx
+    // V3 always have 2 part index, ie: 6.0
+    $sql    = 'SELECT * FROM `ospf_ports` WHERE `device_id` = ? AND `ospf_port_id` REGEXP ?';
+    $params = [ $device['device_id'], '^[[:digit:]]+\.[[:digit:]]+$' ];
+} else {
+    $sql    = 'SELECT * FROM `ospf_ports` WHERE `device_id` = ? AND `ospfVersionNumber` = ?';
+    $params = [ $device['device_id'], 'version3' ];
+}
+$ospf_ports_db = [];
+foreach (dbFetchRows($sql, $params) as $entry) {
     $ospf_ports_db[$entry['ospf_port_id']] = $entry;
 }
 
@@ -292,6 +318,7 @@ foreach ($ospf_ports_poll as $ospf_port_index => $ospf_port_poll) {
     if (!isset($ospf_ports_db[$ospf_port_index])) {
         $insert['device_id']    = $device['device_id'];
         $insert['ospf_port_id'] = $ospf_port_index;
+        $insert['ospfVersionNumber'] = 'version3';
 
         foreach ($ospf_port_oids as $field => $oid) {
             // Loop the OIDs
@@ -313,6 +340,7 @@ foreach ($ospf_ports_poll as $ospf_port_index => $ospf_port_poll) {
             }
         }
         if ($db_update) {
+            $insert['ospfVersionNumber'] = 'version3';
             dbUpdateRowMulti($insert, 'ospf_ports', 'ospf_ports_id');
             echo('U');
         } else {
@@ -335,7 +363,7 @@ foreach ($ospf_ports_db as $ospf_port_db) {
 }
 // Multi Delete
 if (!safe_empty($db_delete)) {
-    dbDelete('ospf_ports', generate_query_values_ng($db_delete, 'ospf_ports_id'));
+    dbDelete('ospf_ports', generate_query_values($db_delete, 'ospf_ports_id'));
 }
 
 unset($ospf_ports_db, $ospf_ports_poll, $db_delete);
@@ -357,18 +385,28 @@ OSPFV3-MIB::ospfv3NbrIfId.4.0.1602414725 = INTEGER: 4
  */
 $ospf_nbrs_poll = snmpwalk_cache_oid($device, 'ospfv3NbrEntry', [], 'OSPFV3-MIB');
 
-$ospf_nbr_oids = ['ospfNbrIpAddr'          => 'ospfv3NbrAddress', 'ospfNbrAddressLessIndex' => 'ospfv3NbrIfId',
+$ospf_nbr_oids = ['ospfNbrIpAddr'          => 'ospfv3NbrAddress',
+                  'ospfNbrAddressLessIndex' => 'ospfv3NbrIfId',
                   'ospfNbrRtrId'           => 'ospfv3NbrRtrId',
-                  'ospfNbrOptions'         => 'ospfv3NbrOptions', 'ospfNbrPriority' => 'ospfv3NbrPriority',
-                  'ospfNbrState'           => 'ospfv3NbrState', 'ospfNbrEvents' => 'ospfv3NbrEvents',
+                  'ospfNbrOptions'         => 'ospfv3NbrOptions',
+                  'ospfNbrPriority'        => 'ospfv3NbrPriority',
+                  'ospfNbrState'           => 'ospfv3NbrState',
+                  'ospfNbrEvents'          => 'ospfv3NbrEvents',
                   'ospfNbrLsRetransQLen'   => 'ospfv3NbrLsRetransQLen',
                   /* 'ospfNbmaNbrStatus', 'ospfNbmaNbrPermanence', */
                   'ospfNbrHelloSuppressed' => 'ospfv3NbrHelloSuppressed'];
 
 // Build array of existing entries
-// V3 always have 3 part index, ie: .4.0.1602414725
-foreach (dbFetchRows('SELECT * FROM `ospf_nbrs` WHERE `device_id` = ? AND `ospf_nbr_id` REGEXP ?',
-                     [$device['device_id'], '^[[:digit:]]+(\.[[:digit:]]+){2}$']) as $entry) {
+if (get_db_version() < 493) {
+    // CLEANME. Remove after CE 24.xx
+    // V3 always have 3 part index, ie: .4.0.1602414725
+    $sql    = 'SELECT * FROM `ospf_nbrs` WHERE `device_id` = ? AND `ospf_nbr_id` REGEXP ?';
+    $params = [ $device['device_id'], '^[[:digit:]]+(\.[[:digit:]]+){2}$' ];
+} else {
+    $sql    = 'SELECT * FROM `ospf_nbrs` WHERE `device_id` = ? AND `ospfVersionNumber` = ?';
+    $params = [ $device['device_id'], 'version3' ];
+}
+foreach (dbFetchRows($sql, $params) as $entry) {
     $ospf_nbrs_db[$entry['ospf_nbr_id']] = $entry;
 }
 
@@ -408,6 +446,7 @@ foreach ($ospf_nbrs_poll as $ospf_nbr_index => $ospf_nbr_poll) {
     if (!isset($ospf_nbrs_db[$ospf_nbr_index])) {
         $insert['device_id']   = $device['device_id'];
         $insert['ospf_nbr_id'] = $ospf_nbr_index;
+        $insert['ospfVersionNumber'] = 'version3';
 
         if (is_null($insert['port_id'])) {
             $insert['port_id'] = 0; // keep compat with old db
@@ -435,6 +474,7 @@ foreach ($ospf_nbrs_poll as $ospf_nbr_index => $ospf_nbr_poll) {
             $db_update = TRUE;
         }
         if ($db_update) {
+            $insert['ospfVersionNumber'] = 'version3';
             if (is_null($insert['port_id'])) {
                 $insert['port_id'] = ['NULL'];
             }
@@ -460,12 +500,11 @@ foreach ($ospf_nbrs_db as $ospf_nbr_db) {
 }
 // Multi Delete
 if (!safe_empty($db_delete)) {
-    dbDelete('ospf_nbrs', generate_query_values_ng($db_delete, 'ospf_nbrs_id'));
+    dbDelete('ospf_nbrs', generate_query_values($db_delete, 'ospf_nbrs_id'));
 }
 
 unset($ospf_nbrs_db, $ospf_nbrs_poll, $db_delete);
 
-/*
 // Create device-wide statistics RRD
 rrdtool_update_ng($device, 'ospfv3-statistics', [
   'instances'  => $ospf_stats['instances'],
@@ -477,8 +516,6 @@ rrdtool_update_ng($device, 'ospfv3-statistics', [
 $graphs['ospfv3_neighbours'] = TRUE;
 $graphs['ospfv3_areas']      = TRUE;
 $graphs['ospfv3_ports']      = TRUE;
-
-*/
 
 echo PHP_EOL;
 

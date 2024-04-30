@@ -1,0 +1,428 @@
+ELTEX-MES-ISS-SNOOP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Unsigned32
+                FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, TruthValue, MacAddress, TimeStamp, RowStatus
+                FROM SNMPv2-TC
+        InterfaceIndex, InterfaceIndexOrZero
+                FROM IF-MIB
+        eltMesIss
+                FROM ELTEX-MES-ISS-MIB
+        fsSnoopPortEntry, fsSnoopVlanFilterEntry
+                FROM ARICENT-SNOOP-MIB
+        InetAddressType, InetAddress
+                FROM INET-ADDRESS-MIB;
+
+eltMesIssSnoopMIB MODULE-IDENTITY
+        LAST-UPDATED "202105170000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "IGMP and MLD Snooping MIB definitions."
+        REVISION "202105170000Z"
+        DESCRIPTION "Added IGMP authentication support"
+        REVISION "202012040000Z"
+        DESCRIPTION "Added eltMesIssSnoopProxyReportingTrust."
+        REVISION "202011170000Z"
+        DESCRIPTION "Added eltMesIssSnoopClearGroups."
+        REVISION "201904190000Z"
+        DESCRIPTION "Added eltMesIssSnoopVlanReplaceSourceIp."
+        REVISION "201901310000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 8 }
+
+-- ========================================================================== --
+--                            Textual Conventions                             --
+-- ========================================================================== --
+
+EltMesIssSnoopAuthType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "IGMP snooping authentication type.
+         none   - no authentication,
+         radius - authentication using RADIUS server."
+    SYNTAX INTEGER {
+        none(1),
+        radius(2)
+    }
+
+EltMesIssSnoopAuthStatusType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Status of IGMP snooping authentication.
+         waiting - wait for response from server,
+         forward - authentication is successfull,
+         discard - access denied by server,
+         timeout - timeout of response from server."
+    SYNTAX INTEGER {
+        waiting(1),
+        forward(2),
+        discard(3),
+        timeout(4)
+    }
+
+-- Top level MIB structure
+
+eltMesIssSnoopObjects OBJECT IDENTIFIER ::= { eltMesIssSnoopMIB 1 }
+
+-- MIB Groups
+
+eltMesIssSnoopGlobals OBJECT IDENTIFIER ::= { eltMesIssSnoopObjects 1 }
+eltMesIssSnoopVlan    OBJECT IDENTIFIER ::= { eltMesIssSnoopObjects 2 }
+eltMesIssSnoopPort    OBJECT IDENTIFIER ::= { eltMesIssSnoopObjects 3 }
+eltMesIssSnoopConfigs OBJECT IDENTIFIER ::= { eltMesIssSnoopObjects 4 }
+
+-- ========================================================================== --
+--                       Snooping VLAN Table Extension                        --
+-- ========================================================================== --
+
+eltMesIssSnoopVlanFilterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssSnoopVlanFilterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the fsSnoopVlanFilterTable table."
+    ::= { eltMesIssSnoopVlan 1 }
+
+eltMesIssSnoopVlanFilterEntry OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopVlanFilterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This entry augments the fsSnoopVlanFilterEntry entry."
+    AUGMENTS { fsSnoopVlanFilterEntry }
+    ::= { eltMesIssSnoopVlanFilterTable 1 }
+
+EltMesIssSnoopVlanFilterEntry ::= SEQUENCE {
+    eltMesIssSnoopVlanCoS               INTEGER,
+    eltMesIssSnoopSparseMode            INTEGER,
+    eltMesIssSnoopVlanReplaceSourceIp  InetAddress
+}
+
+eltMesIssSnoopVlanCoS OBJECT-TYPE
+    SYNTAX INTEGER (0..7 | 255)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Assign IEEE 802.1p value (0-7) to the snooping packets in this VLAN.
+         Value 255 means CoS will not be changed."
+    DEFVAL { 255 }
+    ::= { eltMesIssSnoopVlanFilterEntry 1 }
+
+eltMesIssSnoopSparseMode OBJECT-TYPE
+    SYNTAX      INTEGER { enable (1), disable (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+        "This object is used to enable or disable the snooping module
+         functioning in the sparse mode in specific VLAN.
+
+         In the non-sparse mode, the module will forward the unknown multicast
+         traffic when snooping is enabled in the switch. In the sparse mode
+         (i.e. Sparse mode is enabled), the module will drop the unknown
+         multicast traffic when snooping is enabled in the switch."
+    DEFVAL { disable }
+    ::= { eltMesIssSnoopVlanFilterEntry 2 }
+
+eltMesIssSnoopVlanReplaceSourceIp OBJECT-TYPE
+    SYNTAX InetAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Before forwarding the report packet sent by the host, the source IP
+         address in the packet will be replaced by this IP address.
+         Default value of 0.0.0.0 means that the source IP address will not be
+         replaced."
+    ::= { eltMesIssSnoopVlanFilterEntry 3 }
+
+-- ========================================================================== --
+--                            Groups configuration                            --
+-- ========================================================================== --
+
+eltMesIssSnoopClearGroups OBJECT-TYPE
+    SYNTAX      INTEGER ( 0 | 1..4094)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to clear IGMP/MLD snooping dynamic groups.
+         Setting value to 0 will clear whole table,
+         setting exact VLAN ID will clear all groups that belong to VLAN.
+         This object is logically write-only. Reading this value returns 0."
+    DEFVAL { 0 }
+    ::= { eltMesIssSnoopGlobals 1 }
+
+-- ========================================================================== --
+--                              Proxy-reporting                               --
+-- ========================================================================== --
+
+eltMesIssSnoopPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssSnoopPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the fsSnoopPortTable table."
+    ::= { eltMesIssSnoopPort 1 }
+
+eltMesIssSnoopPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This entry augments the fsSnoopPortEntry entry."
+    AUGMENTS { fsSnoopPortEntry }
+    ::= { eltMesIssSnoopPortTable 1 }
+
+EltMesIssSnoopPortEntry ::= SEQUENCE {
+    eltMesIssSnoopProxyReportingTrust INTEGER
+}
+
+eltMesIssSnoopProxyReportingTrust OBJECT-TYPE
+    SYNTAX      INTEGER { trusted (1), untrusted (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+        "This object is used to set the Proxy reporting trusted mode
+         for interface. Setting the trusted mode will cause the module to forward
+         IGMP traffic from clients' interface to mrouter interface with no changes
+         in packets' headers."
+    DEFVAL { untrusted }
+    ::= { eltMesIssSnoopPortEntry 1 }
+
+-- ========================================================================== --
+--                            IGMP Authentication                             --
+-- ========================================================================== --
+
+eltMesIssSnoopAuthCacheClear OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to clear IGMP/MLD snooping authentication cache entries
+         for interface index. Setting value to 0 will clear whole table."
+    DEFVAL { 0 }
+    ::= { eltMesIssSnoopGlobals 2 }
+
+eltMesIssSnoopAuthEnable  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable IGMP snooping authentication."
+    DEFVAL { false }
+    ::= { eltMesIssSnoopConfigs 1 }
+
+eltMesIssSnoopAuthCacheTimeout  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Authentication cache entry timeout in seconds."
+    DEFVAL { 600 }
+    ::= { eltMesIssSnoopConfigs 2 }
+
+-- ========================================================================== --
+--                            Authentication table                            --
+-- ========================================================================== --
+
+eltMesIssSnoopAuthPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssSnoopAuthPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table lists the IGMP/MLD snooping authentication configuration."
+    ::= { eltMesIssSnoopPort 2 }
+
+eltMesIssSnoopAuthPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopAuthPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing assignment of IGMP/MLD snooping authentication config
+         per interface."
+    INDEX { eltMesIssSnoopAuthPortIfIndex, eltMesIssSnoopAuthPortInetAddressType }
+    ::= { eltMesIssSnoopAuthPortTable 1 }
+
+EltMesIssSnoopAuthPortEntry ::= SEQUENCE {
+    eltMesIssSnoopAuthPortIfIndex             InterfaceIndex,
+    eltMesIssSnoopAuthPortInetAddressType     InetAddressType,
+    eltMesIssSnoopAuthPortType                EltMesIssSnoopAuthType,
+    eltMesIssSnoopAuthPortRequired            TruthValue,
+    eltMesIssSnoopAuthPortForwardFirstEnable  TruthValue,
+    eltMesIssSnoopAuthPortExceptionProfileId  Unsigned32
+}
+
+eltMesIssSnoopAuthPortIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Interface index."
+    ::= { eltMesIssSnoopAuthPortEntry 1 }
+
+eltMesIssSnoopAuthPortInetAddressType OBJECT-TYPE 
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current 
+    DESCRIPTION 
+       "Inet address type (ipv4/ipv6)."
+    ::= { eltMesIssSnoopAuthPortEntry 2 }
+
+eltMesIssSnoopAuthPortType OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopAuthType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to set the authentication type. By default,
+         the authentication is disabled."
+    DEFVAL { none }
+    ::= { eltMesIssSnoopAuthPortEntry 3 }
+
+eltMesIssSnoopAuthPortRequired OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If enabled - discard all IGMP/MLD report messages in case when all
+         authentication servers are unavailable."
+    DEFVAL { false }
+    ::= { eltMesIssSnoopAuthPortEntry 4 }
+
+eltMesIssSnoopAuthPortForwardFirstEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Creates forward entry at the moment when the request to the
+         authentication server is formed. If the answer is positive,
+         the entry remains, otherwise it is deleted."
+    DEFVAL { false }
+    ::= { eltMesIssSnoopAuthPortEntry 5 }
+
+eltMesIssSnoopAuthPortExceptionProfileId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Multicast profile index with authorization exceptions for
+         the interface. Groups will be automatically permitted/denied based
+         on rules in configured profile. No profiles are applied on
+         the interface by default."
+    DEFVAL { 0 }
+    ::= { eltMesIssSnoopAuthPortEntry 6 }
+
+-- ========================================================================== --
+--                         Authentication cache table                         --
+-- ========================================================================== --
+
+eltMesIssSnoopAuthCacheTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssSnoopAuthCacheEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table lists the IGMP/MLD snooping authentication cache information."
+    ::= { eltMesIssSnoopPort 3 }
+
+eltMesIssSnoopAuthCacheEntry OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopAuthCacheEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing assignment of IGMP/MLD snooping entry authentication
+         cache info."
+    INDEX {
+        eltMesIssSnoopAuthCacheIfIndex,
+        eltMesIssSnoopAuthCacheClientMac,
+        eltMesIssSnoopAuthCacheInetAddressType,
+        eltMesIssSnoopAuthCacheClientIpAddr,
+        eltMesIssSnoopAuthCacheGroupIpAddr
+    }
+    ::= { eltMesIssSnoopAuthCacheTable 1 }
+
+EltMesIssSnoopAuthCacheEntry ::= SEQUENCE {
+    eltMesIssSnoopAuthCacheIfIndex          InterfaceIndex,
+    eltMesIssSnoopAuthCacheClientMac        MacAddress,
+    eltMesIssSnoopAuthCacheInetAddressType  InetAddressType,
+    eltMesIssSnoopAuthCacheClientIpAddr     InetAddress,
+    eltMesIssSnoopAuthCacheGroupIpAddr      InetAddress,
+    eltMesIssSnoopAuthCacheAuthServerType   EltMesIssSnoopAuthType,
+    eltMesIssSnoopAuthCacheAuthServerIpAddr InetAddress,
+    eltMesIssSnoopAuthCacheTimeStamp        TimeStamp,
+    eltMesIssSnoopAuthCacheStatus           EltMesIssSnoopAuthStatusType
+}
+
+eltMesIssSnoopAuthCacheIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Interface index behind which the IGMP/MLD client is located."
+    ::= { eltMesIssSnoopAuthCacheEntry 1 }
+
+eltMesIssSnoopAuthCacheClientMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Client MAC address."
+    ::= { eltMesIssSnoopAuthCacheEntry 2 }
+
+eltMesIssSnoopAuthCacheInetAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Inet address type (IPv4/IPv6)."
+    ::= { eltMesIssSnoopAuthCacheEntry 3 }
+
+eltMesIssSnoopAuthCacheClientIpAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Client IP address."
+    ::= { eltMesIssSnoopAuthCacheEntry 4 }
+
+eltMesIssSnoopAuthCacheGroupIpAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "IGMP/MLD group IP address."
+    ::= { eltMesIssSnoopAuthCacheEntry 5 }
+
+eltMesIssSnoopAuthCacheAuthServerType OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopAuthType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Server authentication type."
+    ::= { eltMesIssSnoopAuthCacheEntry 6 }
+
+eltMesIssSnoopAuthCacheAuthServerIpAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Authentication server IP address."
+    ::= { eltMesIssSnoopAuthCacheEntry 7 }
+
+eltMesIssSnoopAuthCacheTimeStamp OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Time of creating entry in seconds since system startup."
+    ::= { eltMesIssSnoopAuthCacheEntry 8 }
+
+eltMesIssSnoopAuthCacheStatus OBJECT-TYPE
+    SYNTAX      EltMesIssSnoopAuthStatusType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Status of IGMP/MLD report authentication
+        (see EltMesIssSnoopAuthStatusType descriprion)."
+    ::= { eltMesIssSnoopAuthCacheEntry 9 }
+
+END

@@ -1,0 +1,1608 @@
+-- Copyright (C) 2015 Aricent Group. All Rights Reserved
+
+-- $Id: fsvxlan.mib,v 1.8 2015/09/04 07:40:17 siva Exp $
+
+--    VXLAN Proprietary MIB Definition
+
+--    This document explains the proprietary MIB implemented
+--    for VXLAN product.
+
+--    This proprietary MIB definition, supplements
+--    draft-mahalingam-dutt-dcops-vxlan-09.txt
+--    and also provides management of certain proprietary features of
+--    VXLAN.
+
+--    The proprietary MIB definitions are:
+
+
+ARICENT-VXLAN-MIB DEFINITIONS ::= BEGIN
+
+   IMPORTS
+      MODULE-IDENTITY, OBJECT-TYPE,
+      enterprises, Integer32, Unsigned32  FROM SNMPv2-SMI
+
+      TEXTUAL-CONVENTION, RowStatus, StorageType, MacAddress, TruthValue FROM SNMPv2-TC
+
+      InterfaceIndexOrZero FROM IF-MIB
+
+      InetAddressType, InetAddress FROM INET-ADDRESS-MIB;
+
+
+   fsvxlan MODULE-IDENTITY
+      LAST-UPDATED "201405210000Z" -- 21 May 2014
+      ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+      CONTACT-INFO "support@aricent.com"
+      DESCRIPTION  "This MIB module contains managed object definitions
+                    for VXLAN standard characteristics. "
+
+      -- Revision History
+
+      REVISION     "201405210000Z"
+      DESCRIPTION  "Initial version of Proprietary MIB for VXLAN. "
+
+      ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 89 }
+
+VlanId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This is a 12-bit VLAN ID used in the VLAN Tag header."
+    SYNTAX      Integer32 (1..4094)
+
+VniId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        " VXLAN Network Identifier (VNI)is a 24 bit segment identifier used in the VXLAN header. VXLAN is a Layer 2 overlay scheme over a Layer 3 network. Each overlay is termed a VXLAN segment. Only VMs within the same VXLAN segment can communicate with each other. Each VXLAN segment is identified through a 24 bit segment ID, termed the VXLAN Network Identifier (VNI). This allows up to 16M VXLAN segments to coexist within the same administrative domain."
+    SYNTAX      Unsigned32 (4096..16777215)
+
+EviId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This object specifies an Identifier of 2 bytes which is used to arrive RD in EVPN BGP routes"
+    SYNTAX      Integer32 (1..4096)
+
+EvpnVxlanBgpRD ::= TEXTUAL-CONVENTION
+    STATUS        current
+    DESCRIPTION
+        "This object specifies the syntax for a route distinguisher."
+    REFERENCE
+        "[RFC4364]"
+    SYNTAX  OCTET STRING(SIZE (0..256))
+
+EvpnVxlanESI ::= TEXTUAL-CONVENTION
+    STATUS        current
+    DESCRIPTION
+        "This object specifies Ethernet Segment Identifier attached to L2 VNI"
+    SYNTAX  OCTET STRING(SIZE (0..10))
+
+EvpnVxlanBgpRTType ::= TEXTUAL-CONVENTION
+   STATUS        current
+   DESCRIPTION
+       "This object defines the type of a route target usage.
+        Route targets can be specified to be imported,
+        exported, or both." 
+   REFERENCE
+        "[RFC4364]"
+   SYNTAX INTEGER { import(1), export(2), both(3) }
+
+EvpnVxlanVrfName ::= TEXTUAL-CONVENTION
+   STATUS        current
+   DESCRIPTION
+       "This object specifies an identifier that is assigned to L3 VNI and
+        is used to uniquely identify the identifier.  This identifier is
+        assigned by the system operator or NMS and SHOULD be unique throughout
+        the EVPN domain.  If this is the case, then this identifier
+        can then be used at any VTEP within a specific EVPN domain
+        to identify this VXLAN/BGP VRF.  It may also be possible to
+        preserve the uniqueness of this identifier across EVPN
+        domain boundaries, in which case this identifier can then
+        be used to uniquely identify VXLAN/BGP VRFs on a more global
+        basis."  
+   SYNTAX OCTET STRING (SIZE (0..16))
+
+-- ------------------------------------------------------------
+-- groups in the MIB
+-- ------------------------------------------------------------
+
+-- MIB Groups
+
+   fsVxlanObjects         OBJECT IDENTIFIER ::= { fsvxlan 1 }
+
+-- MIB Objects
+   fsVxlanSystem                 OBJECT IDENTIFIER ::= { fsVxlanObjects 1 }
+   fsVxlanConfigObjects          OBJECT IDENTIFIER ::= { fsVxlanObjects 2 }
+
+   fsVxlanEnable OBJECT-TYPE
+       SYNTAX INTEGER {
+          enabled          (1),
+          disabled         (2)
+       }
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+          "This object specifies whether the VXLAN is enabled globally."
+            
+
+       REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 4"
+       DEFVAL      { disabled }
+       ::=  { fsVxlanSystem 1 }
+
+   fsVxlanUdpPort OBJECT-TYPE
+      SYNTAX       Unsigned32 (1000..65535)
+      MAX-ACCESS   read-write
+      STATUS       current
+      DESCRIPTION
+          "This object specifies VXLAN UDP Port. The UDP Port number assigned for VXLAN is 4789. The number is assigned by the IANA Service Name and Transport Protocol Port Number Registry.
+          Early implementations of VXLAN have used other values for the destination port. To enable interoperability with these implementations, the destination
+           port should be configurable."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      DEFVAL       { 4789 }
+      ::= { fsVxlanSystem 2 }
+
+    fsVxlanTraceOption OBJECT-TYPE
+       SYNTAX      Unsigned32 (0..4294967295)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "This object is used to enable trace statements in
+           VXLAN Module.
+           A four byte integer is used for enabling the trace level.
+           Each bit in the four byte integer represents a particular
+           trace level.
+           The mapping between the bit positions & the trace level is
+           as follows:
+           0x00000000 - No Traces
+           0xffffffff - All Traces
+           0x00000001 - Critical Traces
+           0x00000002 - Utilities Traces
+           0x00000004 - Management Traces
+           0x00000008 - Entry Exit Traces
+           0x00000010 - All Failures Traces
+           0x00000020 - Memory traces
+           0x00000040 - Packet Dump traces
+           For example if 0x00000001 and 0x00000002 are set, then critical and utilities related
+           traces are generated."
+
+        DEFVAL { 0 }
+        ::= { fsVxlanSystem 3 }
+
+    fsVxlanNotificationCntl  OBJECT-TYPE
+       SYNTAX       INTEGER {
+          enabled     (1),
+          disabled    (2)
+       }
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+          "This object indicates whether the VXLAN module will generate
+           SNMP traps for events defined in this MIB. Enabled specifies that
+           SNMP traps are generated and disabled specifies that no traps 
+           are generated."
+
+       DEFVAL { disabled }
+       ::= { fsVxlanSystem 4 }
+
+   fsEvpnVxlanEnable OBJECT-TYPE
+       SYNTAX INTEGER {
+          enabled          (1),
+          disabled         (2)
+       }
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+          "This object specifies whether the EVPN is enabled globally."
+
+       DEFVAL      { disabled }
+       ::=  { fsVxlanSystem 5 }
+
+--------------------------------------------------------
+-- The VXLAN fsVxlanConfigObjects Group
+--------------------------------------------------------
+
+
+-- *******************************************************************
+-- VXLAN VTEP table "fsVxlanVtepTable"  Starts
+-- *******************************************************************
+   fsVxlanVtepTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVxlanVtepEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+ "This table contains the VTEP (VXLAN Tunnel End Point) IP address and Information related to type  of IP address for a NVE (Network Virtualization Endpoint) interface.
+The objects fsVxlanNveTable and fsVxlanMcastTable refer this table for updating the VTEP IP address. This table should be populated before the creation of fsVxlanNveTable and fsVxlanMcastTable."
+
+      ::= { fsVxlanConfigObjects 1 }
+
+      fsVxlanVtepEntry OBJECT-TYPE
+      SYNTAX       FsVxlanVtepEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This entry in the table contains VTEP IP address and 
+          IP address type information for the NVE interface."
+
+      INDEX {  fsVxlanVtepNveIfIndex  }
+
+      ::= { fsVxlanVtepTable 1 }
+
+   FsVxlanVtepEntry ::=
+      SEQUENCE {
+        fsVxlanVtepNveIfIndex            InterfaceIndexOrZero,
+        fsVxlanVtepAddressType           InetAddressType,
+        fsVxlanVtepAddress               InetAddress,
+        fsVxlanVtepRowStatus             RowStatus
+      }
+
+   fsVxlanVtepNveIfIndex OBJECT-TYPE
+      SYNTAX          InterfaceIndexOrZero
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the Interface-Index value of the NVE interface. 
+          The If-index value is mapped with the NVE interface when
+          the interface is created in the VTEP."
+
+      ::= { fsVxlanVtepEntry 1 }
+
+   fsVxlanVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+         "This object specifies the type of address for VXLAN VTEP. Supported address types are IPv4 and IPv6 . 
+ The objects fsVxlanMcastVtepAddressType and fsVxlanNveVtepAddressTypeare updated based on this object"
+
+       ::= { fsVxlanVtepEntry 2 }
+
+   fsVxlanVtepAddress      OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the source VTEP IP address associated with NVE interface.
+          The objects fsVxlanMcastVtepAddress and fsVxlanNveVtepAddress 
+          are updated based on this object"
+
+      ::= { fsVxlanVtepEntry 3 }
+
+   fsVxlanVtepRowStatus OBJECT-TYPE
+      SYNTAX          RowStatus
+      MAX-ACCESS      read-create
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the row status and used to create, modify, and/or
+          delete a row in this table."
+
+      ::= { fsVxlanVtepEntry 4 }
+
+-- *******************************************************************
+-- VXLAN VTEP table "fsVxlanVtepTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- VXLAN NVE table "fsVxlanNveTable"  Starts
+-- *******************************************************************
+
+   fsVxlanNveTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVxlanNveEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This table contains the NVE (Network Virtualization Endpoint) database. 
+           In this database, remote VTEP information is mapped 
+          with the NVE interface.      
+          When a L2 packet is received on the NVE interface, VTEP consults
+          this database to forward the packet to remote VTEP."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanConfigObjects 2 }
+
+   fsVxlanNveEntry OBJECT-TYPE
+      SYNTAX       FsVxlanNveEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This entry in the table contains NVE interface mapping 
+          with the remote VTEP. The source and remote VTEP information is taken from the entry using NVE If index, VNI number and destination VM MAC for sending the packet to the remote VTEP."
+
+      INDEX {  fsVxlanNveIfIndex,
+               fsVxlanNveVniNumber,
+               fsVxlanNveDestVmMac
+            }
+      ::= { fsVxlanNveTable 1 }
+
+   FsVxlanNveEntry ::=
+      SEQUENCE {
+        fsVxlanNveIfIndex                InterfaceIndexOrZero,
+        fsVxlanNveVniNumber              VniId,
+        fsVxlanNveDestVmMac              MacAddress,
+        fsVxlanNveVtepAddressType        InetAddressType,
+        fsVxlanNveVtepAddress            InetAddress,
+        fsVxlanNveRemoteVtepAddressType  InetAddressType,
+        fsVxlanNveRemoteVtepAddress      InetAddress,
+        fsVxlanNveStorageType            StorageType,
+        fsVxlanNveRowStatus              RowStatus,
+        fsVxlanSuppressArp               INTEGER
+      }
+
+   fsVxlanNveIfIndex OBJECT-TYPE
+      SYNTAX          InterfaceIndexOrZero
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the If-Index value of the NVE interface. 
+             The If index value is mapped with the NVE interface created in the VTEP."
+
+      ::= { fsVxlanNveEntry 1 }
+
+   fsVxlanNveVniNumber OBJECT-TYPE
+      SYNTAX          VniId
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the VNI (VXLAN 
+          Network Identifier) associated with the NVE interface.
+          The valid VNI values ranges  from 4096 to 16777215."
+
+      ::= { fsVxlanNveEntry 2 }
+
+   fsVxlanNveDestVmMac OBJECT-TYPE
+      SYNTAX          MacAddress
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the destination VM Mac associated with NVE
+          interface and VNI (VXLAN Network Identifier).
+          This object is filled by user during static condition. 
+          The object is filled dynamically when the 
+          VXLAN packet is received from destination VTEP."
+
+      ::= { fsVxlanNveEntry 3 }
+
+   fsVxlanNveVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+         "This object specifies the type of address for VXLAN NVE VTEP. Supported address types are IPv4 and IPv6. 
+          This object is copied from fsVxlanVtepAddressType object of fsVxlanVtepTable"
+       ::= { fsVxlanNveEntry 4 }
+
+   fsVxlanNveVtepAddress OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+         "This object specifies source VTEP IP address associated with NVE interface 
+          and VNI (VXLAN Network Identifier). The values are filled in the outer source IP 
+          address field when the frame is encapsulated with the 
+          VXLAN header. This object is copied from fsVxlanVtepAddress object
+          of fsVxlanVtepTable."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanNveEntry 5 }
+
+   fsVxlanNveRemoteVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+  "This object specifies the type of address for Vxlan NVE Remote VTEP Address. Supported address types are IPv4 and IPv6."
+
+       ::= { fsVxlanNveEntry 6 }
+
+   fsVxlanNveRemoteVtepAddress OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               source IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanNveEntry 7 }
+
+   fsVxlanNveStorageType OBJECT-TYPE
+      SYNTAX        StorageType
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+          "This object specifies the storage type for the conceptual row in the
+           fsVxlanNveTable. Conceptual rows having the value
+           'permanent' need not allow write-access to any
+           columnar object in the row.
+            The object is set as 
+           NON-VOLATILE for static entry and VOLATILE for dynamic entry"
+
+      ::= { fsVxlanNveEntry 8 }
+
+   fsVxlanNveRowStatus OBJECT-TYPE
+      SYNTAX          RowStatus
+      MAX-ACCESS      read-create
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the row status and used to create, modify, and/or
+          delete a row in this table."
+
+      ::= { fsVxlanNveEntry 9 }
+
+   fsVxlanSuppressArp OBJECT-TYPE
+       SYNTAX INTEGER {
+          enabled          (1),
+          disabled         (2)
+       }
+       MAX-ACCESS     read-write
+       STATUS         current
+       DESCRIPTION
+       "This object Enables or Disables Suppress Arp in the fsVxlanNveTable."
+
+       DEFVAL      { disabled }
+       ::=  { fsVxlanNveEntry 10 }
+
+-- *******************************************************************
+-- VXLAN NVE table "fsVxlanNveTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- VXLAN Multicast table "fsVxlanMCastTable"  Starts
+-- *******************************************************************
+
+   fsVxlanMCastTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVxlanMCastEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This table contains the Multicast database.       
+          In this database, Multicast IP is mapped with the NVE interface. 
+           When a L2 packet is received on the NVE interface, VTEP checks
+          this database to multicast the packet."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanConfigObjects 3 }
+
+   fsVxlanMCastEntry OBJECT-TYPE
+      SYNTAX       FsVxlanMCastEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This entry in the table contains NVE interface mapping 
+          with multicast IP."
+
+      INDEX {  fsVxlanMCastNveIfIndex,
+               fsVxlanMCastVniNumber
+            }
+      ::= { fsVxlanMCastTable 1 }
+
+   FsVxlanMCastEntry ::=
+      SEQUENCE {
+        fsVxlanMCastNveIfIndex           InterfaceIndexOrZero,
+        fsVxlanMCastVniNumber            VniId,
+        fsVxlanMCastGroupAddressType     InetAddressType,
+        fsVxlanMCastGroupAddress         InetAddress,
+        fsVxlanMCastVtepAddressType      InetAddressType,
+        fsVxlanMCastVtepAddress          InetAddress,
+        fsVxlanMCastRowStatus            RowStatus
+      }
+
+   fsVxlanMCastNveIfIndex OBJECT-TYPE
+      SYNTAX          InterfaceIndexOrZero
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the If-Index value of the NVE interface.
+          This If index value is mapped with the NVE interface created in the VTEP."
+
+      ::= { fsVxlanMCastEntry 1 }
+
+   fsVxlanMCastVniNumber OBJECT-TYPE
+      SYNTAX          VniId
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the VNI (VXLAN Network Identifier) associated with the NVE interface."
+
+      ::= { fsVxlanMCastEntry 2 }
+
+   fsVxlanMCastGroupAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+          "This object specifies the type of address for VXLAN Multicast group. Supported address type are IPv4 and IPv6."
+       ::= { fsVxlanMCastEntry 3 }
+
+   fsVxlanMCastGroupAddress OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+         "The object specifies the Multicast Group IP address associated with 
+Network Virtualization Endpoint (NVE) interface and Virtual Network Identifiers (VNI).        
+          It is used when the destination VM Mac is unknown. This value is filled in the outer destination IP
+          address field when the frame is encapsulated with the VXLAN header."
+  
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanMCastEntry 4 }
+
+   fsVxlanMCastVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+          "The object specifies the type of VTEP addresses. Supported address types are IPv4 and IPv6 addresses 
+           This object is copied from fsVxlanVtepAddressType object of fsVxlanVtepTable."
+
+       ::= { fsVxlanMCastEntry 5 }
+
+   fsVxlanMCastVtepAddress OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+ "This object specifies the source VTEP IP address associated with NVE (Network Virtualization Endpoint) interface and VNI (Virtual Network Identifiers).
+            The value is filled in the outer source IP address field, when the frame is encapsulated with the VXLAN header.
+           This object is copied from fsVxlanVtepAddress of fsVxlanVtepTable"
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanMCastEntry 6 }
+
+   fsVxlanMCastRowStatus OBJECT-TYPE
+      SYNTAX          RowStatus
+      MAX-ACCESS      read-create
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the row status and is used to create, modify, and/or
+          delete a row in the table."
+
+      ::= { fsVxlanMCastEntry 7 }
+
+-- *******************************************************************
+-- VXLAN Multicast table "fsVxlanMCastTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- VXLAN VNI-VLAN mapping table "fsVxlanVniVlanMapTable"  Starts
+-- *******************************************************************
+
+   fsVxlanVniVlanMapTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVxlanVniVlanMapEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+ "This table contains the VNI id, VLAN mapping and VXLAN packet statistics for a particular VXLAN segment (VNI id). When the L2 packet is received from VLAN module, VNI value for a particular VLAN is taken from the database for encapsulating the VXLAN header. When the VXLAN packet is received from SLA module, VLAN value for a particular VNI number is taken from the database for decapsulating the VXLAN header and sends the packet to the particular VLAN."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanConfigObjects 4 }
+
+   fsVxlanVniVlanMapEntry OBJECT-TYPE
+      SYNTAX       FsVxlanVniVlanMapEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This entry in the table contains the VNI (Virtual Network Identifiers) and
+          VLAN mapping. This entry is created once the VNI number is mapped with the
+          particular VLAN"
+
+      INDEX {  fsVxlanVniVlanMapVlanId
+            }
+      ::= { fsVxlanVniVlanMapTable 1 }
+
+   FsVxlanVniVlanMapEntry ::=
+      SEQUENCE {
+        fsVxlanVniVlanMapVlanId             VlanId,
+        fsVxlanVniVlanMapVniNumber          VniId,
+        fsVxlanVniVlanMapPktSent            Unsigned32,
+        fsVxlanVniVlanMapPktRcvd            Unsigned32,
+        fsVxlanVniVlanMapPktDrpd            Unsigned32,
+        fsVxlanVniVlanMapRowStatus          RowStatus,
+        fsVxlanVniVlanDfElection            TruthValue
+      }
+
+   fsVxlanVniVlanMapVlanId OBJECT-TYPE
+      SYNTAX          VlanId
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the VLAN id associated with the VNI. This association
+         is used for the VXLAN packet decapsulation."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanVniVlanMapEntry 1 }
+
+   fsVxlanVniVlanMapVniNumber OBJECT-TYPE
+      SYNTAX          VniId
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the VNI (Virtual Network Identifiers) associated with the VLAN. This association is used for the VXLAN packet encapsulation."
+    
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanVniVlanMapEntry 2 }
+
+
+   fsVxlanVniVlanMapPktSent OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..4294967295)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the number of VXLAN packets sent in the VXLAN 
+         segment (VNI). When this object is read-only, it displays the statistics of
+         this object. This object accepts only value zero (0) as input. The value zero (0) clears the statistics"
+      ::= { fsVxlanVniVlanMapEntry 3 }
+
+   fsVxlanVniVlanMapPktRcvd OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..4294967295)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the number of VXLAN packets received in the VXLAN
+         segment (VNI).When this object is read-only, it displays the statistics of
+         this object. This object accepts only value zero (0) as input. The value zero (0) clears the statistics"
+
+      ::= { fsVxlanVniVlanMapEntry 4 }
+
+   fsVxlanVniVlanMapPktDrpd OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..4294967295)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the number of VXLAN packets dropped in the VXLAN
+         segment (VNI).When this object is read-only, it displays the statistics of
+         this object. This object accepts only value zero ( 0 ) as input. The value zero (0) clears the statistic"
+
+      ::= { fsVxlanVniVlanMapEntry 5 }
+
+   fsVxlanVniVlanMapRowStatus OBJECT-TYPE
+      SYNTAX          RowStatus
+      MAX-ACCESS      read-create
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the row status and is used to create, modify, and/or delete a row in the table."
+
+      ::= { fsVxlanVniVlanMapEntry 6 }
+
+   fsVxlanVniVlanDfElection OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "This object indicates that DF Election is enabled
+           in Vlan Vni Table when the value is set to TRUE(1), and indicates that 
+           DF Election is disabled in Vlan Vni Table when the value is set to FALSE(2)"
+      DEFVAL      { false }
+      ::= { fsVxlanVniVlanMapEntry 7 }
+
+
+-- *******************************************************************
+-- VXLAN VNI-VLAN mapping table "fsVxlanVniVlanMapTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- VXLAN INGRESS-REPLICA table "fsVxlanInReplicaTable"  Starts
+-- *******************************************************************
+
+   fsVxlanInReplicaTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVxlanInReplicaEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This table contains the Ingress Replica database. 
+           In this database, ingress replica information is mapped 
+          with the NVE interface.      
+          When a L2 packet is received on the NVE interface, VTEP consults
+          this database(in the absence of NVE database) to forward the packet to remote VTEP."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanConfigObjects 5 }
+
+   fsVxlanInReplicaEntry OBJECT-TYPE
+      SYNTAX       FsVxlanInReplicaEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This entry in the table contains NVE interface mapping with the Ingress Replica VTEP. The source and ingress replica information is taken from the entry using NVE If index and VNI number for sending the packet to the Ingress Replica VTEP IP."
+
+      INDEX {  fsVxlanInReplicaNveIfIndex,
+               fsVxlanInReplicaVniNumber
+            }
+      ::= { fsVxlanInReplicaTable 1 }
+
+   FsVxlanInReplicaEntry ::=
+      SEQUENCE {
+        fsVxlanInReplicaNveIfIndex              InterfaceIndexOrZero,
+        fsVxlanInReplicaVniNumber                VniId,
+        fsVxlanInReplicaVtepAddressType         InetAddressType,
+        fsVxlanInReplicaVtepAddress             InetAddress,
+        fsVxlanInReplicaRemoteVtepAddressType   InetAddressType,
+        fsVxlanInReplicaRemoteVtepAddress1      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress2      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress3      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress4      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress5      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress6      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress7      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress8      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress9      InetAddress,
+        fsVxlanInReplicaRemoteVtepAddress10     InetAddress,
+        fsVxlanInReplicaRowStatus               RowStatus
+      }
+
+   fsVxlanInReplicaNveIfIndex OBJECT-TYPE
+      SYNTAX          InterfaceIndexOrZero
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies If-Index value of the NVE interface. 
+             The If index value is mapped with the NVE interface created in the VTEP."
+
+      ::= { fsVxlanInReplicaEntry 1 }
+
+   fsVxlanInReplicaVniNumber OBJECT-TYPE
+      SYNTAX          VniId
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the VNI (VXLAN 
+          Network Identifier) associated with the NVE interface.
+          The valid VNI values ranges from 4096 to 16777215."
+
+      ::= { fsVxlanInReplicaEntry 2 }
+
+   fsVxlanInReplicaVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+         "This object specifies the type of address for VXLAN NVE VTEP. Supported address types are IPv4 and IPv6. 
+          This object is copied from fsVxlanVtepAddressType object of fsVxlanVtepTable"
+       ::= { fsVxlanInReplicaEntry 3 }
+
+   fsVxlanInReplicaVtepAddress OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+         "This object specifies source VTEP IP address associated with NVE interface 
+          and VNI (VXLAN Network Identifier). The values are filled in the outer source IP 
+          address field when the frame is encapsulated with the 
+          VXLAN header. This object is copied from fsVxlanVtepAddress object
+          of fsVxlanVtepTable."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 4 }
+
+   fsVxlanInReplicaRemoteVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+  "This object specifies the type of address for Vxlan NVE Ingress Replica VTEP Address. Supported address types are IPv4 and IPv6."
+
+       ::= { fsVxlanInReplicaEntry 5 }
+
+   fsVxlanInReplicaRemoteVtepAddress1 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-1 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 6 }
+
+   fsVxlanInReplicaRemoteVtepAddress2 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-2 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 7 }
+
+   fsVxlanInReplicaRemoteVtepAddress3 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-3 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 8 }
+
+   fsVxlanInReplicaRemoteVtepAddress4 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-4 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 9 }
+
+   fsVxlanInReplicaRemoteVtepAddress5 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-5 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 10 }
+
+   fsVxlanInReplicaRemoteVtepAddress6 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-6 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 11 }
+
+   fsVxlanInReplicaRemoteVtepAddress7 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-7 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 12 }
+
+   fsVxlanInReplicaRemoteVtepAddress8 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-8 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 13 }
+
+   fsVxlanInReplicaRemoteVtepAddress9 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-9 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 14 }
+
+   fsVxlanInReplicaRemoteVtepAddress10 OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination Ingress Replica-10 VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               destination IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanInReplicaEntry 15 }
+
+
+   fsVxlanInReplicaRowStatus OBJECT-TYPE
+      SYNTAX          RowStatus
+      MAX-ACCESS      read-create
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the row status and used to create, modify, and/or
+          delete a row in this table."
+
+      ::= { fsVxlanInReplicaEntry 16 }
+
+
+-- *******************************************************************
+-- VXLAN VNI-VLAN mapping table "fsVxlanInReplicaTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- EVPN-VXLAN Map table "fsEvpnVxlanEviVniMapTable"  Starts
+-- *******************************************************************
+
+   fsEvpnVxlanEviVniMapTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsEvpnVxlanEviVniMapEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+ "This table contains the EVI number mapped with VNI, when encapsulation mode is VXLAN."
+
+      ::= { fsVxlanConfigObjects 6 }
+
+      fsEvpnVxlanEviVniMapEntry OBJECT-TYPE
+      SYNTAX       FsEvpnVxlanEviVniMapEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This object specifies an entry in the table contains EVI and VNI Map Index,
+          Route Distinguisher, ESI and statistics information for the 
+          particular EVPN instance"
+
+      INDEX {  fsEvpnVxlanEviVniMapEviIndex, fsEvpnVxlanEviVniMapVniNumber  }
+
+      ::= { fsEvpnVxlanEviVniMapTable 1 }
+
+   FsEvpnVxlanEviVniMapEntry ::=
+      SEQUENCE {
+        fsEvpnVxlanEviVniMapEviIndex                EviId,
+        fsEvpnVxlanEviVniMapVniNumber               VniId,
+        fsEvpnVxlanEviVniMapBgpRD                   EvpnVxlanBgpRD,
+        fsEvpnVxlanEviVniESI                        EvpnVxlanESI,
+        fsEvpnVxlanEviVniLoadBalance                INTEGER,                
+        fsEvpnVxlanEviVniMapSentPkts                Unsigned32,
+        fsEvpnVxlanEviVniMapRcvdPkts                Unsigned32,
+        fsEvpnVxlanEviVniMapDroppedPkts             Unsigned32,
+        fsEvpnVxlanEviVniMapRowStatus               RowStatus,
+        fsEvpnVxlanEviVniMapBgpRDAuto               TruthValue
+      }
+
+   fsEvpnVxlanEviVniMapEviIndex OBJECT-TYPE
+      SYNTAX          EviId
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the EVI Index. This index is referred to get 
+          the particular EVPN instance"
+
+      ::= { fsEvpnVxlanEviVniMapEntry 1 }
+
+   fsEvpnVxlanEviVniMapVniNumber OBJECT-TYPE
+       SYNTAX     VniId
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+         "This object specifies the VNI Id which is mapped to EVI. This is 
+          one of the indices in the table. Other mib objects such as 
+          fsEvpnVxlanEviVniMapBgpRD, fsEvpnVxlanEviVniESI and statistics shall
+          be identified per EVI and VNI"
+
+       ::= { fsEvpnVxlanEviVniMapEntry 2 }
+
+   fsEvpnVxlanEviVniMapBgpRD OBJECT-TYPE
+         SYNTAX          EvpnVxlanBgpRD
+         MAX-ACCESS      read-write
+         STATUS          current
+         DESCRIPTION
+         " This object specifies the route distinguisher for the EVPN. This object 
+           take Type 0, Type 1 and Type 2 RD as per RFC 4364.
+           In case of auto-discover, Type 0 RD shall be considered."
+         REFERENCE
+         "[RFC4364]"
+         ::= { fsEvpnVxlanEviVniMapEntry 3 }
+
+   fsEvpnVxlanEviVniESI OBJECT-TYPE
+         SYNTAX          EvpnVxlanESI 
+         MAX-ACCESS      read-write
+         STATUS          current
+         DESCRIPTION
+         " This object sepcifies Ethernet Segment Identifier attached to EVPN instance and 
+           this identifier used in case of multi-homing. 
+           ESI can either auto-generated by MC-LAG module, otherwise
+           statically configured by administrator"
+         ::= { fsEvpnVxlanEviVniMapEntry 4 }
+
+   fsEvpnVxlanEviVniLoadBalance OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        enable (1),
+                        disable (2) 
+                        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This object selects Active-Active or
+         Active-Stanby mode in EVPN in case of multi-homing.
+         when enabled, EVPN works in Active-Active mode. when disabled,
+         EVPN works in Active-Standby mode.
+         This object has no significance on single-homing scenario"
+    DEFVAL { disable }
+    ::= { fsEvpnVxlanEviVniMapEntry 5 }
+
+   fsEvpnVxlanEviVniMapSentPkts OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..4294967295)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the number of VXLAN packets sent in the EVPN instance (EVI)
+         When this object is read-only, it displays the statistics of this object.
+         This object accepts only value zero (0) as input. The value zero (0) clears the statistics"
+      ::= { fsEvpnVxlanEviVniMapEntry 6 }
+
+   fsEvpnVxlanEviVniMapRcvdPkts OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..4294967295)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the number of VXLAN packets received in the EVPN instance (EVI)
+         When this object is read-only, it displays the statistics of this object.
+         This object accepts only value zero (0) as input. The value zero (0) clears the statistics"
+
+      ::= { fsEvpnVxlanEviVniMapEntry 7 }
+
+   fsEvpnVxlanEviVniMapDroppedPkts OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..4294967295)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+        "This object specifies the number of VXLAN packets dropped in the EVPN instance (EVI)
+         When this object is read-only, it displays the statistics of this object.
+         This object accepts only value zero ( 0 ) as input. The value zero (0) clears the statistic"
+
+      ::= { fsEvpnVxlanEviVniMapEntry 8 }
+
+   fsEvpnVxlanEviVniMapRowStatus OBJECT-TYPE
+      SYNTAX          RowStatus
+      MAX-ACCESS      read-create
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the row status and is used to create, modify, and/or delete a row in the table. "
+
+      ::= { fsEvpnVxlanEviVniMapEntry 9 }
+
+   fsEvpnVxlanEviVniMapBgpRDAuto OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "This object indicates that auto-discover is enabled 
+           in route distinguisher for the EVPN when it is set as TRUE(1), 
+           and indicates that auto-discover is disabled when 
+           it is set as FALSE(2)."
+      DEFVAL      { false }
+      ::= { fsEvpnVxlanEviVniMapEntry 10 }
+
+-- *******************************************************************
+-- EVPN EVI-VNI mapping table "fsEvpnVxlanEviVniMapTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- EVPN BGP RT table "fsEvpnVxlanBgpRTTable"  Starts
+-- *******************************************************************
+
+   fsEvpnVxlanBgpRTTable   OBJECT-TYPE
+         SYNTAX          SEQUENCE OF FsEvpnVxlanBgpRTEntry
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         " This table specifies the list of Route Targets
+           imported or exported by BGP during Route advertisement of EVPN
+           - L2VNI.
+         "
+         ::= { fsVxlanConfigObjects 7 }
+
+   fsEvpnVxlanBgpRTEntry   OBJECT-TYPE
+         SYNTAX          FsEvpnVxlanBgpRTEntry
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+           "This object specifies an entry in the table, where this entry  specifies the value of the
+            Route Target being used by BGP. Depending on the value
+            of fsEvpnVxlanBgpRTType an RT might be exported or
+            imported or both."
+
+         INDEX     { fsEvpnVxlanEviVniMapEviIndex, fsEvpnVxlanEviVniMapVniNumber, 
+                     fsEvpnVxlanBgpRTIndex, fsEvpnVxlanBgpRTType }
+         ::= { fsEvpnVxlanBgpRTTable 1 }
+
+   FsEvpnVxlanBgpRTEntry ::=
+      SEQUENCE {
+       fsEvpnVxlanBgpRTIndex          Unsigned32,
+       fsEvpnVxlanBgpRTType           EvpnVxlanBgpRTType,
+       fsEvpnVxlanBgpRT               EvpnVxlanBgpRD,
+       fsEvpnVxlanBgpRTRowStatus      RowStatus,
+       fsEvpnVxlanBgpRTAuto           TruthValue
+      }
+
+   fsEvpnVxlanBgpRTIndex   OBJECT-TYPE
+         SYNTAX          Unsigned32
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         "This object specifies an index along with fsEvpnVxlanEviVniMapEviIndex, 
+          fsEvpnVxlanEviVniMapEviIndexidentifies and fsEvpnVxlanBgpRTType
+          identifies one entry in the fsEvpnVxlanBgpRTTable. 
+          By keeping fsEvpnVxlanEviVniMapEviIndex and fsEvpnVxlanEviVniMapVniNumber
+          constant and using new value of fsEvpnVxlanBgpRTIndex, user
+          can configure multiple Route Targets for the same Evpn.
+         "
+         ::= { fsEvpnVxlanBgpRTEntry 1 }
+
+   fsEvpnVxlanBgpRTType  OBJECT-TYPE
+         SYNTAX          EvpnVxlanBgpRTType
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         " This object is one of the indices in fsEvpnVxlanBgpRTTable.
+           Used to define the type of a route target usage.
+           Route targets can be specified to be imported,
+           exported, or both."
+         ::= { fsEvpnVxlanBgpRTEntry 2 }
+
+   fsEvpnVxlanBgpRT      OBJECT-TYPE
+         SYNTAX          EvpnVxlanBgpRD
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+         " This object specifies route target associated with the EVPN service. This shall take Type 0, Type 1
+           and Type 2 RT as per RFC 4364.
+           In case of auto-discover, Type 0 RT shall be considered."
+
+         ::= { fsEvpnVxlanBgpRTEntry 3 }
+
+
+   fsEvpnVxlanBgpRTRowStatus     OBJECT-TYPE
+         SYNTAX          RowStatus
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+         "This object specifies a variable that is used to create, modify, and/or
+          delete a row in this table.
+
+          All other objects in this row must be set to valid
+          values before this object can be set to active(1).
+
+          When a row in this table is in active(1) state, no
+          objects in that row can be modified."
+
+         ::= { fsEvpnVxlanBgpRTEntry 4 }
+
+   fsEvpnVxlanBgpRTAuto OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "This object indicates that auto-discover is enabled 
+           in route target for the EVPN when it is set as TRUE(1),
+           and indicates that auto-discover is disabled when it is set as FALSE(2)."
+      DEFVAL      { false }
+      ::= { fsEvpnVxlanBgpRTEntry 5 }
+
+-- *******************************************************************
+-- EVPN BGP RT table "fsEvpnVxlanBgpRTTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- EVPN BGP VRF RT table "fsEvpnVxlanVrfTable"  Begins
+-- *******************************************************************
+
+   fsEvpnVxlanVrfTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsEvpnVxlanVrfEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+      "This table specifies per-interface VXLAN EVPN VRF Table 
+       capability and associated information. Entries in this table 
+       define VRF routing instances associated with L3-VXLAN VNI.
+       Note that single L3-VXLAN VTEP should be mapped to one VRF."
+
+
+      ::= { fsVxlanConfigObjects 8 }
+
+      fsEvpnVxlanVrfEntry OBJECT-TYPE
+      SYNTAX       FsEvpnVxlanVrfEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This object specifies an entry in the table contains VRF capable of supporting 
+          VXLAN EVPN routing."
+
+      INDEX {  fsEvpnVxlanVrfName }
+
+      ::= { fsEvpnVxlanVrfTable 1 }
+
+   FsEvpnVxlanVrfEntry ::= SEQUENCE {
+     fsEvpnVxlanVrfName                      EvpnVxlanVrfName,
+     fsEvpnVxlanVrfRD                        EvpnVxlanBgpRD,
+     fsEvpnVxlanVrfRowStatus                 RowStatus
+   }
+
+   fsEvpnVxlanVrfName    OBJECT-TYPE
+         SYNTAX          EvpnVxlanVrfName
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+            "This object specifies the human-readable name of the EVPN VRF.  
+             It is strongly recommended that all sites supporting
+             VRFs that are part of the same EVPN use the same
+             naming convention for VRFs."
+         ::= { fsEvpnVxlanVrfEntry 1 }
+
+   fsEvpnVxlanVrfRD      OBJECT-TYPE
+         SYNTAX          EvpnVxlanBgpRD
+         MAX-ACCESS      read-write
+         STATUS          current
+         DESCRIPTION
+         " This object specifies the  route distinguisher for the EVPN VRF. This shall take Type 0, Type 1
+           and Type 2 RD as per RFC 4364.
+           In case of auto-discover, Type 0 RD shall be considered."
+         REFERENCE
+         "[RFC4364]"
+         ::= { fsEvpnVxlanVrfEntry 2 }
+
+   fsEvpnVxlanVrfRowStatus OBJECT-TYPE
+         SYNTAX          RowStatus
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+         "This object specifies a variable that is used to create, modify, and/or
+          delete a row in this table.
+
+          All other objects in this row must be set to valid
+          values before this object can be set to active(1).
+
+          When a row in this table is in active(1) state, no
+          objects in that row can be modified."
+
+         ::= { fsEvpnVxlanVrfEntry 3 }
+
+-- *******************************************************************
+-- EVPN BGP VRF table "fsEvpnVxlanVrfTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- EVPN BGP VRF RT table "fsEvpnVxlanVrfRTTable"  Starts
+-- *******************************************************************
+
+   fsEvpnVxlanVrfRTTable   OBJECT-TYPE
+         SYNTAX          SEQUENCE OF FsEvpnVxlanVrfRTEntry
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         " This table specifies the list of Route Targets
+           imported or exported by BGP during Route advertisement of EVPN
+           per VRF.
+         "
+         ::= { fsVxlanConfigObjects 9 }
+
+   fsEvpnVxlanVrfRTEntry   OBJECT-TYPE
+         SYNTAX          FsEvpnVxlanVrfRTEntry
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+           "An entry in this table specifies the value of the
+            Route Target being used by BGP. Depending on the value
+            of fsEvpnVxlanVrfRTType an RT might be exported or
+            imported or both."
+
+         INDEX     { fsEvpnVxlanVrfName, 
+                     fsEvpnVxlanVrfRTIndex, fsEvpnVxlanVrfRTType }
+         ::= { fsEvpnVxlanVrfRTTable 1 }
+
+   FsEvpnVxlanVrfRTEntry ::=
+      SEQUENCE {
+       fsEvpnVxlanVrfRTIndex          Unsigned32,
+       fsEvpnVxlanVrfRTType           EvpnVxlanBgpRTType,
+       fsEvpnVxlanVrfRT               EvpnVxlanBgpRD,
+       fsEvpnVxlanVrfRTRowStatus      RowStatus
+      }
+
+   fsEvpnVxlanVrfRTIndex   OBJECT-TYPE
+         SYNTAX          Unsigned32
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         "This object specifies an index along with fsEvpnVxlanVrfName, fsEvpnVxlanVrfRTIndex and
+          fsEvpnVxlanVrfRTType identifies one entry in the 
+          fsEvpnVxlanVrfRTTable. By keeping fsEvpnVxlanVrfName
+          constant and using new value of fsEvpnVxlanVrfRTIndex, user
+          can configure multiple Route Targets for the same EVPN VRF.
+         "
+         ::= { fsEvpnVxlanVrfRTEntry 1 }
+
+   fsEvpnVxlanVrfRTType  OBJECT-TYPE
+         SYNTAX          EvpnVxlanBgpRTType
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         " This object is one of the indices in fsEvpnVxlanVrfRTTable.
+           Used to define the type of a route target usage.
+           Route targets can be specified to be imported,
+           exported, or both."
+         ::= { fsEvpnVxlanVrfRTEntry 2 }
+
+   fsEvpnVxlanVrfRT      OBJECT-TYPE
+         SYNTAX          EvpnVxlanBgpRD
+         MAX-ACCESS      read-write
+         STATUS          current
+         DESCRIPTION
+         " This object specifies the route target associated with the EVPN VRF. 
+           This object take Type 0, Type 1 and Type 2 RT as per RFC 4364.
+           In case of auto-discover, Type 0 RT shall be considered."
+
+         ::= { fsEvpnVxlanVrfRTEntry 3 }
+
+   fsEvpnVxlanVrfRTRowStatus     OBJECT-TYPE
+         SYNTAX          RowStatus
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+         "This object specifies a variable that is used to create, modify, and/or
+          delete a row in this table.
+
+          All other objects in this row must be set to valid
+          values before this object can be set to active(1).
+
+          When a row in this table is in active(1) state, no
+          objects in that row can be modified."
+
+         ::= { fsEvpnVxlanVrfRTEntry 4 }
+
+-- *******************************************************************
+-- EVPN BGP VRF RT table "fsEvpnVxlanVrfRTTable"  Ends
+-- *******************************************************************
+
+-- *******************************************************************
+-- EVPN BGP VRF RT table "fsEvpnVxlanMultihomedPeerTable"  Starts
+-- *******************************************************************
+
+   fsEvpnVxlanMultihomedPeerTable   OBJECT-TYPE
+         SYNTAX          SEQUENCE OF FsEvpnVxlanMultihomedPeerTable
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         "This table specifies the list of Multihomed peer ip address
+          imported or exported by BGP during Route advertisement in EVPN
+         "
+         ::= { fsVxlanConfigObjects 10 }
+
+   fsEvpnVxlanMultihomedPeerEntry   OBJECT-TYPE
+         SYNTAX          FsEvpnVxlanMultihomedPeerTable
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         "This object specifies an entry in the table, where the entry specifies IP addresses of multi-homed
+          peers attached to the Ethernet Segment per EVPN instance.
+         "
+
+         INDEX     { fsEvpnVxlanPeerIpAddressType,
+                     fsEvpnVxlanPeerIpAddress,
+                     fsEvpnVxlanMHEviVniESI }
+         ::= { fsEvpnVxlanMultihomedPeerTable 1 }
+
+   FsEvpnVxlanMultihomedPeerTable ::=
+      SEQUENCE {
+       fsEvpnVxlanPeerIpAddressType            InetAddressType,
+       fsEvpnVxlanPeerIpAddress                InetAddress,
+       fsEvpnVxlanMHEviVniESI                  EvpnVxlanESI,
+       fsEvpnVxlanOrdinalNum                   Unsigned32,
+       fsEvpnVxlanMultihomedPeerRowStatus      RowStatus
+      }
+
+   fsEvpnVxlanPeerIpAddressType   OBJECT-TYPE
+         SYNTAX          InetAddressType
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         "This object specifies one of the indices in fsEvpnVxlanMultihomedPeerTable.
+          Supported address types are IPv4 and IPv6.
+         "
+         ::= { fsEvpnVxlanMultihomedPeerEntry 1 }
+
+   fsEvpnVxlanPeerIpAddress   OBJECT-TYPE
+         SYNTAX          InetAddress
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+         "This object is one of the indices in fsEvpnVxlanMultihomedPeerTable.
+          Used to list the IP Address in multihome network.
+          Ip addresses should be stored in ascending order.
+         "
+         ::= { fsEvpnVxlanMultihomedPeerEntry 2 }
+
+   fsEvpnVxlanMHEviVniESI   OBJECT-TYPE
+         SYNTAX          EvpnVxlanESI
+         MAX-ACCESS      not-accessible
+         STATUS          current
+         DESCRIPTION
+          "This object specifies one of the indices in fsEvpnVxlanMultihomedPeerTable.
+           It specifies Ethernet Segment Identifier attached to EVPN instance and
+           is used in case of multi-homing.
+           ESI can either auto-generated by MC-LAG module, otherwise
+           statically configured by administrator
+          "
+         ::= { fsEvpnVxlanMultihomedPeerEntry 3 }
+
+   fsEvpnVxlanOrdinalNum OBJECT-TYPE
+      SYNTAX          Unsigned32 (0..10)
+      MAX-ACCESS      read-write
+      STATUS          current
+      DESCRIPTION
+      "This object specifies the Index of Ordinals in the EVPN
+       The ordinals are used to determine which PE node will be the DF 
+       for a given EVI on the Ethernet Segment.
+       Ip address with Ordinal 0 shall be elected as DF for the given EVI.
+      "
+      ::= { fsEvpnVxlanMultihomedPeerEntry 4 }
+
+   fsEvpnVxlanMultihomedPeerRowStatus     OBJECT-TYPE
+         SYNTAX          RowStatus
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+         "This object is a variable that is used to create, modify, and/or
+          delete a row in this table.
+
+          All other objects in this row must be set to valid
+          values before this object can be set to active(1).
+
+          When a row in this table is in active(1) state, no
+          objects in that row can be modified.
+         "
+         ::= { fsEvpnVxlanMultihomedPeerEntry 5 }
+
+-- *******************************************************************
+-- VXLAN NVE table "fsVxlanEcmpNveTable"  Starts
+-- *******************************************************************
+
+   fsVxlanEcmpNveTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF FsVxlanEcmpNveEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This table contains the NVE (Network Virtualization Endpoint) database.
+           In this database, remote VTEP information is mapped
+          with the NVE interface.
+          When a L2 packet is received on the NVE interface, VTEP consults
+          this database to forward the packet to remote VTEP."
+                                          
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanConfigObjects 11 }
+                                
+      fsVxlanEcmpNveEntry OBJECT-TYPE
+      SYNTAX       FsVxlanEcmpNveEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This entry in the table contains NVE interface mapping                                                                                                       with the remote VTEP. The source and remote VTEP information is taken from the entry using NVE If index, VNI number and destination VM MAC for sending the packet to the remote VTEP."
+
+      INDEX {  fsVxlanEcmpNveIfIndex,
+               fsVxlanEcmpNveVniNumber,
+               fsVxlanEcmpNveDestVmMac,
+               fsVxlanEcmpNveRemoteVtepAddressType,
+               fsVxlanEcmpNveRemoteVtepAddress
+            }                                                                                                                                    
+      ::= { fsVxlanEcmpNveTable 1 }
+        
+      FsVxlanEcmpNveEntry ::=
+      SEQUENCE {   
+        fsVxlanEcmpNveIfIndex                InterfaceIndexOrZero, 
+        fsVxlanEcmpNveVniNumber              VniId,
+        fsVxlanEcmpNveDestVmMac              MacAddress,  
+        fsVxlanEcmpNveVtepAddressType        InetAddressType,
+        fsVxlanEcmpNveVtepAddress            InetAddress,
+        fsVxlanEcmpNveRemoteVtepAddressType  InetAddressType,
+        fsVxlanEcmpNveRemoteVtepAddress      InetAddress,
+        fsVxlanEcmpNveStorageType            StorageType,
+        fsVxlanEcmpSuppressArp               INTEGER,
+        fsVxlanEcmpMHEviVniESI               EvpnVxlanESI,
+        fsVxlanEcmpActive                    TruthValue
+
+      }
+
+      fsVxlanEcmpNveIfIndex OBJECT-TYPE
+      SYNTAX          InterfaceIndexOrZero                                                                                                                         MAX-ACCESS      not-accessible
+      STATUS          current                                                                                                                                      DESCRIPTION                                                                                                                                                     "This object specifies the If-Index value of the NVE interface.
+             The If index value is mapped with the NVE interface created in the VTEP."                                                                       
+      ::= { fsVxlanEcmpNveEntry 1 }
+
+   fsVxlanEcmpNveVniNumber OBJECT-TYPE
+      SYNTAX          VniId
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the VNI (VXLAN
+          Network Identifier) associated with the NVE interface.
+          The valid VNI values ranges  from 4096 to 16777215."
+
+      ::= { fsVxlanEcmpNveEntry 2 }
+
+   fsVxlanEcmpNveDestVmMac OBJECT-TYPE
+      SYNTAX          MacAddress
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+         "This object specifies the destination VM Mac associated with NVE
+          interface and VNI (VXLAN Network Identifier).
+          This object is filled by user during static condition,
+          and is filled dynamically when the
+          VXLAN packet is received from destination VTEP."
+
+      ::= { fsVxlanEcmpNveEntry 3 }
+   fsVxlanEcmpNveVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS read-only
+       STATUS     current                                                                                                                                           DESCRIPTION
+         "This object specifies the type of address for VXLAN NVE VTEP. Supported address types are IPv4 and IPv6.
+          This object is copied from fsVxlanEcmpVtepAddressType object of fsVxlanEcmpVtepTable"                                                                     ::= { fsVxlanEcmpNveEntry 4 }
+                                                                                                                                                                fsVxlanEcmpNveVtepAddress OBJECT-TYPE
+      SYNTAX          InetAddress                                                                                                                                  MAX-ACCESS      read-only                                                                                                                                    STATUS          current
+      DESCRIPTION                                                                                                                                                     "This object specifies source VTEP IP address associated with NVE interface
+          and VNI (VXLAN Network Identifier). The values are filled in the outer source IP
+          address field when the frame is encapsulated with the
+          VXLAN header. This object is copied from fsVxlanEcmpVtepAddress object                                                                                       of fsVxlanEcmpVtepTable."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"                                                                                                    ::= { fsVxlanEcmpNveEntry 5 }
+                                                                                                                                                                fsVxlanEcmpNveRemoteVtepAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType  
+       MAX-ACCESS not-accessible  
+       STATUS     current
+       DESCRIPTION                                                                                                                                             "This object specifies the type of address for Vxlan NVE Remote VTEP Address. Supported address types are IPv4 and IPv6."
+
+       ::= { fsVxlanEcmpNveEntry 6 }
+
+   fsVxlanEcmpNveRemoteVtepAddress OBJECT-TYPE
+      SYNTAX          InetAddress
+      MAX-ACCESS      not-accessible
+      STATUS          current
+      DESCRIPTION
+               "This object specifies the destination VTEP IP address associated with
+               NVE interface and VNI(VXLAN Network Identifier). The values are filled in the outer
+               source IP address field when the frame is encapsulated  with the VXLAN header."
+
+      REFERENCE "draft-mahalingam-dutt-dcops-vxlan - Section 5"
+      ::= { fsVxlanEcmpNveEntry 7 }
+
+   fsVxlanEcmpNveStorageType OBJECT-TYPE
+      SYNTAX        StorageType
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+          "This object specifies the storage type for the conceptual row in the
+           fsVxlanEcmpNveTable. Conceptual rows having the value
+           'permanent' need not allow write-access to any
+            Columnar object in the row.
+            The object is set as
+           NON-VOLATILE for static entry and VOLATILE for dynamic entry"
+
+      ::= { fsVxlanEcmpNveEntry 8 }
+
+   fsVxlanEcmpSuppressArp OBJECT-TYPE                                                                                                                               SYNTAX INTEGER {
+          enabled          (1),
+          disabled         (2)
+       }                     
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION                                                                                                                                                  "This object Enables or Disables Suppress Arp in the fsVxlanEcmpNveTable."
+                                                                                                                                                                    DEFVAL      { disabled }
+       ::=  { fsVxlanEcmpNveEntry 9 }   
+
+   fsVxlanEcmpMHEviVniESI OBJECT-TYPE
+         SYNTAX          EvpnVxlanESI
+         MAX-ACCESS      read-only
+         STATUS          current
+         DESCRIPTION
+          "This object specifies one of the indices in fsVxlanEcmpNveTable.
+           It specifies Ethernet Segment Identifier attached to EVPN instance and
+           this identifier used in case of multi-homing. "
+       ::=  { fsVxlanEcmpNveEntry 10 }
+   fsVxlanEcmpActive OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION
+       "This object indicates whether ECMP mac entry is Active or Standby."
+
+       DEFVAL      { false }
+       ::=  { fsVxlanEcmpNveEntry 11 }
+
+END

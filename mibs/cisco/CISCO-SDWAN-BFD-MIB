@@ -6,7 +6,7 @@
 
 -- July 2021, Richard Fu
 
--- Copyright (c) 2020-2021 by Cisco Systems, Inc.
+-- Copyright (c) 2020-2022 by Cisco Systems, Inc.
 -- All rights reserved.
 -- *****************************************************************
 
@@ -141,6 +141,22 @@ bfdSummaryPollInterval OBJECT-TYPE
     STATUS      current
     DESCRIPTION "App route poll interval"
     ::= { bfdSummary 5 }
+
+-- tagpath /bfd/summary/bfd-sessions-up-suspended
+bfdSummaryBfdSessionsUpSuspended OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Number of bfd sessions that are in up state and are suspended"
+    ::= { bfdSummary 6 }
+
+-- tagpath /bfd/summary/bfd-sessions-down-suspended
+bfdSummaryBfdSessionsDownSuspended OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Number of bfd sessions that are in Down state and are suspended"
+    ::= { bfdSummary 7 }
 
 -- tagpath /bfd/sessions-list
 bfdSessionsListTable OBJECT-TYPE
@@ -371,7 +387,8 @@ BfdHistoryListEntry ::=
         bfdHistoryListTime String,
         bfdHistoryListRxPkts Counter64,
         bfdHistoryListTxPkts Counter64,
-        bfdHistoryListDel UnsignedByte
+        bfdHistoryListDel UnsignedByte,
+        bfdHistoryListFlags String
     }
 
 -- tagpath /bfd/history-list/src-ip
@@ -507,6 +524,14 @@ bfdHistoryListDel OBJECT-TYPE
     DESCRIPTION "Del"
     ::= { bfdHistoryListEntry 14 }
 
+-- tagpath /bfd/history-list/flags-str
+bfdHistoryListFlags OBJECT-TYPE
+    SYNTAX      String (SIZE (1 .. 32))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Flags"
+    ::= { bfdHistoryListEntry 15 }
+
 -- tagpath /bfd/tloc-summary-list
 bfdTlocSummaryListTable OBJECT-TYPE
     SYNTAX      SEQUENCE OF BfdTlocSummaryListEntry
@@ -531,7 +556,9 @@ BfdTlocSummaryListEntry ::=
         bfdTlocSummaryListEncap INTEGER,
         bfdTlocSummaryListSessionsTotal Unsigned32,
         bfdTlocSummaryListSessionsUp Unsigned32,
-        bfdTlocSummaryListSessionsFlap Unsigned32
+        bfdTlocSummaryListSessionsFlap Unsigned32,
+        bfdTlocSummaryListSessionsUpSuspended Unsigned32,
+        bfdTlocSummaryListSessionsDownSuspended Unsigned32
     }
 
 -- tagpath /bfd/tloc-summary-list/if-name
@@ -575,6 +602,22 @@ bfdTlocSummaryListSessionsFlap OBJECT-TYPE
                         (transitions out of UP state)"
     ::= { bfdTlocSummaryListEntry 5 }
 
+-- tagpath /bfd/tloc-summary-list/bfd-sessions-up-suspended
+bfdTlocSummaryListSessionsUpSuspended OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Number of bfd sessions that are in up state and are suspended"
+    ::= { bfdTlocSummaryListEntry 6 }
+
+-- tagpath /bfd/tloc-summary-list/bfd-sessions-down-suspended
+bfdTlocSummaryListSessionsDownSuspended OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Number of bfd sessions that are in Down state and are suspended"
+    ::= { bfdTlocSummaryListEntry 7 }
+
 -- *******************************************************************
 -- *    Compliance statements
 -- *******************************************************************
@@ -595,9 +638,252 @@ ciscoSdwanBfdMIBCompliance MODULE-COMPLIANCE
                         cSdwanBfdSummaryGroup,
                         cSdwanBfdSessionsListGroup,
                         cSdwanBfdHistoryListGroup,
-                        cSdwanBfdTlocSummaryListGroup
+                        cSdwanBfdTlocSummaryListGroup,
+                        cSdwanBfdNotifObjsGroup
                     }
     ::= { ciscoSdwanBfdMIBCompliances 1 }
+
+-- ********************************************************************
+-- *  Notification System Objects
+-- ********************************************************************
+
+netconfNotificationSeverity OBJECT-TYPE
+    SYNTAX      NotificationSeverity
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Netconf notification severity level"
+    ::= { ciscoSdwanBfdMIBNotifObjects 2 }
+
+ciscoSdwanBfdSourceIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Source IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 3 }
+
+ciscoSdwanBfdDestinationIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Destination IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 4 }
+
+ciscoSdwanBfdProtocol OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "TLOC Encapsulation gre(1),
+                                    ipsec(2)"
+    ::= { ciscoSdwanBfdMIBNotifObjects 5 }
+
+ciscoSdwanBfdSourcePort OBJECT-TYPE
+    SYNTAX      UnsignedShort
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Source Port"
+    ::= { ciscoSdwanBfdMIBNotifObjects 6 }
+
+ciscoSdwanBfdDestinationPort OBJECT-TYPE
+    SYNTAX      UnsignedShort
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Destination Port"
+    ::= { ciscoSdwanBfdMIBNotifObjects 7 }
+
+ciscoSdwanBfdLocalSystemIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Local System IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 8 }
+
+ciscoSdwanBfdLocalColor OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Local Color"
+    ::= { ciscoSdwanBfdMIBNotifObjects 9 }
+
+ciscoSdwanBfdRemoteSystemIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Remote System IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 10 }
+
+ciscoSdwanBfdRemoteColor OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Remote Color"
+    ::= { ciscoSdwanBfdMIBNotifObjects 11 }
+
+ciscoSdwanBfdNewState OBJECT-TYPE
+    SYNTAX      OperState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "BFD New State 0(up)
+                               1(down)"
+    ::= { ciscoSdwanBfdMIBNotifObjects 12 }
+
+ciscoSdwanBfdDeleted OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Session Deleted - 1(true)
+                                   0(false)"
+    ::= { ciscoSdwanBfdMIBNotifObjects 13 }
+
+ciscoSdwanBfdFlapReason OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Reason for Flap for BFD session - 1(administrativelyDown),
+                                                   2(echoFunctionFailed),
+                                                   3(neighborSignaledSessionDown),
+                                                   4(sessionDelete),
+                                                   5(controlDetectionTimeExpired),
+                                                   6(max),
+                                                   7(ondemandIdleTimeout)"
+    ::= { ciscoSdwanBfdMIBNotifObjects 14 }
+
+ciscoSdwanBfdSrcIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Source IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 15 }
+
+ciscoSdwanBfdDstIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Destination IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 16 }
+
+ciscoSdwanBfdProto OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "TLOC Encapsulation gre(1),
+                                    ipsec(2)"
+    ::= { ciscoSdwanBfdMIBNotifObjects 17 }
+
+ciscoSdwanBfdSrcPort OBJECT-TYPE
+    SYNTAX      UnsignedShort
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Source Port"
+    ::= { ciscoSdwanBfdMIBNotifObjects 18 }
+
+ciscoSdwanBfdDstPort OBJECT-TYPE
+    SYNTAX      UnsignedShort
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Destination Port"
+    ::= { ciscoSdwanBfdMIBNotifObjects 19 }
+
+ciscoSdwanBfdLocalSystemIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Local System IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 20 }
+
+
+ciscoSdwanBfdRemoteSystemIp OBJECT-TYPE
+    SYNTAX      InetAddressIP 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Remote System IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 21 }
+
+coSdwanBfdLocalColor OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Local Color"
+    ::= { ciscoSdwanBfdMIBNotifObjects 22 }
+
+ciscoSdwanBfdRemoteSystemIp OBJECT-TYPE
+    SYNTAX      InetAddressIP
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Remote System IP address"
+    ::= { ciscoSdwanBfdMIBNotifObjects 23 }
+
+ciscoSdwanBfdRemoteColor OBJECT-TYPE
+   SYNTAX      OCTET STRING
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION "Remote Color"
+   ::= { ciscoSdwanBfdMIBNotifObjects 24 }
+
+ciscoSdwanBfdAppProbePFRStats OBJECT-TYPE
+   SYNTAX      OCTET STRING
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION "App Probe PFR stats"
+   ::= { ciscoSdwanBfdMIBNotifObjects 25 }
+
+ciscoSdwanBfdSlaClasses OBJECT-TYPE
+   SYNTAX      OCTET STRING
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION "SLA Classes"
+   ::= { ciscoSdwanBfdMIBNotifObjects 26 }
+
+ciscoSdwanBfdOldSlaClasses OBJECT-TYPE
+   SYNTAX      OCTET STRING
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION "Old SLA classes"
+   ::= { ciscoSdwanBfdMIBNotifObjects 27 }
+
+-- ********************************************************************
+-- *  Notifications
+-- ********************************************************************
+ciscoSdwanBfdStateChange NOTIFICATION-TYPE
+    OBJECTS {
+                netconfNotificationSeverity,
+                ciscoSdwanBfdSourceIp,
+                ciscoSdwanBfdDestinationIp,
+                ciscoSdwanBfdProto,
+                ciscoSdwanBfdSourcePort,
+                ciscoSdwanBfdDestinationPort,
+                ciscoSdwanBfdLocalSystemIp,
+                ciscoSdwanBfdLocalColor,
+                ciscoSdwanBfdRemoteSystemIp,
+                ciscoSdwanBfdRemoteColor,
+                ciscoSdwanBfdNewState,
+                ciscoSdwanBfdDeleted,
+                ciscoSdwanBfdFlapReason,
+                ciscoSdwanBfdSuspendState
+        }
+        STATUS current
+        DESCRIPTION "Cisco SDWAN trap for BFD state change"
+        ::= { ciscoSdwanBfdMIBNotifs 1 }
+
+ciscoSdwanBfdSlaChange NOTIFICATION-TYPE
+    OBJECTS {
+                netconfNotificationSeverity,
+                ciscoSdwanBfdSrcIp,
+                ciscoSdwanBfdDstIp,
+                ciscoSdwanBfdProto,
+                ciscoSdwanBfdSrcPort,
+                ciscoSdwanBfdDstPort,
+                ciscoSdwanBfdLocalSystemIp,
+                ciscoSdwanBfdLocalColor,
+                ciscoSdwanBfdRemoteSystemIp,
+                ciscoSdwanBfdRemoteColor,
+                ciscoSdwanBfdAppProbePFRStats,
+                ciscoSdwanBfdSlaClasses,
+                ciscoSdwanBfdOldSlaClasses
+        }
+        STATUS current
+        DESCRIPTION "Cisco SDWAN trap for BFD SLA change"
+        ::= { ciscoSdwanBfdMIBNotifs 2 }
+
 
 -- *******************************************************************
 -- *    Units of conformance
@@ -609,7 +895,9 @@ cSdwanBfdSummaryGroup OBJECT-GROUP
                         bfdSummaryBfdSessionsUp,
                         bfdSummaryBfdSessionsMax,
                         bfdSummaryBfdSessionsFlap,
-                        bfdSummaryPollInterval
+                        bfdSummaryPollInterval,
+                        bfdSummaryBfdSessionsUpSuspended,
+                        bfdSummaryBfdSessionsDownSuspended
                     }
     STATUS          current
     DESCRIPTION
@@ -642,7 +930,8 @@ cSdwanBfdHistoryListGroup OBJECT-GROUP
                         bfdHistoryListTime,
                         bfdHistoryListRxPkts,
                         bfdHistoryListTxPkts,
-                        bfdHistoryListDel
+                        bfdHistoryListDel,
+                        bfdHistoryListFlags
                     }
     STATUS          current
     DESCRIPTION
@@ -653,12 +942,55 @@ cSdwanBfdTlocSummaryListGroup OBJECT-GROUP
     OBJECTS         {
                         bfdTlocSummaryListSessionsTotal,
                         bfdTlocSummaryListSessionsUp,
-                        bfdTlocSummaryListSessionsFlap
+                        bfdTlocSummaryListSessionsFlap,
+                        bfdTlocSummaryListSessionsUpSuspended,
+                        bfdTlocSummaryListSessionsDownSuspended
                     }
     STATUS          current
     DESCRIPTION
         "This is a collection of objects of bfd Tloc summary list. "
     ::= { ciscoSdwanBfdMIBGroups 4 }
 
+cSdwanBfdNotifObjsGroup OBJECT-GROUP
+    OBJECTS         {
+                        ciscoSdwanBfdSourceIp,
+                        ciscoSdwanBfdDestinationIp,
+                        ciscoSdwanBfdProto,
+                        ciscoSdwanBfdSourcePort,
+                        ciscoSdwanBfdDestinationPort,
+                        ciscoSdwanBfdLocalSystemIp,
+                        ciscoSdwanBfdLocalColor,
+                        ciscoSdwanBfdRemoteSystemIp,
+                        ciscoSdwanBfdRemoteColor,
+                        ciscoSdwanBfdNewState,
+                        ciscoSdwanBfdDeleted,
+                        ciscoSdwanBfdFlapReason,
+                        ciscoSdwanBfdSuspendState,
+                        ciscoSdwanBfdSrcIp,
+                        ciscoSdwanBfdDstIp,
+                        ciscoSdwanBfdProto,
+                        ciscoSdwanBfdSrcPort,
+                        ciscoSdwanBfdDstPort,
+                        ciscoSdwanBfdLocalSystemIp,
+                        ciscoSdwanBfdLocalColor,
+                        ciscoSdwanBfdRemoteSystemIp,
+                        ciscoSdwanBfdRemoteColor,
+                        ciscoSdwanBfdAppProbePFRStats,
+                        ciscoSdwanBfdSlaClasses,
+                        ciscoSdwanBfdOldSlaClasses,
+                  }
+    STATUS          current
+    DESCRIPTION
+        "This is a collection of objects of bfd notification objects. "
+    ::= { ciscoSdwanBfdMIBGroups 5 }
 
+cSdwanOperSystemNotifsGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   {
+                       ciscoSdwanBfdStateChange,
+                       ciscoSdwanBfdSlaChange
+                    }
+    STATUS          current
+    DESCRIPTION
+        "This is a collection of bfd notifications."
+    ::= { ciscoSdwanBfdMIBGroups 6 }
 END

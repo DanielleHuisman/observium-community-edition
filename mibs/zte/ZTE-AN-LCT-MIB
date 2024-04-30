@@ -1,0 +1,288 @@
+ZTE-AN-LCT-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS 
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+        Integer32, Unsigned32                           FROM SNMPv2-SMI       
+        RowStatus, DisplayString,
+        TEXTUAL-CONVENTION                              FROM SNMPv2-TC        
+        OBJECT-GROUP, MODULE-COMPLIANCE                 FROM SNMPv2-CONF          
+        SnmpAdminString                                 FROM SNMP-FRAMEWORK-MIB
+        zxAnSysObjects                                  FROM ZTE-AN-SYS-MIB;    
+    
+    zxAnLctMib    MODULE-IDENTITY
+        LAST-UPDATED    "201108230000Z"
+        ORGANIZATION    "ZTE Corporation"
+        CONTACT-INFO    "Yao XiangMin  ZTE Corporation
+                         Mail: yao.xiangmin@zte.com.cn 
+                         Tel : +86-21-68897224
+                        "
+        DESCRIPTION  
+           "The MIB module for the management of LCT(Local Craft Terminal)logon.
+           
+            When the LCT user logs in, NE notifies to NMS the login information
+            of LCT user. Similarly when the LCT user logs out(including abnormal
+            exit), NE will report to the NMS that LCT user logs out.
+            
+            After the LCT user logs on NE(Network Element), a session is created
+            between the NE and the LCT. To maintain the session, LCT user sets 
+            heartbeat operation periodically.
+           
+            If LCT user does not set the heartbeat operation within a period of 
+            time(TimeOut), NE will determine the LCT user's link is abnormal and
+            disconnect the LCT session.
+           "
+        REVISION        "201108230000Z"
+        DESCRIPTION     "Initial version of this MIB module." 
+                         
+        ::= { zxAnSysObjects 150 }      
+    
+--------------------------------------------------------------------------------
+-- Following management objects are defined.
+-- 1. zxAnLctGlobalObjects
+-- 2. zxAnLctObjects
+
+-- Following LCT notifications is defined.
+-- 3. zxAnLctNotifications 
+
+-- Following conformance information is defined.
+-- 4. zxAnLctConformance
+
+-------------------------------------------------------------------------------- 
+
+    zxAnLctGlobalObjects   OBJECT IDENTIFIER  ::=  { zxAnLctMib 1 }      
+    zxAnLctObjects         OBJECT IDENTIFIER  ::=  { zxAnLctMib 2 }   
+    zxAnLctNotifications   OBJECT IDENTIFIER  ::=  { zxAnLctMib 3 }     
+    zxAnLctAccessObjects   OBJECT IDENTIFIER  ::=  { zxAnLctObjects 1 }    
+    zxAnLctAccessTraps     OBJECT IDENTIFIER  ::=  { zxAnLctNotifications 1 }      
+    
+--------------------------------------------------------------------------------
+--1. zxAnLctGlobalObjects
+-------------------------------------------------------------------------------- 
+
+    zxAnLctAccessHeartbeatAction   OBJECT-TYPE    
+        SYNTAX          INTEGER
+        {
+            heartbeat(1)
+        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     
+           "After LCT user logs on, LCT can use this object's set operation to
+            keep heartbeat between NE and LCT."                                   
+        ::=  {  zxAnLctGlobalObjects  1  }  
+
+    zxAnLctAccessHeartbeatTimeOut  OBJECT-TYPE     
+        SYNTAX          Integer32(1..3600)
+        UNITS           "seconds"
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+           "The timeout of heartbeat operation. 
+           
+            If LCT user does not set the heartbeat operation within a period of
+            time(TimeOut),NE will determine the LCT user's link is abnormal and
+            disconnect the LCT session."                                                  
+        DEFVAL { 120 } 
+        ::=  {  zxAnLctGlobalObjects  2  }    
+         
+--------------------------------------------------------------------------------
+--2. zxAnLctObjects
+    -- 2.1. zxAnLctAccessObjects   
+--------------------------------------------------------------------------------  
+
+    zxAnLctAccessTable  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF ZxAnLctAccessEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION 
+           "LCT user login and logout configuration information table.
+           
+            This table includes the LCT user name, IP address and additional
+            LCT user login information.It also includes a rowstatus variable
+            for the completion of LCT session creation and deletion."                                            
+        ::= { zxAnLctAccessObjects 1 }
+
+    zxAnLctAccessEntry           OBJECT-TYPE
+        SYNTAX          ZxAnLctAccessEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+           "zxAnLctAccessEntry,A list of the LCT accessing the NE information.
+            
+            There are two variables is mandatory when creat the entry. 
+            All of the mandatory variables must be included in one SNMP set
+            operation.and must comply with the multi-variables binding rule.
+            
+            The multi-variables binding rule should be complied with when a 
+            manager creates an entry. According to this rule, all the related 
+            mib variables must be included in one SNMP set operation.                            
+                    
+            There are two cases based on the variable zxAnLctAccessRowStatus. 
+            The mandatory and optional variables are different in each case.
+             
+            Case 1: to create an entry when LCT user login:
+                mandatory: zxAnLctAccessDetailInfo, zxAnLctAccessRowStatus,
+                optional : none
+
+            Case 2: to destroy the session when LCT user logout:
+                mandatory: zxAnLctAccessRowStatus,
+                optional : none
+             
+            After an entry is created, no variable can be modified. 
+            If a manager tries to modify any variables in this entry, 
+            agent will return error with SNMP error code inconsistentValue."
+        INDEX           { zxAnLctAccessSessionId }
+        ::=  { zxAnLctAccessTable 1 }
+
+    ZxAnLctAccessEntry  ::=  SEQUENCE {
+        zxAnLctAccessSessionId                   Integer32,
+        zxAnLctAccessDetailInfo                  DisplayString,      
+        zxAnLctAccessSourceIpAddress             DisplayString,
+        zxAnLctAccessUserName                    DisplayString,
+        zxAnLctAccessRowStatus                   RowStatus  
+        }
+
+    zxAnLctAccessSessionId       OBJECT-TYPE  
+        SYNTAX          Integer32(1..10)  
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+           "Session ID, The index of the zxAnLctAccessEntery.
+            A new session is created when LCT user login the NE."
+        ::= { zxAnLctAccessEntry 1 }
+       
+    zxAnLctAccessDetailInfo      OBJECT-TYPE  
+        SYNTAX          DisplayString(SIZE(0..200)) 
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     
+           "The detail infomation of LCT login the NE, which used to input
+            additional information about LCT user login.
+                  
+            When LCT user login, must comply with the multi-variables 
+            binding, both zxAnLctAccessDetailInfo and zxAnLctAccessRowStatus
+            ('createAndGo')must included in one SNMP set operation.
+                  
+            When LCT user logout,must comply with the multi-variables 
+            binding,not include this variable."
+        ::=  {  zxAnLctAccessEntry  2  }        
+       
+    zxAnLctAccessSourceIpAddress OBJECT-TYPE
+        SYNTAX          DisplayString (SIZE(1..40))  
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION    
+           "Read-only variable. The source ip address of the active LCT."
+        ::= { zxAnLctAccessEntry 3 }
+ 
+    zxAnLctAccessUserName        OBJECT-TYPE
+        SYNTAX          DisplayString (SIZE(0..64))  
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+           "Read-only variable. The snmp v3 username of the active LCT."
+        ::= { zxAnLctAccessEntry 4 }    
+  
+    zxAnLctAccessRowStatus       OBJECT-TYPE 
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     
+           "The status of this conceptual row.            
+            The supported actions of this conceptual row only include:
+            'createAndGo' and 'destroy'.
+
+            To create a row in this table, a manager must set this object to 
+            createAndGo(4), and must comply with the multi-variables binding 
+            rule described in zxAnLctAccessEntry.
+    
+            To delete a row in this table, a manager must set this object to 
+            destroy(6). 
+             
+            To get this object, the agent returns active(1), when the object
+            has created,others return noSuchInstance."                                              
+        ::=  {  zxAnLctAccessEntry  50  }  
+        
+--------------------------------------------------------------------------------
+-- 3. zxAnLctNotifications   
+-------------------------------------------------------------------------------- 
+        
+    zxAnLctAccessLoginTrap NOTIFICATION-TYPE
+        OBJECTS { 
+        zxAnLctAccessSourceIpAddress,
+        zxAnLctAccessUserName,
+        zxAnLctAccessDetailInfo
+        }
+        STATUS   current
+        DESCRIPTION    
+           "A zxAnLctAccessLogin trap is sent when the agent has 
+            detected that the LCT user has been login."
+        ::= { zxAnLctAccessTraps 1 }          
+        
+    zxAnLctAccessLogoutTrap NOTIFICATION-TYPE
+        OBJECTS { 
+        zxAnLctAccessSourceIpAddress,
+        zxAnLctAccessUserName,
+        zxAnLctAccessDetailInfo
+        }
+        STATUS   current
+        DESCRIPTION   
+           "A zxAnLctAccessLogout trap is sent when the agent has 
+            detected that the LCT user has been logout or LCT session 
+            has been tiemout."
+        ::= { zxAnLctAccessTraps 2 } 
+               
+--------------------------------------------------------------------------------
+-- 4. zxAnLctConformance
+--------------------------------------------------------------------------------
+    zxAnLctConformance      OBJECT IDENTIFIER ::= { zxAnLctMib 4 } 
+    zxAnLctCompliances      OBJECT IDENTIFIER ::= {zxAnLctConformance 1}
+    zxAnLctGroups           OBJECT IDENTIFIER ::= {zxAnLctConformance 2}
+
+    zxAnLctCompliance MODULE-COMPLIANCE
+        STATUS current
+        DESCRIPTION
+           "The compliance statement for entities which implement the
+            LCT management."
+        MODULE
+            MANDATORY-GROUPS {
+               zxAnLctGlobalGroup,
+               zxAnLctAccessGroup,
+               zxAnLctAccessTrapsGroup            
+            }
+        ::= { zxAnLctCompliances 1 }        
+      
+    zxAnLctGlobalGroup OBJECT-GROUP
+        OBJECTS {
+           zxAnLctAccessHeartbeatAction,
+           zxAnLctAccessHeartbeatTimeOut           
+        }
+        STATUS current
+        DESCRIPTION 
+           "A collection of the objects which are used to configure the
+            timeout variable of the LCT session,and set LCT session heartbeat."
+        ::= { zxAnLctGroups 1 } 
+
+    zxAnLctAccessGroup OBJECT-GROUP
+        OBJECTS {
+           zxAnLctAccessDetailInfo,
+           zxAnLctAccessSourceIpAddress,
+           zxAnLctAccessUserName,           
+           zxAnLctAccessRowStatus
+        }
+        STATUS current
+        DESCRIPTION
+          "A collection of the objects which are used to configure LCT user
+           login and logout."
+        ::= { zxAnLctGroups 2 }
+     
+    zxAnLctAccessTrapsGroup OBJECT-GROUP
+        OBJECTS {
+           zxAnLctAccessLoginTrap,
+           zxAnLctAccessLogoutTrap            
+        }
+        STATUS current
+        DESCRIPTION
+           "A collection of notifications for LCT login and logout."
+        ::= { zxAnLctGroups 3 }
+END  

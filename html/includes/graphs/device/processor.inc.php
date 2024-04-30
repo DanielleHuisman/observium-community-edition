@@ -12,7 +12,7 @@
 
 $sql = "SELECT * FROM `processors` WHERE `processor_type` != 'hr-average' AND `device_id` = ?";
 if (isset($vars['filter_id'])) {
-    $sql .= generate_where_clause(generate_query_values_ng($vars['filter_id'], 'processor_id'));
+    $sql .= generate_where_clause(generate_query_values($vars['filter_id'], 'processor_id'));
 }
 $procs = dbFetchRows($sql, [$device['device_id']]);
 

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -34,6 +34,9 @@ const OBS_COLOUR_LIST_B_B = '#e3e3e3'; //$list_colour_b_b = "#e3e3e3";
 const OBS_COLOUR_LIST_HIGHLIGHT = '#ffcccc'; //$list_highlight  = "#ffcccc";
 const OBS_COLOUR_WARN_A = '#ffeeee'; //$warn_colour_a   = "#ffeeee";
 const OBS_COLOUR_WARN_B = '#ffcccc'; //$warn_colour_b   = "#ffcccc";
+
+// FontAwesome compat for brands
+const OBS_PATTERN_FONTAWESOME_BRANDS = '/^icon-(monero|hooli|yelp|cc\-visa|lastfm|shopware|creative\-commons\-nc|aws|redhat|yoast|cloudflare|ups|wpexplorer|dyalog|bity|stackpath|buysellads|first\-order|modx|guilded|vnv|square\-js|js\-square|microsoft|qq|orcid|java|invision|creative\-commons\-pd\-alt|centercode|glide\-g|drupal|hire\-a\-helper|creative\-commons\-by|unity|whmcs|rocketchat|vk|untappd|mailchimp|css3\-alt|square\-reddit|reddit\-square|vimeo\-v|contao|square\-font\-awesome|deskpro|sistrix|square\-instagram|instagram\-square|battle\-net|the\-red\-yeti|square\-hacker\-news|hacker\-news\-square|edge|threads|napster|square\-snapchat|snapchat\-square|google\-plus\-g|artstation|markdown|sourcetree|google\-plus|diaspora|foursquare|github\-alt|phoenix\-squadron|pagelines|algolia|red\-river|creative\-commons\-sa|safari|google|square\-font\-awesome\-stroke|font\-awesome\-alt|atlassian|linkedin\-in|digital\-ocean|nimblr|chromecast|evernote|hacker\-news|creative\-commons\-sampling|adversal|creative\-commons|watchman\-monitoring|fonticons|weixin|shirtsinbulk|codepen|git\-alt|lyft|rev|windows|wizards\-of\-the\-coast|square\-viadeo|viadeo\-square|meetup|centos|adn|cloudsmith|pied\-piper\-alt|square\-dribbble|dribbble\-square|codiepie|node|mix|steam|cc\-apple\-pay|scribd|debian|openid|instalod|expeditedssl|sellcast|square\-twitter|twitter\-square|r\-project|delicious|freebsd|vuejs|accusoft|ioxhost|fonticons\-fi|app\-store|cc\-mastercard|itunes\-note|golang|kickstarter|grav|weibo|uncharted|firstdraft|square\-youtube|youtube\-square|wikipedia\-w|wpressr|rendact|angellist|galactic\-republic|nfc\-directional|skype|joget|fedora|stripe\-s|meta|laravel|hotjar|bluetooth\-b|sticker\-mule|creative\-commons\-zero|hips|behance|reddit|discord|chrome|app\-store\-ios|cc\-discover|wpbeginner|confluence|mdb|dochub|accessible\-icon|ebay|amazon|unsplash|yarn|square\-steam|steam\-square|500px|square\-vimeo|vimeo\-square|asymmetrik|font\-awesome|font\-awesome\-flag|font\-awesome\-logo\-full|gratipay|apple|hive|gitkraken|keybase|apple\-pay|padlet|amazon\-pay|square\-github|github\-square|stumbleupon|fedex|phoenix\-framework|shopify|neos|square\-threads|hackerrank|researchgate|swift|angular|speakap|angrycreative|y\-combinator|empire|envira|square\-gitlab|gitlab\-square|studiovinari|pied\-piper|wordpress|product\-hunt|firefox|linode|goodreads|square\-odnoklassniki|odnoklassniki\-square|jsfiddle|sith|themeisle|page4|hashnode|react|cc\-paypal|squarespace|cc\-stripe|creative\-commons\-share|bitcoin|keycdn|opera|itch\-io|umbraco|galactic\-senate|ubuntu|draft2digital|stripe|houzz|gg|dhl|square\-pinterest|pinterest\-square|xing|blackberry|creative\-commons\-pd|playstation|quinscape|less|blogger\-b|opencart|vine|paypal|gitlab|typo3|reddit\-alien|yahoo|dailymotion|affiliatetheme|pied\-piper\-pp|bootstrap|odnoklassniki|nfc\-symbol|ethereum|speaker\-deck|creative\-commons\-nc\-eu|patreon|avianex|ello|gofore|bimobject|facebook\-f|square\-google\-plus|google\-plus\-square|mandalorian|first\-order\-alt|osi|google\-wallet|d\-and\-d\-beyond|periscope|fulcrum|cloudscale|forumbee|mizuni|schlix|square\-xing|xing\-square|bandcamp|wpforms|cloudversify|usps|megaport|magento|spotify|optin\-monster|fly|aviato|itunes|cuttlefish|blogger|flickr|viber|soundcloud|digg|tencent\-weibo|symfony|maxcdn|etsy|facebook\-messenger|audible|think\-peaks|bilibili|erlang|x\-twitter|cotton\-bureau|dashcube|42\-group|innosoft|elementor|square\-pied\-piper|pied\-piper\-square|creative\-commons\-nd|palfed|superpowers|resolving|xbox|searchengin|tiktok|square\-facebook|facebook\-square|renren|linux|glide|linkedin|hubspot|deploydog|twitch|ravelry|mixer|square\-lastfm|lastfm\-square|vimeo|mendeley|uniregistry|figma|creative\-commons\-remix|cc\-amazon\-pay|dropbox|instagram|cmplid|facebook|gripfire|jedi\-order|uikit|fort\-awesome\-alt|phabricator|ussunnah|earlybirds|trade\-federation|autoprefixer|whatsapp|slideshare|google\-play|viadeo|line|google\-drive|servicestack|simplybuilt|bitbucket|imdb|deezer|raspberry\-pi|jira|docker|screenpal|bluetooth|gitter|d\-and\-d|microblog|cc\-diners\-club|gg\-circle|pied\-piper\-hat|kickstarter\-k|yandex|readme|html5|sellsy|sass|wirsindhandwerk|wsh|buromobelexperte|salesforce|octopus\-deploy|medapps|ns8|pinterest\-p|apper|fort\-awesome|waze|cc\-jcb|snapchat|snapchat\-ghost|fantasy\-flight\-games|rust|wix|square\-behance|behance\-square|supple|rebel|css3|staylinked|kaggle|space\-awesome|deviantart|cpanel|goodreads\-g|square\-git|git\-square|square\-tumblr|tumblr\-square|trello|creative\-commons\-nc\-jp|get\-pocket|perbyte|grunt|weebly|connectdevelop|leanpub|black\-tie|themeco|python|android|bots|free\-code\-camp|hornbill|js|ideal|git|dev|sketch|yandex\-international|cc\-amex|uber|github|php|alipay|youtube|skyatlas|firefox\-browser|replyd|suse|jenkins|twitter|rockrms|pinterest|buffer|npm|yammer|btc|dribbble|stumbleupon\-circle|internet\-explorer|stubber|telegram|telegram\-plane|old\-republic|odysee|square\-whatsapp|whatsapp\-square|node\-js|edge\-legacy|slack|slack\-hash|medrt|usb|tumblr|vaadin|quora|square\-x\-twitter|reacteurope|medium|medium\-m|amilia|mixcloud|flipboard|viacoin|critical\-role|sitrox|discourse|joomla|mastodon|airbnb|wolf\-pack\-battalion|buy\-n\-large|gulp|creative\-commons\-sampling\-plus|strava|ember|canadian\-maple\-leaf|teamspeak|pushed|wordpress\-simple|nutritionix|wodu|google\-pay|intercom|zhihu|korvue|pix|steam\-symbol)/';
 
 /* After this line keep only WUI specific definitions, not required in cli! */
 //if (is_cli()) { return; }
@@ -65,6 +68,10 @@ $config['pages']['gridstack']['no_panel'] = TRUE;
 $config['pages']['dashboard']['no_panel'] = TRUE;
 $config['pages']['map']['no_panel']       = TRUE;
 $config['pages']['map_traffic']['no_panel'] = TRUE;
+$config['pages']['wmap']['no_panel']      = TRUE;
+$config['pages']['netmap']['no_panel']    = TRUE;
+$config['pages']['weathermap']['no_panel']= TRUE;
+
 
 // Refresh pages definitions
 $config['wui']['refresh_times']       = [ 0, 60, 120, 300, 900, 1800 ]; // Allowed refresh times in seconds
@@ -75,8 +82,10 @@ $config['wui']['refresh_disabled'][]  = [ 'page' => 'add_alert_check' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_check' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_regenerate' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_maintenance_add' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_checks', 'export' => 'yes' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'group_add' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'groups_regenerate' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'groups', 'export' => 'yes' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'group', 'view' => 'edit' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'add_alertlog_rule' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'syslog_rules' ];
@@ -103,6 +112,8 @@ $config['wui']['refresh_disabled'][]  = [ 'page' => 'logout' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'customoids' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'log' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'pollers' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'netmap' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'map_traffic' ];
 
 // Search modules used by the ajax search, in order.
 $config['wui']['search_modules'] = [ 'groups', 'devices', 'accesspoints', 'ports', 'slas', 'sensors', 'status',
@@ -129,7 +140,7 @@ $config['icon']['logout']            = "sprite-logout";
 
 $config['icon']['plus']              = "sprite-plus";
 $config['icon']['minus']             = "sprite-minus";
-$config['icon']['success']           = "sprite-success";
+$config['icon']['success']           = "sprite-ok"; // "sprite-success"; hrm, missed
 $config['icon']['error']             = "sprite-error";
 $config['icon']['important']         = "sprite-important";
 
@@ -191,7 +202,7 @@ $config['icon']['syslog-rule-add']   = $config['icon']['plus'];
 $config['icon']['eventlog']          = "sprite-eventlog";
 
 $config['icon']['pollerlog']         = "sprite-performance";
-$config['icon']['pollers']           = "sprite-module";
+$config['icon']['pollers']           = "sprite-vrf";
 $config['icon']['processes']         = "sprite-processes";
 
 $config['icon']['netmap']            = "sprite-netmap";
@@ -238,25 +249,27 @@ $config['icon']['p2pradio']          = "sprite-antenna";
 $config['icon']['billing']           = "sprite-accounting";
 $config['icon']['neighbours']        = "sprite-neighbours";
 $config['icon']['cbqos']             = "sprite-qos";
-$config['icon']['voltage']           = "sprite-voltage";
 $config['icon']['pressure']          = "sprite-pressure";
 $config['icon']['frequency']         = "sprite-frequency";
 $config['icon']['dbm']               = "sprite-laser";
 $config['icon']['counter']           = "sprite-counter";
 $config['icon']['fanspeed']          = "sprite-fanspeed";
-$config['icon']['current']           = "sprite-amps";
-$config['icon']['power']             = "sprite-watts";
+
 $config['icon']['illuminance']       = "sprite-light-bulb";
 $config['icon']['load']              = "sprite-asterisk";
 $config['icon']['progress']          = "sprite-percent";
 $config['icon']['temperature']       = "sprite-temperature";
 $config['icon']['humidity']          = "sprite-humidity";
 $config['icon']['airflow']           = "sprite-airflow";
-$config['icon']['current']           = "sprite-amps";
-$config['icon']['apower']            = "sprite-voltamps";
-$config['icon']['rpower']            = "sprite-voltampreactive";
-$config['icon']['crestfactor']       = "sprite-lightning";
-$config['icon']['powerfactor']       = "sprite-lightning";
+
+$config['icon']['voltage']           = "sprite-lightning";
+$config['icon']['current']           = "sprite-lightning hue-45";
+$config['icon']['power']             = "sprite-lightning hue-90";
+$config['icon']['apower']            = "sprite-lightning hue-135";
+$config['icon']['rpower']            = "sprite-lightning hue-180";
+$config['icon']['crestfactor']       = "sprite-lightning hue-225";
+$config['icon']['powerfactor']       = "sprite-lightning hue-270";
+
 $config['icon']['impedance']         = "sprite-ohms-2";
 $config['icon']['resistance']        = "sprite-ohms";
 $config['icon']['velocity']          = "sprite-performance";
@@ -279,6 +292,7 @@ $config['icon']['fan']               = $config['icon']['fanspeed'];
 $config['icon']['blower']            = $config['icon']['airflow'];
 $config['icon']['chassis']           = "sprite-nic";          // FIXME need other icon
 $config['icon']['contact']           = "sprite-connected";    // FIXME need other icon
+$config['icon']['breaker']           = "sprite-connected";    // FIXME need other icon
 $config['icon']['output']            = "sprite-merge";        // FIXME need other icon
 $config['icon']['powersupply']       = "sprite-power";        // FIXME need other icon
 $config['icon']['rectifier']         = "sprite-frequency-2";  // FIXME need other icon
@@ -364,5 +378,34 @@ $config['icon']['arrow-right']       = "icon-circle-arrow-right";
 $config['icon']['arrow-left']        = "icon-circle-arrow-left";
 
 $config['icons'] = [ 'sprite-device', 'sprite-network', 'sprite-virtual-machine' ];
+
+// Type Classes (see get_type_class())
+$config['type_class']['ospfIfType'] = [
+    'broadcast'              => [ 'class' => 'suppressed', 'icon' => NULL ],
+    'nbma'                   => [ 'class' => 'warning',    'icon' => NULL ],
+    'pointToPoint'           => [ 'class' => 'primary',    'icon' => NULL ],
+    'pointToMultipoint'      => [ 'class' => 'success',    'icon' => NULL ]
+];
+
+$config['type_class']['ospfIfState'] = [
+    'down'                   => [ 'class' => 'error',      'icon' => NULL ],
+    'loopback'               => [ 'class' => 'warning',    'icon' => NULL ],
+    'waiting'                => [ 'class' => 'warning',    'icon' => NULL ],
+    'pointToPoint'           => [ 'class' => 'success',    'icon' => NULL ],
+    'designatedRouter'       => [ 'class' => 'success',    'icon' => NULL ],
+    'backupDesignatedRouter' => [ 'class' => 'primary',    'icon' => NULL ],
+    'otherDesignatedRouter'  => [ 'class' => 'suppressed', 'icon' => NULL ],
+];
+
+$config['type_class']['ospfNbrState'] = [
+    'down'                   => [ 'class' => 'error',      'icon' => NULL ],
+    'attempt'                => [ 'class' => 'warning',    'icon' => NULL ],
+    'init'                   => [ 'class' => 'warning',    'icon' => NULL ],
+    'twoWay'                 => [ 'class' => 'primary',    'icon' => NULL ],
+    'exchangeStart'          => [ 'class' => 'suppressed', 'icon' => NULL ],
+    'exchange'               => [ 'class' => 'suppressed', 'icon' => NULL ],
+    'loading'                => [ 'class' => 'primary',    'icon' => NULL ],
+    'full'                   => [ 'class' => 'success',    'icon' => NULL ]
+];
 
 // EOF

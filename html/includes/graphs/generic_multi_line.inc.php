@@ -4,14 +4,15 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 include($config['html_dir'] . "/includes/graphs/common.inc.php");
 
+$graph_return['valid_options'][] = "alt_y";
 $graph_return['valid_options'][] = "trend";
 
 // Here we scale the number of numerical columns shown to make sure we keep the text.

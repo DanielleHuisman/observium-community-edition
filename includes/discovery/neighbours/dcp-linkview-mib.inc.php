@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -39,7 +39,7 @@ foreach ($dcp_array as $ifIndex => $dcp) {
     $port = get_port_by_index_cache($device, $ifIndex);
 
     $remote_hostname = $dcp['dcpLinkviewRemoteHostname'];
-    // Try find remote device and check if already cached
+    // Try find a remote device and check if already cached
     $remote_device_id = get_autodiscovery_device_id($device, $remote_hostname);
     if (is_null($remote_device_id) &&            // NULL - never cached in other rounds
         check_autodiscovery($remote_hostname)) { // Check all previous autodiscovery rounds
@@ -55,11 +55,12 @@ foreach ($dcp_array as $ifIndex => $dcp) {
     }
 
     $neighbour = [
-      'remote_port_id'  => $remote_port_id,
-      'remote_hostname' => $remote_hostname,
-      'remote_port'     => $dcp['dcpLinkviewRemoteName'],
-      'remote_platform' => '',
-      'remote_version'  => '',
+        'remote_device_id' => $remote_device_id,
+        'remote_port_id'   => $remote_port_id,
+        'remote_hostname'  => $remote_hostname,
+        'remote_port'      => $dcp['dcpLinkviewRemoteName'],
+        'remote_platform'  => '',
+        'remote_version'   => '',
     ];
     discover_neighbour($port, 'dcp', $neighbour);
 }

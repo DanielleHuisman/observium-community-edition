@@ -1,0 +1,470 @@
+--  =======================================================================
+--  File        : oaOspf.mib
+--  Description : Private MIB for Linux Router, is extension of ospf ::= { mib-2 14 }
+--  By          : Alex Rozin
+--  Version     : $Revision: 1.1.1.1 $
+--  Date        : $Date: 2002/03/19 13:41:55 $
+--  $Log: oaOspf.mib,v $
+--  Revision 1.1.1.1  2002/03/19 13:41:55  alex
+--  Version 4.2.3
+--
+--  Revision 1.1.1.1  2002/03/10 11:52:42  alex
+--  Version 4.2.3 (For CERT report reasons)
+--
+--  Revision 1.5  2001/08/20 12:06:53  alex
+--  New route map commnad types
+--
+--  Revision 1.4  2001/03/14 15:29:55  yakovv
+--  1.'ObjectStatus' SYNTAX  type of MIB Objects have been replaced with
+--  'AdminStatus'  SYNTAX  type.
+--  2.Little Change in the DESCRIPTION string of all [oa.....AdminStatus] MIB Objects
+--
+--  Revision 1.3  2001/02/27 08:01:52  alex
+--  File header (Version, Data, Log, Copyright, etc.)
+--
+--  Revision 1.2  2000/12/14 15:27:22  alex
+--  1. ipMetricType as option of oaOspfRouteMapRuleCommand
+--  2. Default values for Access List Table fields
+--
+--  Revision 1.1  2000/12/13 15:22:19  alex
+--  Begin of the great history of the private OSPF MIB
+--
+--
+--  =======================================================================
+--
+-- Copyright (c) 2000 Optical Access.  All Rights Reserved.
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This NBase SNMP MIB Specification
+-- embodies Optical Access's proprietary intellectual property.  NBase
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is Optical Access's intent to encourage the widespread use of this
+-- specification in connection with the management of Optical Access's
+-- products. Optical Access grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of Optical Access's products.
+--
+-- This specification is supplied "AS IS," and Optical Access makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Optical Access retains the right to change this MIB without notification.
+
+
+OAOSPF-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    enterprises,
+    TimeTicks,
+    IpAddress                       FROM RFC1155-SMI
+    DisplayString                   FROM RFC1213-MIB
+    OBJECT-TYPE                     FROM RFC-1212
+    TRAP-TYPE                       FROM RFC-1215;
+
+    ObjectStatus ::= INTEGER
+            {
+            other       (1),
+            enable      (2),
+            disable     (3)
+            }
+
+        AdminStatus ::= INTEGER
+            {
+            other       (1),
+            valid       (2),
+            invalid     (3)
+            }
+
+    Foreign4OspfProtocolType ::= INTEGER
+            {
+            other     (1),
+            kernel    (2),
+            connected (3),
+            static    (4),
+            bgp       (6),
+            rip       (7)
+            }
+
+    BooleanFlag ::= INTEGER
+            {
+            other     (-1),
+            no        (0),
+            yes       (1)
+            }
+
+-- ************************************************************
+-- Objects Identifiers Definition
+-- ************************************************************
+
+oaccess      OBJECT IDENTIFIER ::= { enterprises 6926 }
+oaManagement OBJECT IDENTIFIER ::= { oaccess 1 }
+oaRouter     OBJECT IDENTIFIER ::= { oaManagement 10 }
+
+oaOspf       OBJECT IDENTIFIER ::= { oaRouter 2 }
+
+oaOspfCfg    OBJECT IDENTIFIER ::= { oaOspf 1 }
+
+oaOspfConfigStatus OBJECT-TYPE
+       SYNTAX  INTEGER
+        {
+        other          (1),
+        save           (2),
+        none           (3),
+        init           (4),
+        reset          (5)
+        }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+       "This object is used to save the current 
+       configuration in the 'ospf.conf' file.
+       Writing a save(2) is equal to 'write file ospf' command.
+       Writing a init(4) deletes the 'ospf.conf' file.
+       Writing a reset(5) couses rereading from file 'ospf.conf'.
+       The GET operation returns only usage(3) value."
+       ::= { oaOspfCfg 22 }
+ 
+oaOspfRouteMapTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF OaOspfRouteMapEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+        "OSPF route map."
+        ::= { oaOspf 9 }
+
+oaOspfRouteMapEntry  OBJECT-TYPE
+        SYNTAX  OaOspfRouteMapEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+        "The entries (records)."
+        INDEX { oaOspfRouteMapName,
+                oaOspfRouteMapType,
+                oaOspfRouteMapSequenceNo }
+        ::= { oaOspfRouteMapTable 1 }
+
+OaOspfRouteMapEntry ::= SEQUENCE {
+        oaOspfRouteMapName        DisplayString,
+        oaOspfRouteMapType        INTEGER,
+        oaOspfRouteMapSequenceNo  INTEGER,
+        oaOspfRouteMapExitpolicy  INTEGER,
+        oaOspfRouteMapNextSeqNo   INTEGER,
+        oaOspfRouteMapAdminStatus AdminStatus
+        }
+
+oaOspfRouteMapName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapEntry 1 }
+
+oaOspfRouteMapType OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+          other(1),
+          permit(2),
+          deny(3)
+        }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapEntry 2 }
+
+oaOspfRouteMapSequenceNo OBJECT-TYPE
+        SYNTAX  INTEGER ( 1..65535 )
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapEntry 3 }
+
+oaOspfRouteMapExitpolicy OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+          other(1),
+          exit(2),
+          goto(3),
+          next(4)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfRouteMapEntry 10 }
+
+oaOspfRouteMapNextSeqNo  OBJECT-TYPE
+        SYNTAX  INTEGER ( 1..65535 )
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfRouteMapEntry 11 }
+
+oaOspfRouteMapAdminStatus OBJECT-TYPE
+        SYNTAX  AdminStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "Use valid(2) value by ADDind new and EDITting existing Entry.
+         Use 'invalid' (3) value by DELETting of existing Entry."
+        ::= { oaOspfRouteMapEntry 16 }
+
+oaOspfRouteMapRuleTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF OaOspfRouteMapRuleEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+        "OSPF route map."
+        ::= { oaOspf 10 }
+
+oaOspfRouteMapRuleEntry  OBJECT-TYPE
+        SYNTAX  OaOspfRouteMapRuleEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+        "The entries (records)."
+        INDEX { oaOspfRouteMapRuleName,
+                oaOspfRouteMapRuleType,
+                oaOspfRouteMapRuleSequenceNo,
+                oaOspfRouteMapRuleMethod,
+                oaOspfRouteMapRuleIndex }
+        ::= { oaOspfRouteMapRuleTable 1 }
+
+OaOspfRouteMapRuleEntry ::= SEQUENCE {
+        oaOspfRouteMapRuleName        DisplayString,
+        oaOspfRouteMapRuleType        INTEGER,
+        oaOspfRouteMapRuleSequenceNo  INTEGER,
+        oaOspfRouteMapRuleMethod      INTEGER,
+        oaOspfRouteMapRuleIndex       INTEGER,
+        oaOspfRouteMapRuleCommand     INTEGER,
+        oaOspfRouteMapRuleStr         DisplayString,
+        oaOspfRouteMapRuleAdminStatus AdminStatus
+        }
+
+oaOspfRouteMapRuleName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapRuleEntry 1 }
+
+oaOspfRouteMapRuleType OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+          other(1),
+          permit(2),
+          deny(3)
+        }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapRuleEntry 2 }
+
+oaOspfRouteMapRuleSequenceNo OBJECT-TYPE
+        SYNTAX  INTEGER ( 1..65535 )
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapRuleEntry 3 }
+
+oaOspfRouteMapRuleMethod OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+          other(1),
+          match(2),
+          set(3)
+        }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapRuleEntry 4 }
+
+oaOspfRouteMapRuleIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "Index."
+        ::= { oaOspfRouteMapRuleEntry 5 }
+
+oaOspfRouteMapRuleCommand OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+          other              (1),
+          metric             (2),
+          interface          (3),
+          ipNextHop          (4),
+          ipAddress          (5),
+          ipMetricType       (6),
+          tag               (15),
+          routeType         (16),
+          nextHop           (17),
+          aggregator        (18),
+          atomicAggregate   (19),
+          communityAdditive (20),
+          communityDelete   (21),
+          extcommunity      (22),
+          localPreference   (23),
+          origin            (24),
+          originatorId      (25),
+          vpnv4             (26),
+          weight            (27)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfRouteMapRuleEntry 8 }
+
+oaOspfRouteMapRuleStr OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfRouteMapRuleEntry 9 }
+
+oaOspfRouteMapRuleAdminStatus OBJECT-TYPE
+        SYNTAX  AdminStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "Use valid(2) value by ADDind new and EDITting existing Entry.
+         Use 'invalid' (3) value by DELETting of existing Entry."
+        ::= { oaOspfRouteMapRuleEntry 16 }
+
+
+oaOspfAccListTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF OaOspfAccListEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+        "RIP neighbor; this table replects entries, enabled
+         by 'neighbor <A.B.C.D>' statements."
+        ::= { oaOspf 14 }
+
+oaOspfAccListEntry  OBJECT-TYPE
+        SYNTAX  OaOspfAccListEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+        "The entries (records)."
+        INDEX { oaOspfAccListFamily,
+                oaOspfAccListName,
+                oaOspfAccListFilterIndex }
+        ::= { oaOspfAccListTable 1 }
+
+OaOspfAccListEntry ::= SEQUENCE {
+        oaOspfAccListFamily      INTEGER,
+        oaOspfAccListName        DisplayString,
+        oaOspfAccListFilterIndex INTEGER,
+        oaOspfAccListFilterType  INTEGER,
+        oaOspfAccListIsAny       BooleanFlag,
+        oaOspfAccListIp          IpAddress,
+        oaOspfAccListMaskLen     INTEGER,
+        oaOspfAccListIsExact     BooleanFlag,
+        oaOspfAccListAdminStatus AdminStatus
+        }
+
+oaOspfAccListFamily      OBJECT-TYPE
+        SYNTAX  INTEGER
+         {
+           other (1),
+           inet  (2),
+           inet6 (10)
+         }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfAccListEntry 1 }
+
+oaOspfAccListName        OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfAccListEntry 2 }
+
+oaOspfAccListFilterIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        ::= { oaOspfAccListEntry 3 }
+
+
+oaOspfAccListFilterType  OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+          other   (1),
+          deny    (2),
+          permit  (3),
+          dynamic (4)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        DEFVAL { deny }
+        ::= { oaOspfAccListEntry 6 }
+
+oaOspfAccListIsAny       OBJECT-TYPE
+        SYNTAX  BooleanFlag
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        DEFVAL { yes }
+        ::= { oaOspfAccListEntry 7 }
+
+oaOspfAccListIp          OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        DEFVAL { 0.0.0.0 }
+        ::= { oaOspfAccListEntry 8 }
+
+oaOspfAccListMaskLen     OBJECT-TYPE
+        SYNTAX  INTEGER ( 0..32 )
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        DEFVAL { 0 }
+        ::= { oaOspfAccListEntry 9 }
+
+oaOspfAccListIsExact     OBJECT-TYPE
+        SYNTAX  BooleanFlag
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "."
+        DEFVAL { yes }
+        ::= { oaOspfAccListEntry 10 }
+
+oaOspfAccListAdminStatus OBJECT-TYPE
+        SYNTAX  AdminStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+        "Use valid(2) value by ADDind new and EDITting existing Entry.
+         Use 'invalid' (3) value by DELETting of existing Entry."
+        DEFVAL { valid }
+        ::= { oaOspfAccListEntry 20 }
+
+END
+        

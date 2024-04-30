@@ -20,7 +20,7 @@ $include_order = 'default'; // Use MIBs from default os definitions by first!
 include("includes/include-dir-mib.inc.php");
 
 $table_rows    = [];
-$neighbours_db = dbFetchRows('SELECT * FROM `neighbours` WHERE `device_id` = ?', [$device['device_id']]);
+$neighbours_db = dbFetchRows('SELECT * FROM `neighbours` WHERE `device_id` = ?', [ $device['device_id'] ]);
 foreach ($neighbours_db as $neighbour) {
     $local_port_id   = $neighbour['port_id'];
     $remote_hostname = $neighbour['remote_hostname'];

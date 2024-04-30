@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -67,22 +67,6 @@ if (OBS_DEBUG) {
 
                         // End Dashboards
 
-                        // Weathermaps
-
-                        if ($config['weathermap']['enable'] === TRUE && $_SESSION['userlevel'] > 7) {
-                            $entries = [];
-
-                            foreach (dbFetchRows("SELECT * FROM `weathermaps`") as $weathermap) {
-                                $entries[] = ['text' => $weathermap['wmap_name'], 'url' => generate_url(['page' => "wmap", 'mapname' => $weathermap['wmap_name']]), 'icon' => 'sprite-map'];
-                            }
-
-                            $navbar['observium']['entries'][] = ['title' => 'Weathermaps', 'url' => generate_url(['page' => 'wmap']), 'icon' => 'sprite-map-2', 'entries' => $entries];
-                            $navbar['observium']['entries'][] = ['divider' => TRUE];
-
-                        }
-
-                        // End Weathermaps
-
                         // Show Groups
                         $entity_group_menu = [];
                         if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5) {
@@ -104,9 +88,9 @@ if (OBS_DEBUG) {
                                 $alert_checks_count[$alert_check['entity_type']]++;
 
                                 $alert_checks_type[$alert_check['entity_type']][] = [
-                                  'url'   => generate_url(['page' => 'alert_check', 'alert_test_id' => $alert_check['alert_test_id']]),
-                                  'title' => escape_html($alert_check['alert_name']),
-                                  'icon'  => $config['entities'][$alert_check['entity_type']]['icon']
+                                    'url'   => generate_url(['page' => 'alert_check', 'alert_test_id' => $alert_check['alert_test_id']]),
+                                    'title' => $alert_check['alert_name'],
+                                    'icon'  => $config['entities'][$alert_check['entity_type']]['icon']
                                 ];
 
                             }
@@ -153,25 +137,62 @@ if (OBS_DEBUG) {
 
                         $navbar['observium']['entries'][] = ['divider' => TRUE];
 
+                        $navbar['observium']['entries'][] = ['title' => 'Event Log', 'url' => generate_url(['page' => 'eventlog']), 'icon' => $config['icon']['eventlog']];
+
                         if (isset($config['enable_syslog']) && $config['enable_syslog']) {
                             $navbar['observium']['entries'][] = ['title' => 'Syslog', 'url' => generate_url(['page' => 'syslog']), 'icon' => $config['icon']['syslog']];
 
                             if (OBSERVIUM_EDITION !== 'community') {
                                 $navbar['observium']['entries'][] = [ 'title' => 'Syslog Alerts', 'url' => generate_url(['page' => 'syslog_alerts']), 'icon' => $config['icon']['syslog-alerts'] ];
                                 $navbar['observium']['entries'][] = [ 'title' => 'Syslog Rules', 'url' => generate_url(['page' => 'syslog_rules']), 'icon' => $config['icon']['syslog-rules'], 'userlevel' => 7 ];
-                                $navbar['observium']['entries'][] = [ 'divider' => TRUE ];
                             }
                         }
 
-                        if (isset($config['enable_map']) && $config['enable_map']) { // FIXME link is wrong. Is this a supported feature? No. It smells. HTML page was removed, map.php generator code remains. See replacement below.
-                            $navbar['observium']['entries'][] = ['title' => 'Network Map', 'url' => generate_url(['page' => 'map']), 'icon' => $config['icon']['netmap']];
+                        $navbar['observium']['entries'][] = [ 'divider' => TRUE ];
+
+                        if ($_SESSION['userlevel'] >= 5 && is_file($config['install_dir'] . '/html/includes/netmap.inc.php')) { // Weathermaps only visible to global users.
+
+                            $netmaps = dbFetchRows("SELECT * FROM `netmaps` ORDER BY `name` ASC");
+
+                            $netmap_count = safe_count($netmaps);
+
+                            $netmap_menu = [];
+
+                            $netmap_menu[] = ['title' => 'Create New Advanced Weathermap', 'url' => generate_url(['page' => 'netmap', 'is_new_map' => 1]), 'icon' => $config['icon']['plus']];
+
+                            if(count($netmaps)){
+                               $netmap_menu[] = [ 'divider' => TRUE ];
+                            }
+
+                            foreach ($netmaps as $netmap) {
+                                $netmap_menu[] = ['title' => $netmap['name'], 'url' => generate_url(['page' => 'netmap', 'netmap_id' => $netmap['netmap_id']]), 'icon' => $config['icon']['map']];
+                            }
+
+                          $navbar['observium']['entries'][] = ['title' => 'Advanced Weathermap', 'url' => generate_url(['page' => 'netmap']), 'icon' => $config['icon']['map'], 'entries' => $netmap_menu];
+
                         }
 
+                        // PHP Weathermaps
+
+                        if ($config['weathermap']['enable'] && $_SESSION['userlevel'] >= 5) {
+                            $entries = [];
+
+                            $entries[] = [ 'title' => 'Create New PHP Weathermap', 'url' => generate_url(['page' => 'wmap', 'mapname' => 'new']), 'icon' => $config['icon']['plus'], 'userlevel' => 7 ];
+
+                            foreach (dbFetchRows("SELECT * FROM `weathermaps`") as $weathermap) {
+                                $entries[] = ['text' => $weathermap['wmap_name'], 'url' => generate_url(['page' => "wmap", 'mapname' => $weathermap['wmap_name']]), 'icon' => 'sprite-map-2'];
+                            }
+
+                            $navbar['observium']['entries'][] = ['title' => 'PHP Weathermaps', 'url' => generate_url(['page' => 'wmap']), 'icon' => 'sprite-map-2', 'entries' => $entries];
+                            $navbar['observium']['entries'][] = ['divider' => TRUE];
+
+                        }
+
+                        // End PHP Weathermaps
+
+
                         $navbar['observium']['entries'][] = ['title' => 'Network Map', 'url' => generate_url(['page' => 'map']), 'icon' => $config['icon']['netmap']];
-                        $navbar['observium']['entries'][] = ['title' => 'Network Traffic Map', 'url' => generate_url(['page' => 'map_traffic']), 'icon' => $config['icon']['map']];
-
-                        $navbar['observium']['entries'][] = ['title' => 'Event Log', 'url' => generate_url(['page' => 'eventlog']), 'icon' => $config['icon']['eventlog']];
-
+                        $navbar['observium']['entries'][] = ['title' => 'Network Traffic Map', 'url' => generate_url(['page' => 'map_traffic']), 'icon' => $config['icon']['ospf']];
 
                         $navbar['observium']['entries'][] = ['divider' => TRUE];
 
@@ -233,12 +254,56 @@ if (OBS_DEBUG) {
                                                            'url'         => generate_url(['page' => 'devices']),
                                                            'icon'        => $config['icon']['devices']];
 
-                        if (safe_count($entity_group_menu['device'])) {
-                            $navbar['devices']['entries'][] = ['divider' => TRUE];
-                            $navbar['devices']['entries'][] = ['title' => 'Groups', 'url' => generate_url(['page' => 'groups', 'entity_type' => 'device']), 'icon' => $config['icon']['group'], 'count' => safe_count($entity_group_menu['device']), 'entries' => $entity_group_menu['device']];
+                        if (!safe_empty($entity_group_menu['device'])) {
+                            $navbar['devices']['entries'][] = [ 'divider' => TRUE ];
+                            $group_add = [
+                                [
+                                    'url'   => generate_url([ 'page' => 'group_add', 'entity_type' => 'device' ]),
+                                    'title' => 'Create New Device Group',
+                                    'icon'  => $config['icon']['plus']
+                                ],
+                                [ 'divider' => TRUE ]
+                            ];
+                            $navbar['devices']['entries'][] = [ 'title' => 'Groups',
+                                                                'url'     => generate_url([ 'page' => 'groups', 'entity_type' => 'device' ]),
+                                                                'icon'    => $config['icon']['group'],
+                                                                'count'   => safe_count($entity_group_menu['device']),
+                                                                'entries' => array_merge($group_add, $entity_group_menu['device']),
+                                                                'scrollable' => TRUE
+                            ];
+                        }
+                        if (OBS_DISTRIBUTED && $_SESSION['userlevel'] >= 5) {
+                            // Append divider if not already by groups
+                            if (safe_empty($entity_group_menu['device'])) {
+                                $navbar['devices']['entries'][] = [ 'divider' => TRUE ];
+                            }
+                            $pollers_menu = [];
+                            $sql = 'SELECT `poller_id`, COUNT(*) AS `count` FROM `devices` ' . generate_where_clause($cache['where']['devices_permitted']) . ' GROUP BY `poller_id`';
+                            foreach (dbFetchRows($sql) as $poller_entry) {
+                                //r($poller_entry);
+                                $poller_name = $poller_entry['poller_id'] > 0 ? dbFetchCell('SELECT `poller_name` FROM `pollers` WHERE `poller_id` = ?', [ $poller_entry['poller_id'] ]) : 'Default';
+                                $pollers_menu[] = [ 'url' => generate_url([ 'page' => 'devices', 'poller_id' => $poller_entry['poller_id'] ]), 'title' => $poller_name, 'count' => $poller_entry['count'], 'icon' => $config['icon']['device'] ];
+                            }
+                            $navbar['devices']['entries'][] = [ 'title' => 'Partitions', 'url' => generate_url([ 'page' => 'pollerlog', 'view' => 'pollers']), 'icon' => $config['icon']['pollers'], 'count' => safe_count($pollers_menu), 'entries' => $pollers_menu, 'scrollable' => TRUE ];
                         }
 
-                        $navbar['devices']['entries'][] = ['divider' => TRUE];
+                        $devices_os_entries = [];
+                        $sql = 'SELECT `os`, COUNT(*) as `count` FROM `devices` ' . generate_where_clause($cache['where']['devices_permitted']) . ' GROUP BY `os`';
+                        foreach(dbFetchRows($sql) as $os_entry) {
+                            if (!isset($config['os'][$os_entry['os']])) {
+                                //r($os_entry['os']);
+                                // seems as renamed OSes, but down devices
+                                continue;
+                            }
+                            $devices_os_entries[] = [ 'url' => generate_url([ 'page' => 'devices', 'os' => $os_entry['os'] ]), 'title' => $config['os'][$os_entry['os']]['text'], 'count' => $os_entry['count'], 'icon' => $config['icon']['device'] ];
+                        }
+                        $navbar['devices']['entries'][] = [ 'title'   => 'OSes',
+                                                            'url'     => generate_url([ 'page' => 'devices' ]),
+                                                            'icon'    => $config['icon']['devices'],
+                                                            'count'   => safe_count($devices_os_entries),
+                                                            'entries' => array_sort_by($devices_os_entries, 'title'),
+                                                            'scrollable' => TRUE ];
+                        $navbar['devices']['entries'][] = [ 'divider' => TRUE ];
 
                         // Build location submenu
                         if ($config['web_show_locations']) {
@@ -255,12 +320,12 @@ if (OBS_DEBUG) {
 
                                         $location_split = explode($config['location']['menu']['nested_split_char'], $name, $config['location']['menu']['nested_max_depth']);
 
-                                        // Turn array around if nested reversed option is active
+                                        // Turn this array around if a nested reversed option is active
                                         if ($config['location']['menu']['nested_reversed']) {
                                             $location_split = array_reverse($location_split);
                                         }
 
-                                        $ref = &$locations; // Start from top menu array
+                                        $ref = &$locations; // Start from a top menu array
                                         $last = safe_count($location_split);
 
                                         for ($i = 0; $i < $last; $i++) {
@@ -347,13 +412,27 @@ if (OBS_DEBUG) {
                         $navbar['ports']['entries'][] = ['title' => 'All Ports', 'count' => $cache['ports']['stat']['count'], 'url' => generate_url(['page' => 'ports']), 'icon' => $config['entities']['port']['icon']];
                         $navbar['ports']['entries'][] = ['divider' => TRUE];
 
-                        if (safe_count($entity_group_menu['port'])) {
-                            $navbar['ports']['entries'][] = ['title' => 'Groups', 'url' => generate_url(['page' => 'groups', 'entity_type' => 'port']), 'icon' => $config['icon']['group'], 'count' => safe_count($entity_group_menu['port']), 'entries' => $entity_group_menu['port']];
-                            $navbar['ports']['entries'][] = ['divider' => TRUE];
+                        if (!safe_empty($entity_group_menu['port'])) {
+                            $group_add = [
+                                [
+                                    'url'   => generate_url([ 'page' => 'group_add', 'entity_type' => 'port' ]),
+                                    'title' => 'Create New Port Group',
+                                    'icon'  => $config['icon']['plus']
+                                ],
+                                [ 'divider' => TRUE ]
+                            ];
+                            $navbar['ports']['entries'][] = [ 'title' => 'Groups',
+                                                              'url'   => generate_url([ 'page' => 'groups', 'entity_type' => 'port' ]),
+                                                              'icon'  => $config['icon']['group'],
+                                                              'count' => safe_count($entity_group_menu['port']),
+                                                              'entries' => array_merge($group_add, $entity_group_menu['port']),
+                                                              'scrollable' => TRUE ];
+
+                            $navbar['ports']['entries'][] = [ 'divider' => TRUE ];
                         }
 
-                        $navbar['ports']['entries'][] = ['title' => 'VLANs', 'url' => generate_url(['page' => 'vlan']), 'icon' => $config['icon']['vlan']];
-                        $navbar['ports']['entries'][] = ['divider' => TRUE];
+                        $navbar['ports']['entries'][] = [ 'title' => 'VLANs', 'url' => generate_url(['page' => 'vlan']), 'icon' => $config['icon']['vlan'], 'userlevel' => 5 ];
+                        $navbar['ports']['entries'][] = [ 'divider' => TRUE, 'userlevel' => 5 ];
 
 
                         if ($cache['p2pradios']['count']) {
@@ -504,7 +583,6 @@ if (OBS_DEBUG) {
                                         $sep                           = 0;
                                     }
 
-                                    //$alert_icon = ($cache['sensor_types'][$item]['alert'] ? '<i class="' . $config['icon']['flag'] . ' mini-icon"></i>' : '');
                                     $navbar['health']['entries'][] = [
                                       'url'         => generate_url(['page' => 'health', 'metric' => $item]),
                                       'count_array' => $cache['sensors']['types'][$item],
@@ -519,21 +597,19 @@ if (OBS_DEBUG) {
                         }
 
                         //////////// Build applications menu
-                        if ($_SESSION['userlevel'] >= '5' && ($cache['applications']['count']) > 0) {
-                            $navbar['apps'] = ['url' => '#', 'icon' => $config['icon']['apps'], 'title' => 'Apps'];
+                        if ($_SESSION['userlevel'] >= '5' && $cache['applications']['count'] > 0) {
+                            $navbar['apps'] = [ 'url' => '#', 'icon' => $config['icon']['apps'], 'title' => 'Apps' ];
 
-                            $app_list = dbFetchRows("SELECT `app_type`, COUNT(*) AS `count` FROM `applications`" . generate_where_clause($cache['where']['devices_permitted']) . " GROUP BY `app_type`;");
-                            foreach ($app_list as $app) {
+                            $sql = "SELECT `app_type`, COUNT(*) AS `count` FROM `applications`" . generate_where_clause($cache['where']['devices_permitted']) . " GROUP BY `app_type`";
+                            foreach (dbFetchRows($sql) as $app) {
                                 $image = $config['html_dir'] . "/images/icons/" . $app['app_type'] . ".png";
                                 //$icon  = (is_file($image) ? $app['app_type'] : "apps");
                                 // Detect and add application icon
                                 $icon  = $app['app_type'];
                                 $image = $config['html_dir'] . '/images/apps/' . $icon . '.png';
-                                if (is_file($image)) {
-                                    // Icon found
-                                    //$icon = $app['app_type'];
-                                } else {
-                                    [$icon] = explode('-', str_replace('_', '-', $app['app_type']));
+                                if (!is_file($image)) {
+                                    // Icon not found
+                                    $icon = explode('-', str_replace('_', '-', $app['app_type']))[0];
                                     $image = $config['html_dir'] . '/images/apps/' . $icon . '.png';
                                     if ($icon != $app['app_type'] && is_file($image)) {
                                         // 'postfix_qshape' -> 'postfix'
@@ -653,7 +729,7 @@ if (OBS_DEBUG) {
                             echo('              <a href="' . $dropdown['url'] . '" class="visible-lg visible-xl dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
                             echo('                <' . $element . ' class="' . $dropdown['icon'] . '"></' . $element . '> ' . escape_html($dropdown['title']) . ' <b class="caret"></b></a>' . PHP_EOL);
                             echo('              <a href="' . $dropdown['url'] . '" class="visible-xs visible-sm visible-md dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
-                            echo('                <' . $element . ' class="' . $dropdown['icon'] . '" style="margin-right: 5px;"></i></a>' . PHP_EOL);
+                            echo('                <' . $element . ' class="' . $dropdown['icon'] . '" style="margin-right: 5px;"></' . $element . '></a>' . PHP_EOL);
                             echo('              <ul role="menu" class="dropdown-menu">' . PHP_EOL);
 
                             foreach ($dropdown['entries'] as $entry) {
@@ -737,7 +813,7 @@ $(function() {
 
                         $ua['url'] = "#";
 
-                        echo '<li>' . generate_tooltip_link($ua['url'], ' <i class="' . $ua['icon'] . '"></i>', $ua['content'], NULL, $ua['attribs']) . '</li>';
+                        echo '<li>' . generate_tooltip_link($ua['url'], ' ' . get_icon($ua['icon']), $ua['content'], NULL, $ua['attribs']) . '</li>';
 
                         ?>
                         <li class="dropdown">
@@ -746,97 +822,81 @@ $(function() {
                             <ul role="menu" class="dropdown-menu">
                                 <?php
                                 // Refresh menu
-                                echo('<li class="dropdown-submenu">');
-                                echo('  <a role="menuitem" tabindex="-1" href="' . generate_url($vars) . '"><span><i class="' . $config['icon']['refresh'] . '"></i> Refresh</span>&nbsp;<span id="countrefresh"></span></a>');
-                                echo('  <ul class="dropdown-menu">');
+                                $entries_refresh = [];
                                 foreach ($page_refresh['list'] as $refresh_time) {
-                                    $refresh_class = ($refresh_time == $page_refresh['current'] ? 'active' : '');
+                                    $refresh_class = $refresh_time == $page_refresh['current'] ? 'active' : '';
                                     if (!$page_refresh['allowed']) {
                                         $refresh_class = 'disabled';
                                     }
                                     if ($refresh_time == 0) {
-                                        echo('    <li class="' . $refresh_class . '"><a href="' . generate_url($vars, ['refresh' => '0']) . '"><i class="' . $config['icon']['stop'] . '"></i> Manually</a></li>');
+                                        $entries_refresh[] = [ 'title' => 'Manually', 'url' => generate_url($vars, ['refresh' => '0']), 'icon' => 'stop' ];
                                     } else {
-                                        echo('    <li class="' . $refresh_class . '"><a href="' . generate_url($vars, ['refresh' => $refresh_time]) . '"><i class="' . $config['icon']['refresh'] . '"></i> Every ' . format_uptime($refresh_time, 'longest') . '</a></li>');
+                                        $entries_refresh[] = [ 'title' => 'Every ' . format_uptime($refresh_time, 'longest'), 'url' => generate_url($vars, ['refresh' => $refresh_time]), 'icon' => 'refresh', 'class' => $refresh_class ];
                                     }
                                 }
-                                echo('  </ul>');
-                                echo('</li>');
-                                echo('<li class="divider"></li>');
+                                navbar_submenu([ 'title' => 'Refresh', 'extra' => '&nbsp;<span id="countrefresh"></span>', 'url' => generate_url($vars), 'icon' => 'refresh', 'entries' => $entries_refresh, 'escape' => FALSE ]);
+                                navbar_entry([ 'divider' => TRUE ]);
 
-                                echo('<li class="dropdown-submenu">');
-                                echo('  <a role="menuitem" href="#"><span><i class="' . $config['icon']['users'] . '"></i> Personalisation</span></a>');
-                                echo('  <ul class="dropdown-menu">');
+                                navbar_entry([ 'title' => 'My Profile', 'url' => generate_url(['page' => 'preferences']), 'icon' => 'user-self' ]);
 
-                                // This definition not exist in community edition
+                                $entries_user   = [];
+                                $entries_user[] = [ 'title' => 'My Settings', 'url' => generate_url([ 'page' => 'preferences', 'section' => 'settings' ]), 'icon' => 'user-edit' ];
+                                $entries_user[] = [ 'divider' => TRUE ];
+
+                                // This definition doesn't exist in a community edition
                                 if (OBSERVIUM_EDITION !== 'community') {
                                     foreach ($config['themes'] as $theme_name => $theme_data) {
                                         if ($_SESSION['theme'] !== $theme_name) {
-                                            echo('<li><a href="#" onclick="ajax_action(\'theme\', \'' . $theme_name . '\');" title="Switch to ' . $theme_data['name'] . '"><i class="' . $theme_data['icon'] . '" style="font-size: 16px; color: #555;"></i> ' . $theme_data['name'] . '</a></li>');
+                                            $entries_user[] = [ 'title' => $theme_data['name'], 'url' => '', 'attribs' => [ 'onclick' => 'ajax_action(\'theme\', \'' . $theme_name . '\');' ], 'icon' => $theme_data['icon'] ];
                                         }
                                     }
                                     if ($config['web_theme_default'] !== $_SESSION['theme'] && $config['web_theme_default'] !== 'system') {
                                         // Reset default
-                                        echo('<li><a href="#" onclick="ajax_action(\'theme\', \'reset\');" title="Reset to default"><i class="sprite-refresh" style="font-size: 16px; color: #555;"></i> Reset</a></li>');
+                                        $entries_user[] = [ 'title' => 'Reset', 'url' => '', 'attribs' => [ 'onclick' => 'ajax_action(\'theme\', \'reset\');' ], 'icon' => 'sprite-refresh' ];
                                     }
 
-                                    echo('    <li class="divider"></li>');
+                                    $entries_user[] = [ 'divider' => TRUE ];
                                 }
 
                                 if ($config['graphs']['size'] === 'big') {
-                                    echo('<li><a href="#" onclick="ajax_action(\'normal_graphs\');" title="Switch to normal graphs"><i class="' . $config['icon']['graphs-small'] . '" style="font-size: 16px; color: #555;"></i> Normal Graphs</a></li>');
+                                    $entries_user[] = [ 'title' => 'Normal Graphs', 'url' => '', 'attribs' => [ 'onclick' => 'ajax_action(\'normal_graphs\');' ], 'icon' => 'graphs-small' ];
                                 } else {
-                                    echo('<li><a href="#" onclick="ajax_action(\'big_graphs\');" title="Switch to larger graphs"><i class="' . $config['icon']['graphs-large'] . '" style="font-size: 16px; color: #555;"></i> Large Graphs</a></li>');
+                                    $entries_user[] = [ 'title' => 'Large Graphs', 'url' => '', 'attribs' => [ 'onclick' => 'ajax_action(\'big_graphs\');' ], 'icon' => 'graphs-large' ];
                                 }
 
-                                echo('  </ul>');
-                                echo('</li>');
-
-                                ?>
-                                <li><a href="<?php echo(generate_url(['page' => 'preferences'])); ?>"
-                                       title="My Profile"><?php echo get_icon('user-self'); ?> My
-                                        Profile</a></li>
-                                <?php
+                                navbar_submenu([ 'title' => 'Personalisation', 'icon' => 'users', 'entries' => $entries_user ]);
 
                                 if ($_SESSION['userlevel'] >= 10) {
-                                    echo('<li class="divider"></li>');
-                                    echo('<li class="dropdown-submenu">');
-                                    echo('  <a role="menuitem" tabindex="-1" href="' . generate_url(['page' => 'user_add']) . '"><span><i class="' . $config['icon']['users'] . '"></i> Users & Groups</span></a>');
-                                    echo('  <ul class="dropdown-menu">');
+                                    navbar_entry([ 'divider' => TRUE ]);
+
+                                    $entries_users  = [];
                                     if (auth_usermanagement()) {
-                                        echo('    <li><a href="' . generate_url(['page' => 'user_add']) . '"><i class="' . $config['icon']['user-add'] . '"></i> Add User</a></li>');
+                                        $entries_users[] = [ 'title' => 'Add User', 'url' => generate_url(['page' => 'user_add']), 'icon' => 'user-add' ];
                                     }
-                                    echo('    <li><a href="' . generate_url(['page' => 'user_edit']) . '"><i class="' . $config['icon']['user-edit'] . '"></i> Edit User</a></li>');
-                                    //if (auth_usermanagement())
-                                    //{
-                                    //   echo('    <li><a href="' . generate_url(array('page' => 'user_edit')) . '"><i class="' . $config['icon']['user-delete'] . '"></i> Remove User</a></li>');
+                                    $entries_users[] = [ 'title' => 'Edit User', 'url' => generate_url(['page' => 'user_edit']), 'icon' => 'user-edit' ];
+                                    //if (auth_usermanagement()) {
+                                    //    $entries_users[] = [ 'title' => 'Remove User', 'url' => generate_url(['page' => 'user_edit']), 'icon' => 'user-delete' ];
                                     //}
+                                    $entries_users[] = [ 'divider' => TRUE ];
 
-                                    echo('    <li class="divider"></li>');
+                                    $entries_users[] = [ 'title' => 'Roles', 'url' => generate_url(['page' => 'roles']), 'icon' => 'users' ];
+                                    $entries_users[] = [ 'divider' => TRUE ];
 
-                                    echo('    <li><a href="' . generate_url(['page' => 'roles']) . '"><i class="' . $config['icon']['users'] . '"></i> Roles</a></li>');
+                                    $entries_users[] = [ 'title' => 'Authentication Log', 'url' => generate_url(['page' => 'authlog']), 'icon' => 'user-log' ];
+                                    navbar_submenu([ 'title' => 'Users & Groups', 'url' => generate_url(['page' => 'user_add']), 'icon' => 'users', 'entries' => $entries_users ]);
 
-                                    echo('    <li class="divider"></li>');
-
-                                    echo('    <li><a href="' . generate_url(['page' => 'authlog']) . '"><i class="' . $config['icon']['user-log'] . '"></i> Authentication Log</a></li>');
-                                    echo('  </ul>');
-                                    echo('</li>');
-
-                                    echo('<li class="dropdown-submenu">');
-                                    echo('  <a role="menuitem" tabindex="-1" href="' . generate_url(['page' => 'settings']) . '"><span><i class="' . $config['icon']['settings'] . '"></i> Global Settings</span></a>');
-                                    echo('  <ul class="dropdown-menu">');
-                                    echo('    <li><a href="' . generate_url(['page' => 'settings']) . '"><i class="' . $config['icon']['settings-change'] . '"></i> Edit</a></li>');
-                                    echo('    <li><a href="' . generate_url(['page' => 'settings', 'format' => 'config']) . '"><i class="' . $config['icon']['config'] . '"></i> Full Dump</a></li>');
-                                    echo('    <li><a href="' . generate_url(['page' => 'settings', 'format' => 'changed_config']) . '"><i class="' . $config['icon']['config'] . '"></i> Changed Dump</a></li>');
+                                    $entries_settings = [];
+                                    $entries_settings[] = [ 'title' => 'Edit', 'url' => generate_url(['page' => 'settings']), 'icon' => 'settings-change' ];
+                                    $entries_settings[] = [ 'title' => 'Full Dump', 'url' => generate_url(['page' => 'settings', 'format' => 'config']), 'icon' => 'config' ];
+                                    $entries_settings[] = [ 'title' => 'Changed Dump', 'url' => generate_url(['page' => 'settings', 'format' => 'changed_config']), 'icon' => 'config' ];
                                     if (OBS_DISTRIBUTED) {
-                                        echo('    <li class="divider"></li>');
-                                        echo('    <li><a href="' . generate_url(['page' => 'pollers']) . '"><i class="' . $config['icon']['pollers'] . '"></i> Pollers</a></li>');
+                                        $entries_settings[] = [ 'divider' => TRUE ];
+                                        $entries_settings[] = [ 'title' => 'Pollers', 'url' => generate_url(['page' => 'pollers']), 'icon' => 'pollers' ];
                                     }
-                                    echo('  </ul>');
-                                    echo('</li>');
+                                    navbar_submenu([ 'title' => 'Global Settings', 'url' => generate_url(['page' => 'settings']), 'icon' => 'settings', 'entries' => $entries_settings ]);
                                 }
 
-                                echo('<li class="divider"></li>');
+                                navbar_entry([ 'divider' => TRUE ]);
 
                                 navbar_entry([ 'title' => 'Polling Information', 'url' => generate_url(['page' => 'pollerlog']), 'icon' => $config['icon']['pollerlog'], 'userlevel' => 5 ]);
                                 navbar_entry([ 'title' => 'Process List', 'url' => generate_url(['page' => 'processes']), 'icon' => $config['icon']['processes'], 'userlevel' => 7 ]);
@@ -844,17 +904,21 @@ $(function() {
                                 navbar_entry([ 'title' => 'MIBs', 'url' => generate_url(['page' => 'mibs']), 'icon' => $config['icon']['mibs'], 'userlevel' => 7 ]);
 
                                 if (auth_can_logout()) {
-                                    ?>
-                                    <li class="divider"></li>
-                                    <li><a href="<?php echo(generate_url(['page' => 'logout'])); ?>" title="Logout"><i
-                                              class="<?php echo $config['icon']['logout']; ?>"></i> Logout</a></li>
-                                    <?php
+                                    navbar_entry([ 'divider' => TRUE ]);
+                                    navbar_entry([ 'title' => 'Logout', 'url' => generate_url(['page' => 'logout']), 'icon' => $config['icon']['logout'] ]);
                                 }
+                                navbar_entry([ 'divider' => TRUE ]);
+
+                                $entries_observium   = [];
+                                $entries_observium[] = [ 'title' => 'Observium Docs',      'url' => OBSERVIUM_DOCS_URL,      'icon' => $config['icon']['info'], 'attribs' => [ 'target' => '_blank' ] ];
+                                $entries_observium[] = [ 'title' => 'Observium ChangeLog', 'url' => OBSERVIUM_CHANGELOG_URL, 'icon' => $config['icon']['logs'], 'attribs' => [ 'target' => '_blank' ] ];
+                                $entries_observium[] = [ 'title' => 'Observium MIBs',      'url' => OBSERVIUM_MIBS_URL,      'icon' => $config['icon']['mibs'], 'attribs' => [ 'target' => '_blank' ] ];
+                                $entries_observium[] = [ 'title' => 'Observium Bugs',      'url' => OBSERVIUM_BUG_URL,       'icon' => 'sprite-light-bulb', 'attribs' => [ 'target' => '_blank' ] ];
+                                $entries_observium[] = [ 'title' => 'Observium Discord',   'url' => 'https://discord.gg/GjpNXKWm8W', 'icon' => 'sprite-communication', 'attribs' => [ 'target' => '_blank' ] ];
+                                navbar_submenu([ 'title' => 'Observium Help', 'icon' => $config['icon']['help'], 'entries' => $entries_observium ]);
+
+                                navbar_entry([ 'title' => 'About ' . OBSERVIUM_PRODUCT, 'url' => generate_url(['page' => 'about']), 'icon' => $config['icon']['info'] ]);
                                 ?>
-                                <li class="divider"></li>
-                                <li><a href="<?php echo OBSERVIUM_DOCS_URL; ?>/" title="Help" target="_blank"><i
-                                          class="<?php echo $config['icon']['help']; ?>"></i> Help</a></li>
-                                <li><?php echo(generate_link('<i class="' . $config['icon']['info'] . '"></i> About ' . OBSERVIUM_PRODUCT, ['page' => 'about'], [], FALSE)); ?></li>
                             </ul>
                         </li>
                     </ul>
@@ -895,44 +959,12 @@ $(function() {
         }
 
         <?php
-        if (isset($page_refresh['nexttime'])) // Begin Refresh JS
-        {
-        ?>
+        // Refresh JS
+        if (isset($page_refresh['nexttime'])) {
+            register_html_resource('script', 'time_refresh("countrefresh", '.($page_refresh['nexttime'] - time()).')');
+        }
 
-        // set initial seconds left we're counting down to
-        var seconds_left = <?php echo($page_refresh['nexttime'] - time()); ?>;
-        // get tag element
-        var countrefresh = document.getElementById('countrefresh');
-
-        // update the tag with id "countdown" every 1 second
-        setInterval(function () {
-            // do some time calculations
-            var minutes = parseInt(seconds_left / 60);
-            var seconds = parseInt(seconds_left % 60);
-
-            // format countdown string + set tag value
-            if (minutes > 0) {
-                minutes = minutes + 'min&nbsp;';
-                seconds = seconds + 'sec';
-            } else {
-                minutes = '';
-                if (seconds > 0) {
-                    seconds = seconds + 'sec';
-                } else {
-                    seconds = '0sec';
-                }
-            }
-
-            countrefresh.innerHTML = '<div class="label">' + minutes + seconds + '</div>';
-
-            seconds_left = seconds_left - 1;
-
-        }, 1000);
-
-        <?php
-        } // End Refresh JS
-
-        $menu_time = utime() - $menu_start;
+        $menu_time = elapsed_time($menu_start);
 
         ?>
 

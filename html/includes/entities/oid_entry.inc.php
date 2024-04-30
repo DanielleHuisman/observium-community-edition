@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -105,151 +105,151 @@ function print_oid_table_header($vars, $entries)
     echo '<tbody>' . PHP_EOL;
 }
 
-function print_oid_table($vars)
-{
+function print_oid_table($vars) {
     global $config;
 
     $sql     = build_oid_query($vars);
     $entries = dbFetchRows($sql);
-    $count   = count($entries);
 
-    if (count($entries)) {
-
-        echo generate_box_open();
-
-        print_oid_table_header($vars, $entries);
-
-        foreach ($entries as $device_id => $entry) {
-            //$device = device_by_id_cache($device_id);
-
-            if (!is_numeric($entry['value'])) {
-                $entry['human_value'] = 'NaN';
-            } else {
-                if ($entry['oid_kibi'] == 1) {
-                    $entry['human_value'] = format_value($entry['value'], 'bi') . $entry['oid_symbol'];
-                } else {
-                    $entry['human_value'] = format_value($entry['value'], 'si') . $entry['oid_symbol'];
-                }
-            }
-
-            $graph_array           = [];
-            $graph_array['to']     = $config['time']['now'];
-            $graph_array['id']     = $entry['oid_entry_id'];
-            $graph_array['type']   = "customoid_graph";
-            $graph_array['width']  = 100;
-            $graph_array['height'] = 20;
-            $graph_array['from']   = $config['time']['day'];
-
-            if (is_numeric($entry['value']) || TRUE) {
-                $mini_graph = generate_graph_tag($graph_array);
-            } else {
-                // Do not show "Draw Error" minigraph
-                $mini_graph = '';
-            }
-
-            $thresholds = threshold_string($entry['alert_low'], $entry['warn_low'], $entry['warn_high'],
-                                           $entry['alert_high'], $entry['oid_symbol']);
-
-            switch ($entry['event']) {
-                case "ok";
-                    $entry['html_row_class'] = "up";
-                    $entry['event_class']    = "success";
-                    break;
-                case "warn";
-                    $entry['html_row_class'] = "warning";
-                    $entry['event_class']    = "warning";
-                    break;
-                case "alert";
-                    $entry['html_row_class'] = "error";
-                    $entry['event_class']    = "error";
-                    break;
-                case "ignore";
-                default:
-                    $entry['html_row_class'] = "ignore";
-                    $entry['event_class']    = "ignore";
-                    break;
-            }
-
-            $event = '<span class="label label-' . $entry['event_class'] . '">' . $entry['event'] . '</span>';
-
-            echo '
-              <tr class="' . $entry['html_row_class'] . '">
-                <td class="state-marker"></td>
-                <td><i class="' . $config['entities']['device']['icon'] . '"></i> <b>' . generate_device_link($entry) . '</b></td>';
-            if (!isset($vars['oid_id'])) {
-                echo '
-                <td>' . generate_oid_template_link($entry) . '</td> ';
-            } else {
-                echo '
-                <td></td>';
-            }
-
-            echo '
-                <td>' . $mini_graph . '</td>
-                <td>' . $thresholds . '</td>
-                <td><span class="label label-' . $entry['event_class'] . '">' . $entry['human_value'] . '</span></td>
-                <td>' . $event . '</td>
-                ';
-            if ($entries[0]['oid_autodiscover'] == '0' && $vars['page'] == "customoid") {
-
-                $form                             = ['type'  => 'simple',
-                                                     //'userlevel'  => 10,          // Minimum user level for display form
-                                                     'id'    => 'delete_customoid_device_' . $entry['device_id'],
-                                                     'style' => 'display:inline;',
-                ];
-                $form['row'][0]['form_oid_id']    = [
-                  'type'  => 'hidden',
-                  'value' => $entry['oid_id']];
-                $form['row'][0]['form_device_id'] = [
-                  'type'  => 'hidden',
-                  'value' => $entry['device_id']];
-
-                $form['row'][99]['action'] = [
-                  'type'      => 'submit',
-                  'icon_only' => TRUE, // hide button styles
-                  'name'      => '',
-                  'icon'      => $config['icon']['cancel'],
-                  //'right'       => TRUE,
-                  //'class'       => 'btn-small',
-                  // confirmation dialog
-                  'attribs'   => ['data-toggle'            => 'confirm', // Enable confirmation dialog
-                                  'data-confirm-placement' => 'left',
-                                  'data-confirm-content'   => 'Delete associated device "' . escape_html($entry['hostname']) . '"?',
-                  ],
-                  'value'     => 'delete_customoid_device'];
-
-                echo('<td>');
-                print_form($form);
-                unset($form);
-                echo('</td>');
-            }
-
-            echo '
-              </tr>';
-
-            if ($vars['graphs'] == "yes") {
-                $vars['graph'] = "graph";
-            }
-
-            if ($vars['graph']) {
-                $graph_array         = [];
-                $graph_title         = $entry['oid_descr'];
-                $graph_array['type'] = "customoid_" . $vars['graph'];
-                $graph_array['id']   = $entry['oid_entry_id'];
-
-                echo '<tr><td colspan=8>';
-                print_graph_row($graph_array);
-                echo '</td></tr>';
-            }
-
-        }
-
-        echo '  </table>' . PHP_EOL;
-
-        echo generate_box_close();
-
-    } else {
+    if (safe_empty($entries)) {
         echo '<p class="text-center text-warning bg-warning" style="padding: 10px; margin: 0;"><strong>This Custom OID is not currently associated with any devices</strong></p>';
+        return;
     }
 
+    echo generate_box_open();
+
+    print_oid_table_header($vars, $entries);
+
+    foreach ($entries as $device_id => $entry) {
+        //$device = device_by_id_cache($device_id);
+
+        if (!is_numeric($entry['value'])) {
+            $entry['human_value'] = 'NaN';
+        } else {
+            if ($entry['oid_kibi'] == 1) {
+                $entry['human_value'] = format_value($entry['value'], 'bi') . $entry['oid_symbol'];
+            } else {
+                $entry['human_value'] = format_value($entry['value'], 'si') . $entry['oid_symbol'];
+            }
+        }
+
+        $graph_array           = [];
+        $graph_array['to']     = get_time();
+        $graph_array['id']     = $entry['oid_entry_id'];
+        $graph_array['type']   = "customoid_graph";
+        $graph_array['width']  = 100;
+        $graph_array['height'] = 20;
+        $graph_array['from']   = get_time('day');
+
+        if (is_numeric($entry['value']) || TRUE) {
+            $mini_graph = generate_graph_tag($graph_array);
+        } else {
+            // Do not show "Draw Error" minigraph
+            $mini_graph = '';
+        }
+
+        $thresholds = threshold_string($entry['alert_low'], $entry['warn_low'], $entry['warn_high'],
+                                       $entry['alert_high'], $entry['oid_symbol']);
+
+        switch ($entry['event']) {
+            case "ok";
+                $entry['html_row_class'] = "up";
+                $entry['event_class']    = "success";
+                break;
+            case "warn";
+                $entry['html_row_class'] = "warning";
+                $entry['event_class']    = "warning";
+                break;
+            case "alert";
+                $entry['html_row_class'] = "error";
+                $entry['event_class']    = "error";
+                break;
+            case "ignore";
+            default:
+                $entry['html_row_class'] = "ignore";
+                $entry['event_class']    = "ignore";
+                break;
+        }
+
+        $event = '<span class="label label-' . $entry['event_class'] . '">' . $entry['event'] . '</span>';
+
+        echo '
+          <tr class="' . $entry['html_row_class'] . '">
+            <td class="state-marker"></td>
+            <td><i class="' . $config['entities']['device']['icon'] . '"></i> <b>' .
+            generate_device_link($entry, NULL, [ 'tab' => 'graphs', 'group' => 'custom' ]) . '</b></td>';
+        if (!isset($vars['oid_id'])) {
+            echo '
+            <td>' . generate_oid_template_link($entry) . '</td> ';
+        } else {
+            echo '
+            <td></td>';
+        }
+
+        echo '
+            <td>' . $mini_graph . '</td>
+            <td>' . $thresholds . '</td>
+            <td><span class="label label-' . $entry['event_class'] . '">' . $entry['human_value'] . '</span></td>
+            <td>' . $event . '</td>
+            ';
+
+        if ($entries[0]['oid_autodiscover'] == '0' && $vars['page'] == "customoid") {
+
+            $form                             = ['type'  => 'simple',
+                                                 //'userlevel'  => 10,          // Minimum user level for display form
+                                                 'id'    => 'delete_customoid_device_' . $entry['device_id'],
+                                                 'style' => 'display:inline;',
+            ];
+            $form['row'][0]['form_oid_id']    = [
+              'type'  => 'hidden',
+              'value' => $entry['oid_id']];
+            $form['row'][0]['form_device_id'] = [
+              'type'  => 'hidden',
+              'value' => $entry['device_id']];
+
+            $form['row'][99]['action'] = [
+              'type'      => 'submit',
+              'icon_only' => TRUE, // hide button styles
+              'name'      => '',
+              'icon'      => $config['icon']['cancel'],
+              //'right'       => TRUE,
+              //'class'       => 'btn-small',
+              // confirmation dialog
+              'attribs'   => ['data-toggle'            => 'confirm', // Enable confirmation dialog
+                              'data-confirm-placement' => 'left',
+                              'data-confirm-content'   => 'Delete associated device "' . escape_html($entry['hostname']) . '"?',
+              ],
+              'value'     => 'delete_customoid_device'];
+
+            echo('<td>');
+            print_form($form);
+            unset($form);
+            echo('</td>');
+        }
+
+        echo '
+          </tr>';
+
+        if ($vars['graphs'] == "yes") {
+            $vars['graph'] = "graph";
+        }
+
+        if ($vars['graph']) {
+            $graph_array          = [];
+            $graph_array['title'] = $entry['oid_descr'];
+            $graph_array['type']  = "customoid_" . $vars['graph'];
+            $graph_array['id']    = $entry['oid_entry_id'];
+
+            echo '<tr><td colspan=8>';
+            print_graph_row($graph_array);
+            echo '</td></tr>';
+        }
+
+    }
+
+    echo '  </table>' . PHP_EOL;
+
+    echo generate_box_close();
 }
+
+// EOF

@@ -18,6 +18,9 @@ include_once($config['html_dir'] . '/includes/graphs/common.inc.php');
 $rrd = get_port_rrdfilename($port, 'fdbcount', TRUE);
 if (rrd_is_file($rrd)) {
     $rrd_filename = $rrd;
+} else {
+    $GLOBALS['graph_error'] = "FDB Count RRD does not exist for this port.\nPlease ensure the module is enabled.";
+    return;
 }
 
 $ds = 'value';

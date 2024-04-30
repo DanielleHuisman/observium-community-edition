@@ -1,0 +1,322 @@
+--  =======================================================================
+--  File        : osProvTags.mib
+--  Description : Private MIB support tag manipulation into the Ethernet Provision services.
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-PROV-TAGS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                Unsigned32                                    FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION                            FROM SNMPv2-TC
+                osEthServId                                   FROM OS-ETH-SERV-MIB 
+                oaOptiSwitch, EntryValidator,
+                PortIndex, TagList                            FROM OS-COMMON-TC-MIB
+                VlanIdOrNone                                  FROM IEEE8021-CFM-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osProvTags      MODULE-IDENTITY
+                LAST-UPDATED "202007260000Z"
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "This MIB allows to configurate tag actions in Ethernet
+                    Provision services."
+
+                REVISION     "202007260000Z"
+                DESCRIPTION
+                    "osEvcUniExceptionPortTable and osEvcNniExceptionPortTable."
+
+                REVISION     "201010260000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 9 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+TagAction       ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+       "The values mean:
+         0 - strip a tag;
+         1..4095 - swap a tag: change if it was, or push in, if was not; 
+         4096    - do nothing."
+    SYNTAX      Unsigned32 (0|1..4095|4096)
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osProvTagsObjects           OBJECT IDENTIFIER ::= { osProvTags 1 }
+osProvTagsConformance       OBJECT IDENTIFIER ::= { osProvTags 100 }
+osProvTagsMIBCompliances    OBJECT IDENTIFIER ::= { osProvTagsConformance 1 }
+osProvTagsMIBGroups         OBJECT IDENTIFIER ::= { osProvTagsConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+ 
+-- ************************************************************
+-- The osProvTagsTable Table
+-- ************************************************************
+osProvTagsTable  OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsProvTagsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table allows to define tag manipulations intp the Ethernet Provision Services."
+    REFERENCE
+       "."
+    ::= { osProvTagsObjects 3 }
+
+osProvTagsEntry   OBJECT-TYPE
+    SYNTAX       OsProvTagsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osProvTagsDir, osProvTagsRxTag } 
+    ::= { osProvTagsTable 1 }
+
+OsProvTagsEntry ::= SEQUENCE {
+      osProvTagsDir                INTEGER,
+      osProvTagsRxTag              Unsigned32,
+      osProvTagsAction             TagAction,
+      osProvTagsAdminStatus        EntryValidator
+}
+
+osProvTagsDir        OBJECT-TYPE
+    SYNTAX           INTEGER {
+                       ingress(2),
+                       egress (3)
+                     }
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osProvTagsEntry 5 }
+
+osProvTagsRxTag      OBJECT-TYPE
+    SYNTAX           Unsigned32 (0|1..4095|4096|4097)
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "The semantics of this object depends on the type of service
+        on this node (osEthServNodeType). For UNI-services it is C_VLAN.
+        for I-NNI and E-NNI - it is S-VLAN
+         The values mean:
+         0       - tag is absent
+         1..4095 - tag is equal to this value
+         4096    - tag exists
+         4097    - any tag."
+    ::= { osProvTagsEntry 6 }
+
+osProvTagsAction      OBJECT-TYPE
+    SYNTAX           TagAction
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "The semantics of this object depends on the type of service
+        on this node (osEthServNodeType). For UNI-services it is C_VLAN,
+        for NNI-services - it is S_VLAN."
+    ::= { osProvTagsEntry 10 }
+
+osProvTagsAdminStatus OBJECT-TYPE
+    SYNTAX           EntryValidator
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osProvTagsEntry 98 }
+
+-- ************************************************************
+-- The osEvcUniExceptionPortTable Table
+-- ************************************************************
+osEvcUniExceptionPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsEvcUniExceptionPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Exception s-port[s] for UNI services.
+       CLI: 'port-exception (lte) {tx-s-vlan <1-4095>|rx-s-svlans TAGS-LIST|}'"
+    ::= { osProvTagsObjects 4 }
+
+osEvcUniExceptionPortEntry OBJECT-TYPE
+    SYNTAX      OsEvcUniExceptionPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEvcUniExceptionPortId }
+    ::= { osEvcUniExceptionPortTable 1 }
+
+OsEvcUniExceptionPortEntry ::= SEQUENCE {
+      osEvcUniExceptionPortId          PortIndex,
+      osEvcUniExceptionPortTxSVlan     VlanIdOrNone,
+      osEvcUniExceptionPortRxSVlans    TagList,
+      osEvcUniExceptionPortAdminStatus EntryValidator
+}
+
+osEvcUniExceptionPortId OBJECT-TYPE
+    SYNTAX           PortIndex
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "Port index.
+       Currently may be equal only to LTE port."
+    ::= { osEvcUniExceptionPortEntry 3 }
+
+osEvcUniExceptionPortTxSVlan OBJECT-TYPE
+    SYNTAX           VlanIdOrNone
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "Tag transmitted to osEvcUniExceptionPort.
+        If it equals to 0, then osEthServSVlanId is transmitted."
+    DEFVAL { 0 }
+    ::= { osEvcUniExceptionPortEntry 5 }
+
+
+osEvcUniExceptionPortRxSVlans OBJECT-TYPE
+    SYNTAX           TagList
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "The tags that osEvcUniExceptionPort expects to receive in order to translate to osEthServSVlanId.
+        If osEvcUniExceptionPortRxSVlans is empty, then osEvcUniExceptionPortTxSVlan is used.
+        Currently is not supported."
+    DEFVAL { "" }
+    ::= { osEvcUniExceptionPortEntry 6 }
+
+osEvcUniExceptionPortAdminStatus OBJECT-TYPE
+    SYNTAX           EntryValidator
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Allows to create/remode rows."
+    ::= { osEvcUniExceptionPortEntry 10 }
+
+-- ************************************************************
+-- The osEvcNniExceptionPortTable Table
+-- ************************************************************
+osEvcNniExceptionPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsEvcNniExceptionPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Exception s-port[s] for UNI services.
+       CLI: 'special-s-ports (lte) {tx-s-vlan <1-4095>|rx-s-svlans TAGS-LIST|}'"
+    ::= { osProvTagsObjects 5 }
+
+osEvcNniExceptionPortEntry OBJECT-TYPE
+    SYNTAX      OsEvcNniExceptionPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osEvcNniExceptionPortId, osProvTagsDir, osProvTagsRxTag }
+    ::= { osEvcNniExceptionPortTable 1 }
+
+OsEvcNniExceptionPortEntry ::= SEQUENCE {
+      osEvcNniExceptionPortId          PortIndex,
+      osEvcNniExceptionPortTagsAction  TagAction,
+      osEvcNniExceptionPortAdminStatus EntryValidator
+}
+
+osEvcNniExceptionPortId OBJECT-TYPE
+    SYNTAX           PortIndex
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "Special tag manipulation port"
+    ::= { osEvcNniExceptionPortEntry 3 }
+
+osEvcNniExceptionPortTagsAction OBJECT-TYPE
+    SYNTAX           TagAction
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osEvcNniExceptionPortEntry 6 }
+
+osEvcNniExceptionPortAdminStatus OBJECT-TYPE
+    SYNTAX           EntryValidator
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "Allows to create/remode rows."
+    ::= { osEvcNniExceptionPortEntry 10 }
+
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osProvTagsMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osProvTagsMandatoryGroup
+                         }
+
+    ::= { osProvTagsMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+osProvTagsMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+              osProvTagsAction,
+              osProvTagsAdminStatus,
+              osEvcUniExceptionPortTxSVlan, osEvcUniExceptionPortRxSVlans, osEvcUniExceptionPortAdminStatus,
+              osEvcNniExceptionPortTagsAction, osEvcNniExceptionPortAdminStatus
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osProvTagsMIBGroups 1 }
+
+
+END
+

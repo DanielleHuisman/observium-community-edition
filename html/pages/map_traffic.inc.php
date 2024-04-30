@@ -26,6 +26,8 @@ register_html_resource("js", "cytoscape-popper.js");
 //register_html_resource("js", "cytoscape-qtip.js");
 //register_html_resource("css", "tippy-translucent.css");
 
+register_html_title("Traffic Map");
+
 $navbar['class'] = 'navbar-narrow';
 $navbar['brand'] = 'Traffic Map';
 
@@ -67,7 +69,7 @@ $groups['port']   = isset($groups['port']) && is_array($groups['port']) ? $group
 foreach (array_merge($groups['device'], $groups['port']) as $group) {
     $group_id                                                     = $group['group_id'];
     $navbar['options']['groups']['suboptions'][$group_id]['text'] = $group['group_name'];
-    $navbar['options']['groups']['suboptions'][$group_id]['icon'] = ($group['entity_type'] == "device" ? $config['icon']['device'] : $config['icon']['port']);
+    $navbar['options']['groups']['suboptions'][$group_id]['icon'] = $group['entity_type'] === "device" ? $config['icon']['device'] : $config['icon']['port'];
     $navbar['options']['groups']['suboptions'][$group_id]['url']  = generate_url($vars, ['group_id' => $group_id, 'device_id' => NULL]);
     if ($vars['group_id'] == $group_id) {
         $navbar['options']['groups']['text']  .= ' (' . $group['group_name'] . ')';
@@ -83,8 +85,8 @@ function get_neighbour_map($vars)
 {
     global $cache;
 
-    $where_array   = [];
-    $where_array[] = generate_query_permitted('device');
+    $where_array   = [ '`active` = 1' ];
+    $where_array[] = generate_query_permitted_ng('device');
 
     if (isset($vars['group_id'])) {
 
@@ -97,30 +99,31 @@ function get_neighbour_map($vars)
         if ($group['entity_type'] == "port") {
             $port_id_list = get_group_entities($vars['group_id'], 'port');
             if (count($port_id_list) > 0) {
-                $where_array[] = '(' . generate_query_values_ng($port_id_list, 'port_id') . ' OR ' . generate_query_values_ng($port_id_list, 'remote_port_id') . ')';
+                $where_array[] = '(' . generate_query_values($port_id_list, 'port_id') . ' OR ' . generate_query_values($port_id_list, 'remote_port_id') . ')';
             } else {
                 print_error("Group contains no entities.");
             }
         } elseif ($group['entity_type'] == "device") {
             $device_id_list = get_group_entities($vars['group_id'], 'device');
             if (count($device_id_list) > 0) {
-                $where_array[] = '(' . generate_query_values_ng($device_id_list, 'device_id') . ' OR ' . generate_query_values_ng($device_id_list, 'remote_device_id') . ')';
+                $where_array[] = '(' . generate_query_values($device_id_list, 'device_id') . ' OR ' . generate_query_values($device_id_list, 'remote_device_id') . ')';
             } else {
                 print_error("Group contains no entities.");
             }
         }
     } elseif (isset($vars['device_id']) && $vars['device_id']) {
         //$where_array[] = "(`device_id` = '".dbEscape($vars['device_id'])."' OR `remote_device_id` = '".dbEscape($vars['device_id'])."')";
-        $where_array[] = '(' . generate_query_values_ng($vars['device_id'], 'device_id') . ' OR ' . generate_query_values_ng($vars['device_id'], 'remote_device_id') . ')';
+        $where_array[] = '(' . generate_query_values($vars['device_id'], 'device_id') . ' OR ' . generate_query_values($vars['device_id'], 'remote_device_id') . ')';
     }
 
-    //r($where_array);
+    //bdump($where_array);
     
-    $query = "SELECT * FROM `neighbours` WHERE `active` = '1' " . generate_where_clause($where_array);
+    $query = "SELECT * FROM `neighbours`" . generate_where_clause($where_array);
 
     //r($query);
 
     $neighbours = dbFetchRows($query);
+    //bdump($neighbours);
 
     $device_list = [];
     $port_list   = [];
@@ -227,15 +230,19 @@ function get_neighbour_map($vars)
     foreach ($devices as $device) {
         $id         = 'd' . $device['device_id'];
         $parent_id  = 'l' . string_to_id($device['location']);
-        $nodes[$id] = ['id'       => $id,
-                       'label'    => short_hostname($device['hostname']),
-                       'popupurl' => 'ajax/entity_popup.php?entity_type=device&entity_id=' . $device['device_id'],
-                       'parent'   => $parent_id];
+        $nodes[$id] = [
+            'id'       => $id,
+            'label'    => device_name($device, TRUE),
+            'popupurl' => 'ajax/entity_popup.php?entity_type=device&entity_id=' . $device['device_id'],
+            'parent'   => $parent_id
+        ];
 
         // Add parent nodes
         if (!isset($parents[$parent_id])) {
-            $nodes[$parent_id] = ['id'    => $parent_id,
-                                  'label' => $device['location']];
+            $nodes[$parent_id] = [
+                'id'    => $parent_id,
+                'label' => $device['location']
+            ];
         }
     }
 

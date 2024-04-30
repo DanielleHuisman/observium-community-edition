@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -35,13 +35,29 @@ foreach ($oids as $index => $entry) {
         }
         $descr = str_replace([' Temperature', ' Temp' ], '', $descr);
         $class = 'temperature';
-    } elseif (str_icontains_array($descr, 'Fan') && ($value > 100 || $value == 0)) {
+    } elseif (str_icontains_array($descr, 'Fan')) {
         if ($value == 0) {
             continue;
         }
-        $class = 'fanspeed';
+        if ($value > 100) {
+            $class = 'fanspeed';
+        } elseif ($value > 0) {
+            $class   = 'load';
+        }
+    } elseif (str_iends($descr, [' Curr', ' Current', ' IIN' ])) {
+        if ($value == 0) {
+            continue;
+        }
+        $descr = str_replace([' Curr', ' Current' ], '', $descr);
+        $class = 'current';
+    } elseif (str_iends($descr, [' Pwr', ' Power', ' POUT' ])) {
+        if ($value == 0) {
+            continue;
+        }
+        $descr = str_replace([' Pwr', ' Power' ], '', $descr);
+        $class = 'power';
     } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) ||
-              str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN' ])) {
+              str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN', 'SOC', 'VMEM' ])) {
         if ($value == 0) {
             continue;
         }

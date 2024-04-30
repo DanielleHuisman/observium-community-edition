@@ -1,0 +1,370 @@
+-- Copyright (C) 2010-2012 Aricent Group . All Rights Reserved
+
+-- $Id: fscn.mib,v 1.2 2012/09/07 09:52:05 siva Exp $
+
+--    CN Proprietary MIB Definition
+
+--    This document explains the proprietary MIB implemented
+--    for CN product.
+
+--    This proprietary MIB definition, supplements the standard IEEE802.1Qau
+--    MIB and also provides management of certain proprietary features of
+--    CN.
+
+--    The proprietary MIB definitions follows:
+      ARICENT-CN-MIB DEFINITIONS ::= BEGIN
+
+      IMPORTS
+         MODULE-IDENTITY, OBJECT-TYPE,
+         enterprises,Integer32, Counter32, NOTIFICATION-TYPE
+         FROM SNMPv2-SMI
+         TruthValue, TimeStamp, DisplayString
+         FROM SNMPv2-TC
+         IEEE8021PriorityValue
+         FROM IEEE8021-TC-MIB -- [IEEE 802.1ap]
+         ieee8021CnPortPriEntry, ieee8021CnCpIdentifier, 
+         ieee8021CnGlobalEntry, Ieee8021CnDefenseMode
+         FROM IEEE8021-CN-MIB;
+
+      fscn MODULE-IDENTITY
+           LAST-UPDATED "201209050000Z"
+           ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+           CONTACT-INFO "support@aricent.com"
+         DESCRIPTION
+              "This is the proprietary MIB for CN."
+         REVISION "201209050000Z"
+         DESCRIPTION
+              "This is the proprietary MIB for CN."
+         ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 47 }
+
+-- *****************************************************************************
+--              subtrees in the CN MIB
+-- *****************************************************************************
+    fsCnMaster           OBJECT IDENTIFIER ::= { fscn 1 }
+    fsCnComponent        OBJECT IDENTIFIER ::= { fscn 2 }
+    fsCnPortPriority     OBJECT IDENTIFIER ::= { fscn 3 }
+    fsCnNotifications    OBJECT IDENTIFIER ::= { fscn 4 }
+
+-- *****************************************************************************
+--              fsCnMaster subtree
+--  This subtree contain objects that are common to all the switch components.
+-- *****************************************************************************
+   fsCnSystemControl  OBJECT-TYPE
+    SYNTAX     INTEGER{
+        start(1),
+            shutdown(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "The administrative system control status of CN
+          module. The value 'start' (1) indicates that all
+          resources required by CN module should be allocated
+          and CN should be supported in the device on all ports.
+          The value 'shutdown' (2) indicates that CN should be
+          shutdown in the device on all ports and all allocated
+          memory must be released."              
+    DEFVAL  { start }
+    ::= { fsCnMaster 1 }
+
+    fsCnGlobalEnableTrap OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object is used to enable or disable the transmission of
+            TRAP notification messages.
+           
+            Each bit in this object corresponds to a particular trap
+            If the corresponding bit is set, then the particular
+            trap is enabled. The following traps are supported:
+            
+            Bit Position       Trap 
+	    1              Errored Port table 
+	    2              When a CNM is generated at one of the CPs.
+
+            The remaining bits are unused. More than one trap can also be 
+            enabled. 
+
+            For example, if bits 1 and 2 are set, then both fsCnEpEntryTrap 
+            and fsCnCNMTrap are enabled in the module.
+
+            The user has to enter the corresponding INTEGER VALUE 
+            for the bit set."
+
+       DEFVAL { 3 } -- Bits 1 & 2 set - Errored Port table & CNM Generation
+       ::= { fsCnMaster 2 }           
+
+
+-- *****************************************************************************
+--              fsCnComponent subtree
+--  This subtree contains fsCnXGlobalTable which is an augment to ieee8021CnGlobalTable.
+-- *****************************************************************************
+   fsCnXGlobalTable OBJECT-TYPE
+       SYNTAX        SEQUENCE OF FsCnXGlobalEntry
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+          "List of CN proprietary parameters per Component."
+       ::= { fsCnComponent 1 }
+
+    fsCnXGlobalEntry OBJECT-TYPE
+        SYNTAX       FsCnXGlobalEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "This table augments ieee8021CnGlobalTable."
+       AUGMENTS { ieee8021CnGlobalEntry }
+   ::= { fsCnXGlobalTable 1 }
+
+    FsCnXGlobalEntry ::=
+        SEQUENCE {
+            fsCnXGlobalTraceLevel
+               Integer32,
+            fsCnXGlobalClearCounters
+                TruthValue,
+            fsCnXGlobalTLVErrors
+                Counter32
+           }
+
+    fsCnXGlobalTraceLevel OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object is used to enable Trace Statements in
+                CN Module.
+
+                A FOUR BYTE integer is used for enabling the level of tracing.
+                Each BIT in the four byte integer represents a particular
+                level of Trace.
+
+                The mapping between the bit positions & the level of trace is
+                as follows:
+
+                1 - Management Traces
+                2 - CND State Machine Traces
+                3 - TLV Traces
+                4 - System Resource Traces
+                5 - Redundancy Traces
+                6 - Failure Traces
+                7 - Control Plane Trace
+
+                The remaining bits are unused. Combinations of levels are
+                also allowed.
+
+                For example if the bits 1 and 2 are set, then the trace
+                statements related to management and CND State Machine
+                will be printed.
+
+		By default 'Failure Traces' are enabled.
+                The user has to enter the corresponding INTEGER VALUE for the
+                bits set. For example if bits 1 and 2 are set then user has to
+                set the value 3."
+        DEFVAL  { 32 } -- Bit 6 - 'Failure Traces' Enabled
+        ::= { fsCnXGlobalEntry 1 }
+
+    fsCnXGlobalClearCounters OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object when set to TRUE, resets ieee8021CnGlobalDiscardedFrames, ieee8021CnCpDiscardedFrames,
+	    ieee8021CnCpTransmittedFrames, ieee8021CnCpTransmittedCnms and fsCnXGlobalTLVErrors.
+
+            Setting this object to FALSE has no effect. This object always returns FALSE when read. "
+       DEFVAL { false }
+       ::= { fsCnXGlobalEntry 2 }
+
+    fsCnXGlobalTLVErrors OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "This object is used to keep track of number of malformed TLVs received by CN. 
+            This counter will be incremented every time a CN-TLV is dropped by CN. "
+       ::= { fsCnXGlobalEntry 3 }
+
+-- *****************************************************************************
+--              fsCnPortPriority subtree
+--   This subtree contains the FsCnXPortPriTable which is an augment to ieee8021CnPortPriTable. 
+-- *****************************************************************************
+    fsCnXPortPriTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FsCnXPortPriEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table contains proprietary information applicable to
+             a port and priority." 
+        ::= { fsCnPortPriority 1 }
+
+    fsCnXPortPriEntry OBJECT-TYPE
+        SYNTAX      FsCnXPortPriEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table augments ieee8021CnPortPriTable."
+        AUGMENTS { ieee8021CnPortPriEntry }
+        ::= { fsCnXPortPriTable 1 }
+
+    FsCnXPortPriEntry ::=
+        SEQUENCE {
+          fsCnXPortPriClearCpCounters TruthValue,
+          fsCnXPortPriErrorEntry TruthValue,
+          fsCnXPortPriOperDefMode Ieee8021CnDefenseMode,
+          fsCnXPortPriOperAltPri IEEE8021PriorityValue,
+          fsCnXPortPriLastRcvdEvent DisplayString,
+          fsCnXPortPriLastRcvdEventTime TimeStamp,
+          fsCnXPortPriLastSentEvent DisplayString,
+          fsCnXPortPriLastSentEventTime TimeStamp
+                  }
+
+    fsCnXPortPriClearCpCounters OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+           "This object when set to TRUE, clears the following counters
+            associated with a Port and a CNPV:
+		ieee8021CnCpDiscardedFrames,
+		ieee8021CnCpTransmittedFrames,
+		ieee8021CnCpTransmittedCnms. 
+            Setting this object to FALSE has no effect. 
+            This object always returns FALSE when read."    
+         DEFVAL { false }
+         ::= { fsCnXPortPriEntry 1 }
+
+    fsCnXPortPriErrorEntry OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+            "This Object indicates whether there is a conflict between
+             Alternate Priority assigned to this CNPV with another CNPV. 
+             This flag is set to TRUE when an entry in 
+             ieee8021CnErroredPortTable is created and it is reset to FALSE
+             when entry in ieee8021CnErroredPortTable is deleted."
+         DEFVAL { false }
+         ::= { fsCnXPortPriEntry 2 }
+    
+    fsCnXPortPriOperDefMode OBJECT-TYPE
+        SYNTAX      Ieee8021CnDefenseMode
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object indicates operational CND defense mode for a
+             CNPV on a port."
+        ::= { fsCnXPortPriEntry 3 }
+
+    fsCnXPortPriOperAltPri OBJECT-TYPE
+         SYNTAX     IEEE8021PriorityValue
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+             "This object indicates operational alternate priotity
+              for a CNPV on a port when its CND defense mode is in 
+              cptEdge state"
+         ::= { fsCnXPortPriEntry 4 }
+
+    fsCnXPortPriLastRcvdEvent OBJECT-TYPE
+         SYNTAX     DisplayString
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+            "The object holds the last received event for a port and priority. 
+             This object is meant for debugging purposes.
+
+	     For Eg. When a CN TLV is received from LLDP module, this object
+                     is set as TLV RECVD and fsCnXPortPriLastRcvdEventTime
+		     object will be set to the event received time."
+         ::= { fsCnXPortPriEntry 5 }
+
+    fsCnXPortPriLastRcvdEventTime OBJECT-TYPE
+         SYNTAX     TimeStamp
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+            "The object holds the time at which the last event 
+	     (fsCnXPortPriLastRcvdEvent) was received.
+             This object is meant for debugging purposes.
+
+	     See fsCnXPortPriLastRcvdEvent for this objects usage."
+         ::= { fsCnXPortPriEntry 6 }
+
+    fsCnXPortPriLastSentEvent OBJECT-TYPE
+         SYNTAX     DisplayString
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+            "The object holds the last event sent for a port and priority.
+             This object is meant for debugging purposes."
+         ::= { fsCnXPortPriEntry 7 }
+  
+    fsCnXPortPriLastSentEventTime OBJECT-TYPE
+         SYNTAX     TimeStamp
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+            "The object holds the time at which the last event 
+             (fsCnXPortPriLastSentEvent) was sent. 
+             This object is meant for debugging purposes."
+         ::= { fsCnXPortPriEntry 8 }
+
+-- *****************************************************************************
+--              fsCnNotifications subtree
+--  This subtree contains the objects related to notifications.
+-- *****************************************************************************
+fsCnTraps OBJECT IDENTIFIER ::= { fsCnNotifications 0 }
+
+    fsCnCnmQOffset OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object refers to the difference between the
+         desired and current queue lengths of the CP. 
+         This object is used to calculate quantized feedback field."
+    REFERENCE
+         "IEEE 802.1Qau clause 32.8.7"
+    ::= { fsCnNotifications 1 }
+ 
+    fsCnCnmQDelta OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object refers to the difference between the
+         current and previous queue length of the CP. 
+         This object is used to calculate quantized feedback field."
+    REFERENCE
+         "IEEE 802.1Qau clause 32.8.8"
+    ::= { fsCnNotifications 2 }
+
+    fsCnEpEntryTrap NOTIFICATION-TYPE
+        OBJECTS  {
+           fsCnXPortPriErrorEntry 
+                }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated when an entry is created or deleted in
+             ieee8021CnErroredPortTable. When a row is created, this trap is 
+             generated with fsCnXPortPriErrorEntry as TRUE  and when a row 
+             is deleted, this trap is generated with 
+             fsCnXPortPriErrorEntry as FALSE."
+        ::= { fsCnTraps 1 }
+
+    fsCnCNMTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            ieee8021CnCpIdentifier,
+            fsCnCnmQOffset,
+            fsCnCnmQDelta
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated when congestion occurs at a CP and CNM is 
+             generated. This trap specifies the port on which CNM is
+             generated, the CpIdentifier, the CpQOffset and the CpQDelta 
+             which are used in feedback calculation."
+        ::= {fsCnTraps 2 }   
+
+END

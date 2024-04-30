@@ -54,48 +54,48 @@ echo("</span>");
 
 $width  = "120";
 $height = "40";
-$from   = $config['time']['day'];
+$from   = get_time('day');
 
 echo("</td><td width=135>");
 echo(format_bps($port['ifInOctets_rate'] * 8) . " <img class='optionicon' src='images/icons/arrow_updown.png' /> " . format_bps($port['ifOutOctets_rate'] * 8));
 echo("<br />");
 $port['graph_type'] = "port_bits";
-echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . $config['time']['now'] . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
+echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . get_time('now') . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
                                str_replace("#", "", $row_colour) . "'>", $port['graph_type']));
 
 echo("</td><td width=135>");
 echo("" . format_bps($port['adslAturChanCurrTxRate']) . "/" . format_bps($port['adslAtucChanCurrTxRate']));
 echo("<br />");
 $port['graph_type'] = "port_adsl_speed";
-echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . $config['time']['now'] . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
+echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . get_time('now') . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
                                str_replace("#", "", $row_colour) . "'>", $port['graph_type']));
 
 echo("</td><td width=135>");
 echo("" . format_bps($port['adslAturCurrAttainableRate']) . "/" . format_bps($port['adslAtucCurrAttainableRate']));
 echo("<br />");
 $port['graph_type'] = "port_adsl_attainable";
-echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . $config['time']['now'] . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
+echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . get_time('now') . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
                                str_replace("#", "", $row_colour) . "'>", $port['graph_type']));
 
 echo("</td><td width=135>");
 echo("" . $port['adslAturCurrAtn'] . "dB/" . $port['adslAtucCurrAtn'] . "dB");
 echo("<br />");
 $port['graph_type'] = "port_adsl_attenuation";
-echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . $config['time']['now'] . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
+echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . get_time('now') . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
                                str_replace("#", "", $row_colour) . "'>", $port['graph_type']));
 
 echo("</td><td width=135>");
 echo("" . $port['adslAturCurrSnrMgn'] . "dB/" . $port['adslAtucCurrSnrMgn'] . "dB");
 echo("<br />");
 $port['graph_type'] = "port_adsl_snr";
-echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . $config['time']['now'] . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
+echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . get_time('now') . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
                                str_replace("#", "", $row_colour) . "'>", $port['graph_type']));
 
 echo("</td><td width=135>");
 echo("" . $port['adslAturCurrOutputPwr'] . "dBm/" . $port['adslAtucCurrOutputPwr'] . "dBm");
 echo("<br />");
 $port['graph_type'] = "port_adsl_power";
-echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . $config['time']['now'] . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
+echo(generate_port_link($port, "<img src='graph.php?type=" . $port['graph_type'] . "&amp;id=" . $port['port_id'] . "&amp;from=" . $from . "&amp;to=" . get_time('now') . "&amp;width=" . $width . "&amp;height=" . $height . "&amp;legend=no&amp;bg=" .
                                str_replace("#", "", $row_colour) . "'>", $port['graph_type']));
 
 #  if ($port['ifDuplex'] != 'unknown') { echo("<span class=small>Duplex " . $port['ifDuplex'] . "</span>"); } else { echo("-"); }

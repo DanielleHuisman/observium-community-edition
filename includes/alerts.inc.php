@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -14,10 +14,9 @@
 // TESTME needs unit testing
 function get_contact_by_id($contact_id)
 {
-    if (is_numeric($contact_id)) {
-        $contact = dbFetchRow('SELECT * FROM `alert_contacts` WHERE `contact_id` = ?', [$contact_id]);
-    }
-    if (safe_count($contact)) {
+    if (is_numeric($contact_id) &&
+        $contact = dbFetchRow('SELECT * FROM `alert_contacts` WHERE `contact_id` = ?', [$contact_id])) {
+
         return $contact;
     }
 
@@ -28,10 +27,9 @@ function get_contact_by_id($contact_id)
 // TESTME needs unit testing
 function get_alert_test_by_id($alert_test_id)
 {
-    if (is_numeric($alert_test_id)) {
-        $alert_test = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', [$alert_test_id]);
-    }
-    if (safe_count($alert_test)) {
+    if (is_numeric($alert_test_id) &&
+        $alert_test = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', [$alert_test_id])) {
+
         return $alert_test;
     }
 
@@ -58,15 +56,14 @@ function get_alert_entry_by_id($id)
  * @return void|array
  */
 // TESTME needs unit testing
-function check_entity($entity_type, $entity, $data, $return = FALSE)
-{
+function check_entity($entity_type, $entity, $data, $return = FALSE) {
     global $config, $alert_rules, $alert_table, $device;
 
     //print_vars($entity);
     //print_vars($data);
     //r(array($entity_type, $entity, $data));
 
-    $alert_output = "";
+    //$alert_output = "";
 
     $entity_data         = entity_type_translate_array($entity_type);
     $entity_id_field     = $entity_data['id_field'];
@@ -80,8 +77,9 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
     }
 
     // Hardcode time and weekday for global use.
-    $data['time']    = date('Hi');
-    $data['weekday'] = date('N');
+    $data['unixtime'] = time(); // get_time();
+    $data['time']     = date('Hi');
+    $data['weekday']  = date('N');
 
     foreach ($alert_table[$entity_type][$entity_id] as $alert_test_id => $alert_args) {
         if ($alert_rules[$alert_test_id]['and']) {
@@ -104,18 +102,11 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
 
         if (is_array($alert_rules[$alert_test_id])) {
             print_debug("Checking alert " . $alert_test_id . " associated by " . $alert_args['alert_assocs'] . "\n");
-            $alert_output .= $alert_rules[$alert_test_id]['alert_name'] . " [";
+            //$alert_output .= $alert_rules[$alert_test_id]['alert_name'] . " [";
 
             foreach ($alert_rules[$alert_test_id]['conditions'] as $test_key => $test) {
                 // Replace tagged conditions with entity params from db, ie @sensor_limit
-                if (str_starts($test['value'], '@')) {
-                    $ent_val       = substr($test['value'], 1);
-                    $test['value'] = $entity[$ent_val];
-                    print_debug("DEBUG: ");
-                    print_debug_vars($entity[$ent_val]);
-
-                    print_debug(" replaced @" . $ent_val . " with " . $test['value'] . " from entity. ");
-                }
+                $test['value'] = get_metric_tagged_value($test['metric'], $test['value'], $entity);
 
                 print_debug("Testing: " . $test['metric'] . " " . $test['condition'] . " " . $test['value']);
                 $update_array['state']['metrics'][$test['metric']] = $data[$test['metric']];
@@ -158,98 +149,98 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
             // json_encode the state array before we put it into MySQL.
             $update_array['state'] = safe_json_encode($update_array['state']);
             $alert_info['state']   = $update_array['state'];
-            $last_time             = get_time();
+            $last_time             = $data['unixtime'];
 
             if ($alert) {
                 // Check to see if this alert has been suppressed by anything
                 ## FIXME -- not all of this is implemented
 
-                $suppressed       = [];
+                $suppressed       = []; // reasons
                 $alert_suppressed = FALSE;
 
                 // Have all alerts been suppressed?
                 if ($config['alerts']['suppress']) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "GLOBAL";
+                    $suppressed['GLOBAL'] = "Global Configuration";
                 }
 
                 // Is there a global scheduled maintenance?
-                if (isset($GLOBALS['cache']['maint']['global']) && count($GLOBALS['cache']['maint']['global']) > 0) {
+                if (safe_count($GLOBALS['cache']['maint']['global']) > 0) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "MNT_GBL";
+                    $suppressed['MNT_GBL'] = "Global Maintenance";
                 }
 
                 // Have all alerts on the device been suppressed?
                 if ($device['ignore']) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "DEV";
+                    $suppressed['DEV'] = "Device Ignored";
                 }
 
                 if ($device['ignore_until']) {
                     $device['ignore_until_time'] = strtotime($device['ignore_until']);
-                    if ($device['ignore_until_time'] > time()) {
+                    if ($device['ignore_until_time'] > $last_time) {
                         $alert_suppressed = TRUE;
-                        $suppressed[]     = "DEV_U";
+                        $suppressed['DEV_U'] = "Device Ignored until ".$device['ignore_until'];
                     }
                 }
 
                 if (isset($GLOBALS['cache']['maint'][$entity_type][$entity[$entity_id_field]])) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "MNT_ENT";
+                    $suppressed['MNT_ENT'] = "Entity Maintenance";
                 }
 
                 if (isset($GLOBALS['cache']['maint']['alert_checker'][$alert_test_id])) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "MNT_CHK";
+                    $suppressed['MNT_CHK'] = "Alert Checker Maintenance";
                 }
 
                 if (isset($GLOBALS['cache']['maint']['device'][$device['device_id']])) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "MNT_DEV";
+                    $suppressed['MNT_DEV'] = "Device Maintenance";
                 }
 
                 // Have all alerts on the entity been suppressed?
                 if ($entity[$entity_ignore_field]) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "ENT";
+                    $suppressed['ENT'] = "Entity Ignored";
                 }
 
-                if (is_numeric($entity['ignore_until']) && $entity['ignore_until'] > time()) {
+                if (is_numeric($entity['ignore_until']) && $entity['ignore_until'] > $last_time) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "ENT_U";
+                    $suppressed['ENT_U'] = "Entity Ignored until " . format_unixtime($entity['ignore_until']);
                 }
 
                 // Have alerts from this alerter been suppressed?
                 if ($alert_rules[$alert_test_id]['ignore']) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "CHECK";
+                    $suppressed['CHECK'] = "Alert Checker Ignored";
                 }
 
                 if ($alert_rules[$alert_test_id]['ignore_until']) {
                     $alert_rules[$alert_test_id]['ignore_until_time'] = strtotime($alert_rules[$alert_test_id]['ignore_until']);
-                    if ($alert_rules[$alert_test_id]['ignore_until_time'] > time()) {
+                    if ($alert_rules[$alert_test_id]['ignore_until_time'] > $last_time) {
                         $alert_suppressed = TRUE;
-                        $suppressed[]     = "CHECK_UNTIL";
+                        $suppressed['CHECK_UNTIL'] = "Alert Checker Ignored until ".$alert_rules[$alert_test_id]['ignore_until'];
                     }
                 }
 
                 // Has this specific alert been suppressed?
                 if ($alert_args['ignore']) {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "ENTRY";
+                    $suppressed['ENTRY'] = "Alert Ignored";
                 }
 
                 if ($alert_args['ignore_until']) {
                     $alert_args['ignore_until_time'] = strtotime($alert_args['ignore_until']);
-                    if ($alert_args['ignore_until_time'] > time()) {
+                    if ($alert_args['ignore_until_time'] > $last_time) {
                         $alert_suppressed = TRUE;
-                        $suppressed[]     = "ENTRY_UNTIL";
+                        $suppressed['ENTRY_UNTIL'] = "Alert Ignored until " . $alert_args['ignore_until'];
                     }
                 }
 
                 if (is_numeric($alert_args['ignore_until_ok']) && $alert_args['ignore_until_ok'] == '1') {
                     $alert_suppressed = TRUE;
-                    $suppressed[]     = "ENTRY_UNTIL_OK";
+                    $suppressed['ENTRY_UNTIL_OK'] = "Alert Ignored until OK";
                 }
 
                 $update_array['count'] = $alert_args['count'] + 1;
@@ -259,7 +250,7 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
                 if ($alert_args['count'] >= $alert_rules[$alert_test_id]['delay'] && $alert_suppressed) {
                     // This alert is valid, but has been suppressed.
                     //echo(" Checks failed. Alert suppressed (".implode(', ', $suppressed).").\n");
-                    $alert_output .= "%PFS%N";
+                    //$alert_output .= "%PFS%N";
 
                     $update_array['alert_status'] = '3';
                     $update_array['last_message'] = 'Checks failed (Suppressed: ' . implode(', ', $suppressed) . ')';
@@ -273,7 +264,7 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
                 } elseif ($alert_args['count'] >= $alert_rules[$alert_test_id]['delay']) {
                     // This is a real alert.
                     //echo(" Checks failed. Generate alert.\n");
-                    $alert_output                 .= "%PF!%N";
+                    //$alert_output                 .= "%PF!%N";
                     $update_array['alert_status'] = '0';
                     $update_array['last_message'] = 'Checks failed';
                     $update_array['last_checked'] = $last_time;
@@ -287,7 +278,7 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
                 } else {
                     // This is alert needs to exist for longer.
                     //echo(" Checks failed. Delaying alert.\n");
-                    $alert_output                 .= "%OFD%N";
+                    //$alert_output                 .= "%OFD%N";
                     $update_array['alert_status'] = '2';
                     $update_array['last_message'] = 'Checks failed (delayed)';
                     $update_array['last_checked'] = $last_time;
@@ -301,7 +292,7 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
             } else {
                 $update_array['count'] = 0;
                 // Alert conditions passed. Record that we tested it and update status and other data.
-                $alert_output                 .= "%gOK%N";
+                //$alert_output                 .= "%gOK%N";
                 $update_array['alert_status'] = '1';
                 $update_array['last_message'] = 'Checks OK';
                 $update_array['last_checked'] = $last_time;
@@ -317,8 +308,7 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
                 }
             }
 
-            unset($suppressed);
-            unset($alert_suppressed);
+            unset($suppressed, $alert_suppressed);
 
             #$update_array['alert_table_id'] = $alert_args['alert_table_id'];
 
@@ -387,13 +377,13 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
             }
 
         } else {
-            $alert_output .= "%RAlert missing!%N";
+            //$alert_output .= "%RAlert missing!%N";
         }
 
-        $alert_output .= ("] ");
+        //$alert_output .= ("] ");
     }
 
-    $alert_output .= "%n";
+    //$alert_output .= "%n";
 
     /*
     if ($entity_type == "device") {
@@ -404,6 +394,45 @@ function check_entity($entity_type, $entity, $data, $return = FALSE)
 
     print_cli_data("Checked Alerts", $alert_output, $cli_level);
     */
+}
+
+/**
+ * Replace tagged metric value with entity params from db.
+ * Ie @sensor_limit or magic metric @previous return entity value from db (as previous value)
+ *
+ * @param string $metric
+ * @param mixed $value
+ * @param array $entity
+ * @return mixed
+ */
+function get_metric_tagged_value($metric, $value, $entity) {
+    // Replace tagged conditions with entity params from db, ie @sensor_limit
+    if (str_starts_with($value, '@')) {
+        $ent_val = substr($value, 1);
+        print_debug("DEBUG get_metric_tagged_value(): ");
+        if ($ent_val === 'previous') {
+            // get entity value from previous polling
+            $alt_metric = explode('_', $metric, 2)[1]; // device_status_type -> status_type
+            if (isset($entity[$metric])) {
+                $value = $entity[$metric];
+                print_debug_vars($entity[$metric]);
+            } elseif (isset($entity[$alt_metric])) {
+                $value = $entity[$alt_metric];
+                print_debug_vars($entity[$alt_metric]);
+            } else {
+                // remove tagged value for prevent false alerts
+                $value = NULL;
+            }
+        //} elseif ($ent_val === 'difference' || $ent_val === 'diff') {
+        } else {
+            $value = $entity[$ent_val];
+            print_debug_vars($entity[$ent_val]);
+        }
+
+        print_debug(" replaced $metric value @" . $ent_val . " with " . $value . " from entity. ");
+        print_debug_vars($entity);
+    }
+    return $value;
 }
 
 /**
@@ -519,11 +548,26 @@ function update_alert_table($alert, $silent = TRUE)
 
     $existing_entities = get_alert_entities($alert['alert_test_id']);
 
+    $broken = [];
+    foreach ($existing_entities as $id => $entry) {
+        if (isset($entities[$id]) && $entry['device_id'] != $entities[$id]['device_id']) {
+            //print_vars($existing_entities[$id]);
+            $broken[$id] = $entry;
+            unset($existing_entities[$id]);
+        }
+    }
     //print_vars($existing_entities);
     //print_vars($entities);
 
-    $add    = array_diff_key($entities, $existing_entities);
-    $remove = array_diff_key($existing_entities, $entities);
+    $add    = array_diff_key($entities, (array)$existing_entities);
+    $remove = array_diff_key((array)$existing_entities, $entities);
+    print_debug_vars($add);
+    print_debug_vars($remove);
+    if ($broken_count = safe_count($broken)) {
+        print_debug_vars($broken);
+        print_debug("Found $broken_count broken entries. Remove..");
+        $remove = array_merge($remove, $broken);
+    }
 
     if (!$silent) {
         if (is_cli()) {
@@ -535,23 +579,25 @@ function update_alert_table($alert, $silent = TRUE)
         }
     }
 
+    // Multi-delete (before insert)
+    $db_multi_delete = [];
+    foreach ($remove as $entity_id => $entity) {
+        //dbDelete('alert_table', 'alert_test_id = ? AND entity_id = ?', [$alert['alert_test_id'], $entity_id]);
+        $db_multi_delete[] = $entity['alert_table_id'];
+    }
+    if (!empty($db_multi_delete)) {
+        dbDelete('alert_table', generate_query_values($db_multi_delete, 'alert_table_id'));
+    }
+
     $db_multi_insert = [];
     foreach ($add as $entity_id => $entity) {
-        $db_multi_insert[] = ['device_id' => $entity['device_id'], 'entity_type' => $alert['entity_type'],
-                              'entity_id' => $entity_id, 'alert_test_id' => $alert['alert_test_id']];
-        //dbInsert(array('device_id' => $entity['device_id'], 'entity_type' => $alert['entity_type'], 'entity_id' => $entity_id, 'alert_test_id' => $alert['alert_test_id']), 'alert_table');
+        $db_multi_insert[] = [ 'device_id' => $entity['device_id'], 'entity_type' => $alert['entity_type'],
+                               'entity_id' => $entity_id, 'alert_test_id' => $alert['alert_test_id'] ];
     }
     // Multi insert
     if (!empty($db_multi_insert)) {
         dbInsertMulti($db_multi_insert, 'alert_table');
     }
-
-    foreach ($remove as $entity_id => $entity) {
-        dbDelete('alert_table', 'alert_test_id = ? AND entity_id = ?', [$alert['alert_test_id'], $entity_id]);
-    }
-
-    //print_vars($add);
-    //print_vars($remove);
 
     if (!$silent && !is_cli()) {
         print_message("Alert Checker " . $alert['alert_name'] . " regenerated", 'information');
@@ -683,17 +729,18 @@ function cache_alert_maintenance()
 
 }
 
-function get_alert_entities($ids)
-{
-    $array = [];
-    if (!is_array($ids)) {
-        $ids = [$ids];
+function get_alert_entities($ids) {
+    if (safe_empty($ids)) {
+        return [];
     }
 
-    foreach ($ids as $alert_id) {
-        foreach (dbFetchRows("SELECT * FROM `alert_table` WHERE `alert_test_id` = ?", [$alert_id]) as $entry) {
-            $array[$entry['entity_id']] = ['entity_id' => $entry['entity_id'], 'device_id' => $entry['device_id']];
-        }
+    $array = [];
+    foreach (dbFetchRows("SELECT `alert_table_id`, `entity_id`, `device_id` FROM `alert_table` WHERE " . generate_query_values($ids, 'alert_test_id')) as $entry) {
+        $array[$entry['entity_id']] = [
+            'entity_id'      => $entry['entity_id'],
+            'device_id'      => $entry['device_id'],
+            'alert_table_id' => $entry['alert_table_id']
+        ];
     }
 
     return $array;
@@ -941,7 +988,7 @@ function test_condition($value_a, $condition, $value_b)
                 $value_b = array_map('trim', explode(',', $value_b));
             }
             foreach ($value_b as $value) {
-                if ($value == $value_a) {
+                if ((string)$value === (string)$value_a) { // NOTE. php before 8.x: 'string' == 0 => true
                     $result = TRUE;
                     break 2;
                 }
@@ -959,7 +1006,7 @@ function test_condition($value_a, $condition, $value_b)
                 $value_b = array_map('trim', explode(',', $value_b));
             }
             foreach ($value_b as $value) {
-                if ($value == $value_a) {
+                if ((string)$value === (string)$value_a) { // NOTE. php before 8.x: 'string' == 0 => true
                     $result = FALSE;
                     break 2; // break out of foreach loop and which
                 }
@@ -1883,23 +1930,20 @@ function get_alert_contacts($device, $alert_id, $notification_type)
     return $contacts;
 }
 
-function process_notifications($vars = [])
-{
+function process_notifications($vars = []) {
     global $config;
 
     $result = [];
-    $params = [];
+    $where  = [];
 
-    $sql = 'SELECT * FROM `notifications_queue` WHERE 1';
+    $sql = 'SELECT * FROM `notifications_queue` ';
 
     foreach ($vars as $var => $value) {
         switch ($var) {
             case 'device_id':
             case 'notification_id':
             case 'aca_type':
-                $sql .= generate_query_values_and($value, $var);
-                //$sql .= ' AND `device_id` = ?';
-                //$params[] = $value;
+                $where[] = generate_query_values($value, $var);
                 break;
         }
     }
@@ -1919,9 +1963,7 @@ function process_notifications($vars = [])
      * }
      **/
 
-    foreach (dbFetchRows($sql, $params) as $notification) {
-
-        print_debug_vars($notification);
+    foreach (dbFetchRows($sql . generate_where_clause($where)) as $notification) {
 
         // Recheck if current notification is locked
         $locked = dbFetchCell('SELECT `notification_locked` FROM `notifications_queue` WHERE `notification_id` = ?', [$notification['notification_id']]); //ALTER TABLE `notifications_queue` ADD `notification_locked` BOOLEAN NOT NULL DEFAULT FALSE AFTER `notification_entry`;
@@ -1932,9 +1974,10 @@ function process_notifications($vars = [])
             print_debug_vars($notification, 1);
             continue;
         }
+        print_debug_vars($notification);
 
         // Lock current notification
-        dbUpdate(['notification_locked' => 1], 'notifications_queue', '`notification_id` = ?', [$notification['notification_id']]);
+        dbUpdate([ 'notification_locked' => 1 ], 'notifications_queue', '`notification_id` = ?', [$notification['notification_id']]);
 
         $notification_count = 0;
         $endpoint           = safe_json_decode($notification['endpoints']);
@@ -2022,7 +2065,7 @@ function process_notifications($vars = [])
                     $message['title'] = $message_tags['TITLE'];
                 }
 
-                // Generate notification message from tags using mustache template system
+                // Generate a notification message from tags using a mustache template system
                 if (isset($endpoint['contact_message_custom']) && $endpoint['contact_message_custom'] &&
                     empty(!$endpoint['contact_message_template'])) {
                     // Use user defined template
@@ -2033,7 +2076,7 @@ function process_notifications($vars = [])
                     // template can have tags (ie telegram)
                     if (str_contains($notification_def['message_template'], '%')) {
                         //print_vars($notification_def['message_template']);
-                        $message_template = array_tag_replace(generate_transport_tags($transport, $endpoint), $notification_def['message_template']);
+                        $message_template = array_tag_replace_encode(generate_transport_tags($transport, $endpoint), $notification_def['message_template']);
                         $message_template = strtolower($message_template);
                         //print_vars($message_template);
                     } else {
@@ -2049,7 +2092,7 @@ function process_notifications($vars = [])
                     //$data['message'] = $message['text'];
                 }
 
-                // Afterall message transform
+                // After all, message transform
                 if (isset($notification_def['message_transform']) && $message['text']) {
                     $message['text'] = string_transform($message['text'], $notification_def['message_transform']);
                 }
@@ -2062,27 +2105,15 @@ function process_notifications($vars = [])
                 // Always get response also with bad status
                 $options['ignore_errors'] = TRUE;
 
-                // Retry count (default 1, max 10). See discord definition
-                $request_retry = 1;
-                $request_sleep = 0;
-                if (isset($notification_def['request_retry']) && is_intnum($notification_def['request_retry']) &&
-                    $notification_def['request_retry'] > 1 && $notification_def['request_retry'] <= 10) {
-                    $request_retry = $notification_def['request_retry'];
-                    $request_sleep = 1;
-                }
-
                 // API URL to POST to
                 $url = generate_http_url($transport, $tags, $data);
+                $notify_status['success'] = process_http_request($transport, $url, $options);
 
-                // Send out API call and parse response
-                for ($retry = 1; $retry <= $request_retry; $retry++) {
-                    print_debug("Request #$retry:");
-                    if ($notify_status['success'] = test_http_request($transport, get_http_request($url, $options))) {
-                        // stop for on success
-                        break;
-                    }
-                    // wait little time
-                    sleep($request_sleep);
+                // Secondary (fallback) request, example in webhook-json
+                // https://jira.observium.org/browse/OBS-4767
+                if (isset($notification_def['url1']) && !$notify_status['success']) { // get_http_last_code() === 408
+                    $url = generate_http_url($transport, $tags, $data, 'url1');
+                    $notify_status['success'] = process_http_request($transport, $url, $options);
                 }
 
                 // Clean after transport data and request generation
@@ -2131,7 +2162,7 @@ function process_notifications($vars = [])
         }
 
         if (empty($endpoint)) {
-            dbDelete('notifications_queue', '`notification_id` = ?', [$notification['notification_id']]);
+            dbDelete('notifications_queue', '`notification_id` = ?', [ $notification['notification_id'] ]);
         } else {
             // Set the endpoints to the remaining un-notified endpoints and unlock the queue entry.
             dbUpdate(['notification_locked' => 0, 'endpoints' => safe_json_encode($endpoint)], 'notifications_queue', '`notification_id` = ?', [$notification['notification_id']]);
@@ -2164,8 +2195,8 @@ function log_alert($text, $device, $alert, $log_type)
     return dbInsert($insert, 'alert_log');
 }
 
-function threshold_string($alert_low, $warn_low, $warn_high, $alert_high, $symbol = NULL)
-{
+function threshold_string($alert_low, $warn_low, $warn_high, $alert_high, $symbol = NULL) {
+    $format = ''; // FIXME. Not passed
 
     // Generate "pretty" thresholds
     if (is_numeric($alert_low)) {
@@ -2181,7 +2212,7 @@ function threshold_string($alert_low, $warn_low, $warn_high, $alert_high, $symbo
     }
 
     if ($warn_low_t) {
-        $alert_low_t = $alert_low_t . " (" . $warn_low_t . ")";
+        $alert_low_t .= " (" . $warn_low_t . ")";
     }
 
     if (is_numeric($alert_high)) {
@@ -2200,10 +2231,7 @@ function threshold_string($alert_low, $warn_low, $warn_high, $alert_high, $symbo
         $alert_high_t = "(" . $warn_high_t . ") " . $alert_high_t;
     }
 
-    $thresholds = $alert_low_t . ' - ' . $alert_high_t;
-
-    return $thresholds;
-
+    return $alert_low_t . ' - ' . $alert_high_t;
 }
 
 function check_thresholds($alert_low, $warn_low, $warn_high, $alert_high, $value)
@@ -2244,11 +2272,10 @@ function check_thresholds($alert_low, $warn_low, $warn_high, $alert_high, $value
  * @param array  $message      (optional) Array with some variants of alert message (ie text, html) and title
  * @param array  $message_tags (optional) Array with all message tags
  *
- * @return array           HTTP Context which can used in get_http_request_test() or get_http_request()
+ * @return array               HTTP Context which can used in get_http_request()
  * @global array $config
  */
-function generate_transport_tags($transport, $tags = [], $params = [], $message = [], $message_tags = [])
-{
+function generate_transport_tags($transport, $tags = [], $params = [], $message = [], $message_tags = []) {
     global $config;
 
     if (!isset($message['message'])) {
@@ -2271,9 +2298,9 @@ function generate_transport_tags($transport, $tags = [], $params = [], $message 
     $def_params = [];
     // Merge required/global and optional parameters
     foreach (array_keys($config['transports'][$transport]['parameters']) as $tmp) {
-        $def_params = array_merge($def_params, $config['transports'][$transport]['parameters'][$tmp]);
+        $def_params[] = $config['transports'][$transport]['parameters'][$tmp];
     }
-    foreach ($def_params as $param => $entry) {
+    foreach (array_merge([], ...array_values($config['transports'][$transport]['parameters'])) as $param => $entry) {
         // Set default if tag empty
         if (isset($entry['default']) && safe_empty($tags[$param])) {
             $tags[$param] = $entry['default'];
@@ -2639,9 +2666,10 @@ function generate_attrib_values($attrib, $vars)
                     $name = "$item ($name)";
                 }
                 if (!safe_empty($item)) {
-                    $values[$item] = ['name' => $name];
+                    $values[$item] = [ 'name' => $name ];
                 }
             }
+            //r($values);
             break;
         case "sensor_class":
             foreach ($GLOBALS['config']['sensor_types'] as $class => $data) {
@@ -2723,7 +2751,7 @@ function generate_querybuilder_filter($attrib)
             }
 
         } else {
-            $value_list = generate_attrib_values($attrib['values'], ['entity_type' => $attrib['entity_type'], 'measured_type' => $attrib['measured_type']]);
+            $value_list = generate_attrib_values($attrib['values'], [ 'entity_type' => $attrib['entity_type'], 'measured_type' => $attrib['measured_type'] ]);
         }
 
         asort($value_list);
@@ -2834,8 +2862,8 @@ function generate_querybuilder_filters($entity_type, $type = "attribs")
         $type === 'attribs' && !isset($def[$type]['group_id']) &&
         !isset($def['parent_type'])) { // exclude on parent entities (ie for bgp afi/safi)
         $add_group = [
-          'group_id' => ['label' => 'Group', 'descr' => 'Group Membership', 'type' => 'string', 'values' => 'group'],
-          'group'    => ['label' => 'Group (Free)', 'descr' => 'Group Membership', 'type' => 'string', 'operators' => 'match, notmatch']
+          'group_id' => [ 'label' => 'Group', 'descr' => 'Group Membership', 'type' => 'string', 'values' => 'group' ],
+          'group'    => [ 'label' => 'Group (Free)', 'descr' => 'Group Membership', 'type' => 'string', 'operators' => 'match, notmatch' ]
         ];
         //$config['entities'][$entity]['attribs']['group_id']             = array('label' => 'Group',             'descr' => 'Group Membership',        'type' => 'string', 'values' => 'group');
         //$config['entities'][$entity]['attribs']['group']                = array('label' => 'Group (Free)',      'descr' => 'Group Membership',        'type' => 'string', 'operators' => 'match, notmatch');
@@ -2848,8 +2876,10 @@ function generate_querybuilder_filters($entity_type, $type = "attribs")
 
         $filter[] = generate_querybuilder_filter($attrib);
 
-        if (isset($attrib['values']) && !str_ends($attrib['attrib_id'], "_id") && // Don't show freeform variant for device_id, location_id, group_id and etc
-            (!isset($attrib['free']) || $attrib['free'])) {                       // Don't show freeform variant if attrib free set to false
+        if (isset($attrib['values']) &&
+            (!isset($attrib['free']) || $attrib['free']) && // Don't show freeform variant if attrib free set to false
+            !str_ends_with($attrib['attrib_id'], "_id")) {  // Don't show freeform variant for device_id, location_id, group_id and etc
+
             unset($attrib['values']);
             $attrib['free'] = 1;
             $filter[]       = generate_querybuilder_filter($attrib);
@@ -3043,8 +3073,7 @@ function parse_qb_ruleset($entity_type, $rules, $ignore = FALSE)
     return $sql;
 }
 
-function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
-{
+function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
     global $config;
 
 
@@ -3061,7 +3090,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
 
             //print_r($rule);
 
-            [$table, $field] = explode('.', $rule['field']);
+            [ $table, $field ] = explode('.', $rule['field']);
 
             if ($table === 'entity' || $table == $entity_type) {
                 $table_type_data = $entity_type_data;
@@ -3070,7 +3099,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
                 $table_type_data = entity_type_translate_array($table);
             }
 
-            // Pre Transform value according to DB field (see port ARP/MAC)
+            // Pre-transform value according to DB field (see port ARP/MAC)
             $rule['value_original'] = $rule['value'];
             if (isset($entity_attribs[$field]['transform'])) {
                 $entity_attribs[$field]['transformations'] = $entity_attribs[$field]['transform'];
@@ -3080,9 +3109,9 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
             }
 
             $part = '';
-            // Check if field is measured entity
-            $field_measured = isset($entity_attribs[$field]['measured_type']) &&                    // Attrib have measured type param
-                              isset($config['entities'][$entity_attribs[$field]['measured_type']]); // And this entity type exist
+            // Check if field is a measured entity
+            $field_measured = isset($entity_attribs[$field]['measured_type'],
+                              $config['entities'][$entity_attribs[$field]['measured_type']]); // And this entity type exists
 
             if (isset($entity_attribs[$field]['function']) && function_exists($entity_attribs[$field]['function']) &&
                 (!isset($entity_attribs[$field]['tags']) || $entity_attribs[$field]['tags'])) { // i.e. device poller_id
@@ -3106,17 +3135,16 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
                 //$measured_type      = $entity_attribs[$field]['measured_type'];
                 //$measured_type_data = entity_type_translate_array($measured_type);
 
-                switch ($entity_attribs[$field]['values']) {
-                    case 'measured_group':
-                        // When values used as measured group, convert it to entity ids
-                        //logfile('groups.log', 'passed value: '.var_export($rule['value'], TRUE)); /// DEVEL
-                        $group_ids     = !is_array($rule['value']) ? explode(',', $rule['value']) : $rule['value'];
-                        $rule['value'] = get_group_entities($group_ids);
-                        //logfile('groups.log', 'groups value: '.var_export($rule['value'], TRUE)); /// DEVEL
-                        break;
-                    default:
-                        //$rule['field_quoted'] = '`'.$table_type_data['table'].'`.`'.$field.'`';
+                if ($entity_attribs[$field]['values'] === 'measured_group') {
+                    // When values used as a measured group, convert it to entity ids
+                    //logfile('groups.log', 'passed value: '.var_export($rule['value'], TRUE)); /// DEVEL
+                    $group_ids = !is_array($rule['value']) ? explode(',', $rule['value']) : $rule['value'];
+                    $rule['value'] = get_group_entities($group_ids);
+                    //logfile('groups.log', 'groups value: '.var_export($rule['value'], TRUE)); /// DEVEL
+                } else {
+                    //$rule['field_quoted'] = '`'.$table_type_data['table'].'`.`'.$field.'`';
                 }
+
                 // Override $field by measured entity_id
                 $rule['field_quoted'] = '`' . $table_type_data['table'] . '`.`' . $entity_type_data['table_fields']['measured_id'] . '`';
                 //logfile('groups.log', 'value: '.var_export($rule['value'], TRUE)); /// DEVEL
@@ -3125,9 +3153,8 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
             } elseif (isset($entity_attribs[$field]['table'])) {
                 // This attrib specifies a table name (used for oid, since there is no parent)
                 $rule['field_quoted'] = '`' . $entity_attribs[$field]['table'] . '`.`' . $field . '`';
-            } elseif (!isset($entity_attribs[$field])
-                      && isset($config['entities'][$entity_type]['parent_type'])
-                      && isset($config['entities'][$config['entities'][$entity_type]['parent_type']]['attribs'][$field])) {
+            } elseif (isset($config['entities'][$entity_type]['parent_type'],
+                      $config['entities'][$config['entities'][$entity_type]['parent_type']]['attribs'][$field]) && !isset($entity_attribs[$field])) {
                 // This attrib does not exist on this entity && this entity has a parent && this attrib exists on the parent
                 $rule['field_quoted'] = '`' . $config['entities'][$config['entities'][$entity_type]['parent_type']]['table'] . '`.`' . $field . '`';
 
@@ -3162,40 +3189,34 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
                     $part = ' ' . $rule['field_quoted'] . " = '" . dbEscape($rule['value']) . "'";
                     break;
                 case 'match':
-                    switch ($field) {
-                        case 'group':
-                            //$group = get_group_by_name($rule['value_original']);
-                            $group_ids = get_group_ids_by_name_match($rule['value_original'], $table);
-                            //$group_ids = get_group_ids_by_name_match($rule['value_original'], $entity_type);
-                            if ($values = get_group_entities($group_ids)) {
-                                //$values = get_group_entities($group['group_id']);
-                                $part = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']));
-                            }
-                            break;
-                        default:
-                            $rule['value'] = str_replace(['*', '?'], ['%', '_'], $rule['value_original']);
-                            //$rule['value'] = str_replace('?', '_', $rule['value']);
-                            $part = ' IFNULL(' . $rule['field_quoted'] . ', "") LIKE' . " '" . dbEscape($rule['value']) . "'";
-                            break;
+                    if ($field === 'group') {
+                        //$group = get_group_by_name($rule['value_original']);
+                        $group_ids = get_group_ids_by_name_match($rule['value_original'], $table);
+                        //$group_ids = get_group_ids_by_name_match($rule['value_original'], $entity_type);
+                        if ($values = get_group_entities($group_ids)) {
+                            //$values = get_group_entities($group['group_id']);
+                            $part = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']));
+                        }
+                    } else {
+                        $rule['value'] = str_replace(['*', '?'], ['%', '_'], $rule['value_original']);
+                        //$rule['value'] = str_replace('?', '_', $rule['value']);
+                        $part = ' IFNULL(' . $rule['field_quoted'] . ', "") LIKE' . " '" . dbEscape($rule['value']) . "'";
                     }
                     break;
                 case 'notmatch':
                     $operator_negative = TRUE;
-                    switch ($field) {
-                        case 'group':
-                            //$group = get_group_by_name($rule['value_original']);
-                            $group_ids = get_group_ids_by_name_match($rule['value_original'], $table);
-                            //$group_ids = get_group_ids_by_name_match($rule['value_original'], $entity_type);
-                            if ($values = get_group_entities($group_ids)) {
-                                //$values = get_group_entities($group['group_id']);
-                                $part = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), '!=');
-                            }
-                            break;
-                        default:
-                            $rule['value'] = str_replace(['*', '?'], ['%', '_'], $rule['value_original']);
-                            //$rule['value'] = str_replace('?', '_', $rule['value']);
-                            $part = ' IFNULL(' . $rule['field_quoted'] . ', "") NOT LIKE' . " '" . dbEscape($rule['value']) . "'";
-                            break;
+                    if ($field === 'group') {
+                        //$group = get_group_by_name($rule['value_original']);
+                        $group_ids = get_group_ids_by_name_match($rule['value_original'], $table);
+                        //$group_ids = get_group_ids_by_name_match($rule['value_original'], $entity_type);
+                        if ($values = get_group_entities($group_ids)) {
+                            //$values = get_group_entities($group['group_id']);
+                            $part = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), '!=');
+                        }
+                    } else {
+                        $rule['value'] = str_replace([ '*', '?' ], [ '%', '_' ], $rule['value_original']);
+                        //$rule['value'] = str_replace('?', '_', $rule['value']);
+                        $part = ' IFNULL(' . $rule['field_quoted'] . ', "") NOT LIKE' . " '" . dbEscape($rule['value']) . "'";
                     }
                     break;
                 case 'regexp':
@@ -3214,48 +3235,42 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
                 case 'in':
                     //print_vars($field);
                     //print_vars($rule);
-                    switch ($field) {
-                        case 'group_id':
-                            $values = get_group_entities($rule['value_original']);
-                            $part   = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']));
-                            break;
-                        default:
-                            if (isset($entity_attribs[$field]['transformations'])) {
-                                $values = get_var_csv($rule['value_original']);
-                                foreach ($values as &$value) {
-                                    $value = string_transform($value, $entity_attribs[$field]['transformations']);
-                                }
-                            } else {
-                                // When transformations not used, can use other value overrides, ie function calls
-                                $values = get_var_csv($rule['value']);
+                    if ($field === 'group_id') {
+                        $values = get_group_entities($rule['value_original']);
+                        $part = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']));
+                    } else {
+                        if (isset($entity_attribs[$field]['transformations'])) {
+                            $values = get_var_csv($rule['value_original']);
+                            foreach ($values as &$value) {
+                                $value = string_transform($value, $entity_attribs[$field]['transformations']);
                             }
-                            //r($values);
-                            //logfile('alerts.log', $rule['field_quoted'] . ': ' . var_export($values, TRUE));
-                            //logfile('alerts.log', var_export($rule, TRUE));
-                            $part = generate_query_values_ng($values, $rule['field_quoted'], NULL, ['ifnull']);
-                            break;
+                        } else {
+                            // When transformations not used, can use other value overrides, ie function calls
+                            $values = get_var_csv($rule['value']);
+                        }
+                        //r($values);
+                        //logfile('alerts.log', $rule['field_quoted'] . ': ' . var_export($values, TRUE));
+                        //logfile('alerts.log', var_export($rule, TRUE));
+                        $part = generate_query_values($values, $rule['field_quoted'], NULL, ['ifnull' ]);
                     }
                     //print_vars($parts);
                     break;
                 case 'notin':
                     $operator_negative = TRUE;
-                    switch ($field) {
-                        case 'group_id':
-                            $values = get_group_entities($rule['value_original']);
-                            $part   = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), '!=');
-                            break;
-                        default:
-                            if (isset($entity_attribs[$field]['transformations'])) {
-                                $values = get_var_csv($rule['value_original']);
-                                foreach ($values as &$value) {
-                                    $value = string_transform($value, $entity_attribs[$field]['transformations']);
-                                }
-                            } else {
-                                // When transformations not used, can use other value overrides, ie function calls
-                                $values = get_var_csv($rule['value']);
+                    if ($field === 'group_id') {
+                        $values = get_group_entities($rule['value_original']);
+                        $part = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), '!=');
+                    } else {
+                        if (isset($entity_attribs[$field]['transformations'])) {
+                            $values = get_var_csv($rule['value_original']);
+                            foreach ($values as &$value) {
+                                $value = string_transform($value, $entity_attribs[$field]['transformations']);
                             }
-                            $part = generate_query_values_ng($values, $rule['field_quoted'], '!=', ['ifnull']);
-                            break;
+                        } else {
+                            // When transformations not used, can use other value overrides, ie function calls
+                            $values = get_var_csv($rule['value']);
+                        }
+                        $part = generate_query_values($values, $rule['field_quoted'], '!=', ['ifnull' ]);
                     }
                     break;
             }
@@ -3490,6 +3505,46 @@ function render_qb_rules($entity_type, $rules)
 
 
     return $part;
+}
+
+function valid_json_notification($value) {
+    //r($value);
+    safe_json_decode($value);
+    $valid = json_last_error() === JSON_ERROR_NONE;
+
+    if (!$valid) {
+        // Load test message_tags for correct JSON validate with real data
+        // https://jira.observium.org/browse/OBS-4626
+        //bdump($value);
+        $notification = safe_json_decode(file_get_contents($GLOBALS['config']['install_dir'] . '/includes/templates/test/notification_ALERT.json'));
+        $message_tags = safe_json_decode($notification['message_tags']);
+
+        $notification = safe_json_decode(file_get_contents($GLOBALS['config']['install_dir'] . '/includes/templates/test/notification_SYSLOG.json'));
+        $message_tags = array_merge(safe_json_decode($notification['message_tags']), $message_tags);
+
+        // Decode again with real data
+        //bdump(array_tag_replace($message_tags, $value));
+        safe_json_decode(array_tag_replace($message_tags, $value));
+
+        $valid = json_last_error() === JSON_ERROR_NONE;
+    }
+
+    return $valid;
+}
+
+function alerts_export($vars) {
+
+    $for_export = [];
+    foreach (cache_alert_rules($vars) as $id => $alert) {
+        // clean not required for export
+        unset($alert['alert_test_id'], $alert['enable'], $alert['show_frontpage'], $alert['ignore_until']);
+        // associations already json
+        $alert['alert_assoc'] = safe_json_decode($alert['alert_assoc']);
+
+        $for_export[] = $alert;
+    }
+
+    return $for_export;
 }
 
 // EOF

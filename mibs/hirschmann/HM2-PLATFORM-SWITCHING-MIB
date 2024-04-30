@@ -13,13 +13,15 @@ IMPORTS
     Gauge32, TimeTicks
                                         FROM SNMPv2-SMI
     RowStatus, TruthValue, MacAddress,
-    TEXTUAL-CONVENTION, DisplayString
+    TEXTUAL-CONVENTION, DisplayString,
+	DateAndTime
                                         FROM SNMPv2-TC
     dot1dBasePortEntry					FROM BRIDGE-MIB
 	dot1dPortGmrpEntry					FROM P-BRIDGE-MIB
     VlanId,VlanIndex,dot1qVlanIndex,
     dot1qFdbId, PortList, 
-    dot1qPortVlanEntry
+    dot1qPortVlanEntry,
+	VlanIdOrNone
                                         FROM Q-BRIDGE-MIB
     InterfaceIndexOrZero,                                    
     InterfaceIndex, ifIndex             FROM IF-MIB
@@ -579,8 +581,23 @@ VlanList ::= TEXTUAL-CONVENTION
     hm2AgentLagMirrorProbePortLagMemberErrorReturn OBJECT-IDENTITY
          STATUS      current
          DESCRIPTION "The port cannot be added because it is already a probe port."
-         ::= { hm2AgentLagConfigSNMPExtensionGroup 2 }		  
-		  
+         ::= { hm2AgentLagConfigSNMPExtensionGroup 2 }
+
+    hm2AgentLagMirrorPrivateVLANLagMemberErrorReturn OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "A port which is member of a private VLAN cannot be assigned to the LAG interface."
+         ::= { hm2AgentLagConfigSNMPExtensionGroup 3 }
+
+    hm2AgentLagMirrorRCPLagMemberErrorReturn OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "A port which is used in RCP cannot be assigned to the LAG interface."
+         ::= { hm2AgentLagConfigSNMPExtensionGroup 4 }
+
+    hm2AgentLagMirrorLagAddPortMemberErrorReturn OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "The port cannot be assigned to the LAG interface because the port takes part in a port mirroring."
+         ::= { hm2AgentLagConfigSNMPExtensionGroup 5 }
+
     --**************************************************************************************
     -- hm2AgentSwitchConfigGroup
     --**************************************************************************************
@@ -717,6 +734,24 @@ VlanList ::= TEXTUAL-CONVENTION
                      createAndGo(4) - used to create a new entry
                      destroy(6)     - removes the entry"
          ::= { hm2AgentSwitchStaticMacFilteringEntry 5 }
+
+
+    --**************************************************************************************
+    -- hm2AgentSwitchSNMPExtensionGroup - SNMP Extension Group
+    --**************************************************************************************
+
+    hm2AgentSwitchConfigSNMPExtensionGroup                      OBJECT IDENTIFIER ::= { hm2AgentSwitchConfigGroup 260 }
+
+    hm2AgentSwitchConfigMacAddressNotAllowed OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the mac-address contains a value which is not allowed
+                       in the configuration."
+          ::= { hm2AgentSwitchConfigSNMPExtensionGroup 1 }
+
+    hm2AgentSwitchConfigPortInvalid OBJECT-IDENTITY
+          STATUS      current
+          DESCRIPTION "Indicates that the port number/mask contains an invalid value."
+          ::= { hm2AgentSwitchConfigSNMPExtensionGroup 2 }
 
     --**************************************************************************************
     -- hm2AgentSwitchSnoopingGroup
@@ -1401,6 +1436,83 @@ VlanList ::= TEXTUAL-CONVENTION
 				"The total number of GVRP packets transmitted on this port."
 	::= { hm2AgentSwitchGvrpPortEntry 2 }
 	
+    --**************************************************************************************
+    -- hm2AgentSwitchDVlanTagInterfaceGroup
+    --
+    --**************************************************************************************
+
+    hm2AgentSwitchDVlanTagInterfaceGroup                      OBJECT IDENTIFIER ::= {    hm2AgentSwitchConfigGroup 250 }
+
+    hm2AgentSwitchDVlanTagInterfaceTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF Hm2AgentSwitchDVlanTagInterfaceEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+         "A table that holds the double vlan tagging status per interface."
+         ::= { hm2AgentSwitchDVlanTagInterfaceGroup 1 }
+
+    hm2AgentSwitchDVlanTagInterfaceEntry OBJECT-TYPE
+         SYNTAX      Hm2AgentSwitchDVlanTagInterfaceEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+         "A table entry specifying the double vlan tagging status per interface."
+         INDEX        { hm2AgentSwitchDVlanTagInterfaceIfIndex}
+         ::= { hm2AgentSwitchDVlanTagInterfaceTable 1 }
+
+    Hm2AgentSwitchDVlanTagInterfaceEntry ::=
+         SEQUENCE {
+          hm2AgentSwitchDVlanTagInterfaceIfIndex           InterfaceIndex,
+          hm2AgentSwitchDVlanTagInterfaceStatus            INTEGER
+          }
+
+    hm2AgentSwitchDVlanTagInterfaceIfIndex OBJECT-TYPE
+         SYNTAX      InterfaceIndex
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+         "Interface ID on to which the double vlan tagging status is mapped"
+         ::= { hm2AgentSwitchDVlanTagInterfaceEntry 1 }
+
+    hm2AgentSwitchDVlanTagInterfaceStatus OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Controls the Double Vlan Tag status on this interface. 
+                     
+                      When the value is enable(1), it becomes a core port. 
+                      If at least one port has value enable(1), all other 
+                      ports which have value disable(2) become access ports. 
+                      
+                      When all ports have value disable(2), they become 
+                      normal ports."
+         DEFVAL { disable }
+         ::= { hm2AgentSwitchDVlanTagInterfaceEntry 2} 
+	
+	
+	--**************************************************************************************
+    -- hm2AgentSwitchDVlanTagGroup
+    --
+    --**************************************************************************************
+
+    hm2AgentSwitchDVlanTagGroup                      OBJECT IDENTIFIER ::= {    hm2AgentSwitchConfigGroup 11 }
+
+    hm2AgentSwitchDVlanTagEthertype OBJECT-TYPE         
+         SYNTAX      Integer32 (1..65535) -- 0x0001..0xFFFF         
+         MAX-ACCESS  read-only -- This object was made read-only because of problems with setting a different ethertype. Hotfix for #38576
+         STATUS      current         
+         DESCRIPTION                     
+         "Configures the Double Vlan Tag Ethertype for the switch.
+          If this object is supported, ethertype cannot be configured per port.                      
+          Commonly used are the Ethertypes for vman tags (34984, or 0x88A8)                      
+          and dot1q tags (33024, or 0x8100)."         
+         DEFVAL { 33024 }        
+          ::= { hm2AgentSwitchDVlanTagGroup 1 }
+
     --**************************************************************************************
     -- hm2AgentSwitchVlanMacAssociationGroup
     --**************************************************************************************
@@ -2120,6 +2232,31 @@ hm2AgentPortMirrorTypeTable OBJECT-TYPE
        DESCRIPTION   "VLAN 1 cannot be used as the RSPAN VLAN."
        ::= { hm2AgentPortMirrorSNMPExtensionGroup 17 }
 
+    hm2AgentPortMirrorSourcePortSettingConflict OBJECT-IDENTITY
+       STATUS        current
+       DESCRIPTION   "Source Port mirror can not be configured."
+       ::= { hm2AgentPortMirrorSNMPExtensionGroup 18 }
+
+    hm2AgentPortMirrorDestinationPortSettingConflict OBJECT-IDENTITY
+       STATUS        current
+       DESCRIPTION   "Destination Port mirror can not be configured."
+       ::= { hm2AgentPortMirrorSNMPExtensionGroup 19 }
+
+    hm2AgentVlanInvalidSubnet OBJECT-IDENTITY
+       STATUS      current
+       DESCRIPTION "Invalid subnet cannot be added."
+       ::= { hm2AgentPortMirrorSNMPExtensionGroup 20 }
+
+    hm2AgentPortMirrorSecondaryPortDestinationNotSupported OBJECT-IDENTITY
+       STATUS        current
+       DESCRIPTION   "Vlan mirroring and RSPAN are not supported on second probe port."
+       ::= { hm2AgentPortMirrorSNMPExtensionGroup 21 }
+
+    hm2AgentPortMirrorTxOverUnitBoundaryNotSupported OBJECT-IDENTITY
+       STATUS        current
+       DESCRIPTION   "TX mirroring accross unit boundaries is not supported."
+       ::= { hm2AgentPortMirrorSNMPExtensionGroup 22 }
+
     --**************************************************************************************
     -- hm2AgentDot3adAggPortTable
     --**************************************************************************************
@@ -2237,6 +2374,8 @@ hm2AgentPortMirrorTypeTable OBJECT-TYPE
           hm2AgentPortVoiceVlanAuthMode
               HmEnabledStatus,
           hm2AgentPortDot3FlowControlOperStatus
+              INTEGER,
+          hm2AgentPortSwitchportMode
               INTEGER,
           hm2AgentPortSfpLinkLossAlert
               HmEnabledStatus
@@ -2427,7 +2566,7 @@ hm2AgentPortMirrorTypeTable OBJECT-TYPE
          STATUS      current
          DESCRIPTION
                      "Describes and Configures the Port Voice VLAN ID
-                     if the Voice Vlan Mode is Vlan ID."
+                     if the Voice Vlan Mode is Vlan ID. 0 can not be set."
          DEFVAL { 0 }           
          ::= { hm2AgentPortConfigEntry 30 }
 
@@ -2518,6 +2657,20 @@ hm2AgentPortMirrorTypeTable OBJECT-TYPE
          DESCRIPTION
                      "This object identifies operational status of the flow control per port."
          ::= { hm2AgentPortConfigEntry 38 }
+
+    hm2AgentPortSwitchportMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     general(1),
+                     access(2),
+                     trunk(3),
+                     host(4),
+                     promiscuous(5)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Different types of Switchport modes."
+         ::= { hm2AgentPortConfigEntry 45 }
 
     hm2AgentPortSfpLinkLossAlert OBJECT-TYPE
          SYNTAX      HmEnabledStatus
@@ -3866,6 +4019,195 @@ hm2AgentPortMirrorTypeTable OBJECT-TYPE
          DESCRIPTION
                     "Traffic class priority queue the received frame is mapped to."
          ::= { hm2AgentClassOfServicePortEntry 2 }
+
+	--**************************************************************************************
+    -- hm2AgentKeepalivePortTable
+    --
+    --**************************************************************************************
+
+    hm2AgentKeepalivePortTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF Hm2AgentKeepalivePortEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Keepalive port table."
+         ::= { hm2AgentConfigGroup  31 }
+
+    hm2AgentKeepalivePortEntry OBJECT-TYPE
+         SYNTAX      Hm2AgentKeepalivePortEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Keepalive port table."
+         INDEX       { ifIndex }
+         ::= { hm2AgentKeepalivePortTable 1 }
+
+    Hm2AgentKeepalivePortEntry ::=
+         SEQUENCE {
+         hm2AgentKeepalivePortState
+                 INTEGER,
+         hm2AgentKeepalivePortLoopDetected
+                 INTEGER,
+         hm2AgentKeepalivePortLoopCount
+                 Counter32,
+         hm2AgentKeepalivePortRxAction
+                 INTEGER,
+         hm2AgentKeepalivePortLastLoopDetectedTime
+                 DateAndTime,
+         hm2AgentKeepalivePortTpidType
+                 INTEGER,
+         hm2AgentKeepalivePortVlanId
+                 VlanIdOrNone,
+         hm2AgentKeepalivePortMode
+                 INTEGER,
+		 hm2AgentKeepalivePortTxFrameCount
+                 Counter32,
+		 hm2AgentKeepalivePortRxFrameCount
+                 Counter32,
+		 hm2AgentKeepalivePortDiscardFrameCount
+                 Counter32,
+		 hm2AgentKeepalivePortStatsClear
+                 INTEGER
+         }
+
+    hm2AgentKeepalivePortState OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The keepalive state for the port.
+
+                     enable(1)  - enables keepalive on the port.
+                     disable(2) - disables keepalive on the port.
+
+                     The default port keepalive state is disabled."
+         DEFVAL      { 2 }
+         ::= { hm2AgentKeepalivePortEntry 1 }
+
+    hm2AgentKeepalivePortLoopDetected OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     yes (1),
+                     no (2)
+                     }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Keepalive status for the port.
+
+                     yes (1)  - loop detected on the port.
+                     no  (2)  - no loop detected on the port."
+         ::= { hm2AgentKeepalivePortEntry 2 }
+
+    hm2AgentKeepalivePortLoopCount OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The loop count on a specific port."
+         ::= { hm2AgentKeepalivePortEntry 3 }
+
+    hm2AgentKeepalivePortRxAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     trap         (10),
+                     auto-disable (11),
+                     all          (12)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Action on detecting a loop on the port.
+
+                     trap         (10) - send a trap.
+                     auto-disable (11) - execute auto disable configured action.
+                     all          (12) - all above mentioned actions."
+         DEFVAL      {11}
+         ::= { hm2AgentKeepalivePortEntry 5 }
+    
+    hm2AgentKeepalivePortLastLoopDetectedTime OBJECT-TYPE
+         SYNTAX      DateAndTime 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION  
+                     "TimeStamp when last loop was detected on a port."
+         DEFVAL      { '00000000'H }            
+         ::= { hm2AgentKeepalivePortEntry 7 }
+
+    hm2AgentKeepalivePortTpidType OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none       (0),
+                     dot1q      (1),
+                     dot1ad     (2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Type of TPID to be used for loop protection or None if no vlan based loop protection is required."
+         DEFVAL      {0}
+         ::= { hm2AgentKeepalivePortEntry 8 }
+
+    hm2AgentKeepalivePortVlanId OBJECT-TYPE
+         SYNTAX      VlanIdOrNone
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Vlan Id to be used for loop protection or None if no vlan based loop protection is required."
+         DEFVAL      {0}
+         ::= { hm2AgentKeepalivePortEntry 9 }
+
+    hm2AgentKeepalivePortMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     active(1),
+                     passive(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The keepalive mode for the port.
+
+                     active(1)  - enables transmission of keepalive check frames.
+                     passive(2) - disables transmission of check frames, only reception is active.
+
+                     The default port keepalive mode is passive."
+         DEFVAL      {2}
+         ::= { hm2AgentKeepalivePortEntry 248 }
+
+    hm2AgentKeepalivePortTxFrameCount OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The amount of keepalive check frames sent on a specific port."
+         ::= { hm2AgentKeepalivePortEntry 249 }
+
+    hm2AgentKeepalivePortRxFrameCount OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The amount of keepalive check frames received on a specific port."
+         ::= { hm2AgentKeepalivePortEntry 250 }
+
+    hm2AgentKeepalivePortDiscardFrameCount OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The amount of keepalive check frames discarded on a specific port."
+         ::= { hm2AgentKeepalivePortEntry 251 }
+
+    hm2AgentKeepalivePortStatsClear OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     other(1),
+                     clear(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Clear keepalive statistics on a specific port. When read always returns 'other'."
+         ::= { hm2AgentKeepalivePortEntry 252 }
 
 
 --**************************************************************************************
@@ -5587,7 +5929,326 @@ hm2AgentSystemGroup                             OBJECT IDENTIFIER ::= { hm2Platf
                      "The maximum number of IPv6 multicast forwarding table entries."
          ::= { hm2AgentSdmTemplateEntry 8 }
 
+--*****************************************************************************************
+--    Private Vlan
+--
+--*****************************************************************************************
+    hm2AgentPrivateVlanGroup          OBJECT IDENTIFIER ::= { hm2AgentSwitchConfigGroup 31 }
+
+    hm2AgentPrivateVlanTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF Hm2AgentPrivateVlanEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table of the Private VLAN configuration entries."
+         ::= { hm2AgentPrivateVlanGroup 1 }
+
+    hm2AgentPrivateVlanEntry OBJECT-TYPE
+         SYNTAX      Hm2AgentPrivateVlanEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a Private VLAN."
+         INDEX       { dot1qVlanIndex }
+         ::= { hm2AgentPrivateVlanTable 1 }
+
+    Hm2AgentPrivateVlanEntry ::= SEQUENCE {
+         hm2AgentPrivateVlanType
+              INTEGER,
+         hm2AgentPrivateVlanAssociate
+              VlanList
+         }
+
+    hm2AgentPrivateVlanType OBJECT-TYPE
+        SYNTAX       INTEGER {
+                     primary(1),
+                     isolated(2),
+                     community(3),
+                     unconfigured(4)
+                     }
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+                     "Enables vlan for Private Vlan and configures private vlan type."
+        ::= { hm2AgentPrivateVlanEntry 1 }
+
+    hm2AgentPrivateVlanAssociate OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This field lists all the VlanIDs which are associated with the selected vlan.
+                     If the selected vlan type is not primary(1), a zero-length bitmask is returned."
+         ::= { hm2AgentPrivateVlanEntry 2 }
+
+--*****************************************************************************************
+
+    hm2AgentPrivateVlanIntfAssocTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF Hm2AgentPrivateVlanIntfAssocEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table of the Private VLAN Interface configuration entries."
+         ::= { hm2AgentPrivateVlanGroup 2 }
+
+    hm2AgentPrivateVlanIntfAssocEntry OBJECT-TYPE
+         SYNTAX      Hm2AgentPrivateVlanIntfAssocEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a Private VLAN Interface."
+         INDEX       { ifIndex }
+         ::= { hm2AgentPrivateVlanIntfAssocTable 1 }
+
+    Hm2AgentPrivateVlanIntfAssocEntry ::= SEQUENCE {
+         hm2AgentPrivateVlanIntfAssocHostPrimary
+              Integer32,
+         hm2AgentPrivateVlanIntfAssocHostSecondary
+              Integer32,
+         hm2AgentPrivateVlanIntfAssocPromiscuousPrimary
+              Integer32,
+         hm2AgentPrivateVlanIntfAssocPromiscuousSecondary
+              VlanList,
+         hm2AgentPrivateVlanIntfAssocOperational
+              VlanList
+    }
+    hm2AgentPrivateVlanIntfAssocHostPrimary OBJECT-TYPE
+         SYNTAX      Integer32 (0|1..4093)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the primary host vlan association with the interface.
+                     This must be configured along with hm2AgentPrivateVlanIntfAssocHostSecondary before
+                     the association will be operational.
+
+                     NOTE: Both hm2AgentPrivateVlanIntfAssocHostPrimary and hm2AgentPrivateVlanIntfAssocHostSecondary 
+                     objects must be specified at the same time."
+         ::= { hm2AgentPrivateVlanIntfAssocEntry 1 }
+
+    hm2AgentPrivateVlanIntfAssocHostSecondary OBJECT-TYPE
+         SYNTAX      Integer32 (0|1..4093)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the secondary host vlan association with the interface.  
+                     This must be configured along with hm2AgentPrivateVlanIntfAssocHostPrimary before
+                     the association will be operational.
+                     To remove host-association value of hm2AgentPrivateVlanIntfAssocHostSecondary must be passed as 1.
+                     NOTE: Both hm2AgentPrivateVlanIntfAssocHostPrimary and hm2AgentPrivateVlanIntfAssocHostSecondary 
+                     objects must be specified at the same time."
+         ::= { hm2AgentPrivateVlanIntfAssocEntry 2 }
+
+    hm2AgentPrivateVlanIntfAssocPromiscuousPrimary OBJECT-TYPE
+         SYNTAX      Integer32 (0|1..4093)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the primary promiscuous vlan association with the interface.
+                     This must be configured along with hm2AgentPrivateVlanIntfAssocPromiscuousSecondary before
+                     the association will be operational."
+         ::= { hm2AgentPrivateVlanIntfAssocEntry 3 }
+
+    hm2AgentPrivateVlanIntfAssocPromiscuousSecondary OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the secondary promiscuous vlan association with the interface.
+                     This must be configured along with hm2AgentPrivateVlanIntfAssocPromiscuousPrimary before
+                     the association will be operational."
+         ::= { hm2AgentPrivateVlanIntfAssocEntry 4 }
+
+    hm2AgentPrivateVlanIntfAssocOperational OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Shows the operational private vlans associated with the interface."
+         ::= { hm2AgentPrivateVlanIntfAssocEntry 5 }
+
+   --***************************************************************************
+   -- hm2AgentPrivateVlanSNMPExtensionGroup
+   --**************************************************************************
+
+    hm2AgentPrivateVlanSNMPExtensionGroup   OBJECT IDENTIFIER ::= { hm2AgentPrivateVlanGroup 3 }
+    
+    hm2AgentInvalidPrivateVlan OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "{0} VLAN cannot be used in private VLAN."
+
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 1 }
+
+    hm2AgentVlanIdAlreadyAssociated OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "VLAN already associated with a private domain."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 2 }
+
+    hm2AgentPrimarySecondarySameVlans OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Primary VLAN cannot be associated to itself."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 3 }
+
+    hm2AgentMaxPrivateVlanDomain OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Creation of the private VLAN domain was unsuccessful. Max. count of private VLAN domains reached."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 4 }
+
+    hm2AgentInvalidVLANType OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "VLAN passed as {0} does not belong to type {1}."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 5 }
+
+    hm2AgentSecondaryVlanAlreadyAssociated OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Secondary VLAN already associated."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 6 }
+
+    hm2AgentInvalidSwitchPortMode OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Set the Switchport mode to {0}."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 7 }
+
+    hm2AgentVlansNotAssociated OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Cannot set {0} association. Primary and secondary VLANs are not associated."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 8 }
+
+    hm2AgentInterfaceNotConfigurable OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Interface cannot be configured."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 9 }
+ 
+    hm2AgentVlanNotPrimaryVlanofIntf OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "VLAN is not the primary VLAN of interface."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 10 }
+ 
+    hm2AgentVlansIDNotPresent OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "VLAN does not exist."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 11 }
+
+    hm2AgentSwitchPortModeConflict OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "The switchport mode cannot be changed. The interface is already associated with {0}."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 12 }
+
+    hm2AgentMoreThanOneIsolatedVlan OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "A private domain can only contain one isolated VLAN."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 13 }
+
+    hm2AgentInvalidPrimaryVlan OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "Invalid {0} primary VLAN."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 14 }
+
+    hm2AgentInvalidInterface OBJECT-IDENTITY
+         STATUS      current
+         DESCRIPTION "A private VLAN cannot be configured on the LAG interface."
+         ::= { hm2AgentPrivateVlanSNMPExtensionGroup 15 }
+
+    --**************************************************************************************
+    -- hm2AgentSwitchKeepaliveGroup
+    --
+    --**************************************************************************************
+
+    hm2AgentSwitchKeepaliveGroup                       OBJECT IDENTIFIER ::= { hm2AgentSwitchConfigGroup 43 }
+
+    hm2AgentSwitchKeepaliveState OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable  (1),
+                     disable (2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The keepalive state for the switch.
+
+                     enable  (1) - enables keepalive on the switch.
+                     disable (2) - disables keepalive on the switch.
+
+                     The default switch keepalive state is disabled."
+         DEFVAL      { 2 }
+         ::= { hm2AgentSwitchKeepaliveGroup 1 }
+
+    hm2AgentSwitchKeepaliveTransmitInterval OBJECT-TYPE
+         SYNTAX      Integer32 (1..10)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Transmit interval for detection PDUs."
+         ::= { hm2AgentSwitchKeepaliveGroup 2 }
          
+    hm2AgentSwitchKeepaliveRxThreshold OBJECT-TYPE
+         SYNTAX      INTEGER (0|1..50) 
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Amount of frames to be recevied until an action is taken."
+         ::= { hm2AgentSwitchKeepaliveGroup 248 }
+
+
+    --**************************************************************************************
+    --    hm2AgentPortRedirectGroup
+    --**************************************************************************************
+
+    hm2AgentPortRedirectGroup                     OBJECT IDENTIFIER ::= { hm2AgentConfigGroup 248 }
+
+    hm2AgentPortRedirectTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF Hm2AgentPortRedirectEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "This table includes entries for each Redirect session."
+         ::= { hm2AgentPortRedirectGroup 1 }
+
+    hm2AgentPortRedirectEntry OBJECT-TYPE
+         SYNTAX      Hm2AgentPortRedirectEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Provides configuration of a Redirect session specifying the
+                     destination port, and the source Port Mask, providing a many-to-one
+                     mapping."
+         INDEX       { hm2AgentPortRedirectDestinationPort }
+         ::= { hm2AgentPortRedirectTable 1 }
+
+    Hm2AgentPortRedirectEntry ::= SEQUENCE {
+         hm2AgentPortRedirectDestinationPort
+              InterfaceIndex,
+         hm2AgentPortRedirectSourcePortMask
+              PortList,
+         hm2AgentPortRedirectRowStatus
+              RowStatus
+         }
+
+    hm2AgentPortRedirectDestinationPort OBJECT-TYPE
+         SYNTAX      InterfaceIndex
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The port which traffic from the redirected ports will be sent to."
+         ::= { hm2AgentPortRedirectEntry 1 }
+
+    hm2AgentPortRedirectSourcePortMask OBJECT-TYPE
+         SYNTAX      PortList
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "The ports from which traffic will be redirected to the destination port.
+                     The destination port can not be included in this list of ports."
+         ::= { hm2AgentPortRedirectEntry 2 }
+
+    hm2AgentPortRedirectRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "The status of this port mirroring session."           
+         ::= { hm2AgentPortRedirectEntry 3 }
+         
+
 
 --*************************************************************************************
 --   Traps
@@ -5671,6 +6332,16 @@ hm2AgentSystemGroup                             OBJECT IDENTIFIER ::= { hm2Platf
              "IP address conflict trap signifies the reception of an ARP from
               another host in the LAN that has conflicting IP address."
         ::= { hm2PlatformSwitchingTraps 20 }
+		
+		
+    hm2AgentSwitchLoopProtectionTrap NOTIFICATION-TYPE
+		OBJECTS {
+					ifIndex
+				}
+		STATUS             current
+		DESCRIPTION
+			 "Trap is sent on detection of loop on an interface."
+		::= { hm2PlatformSwitchingTraps 32 }
      
          
      hm2PlatformStpCstBpduGuardTrap NOTIFICATION-TYPE

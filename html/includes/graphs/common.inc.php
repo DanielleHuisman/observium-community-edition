@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -78,7 +78,7 @@ if (isset($log_y)) {
     $rrd_options .= ' --logarithmic';
 }  /// FIXME. Newer used
 
-if ((isset($alt_y) && !$alt_y) || $vars['alt_y'] === 'no') {
+if ((isset($alt_y) && !$alt_y) || get_var_false($vars['alt_y'])) {
 } else {
     $rrd_options .= ' -Y';
 } // Use alternative Y axis if $alt_y not set to FALSE
@@ -99,7 +99,7 @@ if (isset($vars['style']) && $vars['style']) {
 }
 
 // Autoscale
-if (isset($vars['force_autoscale']) && in_array($vars['force_autoscale'], ['yes', 'true', 1])) {
+if (isset($vars['force_autoscale']) && get_var_true($vars['force_autoscale'])) {
     $rrd_options .= ' -A';
 } elseif (!isset($scale_min) && !isset($scale_max)) {
     if ($graph_style === 'mrtg' && !isset($log_y)) { // Don't use this if we're doing logarithmic scale, else it breaks.

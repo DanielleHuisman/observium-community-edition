@@ -1,0 +1,255 @@
+
+-- Copyright (C) 2006-2012 Aricent Group . All Rights Reserved
+
+--$Id: fsdcs.mib,v 1.1 2016/09/17 12:43:08 siva Exp $
+
+--*********************************************************************************************************/
+--
+--Description : This file contains MIB definitions for configuring the  DSLAM related properties in the 
+--              DSLAM Control System component in ISS solution. 
+--
+--*********************************************************************************************************/
+
+
+AricentDCS-MIB DEFINITIONS ::= BEGIN 
+ 
+IMPORTS 
+   MODULE-IDENTITY, OBJECT-TYPE, Integer32,
+   enterprises               FROM SNMPv2-SMI
+   DisplayString, RowStatus  FROM SNMPv2-TC
+   InterfaceIndex            FROM IF-MIB;
+
+
+fsDcsMIB MODULE-IDENTITY 
+    LAST-UPDATED "201806180000Z" 
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE" 
+    CONTACT-INFO "support@aricent.com" 
+
+    DESCRIPTION "The proprietary MIB for configuring the DSLAM related properties in ISS solution." 
+
+      ::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 1}
+
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+
+EnabledStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A simple status value for the object."
+    SYNTAX      INTEGER { enabled(1), disabled(2) }
+
+
+-- ----------------------------------------------------------------- -- 
+-- groups in the MIB  
+-- ----------------------------------------------------------------- -- 
+
+
+    fsDcsSystem            OBJECT IDENTIFIER   ::= { fsDcsMIB 1 }
+    fsDcsConfigControl     OBJECT IDENTIFIER   ::= { fsDcsMIB 2 }
+
+
+------ Config Control Group ------------------------------------
+
+fsDcsDefCircuitIDFormatConfig OBJECT-TYPE
+        SYNTAX          INTEGER {
+                        enabled(1),
+                        disabled(2)
+                        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object provides configuration support for enabling or disabling the 
+             default circuit ID generation format configuration. 
+             When enabled, the configured format will be followed for default circuit ID generation.
+             When disabled, the default circuit ID format as mentioned in TR-101 will be followed.
+              (ie) 'Access-Node-Identifier eth slot/port[:vlan-id]'. "
+
+        DEFVAL  { 2 }
+
+   ::= { fsDcsSystem  1 }
+
+fsDcsDefCircuitIDFormatString OBJECT-TYPE
+        SYNTAX DisplayString(SIZE(1..48))
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "Specifies the string that should be used in Circuit Id/Interface Id sub-option.
+             This is applicable when default circuit Id format configuration is enabled. "
+
+        DEFVAL  { "NULL" }
+
+   ::= { fsDcsSystem 2 }
+
+fsDcsDefCircuitIDFormatOption OBJECT-TYPE
+        SYNTAX          INTEGER {
+                        sp(1),
+                        sv(2),
+                        pv(3),
+                        spv(4)
+                        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            " This object specifies the fields that can be included in the automatically generated 
+              Circuit Id (or) Interface Id.
+		sp - slot + port
+		sv - slot + vlan
+		pv - port + vlan
+		spv - slot + port + vlan
+
+              This is applicable when default circuit ID format configuration is enabled.
+              This object will be overridden when circuit Id is explicitly configured on a port or port and VLAN."
+
+        DEFVAL  { 4 }
+
+   ::= { fsDcsSystem  3 }
+
+fsDcsDefCircuitIDFormatDelimiter OBJECT-TYPE
+        SYNTAX          INTEGER {
+                        hash (1),
+                        dot(2),
+                        comma(3),
+                        semicolon(4),
+                        rightslash(5),
+                        space(6)
+                        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object specifies the delimiters that should be used between different fields
+             in the default circuit id or interface Id that gets generated. 
+
+             This is applicable when default circuit ID format configuration is enabled.
+
+             This object will be overridden when circuit Id is explicitly configured on a port or port and VLAN."
+
+        DEFVAL  { 4 }
+
+   ::= { fsDcsSystem  4 }
+
+
+-- ------------------------------------------------------------------------- 
+-- Port Control Table 
+-- -------------------------------------------------------------------------  
+
+fsDcsPortCtrlTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF FsDcsPortCtrlEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Table containing  Access Loop Identification information for port or for port and VLAN "     
+   ::= { fsDcsConfigControl 1 } 
+ 
+fsDcsPortCtrlEntry OBJECT-TYPE 
+   SYNTAX      FsDcsPortCtrlEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+   "Each entry contains 'Access Loop Identification' information for port or port and VLAN.
+    When VLAN-ID is configured as '0' the configurations are applicable for port and all the VLANs on that port.
+    When VLAN-ID is configured as a valid value, then the configuration is applicable for the port and particular VLAN-ID on that port." 
+   INDEX { fsDcsPortCtrlIndex, fsDcsPortCtrlVlanId  } 
+
+   ::= { fsDcsPortCtrlTable 1 } 
+
+   FsDcsPortCtrlEntry ::= SEQUENCE { 
+       fsDcsPortCtrlIndex                 InterfaceIndex,
+       fsDcsPortCtrlVlanId                Integer32,
+       fsDcsPortCtrlRemoteAgentIdentifier DisplayString,
+       fsDcsPortCtrlRemoteAgentIDStatus   EnabledStatus,
+       fsDcsPortCtrlAccessLoopStatus      EnabledStatus,
+       fsDcsPortCtrlAgentCircuitID        DisplayString,
+       fsDcsPortCtrlVlanRowStatus         RowStatus
+   }  
+fsDcsPortCtrlIndex  OBJECT-TYPE 
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible 
+    STATUS      current 
+    DESCRIPTION 
+    "The interface index"
+    ::= { fsDcsPortCtrlEntry 1 }
+
+fsDcsPortCtrlVlanId  OBJECT-TYPE
+    SYNTAX      Integer32 (0..4094)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object specifies the VLAN ID associated with this entry.
+
+     When valid VLAN ID is configured, the entry is applicable for that port and the specific VLAN-ID.
+     When VLAN ID is configured as zero, then the configuration in this row are applicable for the interface and 
+     for all the VLANs on this interface.
+    "
+    ::= { fsDcsPortCtrlEntry 2 }
+
+    fsDcsPortCtrlRemoteAgentIdentifier OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..63))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Configured Remote Agent Identifier is added in the sub-option of
+    Layer2 DHCP Relay Agent and PPPoE Intermediate Agent DSL Vendor-specific tag as per TR-101.
+    Remote Agent Identifier is used to uniquely identify the user connected to the access node.
+
+    If the Remote Agent Identifier string is configured as NULL string, then the default value for Remote Agent 
+    Identifier will be added in the sub-option (for example, swicth MAC address can be sent as remote circuit id)."
+
+    DEFVAL  { "NULL" }
+
+    ::= { fsDcsPortCtrlEntry 3 }
+
+    fsDcsPortCtrlRemoteAgentIDStatus OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Setting this object Enables or disables the insertion of Agent Remote ID
+    in Layer2 DHCP Relay Agent Option and PPPoE Intermediate Agent 
+    in the given port."
+
+    DEFVAL  { disabled }
+
+    ::= { fsDcsPortCtrlEntry 4 }
+
+    fsDcsPortCtrlAccessLoopStatus OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Setting this object Enables or disables the insertion of Access Loop 
+    characteristics in DHCP Relay Agent and PPPoE Intermediate Agent in the 
+    given port."
+
+    DEFVAL  { disabled }
+
+    ::= { fsDcsPortCtrlEntry 5 }
+
+    fsDcsPortCtrlAgentCircuitID OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..63))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Configured Agent Circuit Identifier is added in the sub-option 
+    of DHCP Relay Agent and PPPoE Intermediate Agent DSL
+    Vendor-specific tag.
+    Agent Identifier is used to uniquely identify the Access Node and the acccess loop logical port 
+    on the Access Node on which the message was received. 
+    A non conflicting, unique string should be configured by the user on each entry. 
+
+    If Agent Circuit Identifier string is not configured or NULL, then the Agent Circuit 
+    Identifier that is generated by default will be sent in the sub-options."
+
+    DEFVAL  { "NULL" }
+
+    ::= { fsDcsPortCtrlEntry 6 }
+
+    fsDcsPortCtrlVlanRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Rowstatus of the port control table."
+
+    ::= { fsDcsPortCtrlEntry 7 }
+                                                             
+    END

@@ -4,21 +4,19 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 $where = [];
 
-$where[] = generate_query_permitted_ng('device');
-
 foreach ($vars as $var => $value) {
     if ($value != "") {
         switch ($var) {
             case 'name':
-                $where[] = generate_query_values_ng($value, $var);
+                $where[] = generate_query_values($value, $var);
                 break;
         }
     }
@@ -36,22 +34,30 @@ echo '  </thead>';
 echo '  <tbody>';
 
 
-foreach (dbFetchRows("SELECT * FROM `packages` " . generate_where_clause($where)) as $v) {
+foreach (dbFetchRows("SELECT * FROM `packages` " . generate_where_clause($where, generate_query_permitted_ng('device'))) as $v) {
     $packages[$v['name']][$v['version']][$v['build']][] = $v;
+
+    //$all[]=$v;
 }
+
+//r($all);
+
+ksort($packages);
+
 
 foreach ($packages as $name => $package) {
     echo '    <tr>' . PHP_EOL;
     echo '      <td><a href="' . generate_url($vars, ['name' => $name]) . '" class="entity">' . $name . '</a></td>' . PHP_EOL;
     echo '      <td>';
 
+    $vers    = [];
+    $content = "";
+    $table   = '';
+
+
     foreach ($package as $version => $builds) {
 
-        $vers    = [];
-        $content = "";
-        $table   = '';
-
-        foreach ($builds as $build => $device_ids) {
+        foreach ($builds as $build => $devices) {
             if ($build) {
                 $dbuild = '-' . $build;
             } else {
@@ -59,19 +65,21 @@ foreach ($packages as $name => $package) {
             }
             $content .= $version . $dbuild;
 
-            foreach ($device_ids as $entry) {
+            foreach ($devices as $entry) {
                 $this_device = ['device_id' => $entry['device_id'], 'hostname' => $GLOBALS['cache']['devices']['hostname_map'][$entry['device_id']]];
 
                 $arch_classes        = [
                   'amd64' => 'label-success',
                   'i386'  => 'label-info'
                 ];
+
                 $entry['arch_class'] = $arch_classes[$entry['arch']] ?? '';
 
                 $manager_classes        = [
                   'deb' => 'label-warning',
                   'rpm' => 'label-important'
                 ];
+
                 $entry['manager_class'] = $manager_classes[$entry['manager']] ?? '';
 
                 $dbuild = !empty($entry['build']) ? '-' . $entry['build'] : '';

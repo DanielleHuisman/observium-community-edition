@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -308,11 +308,7 @@ function discover_status_definition($device, $mib, $entry)
         // %i% can be used in description
         $i++;
 
-        $status['index'] = $index;           // Index in descr
-        foreach (explode('.', $index) as $k => $i) {
-            $status['index' . $k] = $i;          // Index parts
-        }
-        $status['i'] = $i;               // i++ counter in descr
+        $status = array_merge($status, entity_index_tags($index, $i));
 
         $class = entity_class_definition($device, $entry, $status, 'status');
         if ($class === 'exclude' || $class === FALSE) {

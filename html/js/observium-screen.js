@@ -11,13 +11,13 @@
 
 screen_detect();
 // FIXME. Need way for detect monitor change (with different ratio), but no simple way for this
-window.addEventListener('resize', function(event){
-    clearTimeout(window.resizedFinished);
-    window.resizedFinished = setTimeout(function(){
-        //console.log('Resized finished.');
-        screen_detect(true);
-    }, 250);
-});
+// window.addEventListener('resize', function(event){
+//     clearTimeout(window.resizedFinished);
+//     window.resizedFinished = setTimeout(function(){
+//         //console.log('Resized finished.');
+//         screen_detect(true);
+//     }, 250);
+// });
 
 function screen_detect(force = false) {
     if (force) {
@@ -59,7 +59,7 @@ function screen_detect(force = false) {
         // if (get_cookie('screen_scheme') === color_scheme) {
         //   location.reload(true);
         // } else {
-        //   console.log('Screeen scheme not set in cookie by unknown reason.');
+        //   console.log('Screen scheme not set in cookie by unknown reason.');
         // }
     } else {
         //console.log('screen_scheme (cached) = ' + color_scheme);

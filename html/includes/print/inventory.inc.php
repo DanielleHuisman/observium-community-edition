@@ -29,31 +29,31 @@ function generate_inventory_query($vars)
             switch ($var) {
                 case 'device':
                 case 'device_id':
-                    $where[] = generate_query_values_ng($value, 'device_id');
+                    $where[] = generate_query_values($value, 'device_id');
                     break;
                 case 'os':
-                    $where[]  = generate_query_values_ng($value, 'os');
+                    $where[]  = generate_query_values($value, 'os');
                     $select[] = 'devices.os';
                     $devices  = TRUE;
                     break;
                 case 'parts':
                 case 'entPhysicalModelName':
-                    $where[] = generate_query_values_ng($value, 'entPhysicalModelName', 'LIKE');
+                    $where[] = generate_query_values($value, 'entPhysicalModelName', 'LIKE');
                     break;
                 case 'serial':
                 case 'entPhysicalSerialNum':
-                    $where[] = generate_query_values_ng($value, 'entPhysicalSerialNum', '%LIKE%');
+                    $where[] = generate_query_values($value, 'entPhysicalSerialNum', '%LIKE%');
                     break;
                 case 'description':
                 case 'entPhysicalDescr':
-                    $where[] = generate_query_values_ng($value, 'entPhysicalDescr', '%LIKE%');
+                    $where[] = generate_query_values($value, 'entPhysicalDescr', '%LIKE%');
                     break;
                 case 'class':
                 case 'entPhysicalClass':
-                    $where[] = generate_query_values_ng($value, 'entPhysicalClass', '%LIKE%');
+                    $where[] = generate_query_values($value, 'entPhysicalClass', '%LIKE%');
                     break;
                 case 'deleted':
-                    $where[] = generate_query_values_ng($value, 'deleted', 'NOT NULL');
+                    $where[] = generate_query_values($value, 'deleted', 'NOT NULL');
                     break;
             }
         }
@@ -286,14 +286,14 @@ function print_ent_physical($entPhysicalContainedIn, $level, $class)
                 $icon = 'linecard'; // need something better
                 break;
             case str_starts($ent['entPhysicalClass'], ['module', 'adapter']):
-            case str_contains_array($ent['entPhysicalClass'], 'Interface'):
+            case str_contains($ent['entPhysicalClass'], 'Interface'):
                 $icon = 'linecard';
                 break;
             case $ent['entPhysicalClass'] === 'port':
                 $icon = 'port';
                 break;
             case str_starts($ent['entPhysicalClass'], ['container', 'fabric', 'backplane']):
-            case str_contains_array($ent['entPhysicalClass'], 'Concentrator'):
+            case str_contains($ent['entPhysicalClass'], 'Concentrator'):
                 $icon = 'package';
                 break;
             case str_starts($ent['entPhysicalClass'], ['stack']):

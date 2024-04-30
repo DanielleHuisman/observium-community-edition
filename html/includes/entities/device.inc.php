@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -21,8 +21,7 @@
  *
  * @return array
  */
-function build_devices_where_array($vars)
-{
+function build_devices_where_array($vars) {
     $where_array = [];
     foreach ($vars as $var => $value) {
         if (!safe_empty($value)) {
@@ -30,11 +29,21 @@ function build_devices_where_array($vars)
                 case 'group':
                 case 'group_id':
                     $values            = get_group_entities($value);
-                    $where_array[$var] = generate_query_values_ng($values, 'device_id');
+                    $where_array[$var] = generate_query_values($values, 'device_id');
+                    break;
+                case 'poller':
+                    // Poller Name
+                    if (!is_numeric($value) &&
+                        $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `poller_name` = ?", [ $value ])) {
+                        $value = $poller_id;
+                    }
+                    // No break here
+                case 'poller_id':
+                    $where_array[$var] = generate_query_values($value, 'poller_id');
                     break;
                 case 'device':
                 case 'device_id':
-                    $where_array[$var] = generate_query_values_ng($value, 'device_id');
+                    $where_array[$var] = generate_query_values($value, 'device_id');
                     break;
                 case 'hostname':
                 case 'sysname':
@@ -42,15 +51,13 @@ function build_devices_where_array($vars)
                 case 'sysDescr':
                 case 'serial':
                 case 'purpose':
-                    $condition         = str_contains_array($value, ['*', '?']) ? 'LIKE' : '%LIKE%';
-                    $where_array[$var] = generate_query_values_ng($value, $var, $condition);
+                    $where_array[$var] = generate_query_values($value, $var, '%LIKE%');
                     break;
                 case 'location_text':
-                    $condition         = str_contains_array($value, ['*', '?']) ? 'LIKE' : '%LIKE%';
-                    $where_array[$var] = generate_query_values_ng($value, 'devices.location', $condition);
+                    $where_array[$var] = generate_query_values($value, 'devices.location', '%LIKE%');
                     break;
                 case 'location':
-                    $where_array[$var] = generate_query_values_ng($value, 'devices.location');
+                    $where_array[$var] = generate_query_values($value, 'devices.location');
                     break;
                 case 'location_lat':
                 case 'location_lon':
@@ -59,7 +66,7 @@ function build_devices_where_array($vars)
                 case 'location_county':
                 case 'location_city':
                     if ($GLOBALS['config']['geocoding']['enable']) {
-                        $where_array[$var] = generate_query_values_ng($value, 'devices_locations.' . $var);
+                        $where_array[$var] = generate_query_values($value, 'devices_locations.' . $var);
                     }
                     break;
                 case 'os':
@@ -80,10 +87,10 @@ function build_devices_where_array($vars)
                 case 'snmp_port':
                 case 'snmp_maxrep':
                 case 'snmp_version':
-                    $where_array[$var] = generate_query_values_ng($value, $var);
+                    $where_array[$var] = generate_query_values($value, $var);
                     break;
                 case 'graph':
-                    $where_array[$var] = generate_query_values_ng(devices_with_graph($value), "devices.device_id");
+                    $where_array[$var] = generate_query_values(devices_with_graph($value), "devices.device_id");
             }
         }
     }
@@ -91,13 +98,12 @@ function build_devices_where_array($vars)
     return $where_array;
 }
 
-function devices_with_graph($graph)
-{
+function devices_with_graph($graph) {
 
     $devices = [];
 
-    $sql = "SELECT `device_id` FROM `device_graphs` WHERE `graph` = ? AND `enabled` = '1'";
-    foreach (dbFetchRows($sql, [$graph]) as $entry) {
+    $sql = "SELECT `device_id` FROM `device_graphs` WHERE `graph` = ? AND `enabled` = ?";
+    foreach (dbFetchRows($sql, [ $graph, 1 ]) as $entry) {
         $devices[$entry['device_id']] = $entry['device_id'];
     }
 
@@ -343,8 +349,8 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
                   'legend'    => 'no',
                   'width'     => 600,
                   'height'    => 90,
-                  'from'      => $config['time']['week'],
-                  'to'        => $config['time']['now'],
+                  'from'      => get_time('week'),
+                  'to'        => get_time(),
                 ];
 
                 $hostbox = '
@@ -363,10 +369,10 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
             $graph_array           = [];
             $graph_array['height'] = "100";
             $graph_array['width']  = "310";
-            $graph_array['to']     = $config['time']['now'];
+            $graph_array['to']     = get_time();
             $graph_array['device'] = $device['device_id'];
             $graph_array['type']   = "device_bits";
-            $graph_array['from']   = $config['time']['day'];
+            $graph_array['from']   = get_time('day');
             $graph_array['legend'] = "no";
             $graph_array['height'] = "45";
             $graph_array['width']  = "175";
@@ -374,7 +380,7 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
 
             if (isset($config['os'][$device['os']]['graphs'])) {
                 $graphs = $config['os'][$device['os']]['graphs'];
-            } elseif (isset($device['os_group']) && isset($config['os'][$device['os_group']]['graphs'])) {
+            } elseif (isset($device['os_group'], $config['os'][$device['os_group']]['graphs'])) {
                 $graphs = $config['os'][$device['os_group']]['graphs'];
             } else {
                 // Default group
@@ -408,7 +414,7 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
     <td style="width: 300px;"><span class="entity-title">' . $tags['device_link'] . '</span><br />' . $tags['location'] . '</td>
     <td>';
             if ($tags['graphs']) {
-                $hostbox .= '' . implode($tags['graphs']) . '';
+                $hostbox .= implode($tags['graphs']);
             }
             $hostbox .= '</td>
   </tr>';
@@ -436,7 +442,7 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
     if ($vars['graph']) {
         $hostbox .= '<tr><td colspan="' . $table_cols . '">';
 
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['device'] = $device['device_id'];
         $graph_array['type']   = 'device_' . $vars['graph'];
 
@@ -450,7 +456,7 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
 }
 
 /**
- * Returns icon tag (by default) or icon name for current device array
+ * Returns icon tag (by default) or icon name for a current device array
  *
  * @param array $device    Array with device info (from DB)
  * @param bool  $base_icon Return complete img tag with icon (by default) or just base icon name
@@ -458,25 +464,25 @@ function print_device_row($device, $vars = ['view' => 'basic'], $link_vars = [])
  *
  * @return string Img tag with icon or base icon name
  */
-function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
-{
+function get_device_icon($device, $base_icon = FALSE, $dark = FALSE) {
     global $config;
 
     $icon = 'generic';
+    $ext  = 'png'; // currently fallback default
 
     if (device_permitted($device)) {
         $device['os'] = strtolower($device['os']);
         $model        = $config['os'][$device['os']]['model'];
 
-        if (!safe_empty($device['icon']) && is_file($config['html_dir'] . '/images/os/' . $device['icon'] . '.png')) {
+        if (!safe_empty($device['icon']) && $ext = is_file_ext($config['html_dir'] . '/images/os/' . $device['icon'])) {
             // Custom device icon from DB
             $icon = $device['icon'];
         } elseif ($model && isset($config['model'][$model][$device['sysObjectID']]['icon']) &&
-                  is_file($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'] . '.png')) {
+                  $ext = is_file_ext($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'])) {
             // Per model icon
             $icon = $config['model'][$model][$device['sysObjectID']]['icon'];
         } elseif (isset($config['os'][$device['os']]['icon']) &&
-                  is_file($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'] . '.png')) {
+                  $ext = is_file_ext($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'])) {
             // Icon defined in os definition
             $icon = $config['os'][$device['os']]['icon'];
         } else {
@@ -485,12 +491,12 @@ function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
                 // Red Hat Enterprise -> redhat
                 $distro = strtolower(trim(str_replace([ ' Enterprise', 'Red Hat' ], [ '', 'redhat' ], $device['distro'])));
                 $distro = safename($distro);
-                if (is_file($config['html_dir'] . '/images/os/' . $distro . '.png')) {
+                if ($ext = is_file_ext($config['html_dir'] . '/images/os/' . $distro)) {
                     $icon = $distro;
                 }
             }
 
-            if ($icon === 'generic' && is_file($config['html_dir'] . '/images/os/' . $device['os'] . '.png')) {
+            if ($icon === 'generic' && $ext = is_file_ext($config['html_dir'] . '/images/os/' . $device['os'])) {
                 // Icon by OS name
                 $icon = $device['os'];
             }
@@ -501,19 +507,23 @@ function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
             if ($device['vendor']) {
                 $vendor = $device['vendor'];
             } else {
-                $vendor = rewrite_vendor($config['os'][$device['os']]['vendor']); // Compatibility, if device not polled for long time
+                $vendor = rewrite_vendor($config['os'][$device['os']]['vendor']); // Compatibility, if a device not polled for long time
             }
 
             $vendor_safe = safename(strtolower($vendor));
             if (isset($config['vendors'][$vendor_safe]['icon'])) {
                 $icon = $config['vendors'][$vendor_safe]['icon'];
-            } elseif (is_file($config['html_dir'] . '/images/os/' . $vendor_safe . '.png')) {
+                $ext = is_file_ext($config['html_dir'] . '/images/os/' . $icon);
+            } elseif ($ext = is_file_ext($config['html_dir'] . '/images/os/' . $vendor_safe)) {
                 $icon = $vendor_safe;
             } elseif (isset($config['os'][$device['os']]['icons'])) {
                 // Fallback to os alternative icon
                 $icon = array_values($config['os'][$device['os']]['icons'])[0];
+                $ext = is_file_ext($config['html_dir'] . '/images/os/' . $icon);
             }
         }
+    } else {
+        print_warning('NOT permitted');
     }
 
     // Set dark mode by session
@@ -522,7 +532,7 @@ function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
     }
 
     // Prefer dark variant of icon in dark mode
-    if ($dark && is_file($config['html_dir'] . '/images/os/' . $icon . '-dark.png')) {
+    if ($dark && is_file_ext($config['html_dir'] . '/images/os/' . $icon . '-dark', $ext)) {
         $icon .= '-dark';
     }
 
@@ -533,6 +543,11 @@ function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
 
     // return image html tag
     $base_url = rtrim($config['base_url'], '/');
+    if ($ext === 'svg') {
+        return '<img src="' . $base_url . '/images/os/' . $icon . '.svg" style="max-height: 32px; max-width: 48px;" alt="" />';
+    }
+
+    // PNG images
     $srcset   = '';
     // Now we always have 2x icon variant!
     //if (is_file($config['html_dir'] . '/images/os/' . $icon . '_2x.png')) // HiDPI image exist?
@@ -725,15 +740,23 @@ function generate_device_form_values($form_filter = FALSE, $column = 'device_id'
 {
     global $cache;
 
+    //r($form_filter);
+    //r($column);
+    //r($options);
+    if (!is_array($form_filter)) {
+        $options['filter_mode'] = FALSE;
+    }
+
     $form_items = [];
     foreach ($cache['devices']['hostname'] as $hostname => $device_id) {
         // Filter items based on filter_mode
         if ($options['filter_mode'] === 'include') {
-            if (is_array($form_filter) && !in_array($device_id, $form_filter)) {
+            if (!in_array($device_id, $form_filter)) {
+                //r($device_id);
                 continue;
             }
         } elseif ($options['filter_mode'] === 'exclude') {
-            if (is_array($form_filter) && in_array($device_id, $form_filter)) {
+            if (in_array($device_id, $form_filter)) {
                 continue;
             }
         }
@@ -764,16 +787,25 @@ function generate_device_form_values($form_filter = FALSE, $column = 'device_id'
             $form_items[$device_id]['group'] = 'UP';
             $form_items[$device_id]['class'] = 'bg-info';
         }
-        $form_items[$device_id]['name'] = $hostname;
+        if ($GLOBALS['config']['web_device_name'] && $GLOBALS['config']['web_device_name'] !== 'hostname') {
+            $device = device_by_id_cache($device_id);
+            $form_items[$device_id]['name'] = device_name($device);
+            if (!isset($options['subtext']) && $form_items[$device_id]['name'] !== $hostname) {
+                $form_items[$device_id]['subtext'] = $hostname;
+            }
+        } else {
+            $form_items[$device_id]['name'] = $hostname;
+        }
 
         if (isset($options['subtext'])) {
-            $device = device_by_id_cache($device_id);
+            $device = $device ?? device_by_id_cache($device_id);
             $form_items[$device_id]['subtext'] = array_tag_replace($device, $options['subtext']);
         }
         if (isset($options['show_icon']) && $options['show_icon']) {
             $device = $device ?? device_by_id_cache($device_id);
             $form_items[$device_id]['icon'] = $GLOBALS['config']['devicetypes'][$device['type']]['icon'] ?? $GLOBALS['config']['entities']['device']['icon'];
         }
+        unset($device);
     }
 
     return $form_items;
@@ -892,6 +924,205 @@ function print_device_permission_box($mode, $perms, $params = []) {
     print_form($form);
 
     echo generate_box_close();
+}
+
+function get_device_graphs_sections($device) {
+    global $config, $cache;
+
+    if (!isset($cache['graphs_sections'][$device['device_id']])) {
+
+        $graphs_sections = [];
+
+        if (OBSERVIUM_EDITION !== 'community' && dbExist('oids_entries', '`device_id` = ?', [ $device['device_id'] ])) {
+            // Custom OIDs
+            $device['graphs']['custom'] = [ 'device_id' => $device['device_id'], 'graph' => 'custom', 'enabled' => 1 ];
+        }
+
+        foreach ($device['graphs'] as $entry) {
+            if (isset($entry['enabled']) && !$entry['enabled']) {
+                // Skip disabled graphs
+                continue;
+            }
+
+            $section = $config['graph_types']['device'][$entry['graph']]['section'] ?? $entry['graph'];
+
+            if (in_array($section, $config['graph_sections'])) {
+                // Collect only enabled and exists graphs
+                //$graphs_sections[$section][$entry['graph']] = $entry['enabled'];
+                if (isset($config['graph_types']['device'][$entry['graph']]['order']) && is_numeric($config['graph_types']['device'][$entry['graph']]['order'])) {
+                    $order = $config['graph_types']['device'][$entry['graph']]['order'];
+                } else {
+                    $order = 999; // Set high order for unordered graphs
+                }
+                while (isset($graphs_sections[$section][$order])) {
+                    $order++;
+                }
+                $graphs_sections[$section][$order] = $entry['graph'];
+            }
+        }
+
+        // Set sections order
+        $graphs_sections_sorted = [];
+        foreach ($config['graph_sections'] as $section) {
+            if (isset($graphs_sections[$section])) {
+                $graphs_sections_sorted[$section] = $graphs_sections[$section];
+                unset($graphs_sections[$section]);
+            }
+        }
+        //r($graphs_sections_sorted);
+        //r($graphs_sections);
+
+        $cache['graphs_sections'][$device['device_id']] = array_merge($graphs_sections_sorted, $graphs_sections);
+    }
+
+    return $cache['graphs_sections'][$device['device_id']];
+}
+
+function navbar_health_menu($device, $vars = []) {
+    global $config, $cache;
+
+    if (!isset($cache['health_exist'][$device['device_id']])) {
+        $cache['health_exist'][$device['device_id']] = [
+            'storage'    => dbExist('storage',    '`device_id` = ?', [ $device['device_id'] ]),
+            'diskio'     => dbExist('ucd_diskio', '`device_id` = ?', [ $device['device_id'] ]),
+            'mempools'   => dbExist('mempools',   '`device_id` = ?', [ $device['device_id'] ]),
+            'processors' => dbExist('processors', '`device_id` = ?', [ $device['device_id'] ]),
+            'sensors'    => dbExist('sensors',    '`device_id` = ? AND `sensor_deleted` = 0', [ $device['device_id'] ]),
+            'status'     => dbExist('status',     '`device_id` = ? AND `status_deleted` = 0', [ $device['device_id'] ]),
+            'counter'    => dbExist('counters',   '`device_id` = ? AND `counter_deleted` = 0', [ $device['device_id'] ]),
+        ];
+
+        if ($cache['health_exist'][$device['device_id']]['sensors']) {
+            // Keep sensors order for base types static
+            $sensors_order = [ 'temperature', 'humidity', 'fanspeed', 'airflow', 'current',
+                               'voltage', 'power', 'apower', 'rpower', 'frequency' ];
+            $other_types  = array_diff(array_keys($config['sensor_types']), $sensors_order);
+            $sensors_order = array_merge($sensors_order, $other_types);
+            //r($sensors_order);
+
+            $sensors_classes = dbFetchColumn("SELECT DISTINCT `sensor_class` FROM `sensors` WHERE `device_id` = ? AND `sensor_deleted` = ?", [ $device['device_id'], 0 ]);
+            $cache['health_exist'][$device['device_id']]['sensors_classes'] = array_intersect($sensors_order, $sensors_classes);
+        }
+
+        /* All counters in single page?
+        if ($cache['health_exist'][$device['device_id']]['counter']) {
+            $cache['health_exist'][$device['device_id']]['counter_classes'] = dbFetchRows("SELECT DISTINCT `counter_class` FROM `counters` WHERE `device_id` = ? AND `counter_deleted` = ?", [ $device['device_id'], 0 ]);
+            foreach ($counters_classes as $counter) {
+                $datas[$counter['counter_class']] = [ 'icon' => $config['counter_types'][$counter['counter_class']]['icon'] ];
+            }
+        }
+        */
+        //r($cache['health_exist'][$device['device_id']]);
+    }
+    $health_exist = $cache['health_exist'][$device['device_id']];
+
+    $datas = [];
+    if ($health_exist['processors']) {
+        $datas['processor'] = [ 'icon' => $config['entities']['processor']['icon'] ];
+    }
+    if ($health_exist['mempools']) {
+        $datas['mempool'] = [ 'icon' => $config['entities']['mempool']['icon'] ];
+    }
+    if ($health_exist['storage']) {
+        $datas['storage'] = [ 'icon' => $config['entities']['storage']['icon'] ];
+    }
+    if ($health_exist['diskio']) {
+        $datas['diskio'] = [ 'icon' => $config['icon']['diskio'] ];
+    }
+
+    if ($health_exist['status']) {
+        $datas['status'] = [ 'icon' => $config['entities']['status']['icon'] ];
+    }
+
+    if ($health_exist['sensors_classes']) {
+        foreach ($health_exist['sensors_classes'] as $sensor_class) {
+            //if ($sensor['sensor_class'] == 'counter') { continue; } // DEVEL
+            $datas[$sensor_class] = [ 'icon' => $config['sensor_types'][$sensor_class]['icon'] ];
+        }
+    }
+
+    if ($health_exist['counter']) {
+        $datas['counter'] = [ 'icon' => $config['entities']['counter']['icon'] ];
+    }
+
+    $menu = [];
+    $navbar_count = count($datas);
+    foreach ($datas as $type => $options) {
+        if ($vars['metric'] == $type) {
+            $menu[$type]['class'] = "active";
+        } elseif ($navbar_count > 8) {
+            $menu[$type]['class'] = "icon";
+        } // Show only icons if too many items in navbar
+        if (isset($options['icon'])) {
+            $menu[$type]['icon'] = $options['icon'];
+        }
+        $menu[$type]['url']  = generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'health', 'metric' => $type ]);
+        $menu[$type]['text'] = nicecase($type);
+    }
+
+    return $menu;
+}
+
+// TESTME needs unit testing
+// DOCME needs phpdoc block
+function device_permitted($device_id)
+{
+    global $permissions;
+
+    // If we've been passed an entity with device_id, just use that.
+    if (is_array($device_id) && isset($device_id['device_id'])) {
+        $device_id = $device_id['device_id'];
+    }
+
+    // If we still don't have a numeric device_id, return false because someone messed up.
+    if (!is_numeric($device_id)) {
+        return $_SESSION['userlevel'] >= 5; // in case when passed a pseudo device (like in OSes page)
+    }
+
+    // Level >5 can see everything.
+    if ($_SESSION['userlevel'] >= 5) {
+        $allowed = TRUE;
+    } elseif (isset($permissions['device'][$device_id])) {
+        $allowed = TRUE;
+    } else {
+        $allowed = FALSE;
+    }
+    return $allowed;
+}
+
+// TESTME needs unit testing
+// DOCME needs phpdoc block
+function device_link_class($device)
+{
+    if (isset($device['status']) && $device['status'] == '0') {
+        $class = "red";
+    } else {
+        $class = "";
+    }
+    if ((isset($device['ignore']) && $device['ignore'] == '1')
+        || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > get_time())) {
+        $class = "grey";
+        if (isset($device['status']) && $device['status'] == '1') {
+            $class = "green";
+        }
+    }
+    if (isset($device['disabled']) && $device['disabled'] == '1') {
+        $class = "grey";
+    }
+
+    return $class;
+}
+
+/**
+ * Returns TRUE if the device is marked as ignored in the cache.
+ *
+ * @param $device_id
+ *
+ * @return bool
+ */
+function device_is_ignored($device_id)
+{
+    return isset($GLOBALS['cache']['devices']['ignored']) && in_array($device_id, $GLOBALS['cache']['devices']['ignored'], TRUE);
 }
 
 // EOF

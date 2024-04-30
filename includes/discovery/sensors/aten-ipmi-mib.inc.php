@@ -4,39 +4,39 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
 // Currently not possible convert to definitions because type detection is hard, based on descriptions
 // SAME code in FORTINET-FORTIGATE-MIB
 
-// ATEN-IPMI-MIB::sensorNumber.2 = INTEGER: 10
-// ATEN-IPMI-MIB::sensorReading.2 = Wrong Type (should be INTEGER): STRING: "53.000"
-// ATEN-IPMI-MIB::sensorPositiveHysteresis.2 = INTEGER: 0
-// ATEN-IPMI-MIB::sensorNegativeHysteresis.2 = INTEGER: 0
-// ATEN-IPMI-MIB::lncThreshold.2 = Wrong Type (should be INTEGER): STRING: "10.000"
-// ATEN-IPMI-MIB::lcThreshold.2 = Wrong Type (should be INTEGER): STRING: "5.000"
-// ATEN-IPMI-MIB::lnrThreshold.2 = Wrong Type (should be INTEGER): STRING: "5.000"
-// ATEN-IPMI-MIB::uncThreshold.2 = Wrong Type (should be INTEGER): STRING: "85.000"
-// ATEN-IPMI-MIB::ucThreshold.2 = Wrong Type (should be INTEGER): STRING: "90.000"
-// ATEN-IPMI-MIB::unrThreshold.2 = Wrong Type (should be INTEGER): STRING: "105.000"
-// ATEN-IPMI-MIB::eventAssertionEnable.2 = INTEGER: 2560
-// ATEN-IPMI-MIB::eventDeassertionEnable.2 = INTEGER: 2560
-// ATEN-IPMI-MIB::sensorIDString.2 = STRING: "PCH Temp"
+// ATEN-IPMI-MIB::sensorNumber.3 = INTEGER: 10
+// ATEN-IPMI-MIB::sensorReading.3 = STRING: "37.000"
+// ATEN-IPMI-MIB::sensorPositiveHysteresis.3 = INTEGER: 0
+// ATEN-IPMI-MIB::sensorNegativeHysteresis.3 = INTEGER: 0
+// ATEN-IPMI-MIB::lncThreshold.3 = STRING: "10.000"
+// ATEN-IPMI-MIB::lcThreshold.3 = STRING: "5.000"
+// ATEN-IPMI-MIB::lnrThreshold.3 = STRING: "5.000"
+// ATEN-IPMI-MIB::uncThreshold.3 = STRING: "85.000"
+// ATEN-IPMI-MIB::ucThreshold.3 = STRING: "90.000"
+// ATEN-IPMI-MIB::unrThreshold.3 = STRING: "105.000"
+// ATEN-IPMI-MIB::eventAssertionEnable.3 = INTEGER: 2560
+// ATEN-IPMI-MIB::eventDeassertionEnable.3 = INTEGER: 2560
+// ATEN-IPMI-MIB::sensorIDString.3 = STRING: "PCH Temp"
 
 // ATEN-IPMI-MIB::sensorNumber.75 = INTEGER: 0
-// ATEN-IPMI-MIB::sensorReading.75 = Wrong Type (should be INTEGER): STRING: "0.000"
+// ATEN-IPMI-MIB::sensorReading.75 = STRING: "0.000"
 // ATEN-IPMI-MIB::sensorPositiveHysteresis.75 = INTEGER: 0
 // ATEN-IPMI-MIB::sensorNegativeHysteresis.75 = INTEGER: 0
-// ATEN-IPMI-MIB::lncThreshold.75 = Wrong Type (should be INTEGER): STRING: "0.000"
-// ATEN-IPMI-MIB::lcThreshold.75 = Wrong Type (should be INTEGER): STRING: "0.000"
-// ATEN-IPMI-MIB::lnrThreshold.75 = Wrong Type (should be INTEGER): STRING: "0.000"
-// ATEN-IPMI-MIB::uncThreshold.75 = Wrong Type (should be INTEGER): STRING: "0.000"
-// ATEN-IPMI-MIB::ucThreshold.75 = Wrong Type (should be INTEGER): STRING: "0.000"
-// ATEN-IPMI-MIB::unrThreshold.75 = Wrong Type (should be INTEGER): STRING: "0.000"
+// ATEN-IPMI-MIB::lncThreshold.75 = STRING: "0.000"
+// ATEN-IPMI-MIB::lcThreshold.75 = STRING: "0.000"
+// ATEN-IPMI-MIB::lnrThreshold.75 = STRING: "0.000"
+// ATEN-IPMI-MIB::uncThreshold.75 = STRING: "0.000"
+// ATEN-IPMI-MIB::ucThreshold.75 = STRING: "0.000"
+// ATEN-IPMI-MIB::unrThreshold.75 = STRING: "0.000"
 // ATEN-IPMI-MIB::eventAssertionEnable.75 = INTEGER: 0
 // ATEN-IPMI-MIB::eventDeassertionEnable.75 = INTEGER: 0
 // ATEN-IPMI-MIB::sensorIDString.75 = ""
@@ -139,8 +139,20 @@ foreach ($oids as $index => $entry) {
             $class   = 'load';
             $options = [];
         }
+    } elseif (str_iends($descr, [' Curr', ' Current', ' IIN' ])) {
+        if ($value == 0) {
+            continue;
+        }
+        $descr = str_replace([' Curr', ' Current' ], '', $descr);
+        $class = 'current';
+    } elseif (str_iends($descr, [' Pwr', ' Power', ' POUT' ])) {
+        if ($value == 0) {
+            continue;
+        }
+        $descr = str_replace([' Pwr', ' Power' ], '', $descr);
+        $class = 'power';
     } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) || preg_match('/^\d+(\.\d+)?V/', $descr) ||
-              str_icontains_array($descr, ['VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN'])) {
+              str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN', 'SOC', 'VMEM' ])) {
         if ($value == 0) {
             continue;
         }

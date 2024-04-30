@@ -13,7 +13,7 @@
 /// SEARCH SENSORS
 $results = dbFetchRows("SELECT * FROM `sensors`
                         LEFT JOIN `devices` USING (`device_id`)" .
-                       generate_where_clause($GLOBALS['cache']['where']['device_permitted'], '`sensor_descr` LIKE ?') .
+                       generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`sensor_descr` LIKE ?') .
                        " ORDER BY `sensor_descr` LIMIT $query_limit", [$query_param]);
 
 if (!safe_empty($results)) {

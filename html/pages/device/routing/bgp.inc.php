@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@ echo generate_box_open();
         <tbody>
         <tr class="up">
             <td class="state-marker"></td>
-            <td style="padding: 10px 14px;"><span style="font-size: 20px; color: #193d7f;">BGP AS<?php echo($device['human_local_as']); ?></span>
+            <td style="padding: 10px 14px;"><span style="font-size: 20px;">BGP AS<?php echo($device['human_local_as']); ?></span>
             </td>
             <td>
 
@@ -84,60 +83,73 @@ if (!isset($vars['view'])) {
 }
 
 unset($navbar);
-$link_array = ['page'   => 'device',
-               'device' => $device['device_id'],
-               'tab'    => 'routing',
-               'proto'  => 'bgp'];
+$link_array = [
+  'page'    => 'device',
+  'device'  => $device['device_id'],
+  'tab'     => 'routing',
+  'proto'   => 'bgp'
+];
 
-$types = ['all'      => 'All',
-          'internal' => 'iBGP',
-          'external' => 'eBGP'];
+$types = [
+  'all'      => 'All',
+  'internal' => 'iBGP',
+  'external' => 'eBGP'
+];
 
 foreach ($types as $option => $text) {
-    $navbar['options'][$option]['text'] = $text;
-    if ($vars['type'] == $option || (empty($vars['type']) && $option == 'all')) {
-        $navbar['options'][$option]['class'] .= " active";
-        $bgp_options                         = ['type' => NULL];
-    } else {
-        $bgp_options = ['type' => $option];
-    }
-    if ($vars['adminstatus']) {
-        $bgp_options['adminstatus'] = $vars['adminstatus'];
-    } elseif ($vars['state']) {
-        $bgp_options['state'] = $vars['state'];
-    }
-    $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
+  $navbar['options'][$option]['text'] = $text;
+  if ($vars['type'] == $option || (empty($vars['type']) && $option === 'all')) {
+    $navbar['options'][$option]['class'] .= " active";
+    $bgp_options = [ 'type' => NULL ];
+  } else {
+    $bgp_options = [ 'type' => $option ];
+  }
+
+  if ($vars['adminstatus']) {
+    $bgp_options['adminstatus'] = $vars['adminstatus'];
+  } elseif ($vars['state']) {
+    $bgp_options['state'] = $vars['state'];
+  }
+  $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
 }
 
-$statuses = ['stop'  => 'Shutdown',
-             'start' => 'Enabled',
-             'down'  => 'Down'];
+// VRFs
+if (dbExist('bgpPeers', '`device_id` = ? AND `virtual_name` NOT IS NULL', [ $device['device_id'] ])) {
+  $navbar['options'][$option]['text'] = 'VRFs';
+  $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
+}
+
+$statuses = [
+  'stop'  => 'Shutdown',
+  'start' => 'Enabled',
+  'down'  => 'Down'
+];
 foreach ($statuses as $option => $text) {
-    $status                             = ($option == 'down') ? 'state' : 'adminstatus';
-    $navbar['options'][$option]['text'] = $text;
-    if ($vars[$status] == $option) {
-        $navbar['options'][$option]['class'] .= " active";
-        $bgp_options                         = [$status => NULL];
-    } else {
-        $bgp_options = [$status => $option];
-    }
-    if ($vars['type']) {
-        $bgp_options['type'] = $vars['type'];
-    }
-    $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
+  $status = ($option == 'down') ? 'state' : 'adminstatus';
+  $navbar['options'][$option]['text'] = $text;
+  if ($vars[$status] == $option) {
+    $navbar['options'][$option]['class'] .= " active";
+    $bgp_options = [ $status => NULL ];
+  } else {
+    $bgp_options = [ $status => $option ];
+  }
+  if ($vars['type']) {
+    $bgp_options['type'] = $vars['type'];
+  }
+  $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
 }
 
 $navbar['options_right']['details']['text'] = 'No Graphs';
 if ($vars['view'] === 'details') {
-    $navbar['options_right']['details']['class'] .= ' active';
+  $navbar['options_right']['details']['class'] .= ' active';
 }
-$navbar['options_right']['details']['url'] = generate_url($vars, ['view' => 'details', 'graph' => 'NULL']);
+$navbar['options_right']['details']['url'] = generate_url($vars, [ 'view' => 'details', 'graph' => 'NULL' ]);
 
 $navbar['options_right']['updates']['text'] = 'Updates';
 if ($vars['graph'] === 'updates') {
-    $navbar['options_right']['updates']['class'] .= ' active';
+  $navbar['options_right']['updates']['class'] .= ' active';
 }
-$navbar['options_right']['updates']['url'] = generate_url($vars, ['view' => 'graphs', 'graph' => 'updates']);
+$navbar['options_right']['updates']['url'] = generate_url($vars, [ 'view' => 'graphs', 'graph' => 'updates' ]);
 
 /*
 $bgp_graphs = array();

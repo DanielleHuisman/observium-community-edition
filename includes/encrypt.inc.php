@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     encrypt
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -105,6 +105,26 @@ function decrypt_mcrypt($encrypted, $key)
     return $string;
 }
 
+function is_base64($string) {
+    // Check if there are valid base64 characters
+    if (!preg_match('/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', $string)) {
+        return FALSE;
+    }
+
+    // Decode the string in strict mode and check the results
+    $decoded = base64_decode($string, TRUE);
+    if ($decoded === FALSE) {
+        return FALSE;
+    }
+
+    // Encode the string again
+    if (base64_encode($decoded) != $string) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 /**
  * Safe variant of base64_encode()
  *
@@ -201,6 +221,38 @@ function pad_key($key)
 
     // return
     return $key;
+}
+
+function get_encrypt_key($random = FALSE) {
+
+  if (!OBS_ENCRYPT || OBS_ENCRYPT_MODULE !== 'sodium') { // only available for php 7.2+ & sodium
+    print_debug("Sodium encryption unavailable or incorrect encryption secret.");
+    return NULL;
+  }
+
+  $charlist = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$^&*()_+-=[]{}\|/?,.<>;:';
+  if ($random) {
+    return generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES, $charlist);
+  }
+
+    $secret = get_defined_settings('encrypt_secret');
+    if (check_extension_exists('mbstring')) {
+      $key_len = is_string($secret) ? mb_strlen($secret, '8bit') : 0;
+    } else {
+      $key_len = is_string($secret) ? strlen($secret) : 0;
+    }
+    if ($key_len < 12 || $key_len > 32) {
+      print_debug("Incorrect encryption secret, must be at least 12 and not more than 32.");
+      if (OBS_DEBUG) {
+        // php -r 'echo "\$config[\"encrypt_secret\"] = \"" . bin2hex(random_bytes(16)) . "\";\n";' >> config.php
+        print_cli("Add to config.php:\n");
+        print_cli("\$config['encrypt_secret'] = '" . generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES, $charlist) . "';\n");
+      }
+
+      return NULL;
+    }
+
+  return $secret;
 }
 
 // EOF

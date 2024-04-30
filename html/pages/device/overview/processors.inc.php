@@ -68,10 +68,10 @@ if (count($processors_db)) {
         $graph_array           = [];
         $graph_array['height'] = "100";
         $graph_array['width']  = "512";
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['device'] = $device['device_id'];
         $graph_array['type']   = (isset($device['graphs']['ucd_ss_cpu']) ? 'device_ucd_ss_cpu' : 'device_processor');
-        $graph_array['from']   = $config['time']['day'];
+        $graph_array['from']   = get_time('day');
         $graph_array['legend'] = "no";
         $graph                 = generate_graph_tag($graph_array);
 
@@ -110,10 +110,10 @@ if (count($processors_db)) {
         $graph_array           = [];
         $graph_array['height'] = "100";
         $graph_array['width']  = "210";
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = implode(',', $proc['id']);
         $graph_array['type']   = $graph_type;
-        $graph_array['from']   = $config['time']['day'];
+        $graph_array['from']   = get_time('day');
         $graph_array['legend'] = "no";
 
         if (count($proc['id']) > 1) {

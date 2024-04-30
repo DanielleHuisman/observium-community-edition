@@ -1,0 +1,1345 @@
+DC-VPLS-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    enterprises, Unsigned32,
+    Gauge32
+      FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION,
+    TruthValue,
+    RowStatus
+      FROM SNMPv2-TC
+
+    SnmpAdminString
+      FROM SNMP-FRAMEWORK-MIB
+
+    InetAddressType,
+    InetAddress
+      FROM INET-ADDRESS-MIB
+
+    InterfaceIndex,
+    ifIndex
+      FROM IF-MIB
+
+    l2vmEntityIndex,
+    BgpRouteDistinguisher,
+    BgpExtendedCommunity,
+    L2vpnVeIdOrZero,
+    L2vpnADType,
+    L2vpnSigType,
+    L2vpnPwBindType
+      FROM DC-L2VPN-MIB
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP
+      FROM SNMPv2-CONF
+
+    IANAPwTypeTC
+      FROM IANA-PWE3-MIB            -- RFC5601
+
+    AdminStatus,
+    NpgOperStatus,
+    NumericIndex,
+    NumericIndexOrZero
+      FROM DC-MASTER-TC;
+
+  vplsMib MODULE-IDENTITY
+    LAST-UPDATED "201502260000Z"  -- February 26, 2015
+    ORGANIZATION "MRV Communications."
+    CONTACT-INFO
+       "For technical support, please contact your service channel"
+
+    DESCRIPTION  "VPLS MIB."
+    ::= { opx 18 }
+
+nbase                      OBJECT IDENTIFIER ::= { enterprises 629 }
+opx                      OBJECT IDENTIFIER ::= { nbase 10 }
+
+  vplsNotifications OBJECT IDENTIFIER ::= { vplsMib 0 } -- VPLS notifications
+  vplsObjects       OBJECT IDENTIFIER ::= { vplsMib 1 } -- VPLS tables
+  vplsConformance   OBJECT IDENTIFIER ::= { vplsMib 2 } -- Module conformance
+
+-------------------------------------------------------------------------------
+--
+-- Textual conventions
+--
+
+  VplsAcStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The status of a VPLS Attachment Circuit."
+    SYNTAX      INTEGER {
+                  unknown(0),
+                  active(1),
+                  standby(2)
+                }
+
+  VplsMCFloodMode ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Which (if any) multicast frames should be flooded for a VPLS."
+    SYNTAX      INTEGER {
+                  all(1),
+                  unknown(2),
+                  none(3)
+                }
+
+-------------------------------------------------------------------------------
+--
+-- VPLS Config Table.
+--
+-- This table allows a VPLS to be configured.
+--
+
+   vplsConfigTable OBJECT-TYPE
+       SYNTAX          SEQUENCE OF VplsConfigEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+        "VPLS Configuration Table.
+
+         This table specifies information for configuring and
+         monitoring Virtual Private LAN Services (VPLS).
+
+         It corresponds to vplsConfigTable and vplsBgpADConfigTable
+         in draft-ietf-l2vpn-vpls-mib-12.
+
+         A row in this table represents a Virtual Private LAN Service
+         (VPLS) in a packet network.  It is indexed by vplsIndex,
+         which uniquely identifies a single VPLS within a DC-L2VPN
+         Manager entity.
+
+         If the value of any read-create objects are changed when
+         vplsStatusOperStatus is 'up' then the VPLS may be
+         deactivated (vplsStatusOperStatus 'down') before the change
+         is made.  The VPLS will then attempt to re-activate.  Note
+         that the VPLS may or may not re-activate depending on the
+         validity of the new configuration."
+       ::= { vplsObjects 1 }
+
+   vplsConfigEntry OBJECT-TYPE
+       SYNTAX          VplsConfigEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+        "Represents a configured VPLS."
+       INDEX { l2vmEntityIndex,
+               vplsIndex }
+       ::= { vplsConfigTable 1 }
+
+  VplsConfigEntry ::=
+     SEQUENCE {
+         vplsIndex                       NumericIndex,
+         vplsConfigRowStatus             RowStatus,
+         vplsConfigAdminStatus           AdminStatus,
+         vplsConfigOperStatus            NpgOperStatus,
+         vplsConfigName                  SnmpAdminString,
+         vplsConfigDescr                 SnmpAdminString,
+         vplsConfigADType                L2vpnADType,
+         vplsConfigSigType               L2vpnSigType,
+         vplsConfigPwEncapType           IANAPwTypeTC,
+         vplsConfigMacLearning           TruthValue,
+         vplsConfigDiscardUnknownDest    TruthValue,
+         vplsConfigMacAge                Unsigned32,
+         vplsConfigMtu                   Unsigned32,
+         vplsConfigMacSize               Unsigned32,
+         vplsConfigPwMacAddressLimit     Unsigned32,
+         vplsConfigControlWord           TruthValue,
+         vplsConfigSeqDelivery           TruthValue,
+         vplsConfigRouteDistinguisher    BgpRouteDistinguisher,
+         vplsConfigVpnId                 BgpExtendedCommunity,
+         vplsConfigLocalVeID             L2vpnVeIdOrZero,
+         vplsConfigLocalPreference       Unsigned32,
+         vplsConfigLabelBlockSize        Unsigned32,
+         vplsConfigADPwMacLearning       TruthValue,
+         vplsConfigMultiCastFloodMode    VplsMCFloodMode,
+         vplsConfigIgnoreMtuMismatch     TruthValue,
+         vplsConfigIgnoreEncapsMismatch  TruthValue
+     }
+
+   vplsIndex  OBJECT-TYPE
+       SYNTAX          NumericIndex
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+            "Index identifying the VPLS instance."
+       ::= { vplsConfigEntry 2 }
+
+   vplsConfigRowStatus OBJECT-TYPE
+       SYNTAX          RowStatus
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The row status of this VPLS Configuration Table entry,
+             used to create and destroy table entries."
+       ::= { vplsConfigEntry 3 }
+
+   vplsConfigAdminStatus OBJECT-TYPE
+       SYNTAX          AdminStatus
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The administrative status of this VPLS instance, used to
+             activate and deactivate the VPLS instance."
+       DEFVAL           { adminStatusUp }
+       ::= { vplsConfigEntry 4 }
+
+   vplsConfigOperStatus OBJECT-TYPE
+       SYNTAX          NpgOperStatus
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+            "The current operational state of this VPLS instance.
+
+             If the operational status is 'up' then the VPLS is
+             programmed in the data plane."
+       ::= { vplsConfigEntry 5 }
+
+   vplsConfigName  OBJECT-TYPE
+       SYNTAX          SnmpAdminString
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "A textual name of the VPLS instance.  If there is no local
+            name, or this object is otherwise not applicable, then
+            this field MUST contain a zero-length octet string."
+       ::= { vplsConfigEntry 6 }
+
+   vplsConfigDescr  OBJECT-TYPE
+       SYNTAX          SnmpAdminString
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "A textual string containing information about the VPLS
+            service.  If there is no information for this VPLS
+            service, then this field MUST contain a zero-length octet
+            string."
+       ::= { vplsConfigEntry 7 }
+
+   vplsConfigADType  OBJECT-TYPE
+       SYNTAX          L2vpnADType
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The auto-discovery protocol used by this VPLS.
+
+             Changing this value will cause an interruption to data
+             flow for this VPLS."
+       DEFVAL           { none }
+       ::= { vplsConfigEntry 8 }
+
+   vplsConfigSigType  OBJECT-TYPE
+       SYNTAX          L2vpnSigType
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The pseudowire signaling protocol used for auto-created
+             PWs on this VPLS.
+
+             If vplsConfigADType is set to 'none' this field is
+             ignored.
+
+             If vplsConfigADType is set to 'bgp' this field must be set
+             to 'ldp' or 'bgp'.
+
+             Changing this value will cause an interruption to data
+             flow for this VPLS."
+       DEFVAL           { none }
+       ::= { vplsConfigEntry 9 }
+
+   vplsConfigPwEncapType  OBJECT-TYPE
+       SYNTAX          IANAPwTypeTC
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The MPLS PW encapsulation type used by this VPLS.
+
+             Changing this value will cause an interruption to data
+             flow for this VPLS."
+       DEFVAL           { ethernet }
+       ::= { vplsConfigEntry 10 }
+
+   vplsConfigMacLearning OBJECT-TYPE
+       SYNTAX          TruthValue
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "This field specifies if MAC Learning is enabled for this
+             VPLS.  If this field is true then MAC Learning is enabled.
+             If false, then MAC Learning is disabled."
+       DEFVAL          { true }
+       ::= { vplsConfigEntry 11 }
+
+   vplsConfigDiscardUnknownDest OBJECT-TYPE
+       SYNTAX          TruthValue
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "If the value of this field is 'true', then frames received
+             with an unknown destination MAC are discarded in this
+             VPLS.  If 'false', then the packets are processed."
+       DEFVAL          { false }
+       ::= { vplsConfigEntry 12 }
+
+   vplsConfigMacAge OBJECT-TYPE
+       SYNTAX          Unsigned32
+       UNITS           "seconds"
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The aging time for entries in the VPLS Forwarder's FDB.
+            Set to zero to disable MAC aging."
+       DEFVAL          { 0 }
+       ::= { vplsConfigEntry 13 }
+
+   vplsConfigMtu OBJECT-TYPE
+       SYNTAX          Unsigned32 (64..9192)
+       UNITS           "bytes"
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The layer 2 MTU of this VPLS.
+
+             When using auto-discovery and signaling, this specifies
+             the signaled layer 2 MTU.  This can be used to limit the
+             MTU to a value lower than the MTU supported by the
+             associated Pseudowires.
+
+             Changing this value will cause an interruption to data
+             flow for this VPLS."
+       DEFVAL          { 1500 }
+       ::= { vplsConfigEntry 14 }
+
+   vplsConfigMacSize OBJECT-TYPE
+       SYNTAX          Unsigned32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The maximum number of learned and static entries allowed in
+            the VPLS Forwarder's FDB.  A value of zero means no maximum."
+       DEFVAL          { 0 }
+       ::= { vplsConfigEntry 15 }
+
+   vplsConfigPwMacAddressLimit OBJECT-TYPE
+       SYNTAX          Unsigned32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The maximum number of learned and static entries allowed in
+            the FDB for each PW binding.  A value of zero means no maximum."
+       DEFVAL           { 0 }
+       ::= { vplsConfigEntry 16 }
+
+   vplsConfigControlWord OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "Whether or not the pseudowires use a PW control word.
+
+                    Changing this value will cause an interruption to data
+                    flow for this VPLS."
+       DEFVAL      { false }
+       ::= { vplsConfigEntry 17 }
+
+   vplsConfigSeqDelivery OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "Whether or not the pseudowires must provide sequenced
+                    delivery of traffic.
+
+                    Changing this value will cause an interruption to data
+                    flow for this VPLS."
+       DEFVAL      { false }
+       ::= { vplsConfigEntry 18 }
+
+   vplsConfigRouteDistinguisher OBJECT-TYPE
+       SYNTAX      BgpRouteDistinguisher
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "The route distinguisher for this VPLS.  See [RFC4364] for
+                    a complete definition of a route distinguisher.
+
+                    This is only used if BGP auto-discovery is enabled
+                    (vplsConfigADType = bgp).
+
+                    Changing this value will cause an interruption to data
+                    flow for this VPLS."
+       DEFVAL      { '0000000000000000'H }
+       ::= { vplsConfigEntry 19 }
+
+   vplsConfigVpnId OBJECT-TYPE
+       SYNTAX      BgpExtendedCommunity
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "The VPN ID to advertise as a BGP extended community, or
+                    zero if none.
+
+                    If the VPLS uses BGP auto-discovery and LDP signaling
+                    (vplsConfigADType = bgp and vplsConfigSigType = ldp) then
+                    this must be set to a valid VPN ID, otherwise it is unused
+                    and can be set to zero.
+
+                    In order to be a valid VPN ID, the first two bytes must
+                    be either an AS-specific L2VPN identifier extended
+                    community (0x000A) or an IPv4-address-specific L2VPN
+                    identifier extended community (0x010A).
+
+                    If the VPLS uses BGP auto-discovery and LDP signaling then
+                    the VPN ID is used as follows.
+                    -  The VPLS advertises the VPN ID as a BGP extended
+                       community attribute on all BGP L2VPN routes that it
+                       exports.
+                    -  The VPLS uses the VPN ID as an import filter on all BGP
+                       L2VPN routes that it imports (in addition to Route
+                       Target import filtering).
+                    -  The VPLS uses the VPN ID as the AGI value in LDP
+                       messages.
+
+                    Changing this value will cause an interruption to data
+                    flow for this VPLS."
+       DEFVAL      { '0000000000000000'H }
+       ::= { vplsConfigEntry 20 }
+
+   vplsConfigLocalVeID OBJECT-TYPE
+       SYNTAX      L2vpnVeIdOrZero
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "The local VPLS VE ID, or zero if not specified.
+
+                    This is only used if BGP auto-discovery is enabled
+                    (vplsConfigADType = bgp).  It can be used with BGP or LDP
+                    signaling.
+
+                    If auto-discovery is enabled then the VPLS establishes a
+                    pseudowire (PW) between each pair of VEs within the VPLS.
+
+                    The valid range for VE IDs depends on whether LDP or BGP
+                    signaling is used.
+                    -  For LDP signaling (vplsConfigSigType = ldp) the valid
+                       range is 1-4294967295 (4 bytes).
+                    -  For BGP signaling (vplsConfigSigType = bgp) the valid
+                       range is 1-65535 (2 bytes).
+
+                    The use of the VE ID in auto-discovery and signaling also
+                    depends on whether LDP or BGP signaling is used.
+                    -  For BGP auto-discovery with LDP signaling the VE ID is
+                       advertized in the 4-byte 'PE_addr' field in the BGP
+                       NLRI specified in [RFC 6074].  It is also used as the
+                       local SAII/TAII value in LDP messages.
+                    -  For BGP auto-discovery with BGP signaling the VE ID is
+                       advertized in the 2-byte 'VE ID' field in the BGP NLRI
+                       specified in [RFC 4761].
+
+                    Changing this value will cause an interruption to data
+                    flow for this VPLS."
+       DEFVAL      { 0 }
+       ::= { vplsConfigEntry 21 }
+
+   vplsConfigLocalPreference OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "The preference that the local PE router is the designated
+                    forwarder for this VPLS.  High values are preferred to low
+                    values.
+
+                    This is only used if BGP auto-discovery is enabled
+                    (vplsConfigADType = bgp).  It can be used with BGP or LDP
+                    signaling.
+
+                    The local PE router sets the LOCAL_PREF attribute to the
+                    value configured in this field in the BGP routes that it
+                    sends for this VPLS."
+       DEFVAL      { 100 }
+       ::= { vplsConfigEntry 22 }
+
+   vplsConfigLabelBlockSize OBJECT-TYPE
+       SYNTAX      Unsigned32 (2 | 4 | 8 | 16)
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "The size of the label blocks for this VPLS.
+
+                    This is only used when using BGP auto-discovery with BGP
+                    signaling (vplsConfigADType = bgp and vplsConfigSigType =
+                    bgp).
+
+                    The only currently-permitted sizes are 2, 4, 8 and 16.
+
+                    Changing this value will cause an interruption to data
+                    flow for this VPLS."
+       DEFVAL      { 8 }
+       ::= { vplsConfigEntry 23 }
+
+    vplsConfigADPwMacLearning OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION "This field specifies if MAC Learning is enabled for BGP
+                   auto-discovered PW bindings in this VPLS.
+
+                   If this field and vplsConfigMacLearning are both true then
+                   MAC Learning is enabled for the PW bindings.  Otherwise
+                   MAC Learning is disabled."
+      DEFVAL      { true }
+      ::= { vplsConfigEntry 24 }
+
+    vplsConfigMultiCastFloodMode OBJECT-TYPE
+      SYNTAX      VplsMCFloodMode
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION "This field specifies which (if any) multicast frames are
+                   flooded in this VPLS."
+      DEFVAL      { all }
+      ::= { vplsConfigEntry 25 }
+
+    vplsConfigIgnoreMtuMismatch OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION "This field specifies whether mismatches of MTU size with
+                   remote PE routers should be ignored for this VPLS.
+
+                   If this field is false, PWs will not be established to
+                   remote PE routers that signal a different MTU.  Otherwise
+                   PWs will be established.
+
+                   Changing this value will cause an interruption to data
+                   flow for this VPLS."
+      DEFVAL      { false }
+      ::= { vplsConfigEntry 26 }
+
+    vplsConfigIgnoreEncapsMismatch OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION "This field specifies whether mismatches of encapsulation
+                   type with remote PE routers should be ignored for this
+                   VPLS.
+
+                   If this field is false, PWs will not be established to
+                   remote PE routers that signal a different encapsulation
+                   type.  Otherwise PWs will be established.
+
+                   Changing this value will cause an interruption to data
+                   flow for this VPLS."
+      DEFVAL      { false }
+      ::= { vplsConfigEntry 27 }
+
+-- End of VPLS Config Table.
+
+-------------------------------------------------------------------------------
+--
+-- VPLS Status Table (READ-ONLY).
+--
+-- This table reports the status of a configured VPLS service.
+--
+
+   vplsStatusTable OBJECT-TYPE
+       SYNTAX          SEQUENCE OF VplsStatusEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "This read-only table provides information for monitoring
+            Virtual Private LAN Services (VPLS).
+
+            It corresponds to vplsStatusTable in
+            draft-ietf-l2vpn-vpls-mib-12."
+       ::= { vplsObjects 2 }
+
+   vplsStatusEntry OBJECT-TYPE
+       SYNTAX          VplsStatusEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "A row in this table represents a Virtual Private LAN
+            Service (VPLS) in a packet network.  It is indexed by
+            vplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row in this table is automatically created by the agent
+            when a VPLS service is configured."
+       INDEX { l2vmEntityIndex,
+               vplsIndex }
+       ::= { vplsStatusTable 1 }
+
+   VplsStatusEntry ::=
+       SEQUENCE {
+           vplsStatusOperStatus                        NpgOperStatus,
+           vplsStatusPwSetDownGauge                    Gauge32,
+           vplsStatusPwSetGoingUpGauge                 Gauge32,
+           vplsStatusPwSetUpGauge                      Gauge32,
+           vplsStatusPwSetFailGauge                    Gauge32,
+           vplsStatusPwSetFailPermGauge                Gauge32,
+           vplsStatusAcDownGauge                       Gauge32,
+           vplsStatusAcGoingUpGauge                    Gauge32,
+           vplsStatusAcUpGauge                         Gauge32,
+           vplsStatusAcFailGauge                       Gauge32,
+           vplsStatusAcFailPermGauge                   Gauge32,
+           vplsStatusDesignatedForwarder               TruthValue
+       }
+
+   vplsStatusOperStatus OBJECT-TYPE
+       SYNTAX      NpgOperStatus
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION "The current operational state of this VPLS instance.
+
+                    If the operational status is 'up' then the VPLS is
+                    programmed in the data plane."
+       ::= { vplsStatusEntry 3 }
+
+   vplsStatusPwSetDownGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'down' PW Sets currently present in this VPLS instance."
+     ::= { vplsStatusEntry 4 }
+
+   vplsStatusPwSetGoingUpGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'going-up' PW Sets currently present in this VPLS
+                  instance."
+     ::= { vplsStatusEntry 5 }
+
+   vplsStatusPwSetUpGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'up' PW Sets currently present in this VPLS instance."
+     ::= { vplsStatusEntry 6 }
+
+   vplsStatusPwSetFailGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the number of operationally 'failed'
+                  PW Sets currently present in this VPLS instance."
+     ::= { vplsStatusEntry 7 }
+
+   vplsStatusPwSetFailPermGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the number of operationally
+                  'failed-perm' PW Sets currently present in this VPLS
+                  instance."
+     ::= { vplsStatusEntry 8 }
+
+   vplsStatusAcDownGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'down' attachment circuits currently present in this VPLS
+                  instance."
+     ::= { vplsStatusEntry 9 }
+
+   vplsStatusAcGoingUpGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'going-up' attachment circuits currently present in this
+                  VPLS instance."
+     ::= { vplsStatusEntry 10 }
+
+   vplsStatusAcUpGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'up' attachment circuits currently present in this VPLS
+                  instance."
+     ::= { vplsStatusEntry 11 }
+
+   vplsStatusAcFailGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'failed' attachment circuits currently present in this
+                  VPLS instance."
+     ::= { vplsStatusEntry 12 }
+
+   vplsStatusAcFailPermGauge OBJECT-TYPE
+     SYNTAX      Gauge32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This field specifies the total number of operationally
+                  'failed-perm' attachment circuits currently present in
+                  this VPLS instance."
+     ::= { vplsStatusEntry 13 }
+
+   vplsStatusDesignatedForwarder OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION "Whether or not the PE router is currently the elected
+                    Designated Forwarder for this VPLS instance.
+
+                    This field is only used if BGP auto-discovery is enabled
+                    (vplsConfigADType = bgp).  Otherwise, it is set to false."
+       ::= { vplsStatusEntry 14 }
+
+-- End of VPLS Status Table.
+
+-------------------------------------------------------------------------------
+--
+-- VPLS AC Binding Config Table.
+--
+-- This is a Metaswitch proprietary table.  It enables the configuration of
+-- Interfaces as attachment circuits (ACs) for a VPLS service.
+--
+-- Note that this table is indexed on Interface index to ensure that an
+-- Interface is only ever configured in a single VPLS.  The read-only
+-- vplsAcBindTable can be used to show the ACs configured for each VPLS.
+--
+
+   vplsAcBindCfgTable  OBJECT-TYPE
+       SYNTAX          SEQUENCE OF VplsAcBindCfgEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "This table provides an association between an Interface (as an
+            attachment circuit) and a VPLS service.
+
+            Multiple ACs can be associated to a single VPLS service.
+
+            Note that changes to this table may cause the corresponding
+            AC to go operationally down as it may involve re-programming
+            the AC in the data plane."
+       ::= { vplsObjects 3 }
+
+   vplsAcBindCfgEntry OBJECT-TYPE
+       SYNTAX          VplsAcBindCfgEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "Each row represents an association between an attachment
+            circuit (AC) and a  VPLS instance.  ACs are identified by
+            their Interface index as defined in the ifTable."
+       INDEX { l2vmEntityIndex,
+               ifIndex }
+       ::= { vplsAcBindCfgTable 1 }
+
+   VplsAcBindCfgEntry ::=
+       SEQUENCE {
+           vplsAcBindCfgRowStatus                 RowStatus,
+           vplsAcBindCfgAdminStatus               AdminStatus,
+           vplsAcBindCfgOperStatus                NpgOperStatus,
+           vplsAcBindCfgVplsIndex                 NumericIndexOrZero,
+           vplsAcBindCfgMacAddrLimit              Unsigned32,
+           vplsAcBindCfgMacLearning               TruthValue
+       }
+
+   vplsAcBindCfgRowStatus  OBJECT-TYPE
+       SYNTAX          RowStatus
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The row status for this VPLS AC Binding Configuration
+             Table entry, used to create and destroy table entries."
+      ::= { vplsAcBindCfgEntry 3 }
+
+   vplsAcBindCfgAdminStatus OBJECT-TYPE
+       SYNTAX          AdminStatus
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "The administrative status of this VPLS AC Binding, used to
+             activating and deactivate the VPLS AC Binding."
+       DEFVAL           { adminStatusUp }
+       ::= { vplsAcBindCfgEntry 4 }
+
+   vplsAcBindCfgOperStatus OBJECT-TYPE
+       SYNTAX          NpgOperStatus
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+           "The curent operational status of the binding.
+
+            If the operational status is 'up' then the AC is
+            programmed in the data plane and bound to the VPLS."
+       ::= { vplsAcBindCfgEntry 5 }
+
+   vplsAcBindCfgVplsIndex OBJECT-TYPE
+       SYNTAX          NumericIndexOrZero
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "Index identifying the VPLS instance.
+
+             This field must be set to a non-zero value for which there
+             is a matching operationally 'up' VPLS before the VPLS AC
+             Binding can go into operational status 'up'.
+
+             Changing this value will cause an interruption to data
+             flow from this AC onto the VPLS."
+       DEFVAL          { 0 }
+       ::= { vplsAcBindCfgEntry 6 }
+
+   vplsAcBindCfgMacAddrLimit OBJECT-TYPE
+       SYNTAX          Unsigned32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The maximum number of learned and static entries allowed
+            in the FDB for this AC binding.  A value of zero means no
+            maximum."
+       DEFVAL          { 0 }
+       ::= { vplsAcBindCfgEntry 7 }
+
+   vplsAcBindCfgMacLearning OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION "This field specifies if MAC Learning is enabled for this
+                  AC binding.
+
+                  If this field and vplsConfigMacLearning are both true then
+                  MAC Learning is enabled for the AC binding.  Otherwise MAC
+                  Learning is disabled."
+     DEFVAL      { true }
+     ::= { vplsAcBindCfgEntry 8 }
+
+-- End VPLS AC Binding Config Table
+
+-------------------------------------------------------------------------------
+--
+-- VPLS PW Set Binding Config Table.
+--
+-- This table enables the manual configuration of PW Sets as members of a VPLS.
+--
+
+   vplsPwSetBindCfgTable  OBJECT-TYPE
+       SYNTAX          SEQUENCE OF VplsPwSetBindCfgEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "This table allows an operator to manually configure an association
+            between a PW Set and a VPLS.
+
+            A PW Set is a redundant group of PWs that contains at most one
+            active PW and an arbitrary number of standby PWs.  It is identified
+            by a PW Set index.  When the user manually configures a PW in the
+            pwTable, they may place the PW into a PW Set by configuring the PW
+            with the appropriate PW Set Index.  The user then places the whole
+            PW Set into the VPLS by creating a row in this table.  The system
+            will automatically select which PW in the set actually carries the
+            VPLS customer frames, and will automatically manage a transition
+            between PWs in the PW Set in the event that the active PW changes.
+
+            If PW redundancy is not required, then the user should configure
+            PWs in the pwTable as normal, and set the PW Set index equal to the
+            pwIndex.  This will create a PW Set containing exactly one PW,
+            which can then be placed into the VPLS using this table.
+
+            Note that PW Sets containing auto-discovered pseudowires do not
+            appear in this table.
+
+            This table is indexed on vplsPwSetBindIndex to ensure a PW Set is
+            only ever configured in a single VPLS.  The read-only pwBindTable
+            displays all PWs bound to each VPLS.
+
+            Note that a change to any read-create field in this table will
+            cause any active PWs in the corresponding PW Set to go
+            operationally down and be re-programmed."
+       ::= { vplsObjects 4 }
+
+   vplsPwSetBindCfgEntry OBJECT-TYPE
+       SYNTAX          VplsPwSetBindCfgEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "Each row represents a manual association between a PW Set and a
+            VPLS instance."
+       INDEX  { l2vmEntityIndex,
+                vplsPwSetBindCfgIndex }
+       ::= { vplsPwSetBindCfgTable 1 }
+
+   VplsPwSetBindCfgEntry ::=
+       SEQUENCE {
+           vplsPwSetBindCfgIndex                NumericIndex,
+           vplsPwSetBindCfgRowStatus            RowStatus,
+           vplsPwSetBindCfgAdminStatus          AdminStatus,
+           vplsPwSetBindCfgOperStatus           NpgOperStatus,
+           vplsPwSetBindCfgVplsIndex            NumericIndexOrZero,
+           vplsPwSetBindCfgSpltHznGrp           Unsigned32,
+           vplsPwSetBindCfgMacLearning          TruthValue
+       }
+
+   vplsPwSetBindCfgIndex  OBJECT-TYPE
+       SYNTAX          NumericIndex
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+            "The index of the PW Set that is being bound to a VPLS."
+       ::= { vplsPwSetBindCfgEntry 2 }
+
+   vplsPwSetBindCfgRowStatus  OBJECT-TYPE
+       SYNTAX         RowStatus
+       MAX-ACCESS     read-create
+       STATUS         current
+       DESCRIPTION
+            "The row status for this VPLS PW Set Binding Configuration
+             Table entry, used to create and destroy table entries."
+       ::= { vplsPwSetBindCfgEntry 3 }
+
+   vplsPwSetBindCfgAdminStatus  OBJECT-TYPE
+       SYNTAX         AdminStatus
+       MAX-ACCESS     read-create
+       STATUS         current
+       DESCRIPTION
+            "The administrative status of this VPLS PW Set Binding,
+             used to activate and deactivate the binding."
+       DEFVAL          { adminStatusUp }
+       ::= { vplsPwSetBindCfgEntry 4 }
+
+   vplsPwSetBindCfgOperStatus  OBJECT-TYPE
+       SYNTAX              NpgOperStatus
+       MAX-ACCESS          read-only
+       STATUS              current
+       DESCRIPTION
+            "The curent operational status of the binding.
+
+             If the operational status is 'up' then a PW is programmed
+             in the data plane and bound to the VPLS Forwarder."
+       ::= { vplsPwSetBindCfgEntry 5 }
+
+   vplsPwSetBindCfgVplsIndex  OBJECT-TYPE
+       SYNTAX          NumericIndexOrZero
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+            "Index identifying the VPLS instance.
+
+             This field must be set to a non-zero value before the VPLS
+             PW Set Binding can go into operation status 'up'.
+
+             Changing this value will cause an interruption to data
+             flow from this PW Set."
+       DEFVAL          { 0 }
+       ::= { vplsPwSetBindCfgEntry 6 }
+
+   vplsPwSetBindCfgSpltHznGrp  OBJECT-TYPE
+       SYNTAX          Unsigned32 (0..255)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The split horizon group ID that all the PWs in this PW Set belong
+            to.  A value of zero indicates that the PWs in this PW Set do not
+            belong to any split horizon group.
+
+            When a broadcast or unknown-unicast packet is received from a PW
+            in a given split-horizon group, it is replicated to all other
+            PWs bound to the VPLS forwarder except for those that are in the
+            same split horizon group.  This facilitates special PW topologies.
+            For example, in a hub-and-spoke topology, it would be normal to
+            place all hub-facing PWs into the same split horizon group, and
+            not to place spoke-facing PWs into any split horizon group (that
+            is, configure vplsPwSetBindCfgSpltHznGrp = 0 for the spoke-facing
+            PWs).
+
+            By default, all PWs are added to the same split horizon group
+            with index 1."
+       DEFVAL          { 1 }
+       ::= { vplsPwSetBindCfgEntry 7 }
+
+   vplsPwSetBindCfgMacLearning OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION "This field specifies if MAC Learning is enabled for this
+                  PW Set binding.
+
+                  If this field and vplsConfigMacLearning are both true then
+                  MAC Learning is enabled for the PW Set binding.  Otherwise
+                  MAC Learning is disabled."
+     DEFVAL      { true }
+     ::= { vplsPwSetBindCfgEntry 8 }
+
+-- End of VPLS PW Set Binding Config Table.
+
+-------------------------------------------------------------------------------
+--
+-- VPLS AC Binding Table (READ-ONLY).
+--
+-- This is a Metaswitch proprietary table.  It enables the operator to view
+-- the attachment circuits associated with a given VPLS service.
+--
+-- Note that this table is read-only.  The vplsAcBindCfgTable can be used to
+-- configure the ACs in a VPLS.
+--
+
+   vplsAcBindTable  OBJECT-TYPE
+       SYNTAX          SEQUENCE OF VplsAcBindEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "This table displays the association between a VPLS service and
+            the corresponding attachment circuits (ACs).  A service can
+            have more than one AC association."
+       ::= { vplsObjects 5 }
+
+   vplsAcBindEntry OBJECT-TYPE
+       SYNTAX          VplsAcBindEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "Each row represents an association between a VPLS instance and
+            one or more attachment circuits (ACs).  ACs are identified by
+            their interface index as defined in the ifTable.
+
+            Each index is unique in describing an entry in this table.
+            However both indexes are required to define the one to many
+            association of service to AC."
+       INDEX { l2vmEntityIndex,
+               vplsIndex,
+               ifIndex }
+       ::= { vplsAcBindTable 1 }
+
+   VplsAcBindEntry ::=
+       SEQUENCE {
+           vplsAcBindOperStatus            NpgOperStatus,
+           vplsAcBindAcStatus              INTEGER
+       }
+
+   vplsAcBindOperStatus OBJECT-TYPE
+       SYNTAX          NpgOperStatus
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+           "The curent operational status of the binding.  If the
+            operational status is 'up' then the AC is programmed in the
+            data plane and bound to the VPLS."
+       ::= { vplsAcBindEntry 4 }
+
+   vplsAcBindAcStatus OBJECT-TYPE
+       SYNTAX          VplsAcStatus
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+           "The current status of the AC."
+       ::= { vplsAcBindEntry 5 }
+
+-- End of VPLS AC Binding Table
+
+-------------------------------------------------------------------------------
+--
+-- VPLS PW Set Bind Table (READ-ONLY).
+--
+-- This table displays information on the PW Sets bound to a VPLS Forwarder.
+--
+-- Note that this includes manually configured PW Sets and PW Sets that contain
+-- auto-discovered pseudowires.
+--
+
+   vplsPwSetBindTable  OBJECT-TYPE
+       SYNTAX          SEQUENCE OF VplsPwSetBindEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "This table displays the association between a VPLS, an individual
+            VPLS Forwarder and the PW Sets that are bound to the VPLS.
+
+            This table is read-only."
+       ::= { vplsObjects 6 }
+
+   vplsPwSetBindEntry OBJECT-TYPE
+       SYNTAX          VplsPwSetBindEntry
+       MAX-ACCESS      not-accessible
+       STATUS          current
+       DESCRIPTION
+           "Each row represents an association between a VPLS Forwarder and a
+            PW Set."
+       INDEX  { l2vmEntityIndex,
+                vplsIndex,
+                vplsPwSetBindIndex }
+       ::= { vplsPwSetBindTable 1 }
+
+   VplsPwSetBindEntry ::=
+       SEQUENCE {
+           vplsPwSetBindIndex                NumericIndex,
+           vplsPwSetBindOperStatus           NpgOperStatus,
+           vplsPwSetBindConfigType           L2vpnPwBindType,
+           vplsPwSetBindIfIndex              InterfaceIndex,
+           vplsPwSetBindRemoteRD             BgpRouteDistinguisher,
+           vplsPwSetBindRemoteAddrType       InetAddressType,
+           vplsPwSetBindRemoteAddr           InetAddress
+       }
+
+   vplsPwSetBindIndex  OBJECT-TYPE
+       SYNTAX              NumericIndex
+       MAX-ACCESS          not-accessible
+       STATUS              current
+       DESCRIPTION
+           "The index of the PW Set that is bound to this VPLS.
+
+            If vplsPwSetBindConfigType is 'manual' then this field corresponds
+            to vplsPwSetBindCfgIndex.
+
+            If vplsPwSetBindConfigType is 'autodiscovery' then this field is
+            assigned automatically."
+       ::= { vplsPwSetBindEntry 3 }
+
+   vplsPwSetBindOperStatus  OBJECT-TYPE
+       SYNTAX              NpgOperStatus
+       MAX-ACCESS          read-only
+       STATUS              current
+       DESCRIPTION
+           "The curent operational status of the binding.  If the
+            operational status is 'up' then the PW Set is programmed in the
+            data plane and bound to the VPLS Forwarder."
+       ::= { vplsPwSetBindEntry 4 }
+
+   vplsPwSetBindConfigType  OBJECT-TYPE
+       SYNTAX              L2vpnPwBindType
+       MAX-ACCESS          read-only
+       STATUS              current
+       DESCRIPTION
+           "If the PW Set was bound to the VPLS manually via a row in
+            vplsPwSetBindCfgTable then this field is set to pwMibIndex.
+
+            If the PW Set contains a PW that was created automatically as the
+            result of an auto-discovery process, then this field is set to
+            lclRmtVeId."
+       ::= { vplsPwSetBindEntry 5 }
+
+   vplsPwSetBindIfIndex  OBJECT-TYPE
+       SYNTAX              InterfaceIndex
+       MAX-ACCESS          read-only
+       STATUS              current
+       DESCRIPTION
+           "The interface index that has been assigned for this PW
+            Set if known, or zero otherwise."
+       ::= { vplsPwSetBindEntry 6 }
+
+  vplsPwSetBindRemoteRD OBJECT-TYPE
+    SYNTAX      BgpRouteDistinguisher
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote route distinguisher, or null if not known.
+
+                 This is the route distinguisher of the best BGP route
+                 advertising the remote VPLS VE.
+
+                 This is only relevant if vplsPwSetBindConfigType =
+                 lclRmtVeId."
+    ::= { vplsPwSetBindEntry 7 }
+
+  vplsPwSetBindRemoteAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address family of the remote address.
+
+                 This is only relevant if vplsPwSetBindConfigType =
+                 lclRmtVeId."
+    ::= { vplsPwSetBindEntry 8 }
+
+  vplsPwSetBindRemoteAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote address, or null if not known.
+
+                 This is the address of the router advertising the best BGP
+                 route to the remote VPLS VE.
+
+                 This is only relevant if vplsPwSetBindConfigType =
+                 lclRmtVeId."
+    ::= { vplsPwSetBindEntry 9 }
+
+-- End of VPLS PW Set Bind Table.
+
+-------------------------------------------------------------------------------
+--
+-- VPLS Notifications.
+--
+
+   vplsStatusChanged NOTIFICATION-TYPE
+       OBJECTS {
+           vplsConfigName,
+           vplsConfigVpnId,
+           vplsConfigAdminStatus,
+           vplsStatusOperStatus
+       }
+       STATUS          current
+       DESCRIPTION
+            "The vplsStatusChanged notification is generated when
+             vplsStatusOperStatus changes to operStatusUp or
+             operStatusFailedPerm.
+
+             The object instances included in the notification are
+             the ones associated with the VPLS service whose
+             status has changed.
+
+             The vplsConfigAdminStatus object included in this notification
+             always has value adminStatusUp.  It is included for compatibility
+             with draft-ietf-l2vpn-vpls-mib-12."
+       ::= { vplsNotifications 1 }
+
+-- End of VPLS Notifications
+
+-------------------------------------------------------------------------------
+--
+-- Conformance statement
+--
+
+ vplsCompliances
+    OBJECT IDENTIFIER ::= { vplsConformance 1 }
+
+ vplsGroups
+    OBJECT IDENTIFIER ::= { vplsConformance 2 }
+
+--
+-- Module compliance is divided into three categories.
+--   -  Full compliance.
+--   -  Support for manual PWs only.
+--   -  Support for auto-created PWs only.
+--
+
+ vplsFullCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for manual PW
+                 bindings and auto-created PW bindings using BGP
+                 auto-discovery."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         vplsBaseGroup,
+                         vplsNotificationGroup,
+                         vplsManualPwGroup,
+                         vplsAutoPwGroup
+                       }
+    ::= { vplsCompliances 1 }
+
+ vplsManualPwCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for manual PW
+                 bindings."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         vplsBaseGroup,
+                         vplsNotificationGroup,
+                         vplsManualPwGroup
+                       }
+    ::= { vplsCompliances 2 }
+
+ vplsAutoPwCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "The module is implemented with support for auto-created PW
+                 bindings using BGP auto-discovery."
+    MODULE -- this module
+      MANDATORY-GROUPS {
+                         vplsBaseGroup,
+                         vplsNotificationGroup,
+                         vplsAutoPwGroup
+                       }
+    ::= { vplsCompliances 3 }
+
+--
+
+  vplsBaseGroup OBJECT-GROUP
+    OBJECTS {
+      vplsConfigRowStatus,
+      vplsConfigAdminStatus,
+      vplsConfigOperStatus,
+      vplsConfigName,
+      vplsConfigDescr,
+      vplsConfigADType,
+      vplsConfigSigType,
+      vplsConfigPwEncapType,
+      vplsConfigMacLearning,
+      vplsConfigDiscardUnknownDest,
+      vplsConfigMacAge,
+      vplsConfigMtu,
+      vplsConfigMacSize,
+      vplsConfigPwMacAddressLimit,
+      vplsConfigControlWord,
+      vplsConfigSeqDelivery,
+      vplsConfigMultiCastFloodMode,
+      vplsStatusOperStatus,
+      vplsStatusPwSetDownGauge,
+      vplsStatusPwSetGoingUpGauge,
+      vplsStatusPwSetUpGauge,
+      vplsStatusPwSetFailGauge,
+      vplsStatusPwSetFailPermGauge,
+      vplsStatusAcDownGauge,
+      vplsStatusAcGoingUpGauge,
+      vplsStatusAcUpGauge,
+      vplsStatusAcFailGauge,
+      vplsStatusAcFailPermGauge,
+      vplsAcBindCfgRowStatus,
+      vplsAcBindCfgAdminStatus,
+      vplsAcBindCfgOperStatus,
+      vplsAcBindCfgVplsIndex,
+      vplsAcBindCfgMacAddrLimit,
+      vplsAcBindCfgMacLearning,
+      vplsAcBindOperStatus,
+      vplsAcBindAcStatus,
+      vplsPwSetBindOperStatus,
+      vplsPwSetBindConfigType,
+      vplsPwSetBindIfIndex
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects that are common to all styles of VPLS configuration."
+    ::= { vplsGroups 1 }
+
+  vplsManualPwGroup OBJECT-GROUP
+    OBJECTS {
+      vplsPwSetBindCfgRowStatus,
+      vplsPwSetBindCfgAdminStatus,
+      vplsPwSetBindCfgOperStatus,
+      vplsPwSetBindCfgVplsIndex,
+      vplsPwSetBindCfgSpltHznGrp,
+      vplsPwSetBindCfgMacLearning
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects that are specific to VPLS configuration using manual PWs."
+    ::= { vplsGroups 2 }
+
+  vplsAutoPwGroup OBJECT-GROUP
+    OBJECTS {
+      vplsStatusDesignatedForwarder,
+      vplsConfigRouteDistinguisher,
+      vplsConfigVpnId,
+      vplsConfigLocalVeID,
+      vplsConfigLocalPreference,
+      vplsConfigLabelBlockSize,
+      vplsConfigADPwMacLearning,
+      vplsConfigIgnoreMtuMismatch,
+      vplsConfigIgnoreEncapsMismatch,
+      vplsPwSetBindRemoteRD,
+      vplsPwSetBindRemoteAddrType,
+      vplsPwSetBindRemoteAddr
+    }
+    STATUS    current
+    DESCRIPTION
+        "Objects that are specific to VPLS configuration using auto-created
+         PWs."
+    ::= { vplsGroups 3 }
+
+  vplsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+      vplsStatusChanged
+    }
+    STATUS          current
+    DESCRIPTION
+         "The group of notifications supporting the Notifications generated for
+          VPLS instances."
+    ::= { vplsGroups 4 }
+
+-------------------------------------------------------------------------------
+
+END

@@ -93,26 +93,16 @@ if ($config['poller_id'] === 0) {
 
     $last_checked = get_obs_attrib('last_versioncheck');
 
-    if (!is_numeric($last_checked) || $last_checked < time() - 3600 || isset($options['u'])) {
+    if (isset($options['u']) || !is_numeric($last_checked) || $last_checked < (time() - 3600)) {
         //$stats = get_instance_stats();
-        $stats = ['version' => OBSERVIUM_VERSION];
+        $stats = [ 'version' => OBSERVIUM_VERSION ];
 
         // Serialize and base64 encode stats array for transportation
         $stat_base64 = base64_encode(serialize($stats));
 
-        $tags = ['stats' => $stat_base64];
+        $tags = [ 'stats' => $stat_base64 ];
 
-        // Generate context/options with encoded data
-        $ver_options = generate_http_context($config['http_api']['observium_versions'], $tags);
-
-        // API URL
-        $url = generate_http_url($config['http_api']['observium_versions'], $tags);
-
-        // Request
-        $response = get_http_request($url, $ver_options, 10); // Ratelimit 10/day
-
-        if (test_http_request($config['http_api']['observium_versions'], $response) &&
-            $versions = safe_json_decode($response)) {
+        if ($versions = get_http_def('observium_versions', $tags)) {
 
             print_debug_vars($versions);
             if (OBSERVIUM_EDITION === "community") {

@@ -24,7 +24,8 @@ function generate_box_open($args = [])
         $return .= 'id="' . $args['id'] . '" ';
     }
 
-    $return .= 'class="' . OBS_CLASS_BOX . ($args['box-class'] ? ' ' . $args['box-class'] : '') . '" ' . ($args['box-style'] ? 'style="' . $args['box-style'] . '"' : '') . '>' . PHP_EOL;
+    $return .= 'class="' . OBS_CLASS_BOX . ($args['box-class'] ? ' ' . $args['box-class'] : '') . '" ' .
+               ($args['box-style'] ? 'style="' . $args['box-style'] . '"' : '') . '>' . PHP_EOL;
 
     if (isset($args['title'])) {
         $return .= '  <div class="box-header' . ($args['header-border'] ? ' with-border' : '') . '">' . PHP_EOL;
@@ -34,10 +35,10 @@ function generate_box_open($args = [])
         if (isset($args['icon'])) {
             $return .= get_icon($args['icon']);
         }
-        $return .= '<' . (isset($args['title-element']) ? $args['title-element'] : 'h3') . ' class="box-title"';
+        $return .= '<' . ($args['title-element'] ?? 'h3') . ' class="box-title"';
         $return .= isset($args['title-style']) ? ' style="' . $args['title-style'] . '"' : '';
         $return .= '>';
-        $return .= escape_html($args['title']) . '</' . (isset($args['title-element']) ? $args['title-element'] : 'h3') . '>' . PHP_EOL;
+        $return .= escape_html($args['title']) . '</' . ($args['title-element'] ?? 'h3') . '>' . PHP_EOL;
         if (isset($args['url'])) {
             $return .= '</a>';
         }
@@ -46,17 +47,16 @@ function generate_box_open($args = [])
             $return .= '    <div class="box-tools pull-right">';
 
             foreach ($args['header-controls']['controls'] as $control) {
-                $anchor = (isset($control['anchor']) && $control['anchor']) ||
-                          (isset($control['config']) && !empty($control['config']));
+                $anchor = (isset($control['anchor']) && $control['anchor']) || !empty($control['config']);
                 if ($anchor) {
                     $return .= ' <a role="button"';
                 } else {
                     $return .= '<button type="button"';
                 }
-                if (isset($control['url']) && $control['url'] !== '#' && !empty($control['url'])) {
+                if (!empty($control['url']) && $control['url'] !== '#') {
                     $return .= ' href="' . $control['url'] . '"';
-                } elseif (isset($control['config']) && !empty($control['config'])) {
-                    // Check/get config option
+                } elseif (!empty($control['config'])) {
+                    // Check/get a config option
                     $return .= ' href="#"'; // set config url
                     if (empty($control['data']) && isset($control['value'])) {
                         $control['data'] = ['onclick' => "ajax_settings('" . $control['config'] . "', '" . $control['value'] . "');"];
@@ -126,12 +126,9 @@ function generate_box_close($args = [])
 }
 
 // DOCME needs phpdoc block
-function print_graph_row_port($graph_array, $port)
-{
+function print_graph_row_port($graph_array, $port) {
 
-    global $config;
-
-    $graph_array['to'] = $config['time']['now'];
+    $graph_array['to'] = get_time();
     $graph_array['id'] = $port['port_id'];
 
     print_graph_row($graph_array);
@@ -189,8 +186,8 @@ function generate_graph_summary_row($graph_summary_array, $state_marker = FALSE)
     if ($state_marker) {
         $graph_array['width'] -= 2;
     }
-    $graph_array['to']   = $config['time']['now'];
-    $graph_array['from'] = $config['time'][$graph_summary_array['period']];
+    $graph_array['to']   = get_time();
+    $graph_array['from'] = get_time($graph_summary_array['period']);
 
     $graph_rows = [];
     foreach ($graph_summary_array['types'] as $graph_type) {
@@ -206,11 +203,7 @@ function generate_graph_summary_row($graph_summary_array, $state_marker = FALSE)
         $graph_array['type'] = $graph_type;
 
         preg_match(OBS_PATTERN_GRAPH_TYPE, $graph_type, $type_parts);
-        if (isset($config['graph_types'][$type_parts['type']][$type_parts['subtype']]['descr'])) {
-            $descr = $config['graph_types'][$type_parts['type']][$type_parts['subtype']]['descr'];
-        } else {
-            $descr = nicecase($graph_type);
-        }
+        $descr = $config['graph_types'][$type_parts['type']][$type_parts['subtype']]['descr'] ?? nicecase($graph_type);
 
         $graph_array_zoom           = $graph_array;
         $graph_array_zoom['height'] = "175";
@@ -220,6 +213,7 @@ function generate_graph_summary_row($graph_summary_array, $state_marker = FALSE)
         $link_array         = $graph_array;
         $link_array['page'] = "graphs";
         unset($link_array['height'], $link_array['width']);
+        unset($link_array['legend']); // Remove the legend=no when we kick out to /graphs/ because it doesn't make sense there.
         $link = generate_url($link_array);
 
         $popup_contents = '<h3>' . $descr . '</h3>';
@@ -286,7 +280,7 @@ function generate_graph_row($graph_array, $state_marker = FALSE)
     }
 
     if ($graph_array['shrink']) {
-        $graph_array['width'] = $graph_array['width'] - $graph_array['shrink'];
+        $graph_array['width'] -= $graph_array['shrink'];
     }
 
     // If we're printing the row inside a table cell with "state-marker", we need to make the graphs a tiny bit smaller to fit
@@ -294,7 +288,7 @@ function generate_graph_row($graph_array, $state_marker = FALSE)
         $graph_array['width'] -= 2;
     }
 
-    $graph_array['to'] = $config['time']['now'];
+    $graph_array['to'] = get_time();
 
     $graph_rows = [];
     foreach ($periods as $period) {
@@ -405,16 +399,16 @@ SCRIPT;
     echo('      <td class="text-nowrap" style="width: 50px">' . PHP_EOL);
     echo('<div class="pull-right">');
     if ($locked && !isset($variable['locked'])) {
-        echo(generate_tooltip_link(NULL, '<i class="' . $config['icon']['lock'] . '"></i>', 'This setting is locked because it has been set in your <strong>config.php</strong> file.'));
+        echo(generate_tooltip_link(NULL, get_icon($config['icon']['lock']), 'This setting is locked because it has been set in your <strong>config.php</strong> file.'));
         echo '&nbsp;';
     }
-    echo(generate_tooltip_link(NULL, '<i id="clipboard" class="' . $config['icon']['question'] . '" data-clipboard-text="' . $confname . '"></i>', 'Variable name to use in <strong>config.php</strong>: ' . $confname));
+    echo(generate_tooltip_link(NULL, get_icon($config['icon']['question'], '', [ 'id' => 'clipboard', 'data-clipboard-text' => $confname ]), 'Variable name to use in <strong>config.php</strong>: ' . $confname . '<br /><em>Click the mouse button to copy config variable to the clipboard.</em>'));
     echo('      </div>' . PHP_EOL);
     echo('      </td>' . PHP_EOL);
     echo('      <td>' . PHP_EOL);
 
     // Split enum|foo|bar into enum  foo|bar
-    [$vartype, $varparams] = explode('|', $variable['type'], 2);
+    [ $vartype, $varparams ] = explode('|', $variable['type'], 2);
     $params = [];
 
     // If a callback function is defined, use this to fill params.
@@ -518,7 +512,7 @@ SCRIPT;
             echo('<div id="' . $htmlname . '_clone" style="margin: -5px 0 -5px 0;">  <!-- START clone -->' . PHP_EOL);
             // Here parse stored json/array
             if (!safe_count($content)) {
-                // Create empty array for initial row
+                // Create an empty array for initial row
                 $content = ['' => ''];
             }
             $i = 0;

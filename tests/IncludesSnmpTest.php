@@ -170,81 +170,87 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-  * @dataProvider providerSnmpFixNumeric
-  * @group numbers
-  */
-  public function testSnmpFixNumeric($value, $result, $unit)
-  {
-    $this->assertSame($result, snmp_fix_numeric($value, $unit));
-  }
+    /**
+    * @dataProvider providerSnmpFixNumeric
+    * @group numbers
+    */
+    public function testSnmpFixNumeric($value, $result, $unit) {
+        $this->assertSame($result, snmp_fix_numeric($value, $unit));
+    }
 
-  public function providerSnmpFixNumeric()
-  {
-    $split_lanes = '
+    public function providerSnmpFixNumeric() {
+
+        $array = [
+            array(         0,           0),
+            array(  '-65000',      -65000),
+            array(        '',          ''),
+            array(  'Some.0',    'Some.0'),
+            array(     FALSE,       FALSE),
+            array(4200000066,  4200000066),
+            // Here numeric fixes
+            array('"-7"',              -7),
+            array('+7',                 7),
+            array('  20,4',          20.4),
+            array('4,200000067', 4.200000067),
+            array('" -002.4336 dBm: Normal "', -2.4336),
+            array('"66.1 C (151.0 F)"', 66.1),
+            array('"36 C/96 F"', 36),
+            array('"8232W"', 8232),
+            array('"1628W (+/- 3.0%)"', 1628),
+            array('3.09(W-)', 3.09),
+            array('-26.02(A-)', -26.02),
+            array('-0.00(A-)', 0.0),
+            // Convert some passed units
+            array('512 MB', 512),
+            array('512 MB', 536870912.0, 'bytes'),
+            array('119.1 GB', 119.1),
+            array('119.1 GB', 127882651238.4, 'bytes'),
+            array('0x01', 1, 'hex'),
+            array('0x00', 0, 'hex'),
+            // More complex
+            array('CPU Temperature-Ctlr B: 58 C 136.40F',   58),
+            array('Capacitor Cell 1 Voltage-Ctlr B: 2.04V', 2.04),
+            array('Voltage 12V Rail Loc: left-PSU: 12.22V', 12.22),
+            array('Current 12V Rail Loc: right-PSU: 9.53A', 9.53),
+            array('Capacitor Charge-Ctlr B: 100%',          100),
+            array('Spinning at 5160 RPM',                   5160),
+            // Split
+            array('42.50 ,35.97 ,40.64 ,40.38', 42.5,  'split1'),
+            array('42.50 ,35.97 ,40.64 ,40.38', 35.97, 'split2'),
+            array('42.50 ,35.97 ,40.64 ,40.38', 40.64, 'split3'),
+            array('42.50 ,35.97 ,40.64 ,40.38', 40.38, 'split4'),
+
+            array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 0, 'split1'),
+            array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 2, 'split2'),
+            array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 3, 'split3'),
+            [ "    5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)", 6.510,  'split1' ],
+            [ "    5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)", 7.724,  'split2' ],
+            [ "    5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)", 6.3812, 'split3' ],
+            [ "5 Sec (6.99%),    1 Min (6.72%),   5 Min (9.06%)", 9.06, 'split3' ],
+            [ "20% (cpu1: 28%   cpu2: 13%)", 20 ],
+            [ "20% (cpu1: 28%   cpu2: 13%)", 28, 'split1' ],
+            [ "20% (cpu1: 28%   cpu2: 13%)", 13, 'split2' ],
+        ];
+
+        // Split lanes
+        $split_lanes = '
 Lane  1:  1.01 dBm
 Lane  2:  1.29 dBm
 Lane  3:   2.1 dBm
 Lane  4:  2.71 dBm';
-    $array = array(
-      array(         0,           0),
-      array(  '-65000',      -65000),
-      array(        '',          ''),
-      array(  'Some.0',    'Some.0'),
-      array(     FALSE,       FALSE),
-      array(4200000066,  4200000066),
-      // Here numeric fixes
-      array('"-7"',              -7),
-      array('+7',                 7),
-      array('  20,4',          20.4),
-      array('4,200000067', 4.200000067),
-      array('" -002.4336 dBm: Normal "', -2.4336),
-      array('"66.1 C (151.0 F)"', 66.1),
-      array('"36 C/96 F"', 36),
-      array('"8232W"', 8232),
-      array('"1628W (+/- 3.0%)"', 1628),
-      array('3.09(W-)', 3.09),
-      array('-26.02(A-)', -26.02),
-      array('-0.00(A-)', 0.0),
-      // Convert some passed units
-      array('512 MB', 512),
-      array('512 MB', 536870912.0, 'bytes'),
-      array('119.1 GB', 119.1),
-      array('119.1 GB', 127882651238.4, 'bytes'),
-      array('0x01', 1, 'hex'),
-      array('0x00', 0, 'hex'),
-      // More complex
-      array('CPU Temperature-Ctlr B: 58 C 136.40F',   58),
-      array('Capacitor Cell 1 Voltage-Ctlr B: 2.04V', 2.04),
-      array('Voltage 12V Rail Loc: left-PSU: 12.22V', 12.22),
-      array('Current 12V Rail Loc: right-PSU: 9.53A', 9.53),
-      array('Capacitor Charge-Ctlr B: 100%',          100),
-      array('Spinning at 5160 RPM',                   5160),
-      // Split
-      array('42.50 ,35.97 ,40.64 ,40.38', 42.5,  'split1'),
-      array('42.50 ,35.97 ,40.64 ,40.38', 35.97, 'split2'),
-      array('42.50 ,35.97 ,40.64 ,40.38', 40.64, 'split3'),
-      array('42.50 ,35.97 ,40.64 ,40.38', 40.38, 'split4'),
-      array($split_lanes, 1.01,  'split_lane1'),
-      array($split_lanes, 1.29,  'split_lane2'),
-      array($split_lanes, 2.1,   'split_lane3'),
-      array($split_lanes, 2.71,  'split_lane4'),
+        $array[] = [ $split_lanes, 1.01,  'split_lane1' ];
+        $array[] = [ $split_lanes, 1.29,  'split_lane2' ];
+        $array[] = [ $split_lanes, 2.1,   'split_lane3' ];
+        $array[] = [ $split_lanes, 2.71,  'split_lane4' ];
 
-      array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 0, 'split1'),
-      array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 2, 'split2'),
-      array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 3, 'split3'),
-    );
+        foreach ($array as $index => $entry) {
+            if (!isset($entry[2])) {
+                $array[$index][] = NULL;
+            }
+        }
 
-    foreach ($array as $index => $entry)
-    {
-      if (!isset($entry[2]))
-      {
-        $array[$index][] = NULL;
-      }
+        return $array;
     }
-
-    return $array;
-  }
 
   /**
   * @dataProvider providerSnmpFixString

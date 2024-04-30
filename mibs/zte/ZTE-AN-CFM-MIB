@@ -1,0 +1,1230 @@
+
+--------------------------------------------------------------------------
+-- File Name : ZTE-AN-CFM-MIB.mib
+-- Date      : 2010-01-28
+-- Author    : ZTE Nms dept.
+
+--
+-- Zte System Mgmt Mib for Access Node
+-- 
+-- 
+--------------------------------------------------------------------------
+
+ZTE-AN-CFM-MIB    DEFINITIONS ::= BEGIN            
+    
+    IMPORTS
+        enterprises, MODULE-IDENTITY,Integer32 ,Unsigned32 ,
+        Counter64, Counter32                           FROM SNMPv2-SMI        
+        TimeStamp,MacAddress,RowStatus,TruthValue      FROM SNMPv2-TC        
+        
+        zxAn                                           FROM ZTE-AN-TC-MIB
+        ifIndex                                        FROM RFC1213-MIB    
+        InterfaceIndexOrZero                           FROM IF-MIB            
+        dot1agCfmMaNetEntry, Dot1agCfmMepIdOrZero, 
+        dot1agCfmMepEntry, dot1agCfmMdIndex, 
+        dot1agCfmMaIndex, dot1agCfmMepIdentifier       FROM IEEE8021-CFM-MIB;
+                                                       
+        
+    zxAnCfmMib    MODULE-IDENTITY
+        LAST-UPDATED    "201001281600Z"
+        ORGANIZATION    "ZTE Corporation"
+        CONTACT-INFO    "ZTE NMS dept.
+                         Li Xiaochun  68896452"
+        DESCRIPTION        "This MIB defines Description of zte ethernet OAM 
+                         managed objects."
+        ::=  { zxAn 62 }
+        
+    zxAnCfmObjects    OBJECT IDENTIFIER ::=  {  zxAnCfmMib  1  }
+    
+    zxAnCfmTrapObjects    OBJECT IDENTIFIER    ::=  {  zxAnCfmMib  2  }
+        
+--------------------------------------------------------------------------------
+-- Following objects are defined.
+
+-- Global Configuration
+-- MA Management
+-- MEP Management
+-- Remote MEP Config Table
+-- MIP Table
+-- CFM Compatibility Table
+-- CFM Interface Table
+-- Trap Objects
+--------------------------------------------------------------------------------
+        
+        
+--------------------------------------------------------------------------------
+-- Global Configuration
+--------------------------------------------------------------------------------
+
+    zxAnCfmGlobalObjects  OBJECT IDENTIFIER    ::=  {  zxAnCfmObjects  1  }        
+        
+    zxAnCfmEnable OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+            enabled  ( 1 ) , 
+            disabled ( 2 )
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Enabled or disabled the CFM functions."
+        ::= { zxAnCfmGlobalObjects 1}  
+                          
+
+--------------------------------------------------------------------------------
+-- MA Management
+--------------------------------------------------------------------------------
+    
+    zxAnCfmMa  OBJECT IDENTIFIER ::= { zxAnCfmObjects 2 }
+
+    zxAnCfmMaNetTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ZxAnCfmMaNetEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION 
+            "The Maintenance Association table.  Each row in the table
+             represents an MA.  An MA is a set of MEPs, each configured
+             with a single service instance.
+            
+             This is the part of the complete MA table that is constant
+             across all Bridges in a Maintenance Domain, and across all
+             components of a single Bridge.  That part of the MA table that
+             can vary from Bridge component to Bridge component is contained
+             in the dot1agCfmMaCompTable.
+             
+             Creation of a Service Instance establishes a connectionless
+             association among the selected DSAPs.  Configuring a
+             Maintenance association End Point (MEP) at each of the
+             DSAPs creates a Maintenance Association (MA) to monitor
+             that connectionless connectivity.  The MA is identified by a
+             Short MA Name that is unique within the Maintenance Domain
+             and chosen to facilitate easy identification of the Service
+             Instance.  Together, the Maintenance Domain Name and the
+             Short MA Name form the Maintenance Association Identifier
+             (MAID) that is carried in CFM Messages to identify
+             incorrect connectivity among Service Instances.  A small
+             integer, the Maintenance association End Point Identifier
+             (MEPID), identifies each MEP among those configured on a
+             single MA (802.1ag clauses 3.19 and 18.2).
+             
+             This table uses two indices, first index is the index of the
+             Maintenance Domain table.  The second index is the same as the
+             index of the dot1agCfmMaCompEntry for the same MA.
+             
+             The writable objects in this table need to be persistent
+             upon reboot or restart of a device."
+        ::= { zxAnCfmMa 1 }
+
+    zxAnCfmMaNetEntry OBJECT-TYPE
+        SYNTAX      ZxAnCfmMaNetEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The MA table entry."        
+        AUGMENTS    { dot1agCfmMaNetEntry }
+        ::= { zxAnCfmMaNetTable 1 }
+        
+    ZxAnCfmMaNetEntry ::= SEQUENCE {
+        zxAnCfmMaNetCcmDaType      INTEGER,
+        zxAnCfmMaProtect        INTEGER,
+        zxAnCfmMaTunnel         Unsigned32
+    }
+    
+    zxAnCfmMaNetCcmDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast              ( 1 ) , 
+             multicastclass1     ( 2 )
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the type of CCM DA(destination MAC address),
+             which should be unicast or multicastclass1.
+            "
+        ::= { zxAnCfmMaNetEntry 1 }      
+        
+    zxAnCfmMaProtect OBJECT-TYPE
+        SYNTAX INTEGER 
+        {
+             maProtectNothing (1),
+             cfmMaProtectVlan (2),
+             cfmMaProtectTunnel (3),
+             cfmMaProtectPort (4),  
+             cfmMaProtectLink (5)
+        }      
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the type of CCM DA(destination MAC address),
+             which should be unicast or multicastclass1.
+            "
+        ::= { zxAnCfmMaNetEntry 2 }         
+        
+    zxAnCfmMaTunnel OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..4294967295) 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION       
+            ""  
+        ::= { zxAnCfmMaNetEntry 3 }             
+        
+--------------------------------------------------------------------------------
+-- MEP Management
+--------------------------------------------------------------------------------
+
+    zxAnCfmMep  OBJECT IDENTIFIER ::= { zxAnCfmObjects 3 }
+
+    zxAnCfmMepTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ZxAnCfmMepEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "CFM Mep Table"
+        ::= { zxAnCfmMep 1 }
+
+    zxAnCfmMepEntry OBJECT-TYPE
+        SYNTAX       ZxAnCfmMepEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "CFM Mep Entry"        
+        AUGMENTS     { dot1agCfmMepEntry }
+        ::= { zxAnCfmMepTable 1 }
+        
+    ZxAnCfmMepEntry ::= SEQUENCE {
+        zxAnCfmMepCcCheckEnable         TruthValue,
+        zxAnCfmMepLmEnable              TruthValue,
+        zxAnCfmMepDmEnable              TruthValue,   
+        zxAnCfmMepLbmTestType           INTEGER,
+        zxAnCfmMepLbmAppType            INTEGER,      
+        zxAnCfmMepLmTargetMacAddress    MacAddress,
+        zxAnCfmMepLmTargetMepId         Dot1agCfmMepIdOrZero,
+        zxAnCfmMepLmTargetIsMepId       TruthValue,
+        zxAnCfmMepLmmDaType             INTEGER,
+        zxAnCfmMepLmEndType             INTEGER,
+        zxAnCfmMepLmInterval            Integer32,
+        zxAnCfmMepLmDuration            Integer32,
+        zxAnCfmMepLmPriority            Unsigned32,
+        zxAnCfmMepLmFarendLoss          Integer32,
+        zxAnCfmMepLmNearendLoss         Integer32,
+        zxAnCfmMepLmLossRatio           Integer32,
+        zxAnCfmMepLmStatus              TruthValue,
+        zxAnCfmMepLmResultOk            TruthValue,
+        zxAnCfmMepLmFarendLossRatio     Integer32,          
+        zxAnCfmMepDmTargetMacAddress    MacAddress,
+        zxAnCfmMepDmTargetMepId         Dot1agCfmMepIdOrZero,
+        zxAnCfmMepDmTargetIsMepId       TruthValue,
+        zxAnCfmMep1dmDaType             INTEGER,
+        zxAnCfmMepDdmDaType             INTEGER,
+        zxAnCfmMepDmWayType             INTEGER,
+        zxAnCfmMepDmInterval            Integer32,
+        zxAnCfmMepDmDuration            Integer32,
+        zxAnCfmMepDmPriority            Unsigned32,
+        zxAnCfmMepDmOneWayAvgDelay      Counter64,
+        zxAnCfmMepDmOneWayAvgDv         Counter64,
+        zxAnCfmMepDmTwoWayAvgDelay      Counter64,
+        zxAnCfmMepDmTwoWayAvgDv         Counter64,
+        zxAnCfmMepDmStatus              TruthValue,
+        zxAnCfmMepDmResultOk            TruthValue,
+        zxAnCfmMepTestTlvLength         Unsigned32,
+        zxAnCfmMepTestEnable            INTEGER,
+        zxAnCfmMepTestAppType           INTEGER,
+        zxAnCfmMepTestDestMacAddress    MacAddress,
+        zxAnCfmMepTestDestMepId         Dot1agCfmMepIdOrZero,
+        zxAnCfmMepTestDestIsMepId       TruthValue,
+        zxAnCfmMepTestInterval          Integer32,
+        zxAnCfmMepTestDuration          Integer32,
+        zxAnCfmMepTestPriority          Unsigned32,
+        zxAnCfmMepTestDaType            INTEGER,
+        zxAnCfmMepTestTlvEnable         INTEGER,
+        zxAnCfmMepTestPattern           INTEGER,
+        zxAnCfmMepTestStatus            TruthValue,
+        zxAnCfmMepTestResultOk          TruthValue,
+        zxAnCfmMepTestMsgSeqNumber      Unsigned32,
+        zxAnCfmMepTestNextMsgSeqNumber  Unsigned32,
+        zxAnCfmMepTestTransmitRate      Unsigned32,
+        zxAnCfmMepTestFarendLossRatio   Integer32,
+        zxAnCfmMepTestFarendBitErrRatio Integer32,
+        zxAnCfmMepAisEnable             INTEGER,
+        zxAnCfmMepLckEnable             INTEGER,
+        zxAnCfmMepAisClientMegLevel     Integer32,
+        zxAnCfmMepLckClientMegLevel     Integer32,
+        zxAnCfmMepAisLckInterval        Integer32,
+        zxAnCfmMepAisPriority           Unsigned32,
+        zxAnCfmMepLckPriority           Unsigned32,
+        zxAnCfmMepAisDaType             INTEGER,
+        zxAnCfmMepLckDaType             INTEGER,
+        zxAnCfmMepAisStatus             TruthValue,
+        zxAnCfmMepLckStatus             TruthValue,
+        zxAnCfmMepLckSendEnable         TruthValue,
+        zxAnCfmMepRdiStatus             TruthValue
+    }
+    
+    zxAnCfmMepCcCheckEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Enabled or disabled the CCM frame defect checking."
+        ::= { zxAnCfmMepEntry 1 }     
+    
+    zxAnCfmMepLmEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Enabled or disabled the ETH-LM functions."
+        ::= { zxAnCfmMepEntry 2 }
+    
+    zxAnCfmMepDmEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+           "Enabled or disabled the ETH-DM functions."
+        ::= { zxAnCfmMepEntry 3 }
+    
+    zxAnCfmMepLbmTestType OBJECT-TYPE
+        SYNTAX  INTEGER
+        { 
+             unicast              ( 1 ) , 
+             multicastclass1     ( 2 ) 
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the type of ETH-LBM is unicast or multicast."
+        ::= { zxAnCfmMepEntry 4 }
+    
+    zxAnCfmMepLbmAppType OBJECT-TYPE
+        SYNTAX  INTEGER
+        { 
+             connectivity ( 1 ) , 
+             outofservicediagnostic    ( 2 ) ,
+             inservicediagnostic ( 3 )
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the app type of ETH-LBM, which means to verify 
+             bidirectional connectivity of a MEP with a MIP or a peer MEP, 
+             or to perform a bidirectional in-service or out-of-service 
+             diagnostics test between a pair of peer MEPs. 
+             This includes verifying bandwidth throughput, detecting bit 
+             errors, etc.
+            "
+        ::= { zxAnCfmMepEntry 5 }
+    
+    zxAnCfmMepLmTargetMacAddress OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The Target MAC Address Field to be transmitted: A unicast
+             destination MAC address.
+             This address will be used if the value of the column
+             dot1agCfmMepLmTargetIsMepId is 'false'.
+            "
+        ::= { zxAnCfmMepEntry 6 }
+
+    zxAnCfmMepLmTargetMepId OBJECT-TYPE
+        SYNTAX      Dot1agCfmMepIdOrZero
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "An indication of the Target MAC Address Field to be
+             transmitted:
+             The Maintenance association End Point Identifier of
+             another MEP in the same Maintenance Association
+             This address will be used if the value of the column
+             dot1agCfmMepLmTargetIsMepId is 'true'.
+            "
+        ::= { zxAnCfmMepEntry 7 }
+
+    zxAnCfmMepLmTargetIsMepId OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "True indicates that MEPID of the target MEP is used for
+             Linktrace transmission.
+             False indicates that unicast destination MAC address of the
+             target MEP is used for LM transmission.
+            "
+        ::= { zxAnCfmMepEntry 8 }
+        
+    zxAnCfmMepLmmDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast              ( 1 ) , 
+             multicastclass1     ( 2 ) 
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the da type of LMM."
+        ::= { zxAnCfmMepEntry 9 }
+    
+     zxAnCfmMepLmEndType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             oneended      ( 1 ) , 
+             twoended     ( 2 ) 
+        } 
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the end type of ETH-LM, which should be one-ended
+             or two-ended."
+        ::= { zxAnCfmMepEntry 10 }
+    
+    zxAnCfmMepLmInterval OBJECT-TYPE
+        SYNTAX      Integer32
+        UNITS       "seconds"
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+            "The interval at which LMMs are sent by a MEP, the default 
+             value is 5 seconds."
+        DEFVAL { 5 }             
+        ::= { zxAnCfmMepEntry 11 }
+    
+    zxAnCfmMepLmDuration OBJECT-TYPE
+        SYNTAX      Integer32
+        UNITS       "seconds"
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+            "The time of duration of ETH-LM test, the default value is 
+             60 seconds."
+        DEFVAL { 60 }             
+        ::= { zxAnCfmMepEntry 12 }
+         
+    zxAnCfmMepLmPriority OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..7)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The priority value for LMMs transmitted by the MEP.
+             Default Value is the highest priority value allowed to pass
+             through the bridge port for any of this MEPs VIDs.
+             The management entity can obtain the default value for this 
+             variable from the priority regeneration table by extracting the 
+             highest priority value in this table on this MEPs bridge port.
+             (1 is lowest, then 2, then 0, then 3-7)."
+        ::= { zxAnCfmMepEntry 13 }
+    
+    zxAnCfmMepLmFarendLoss OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of far-end frame loss."
+        ::= { zxAnCfmMepEntry 14 }
+    
+    zxAnCfmMepLmNearendLoss OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of near-end frame loss."
+        ::= { zxAnCfmMepEntry 15 }
+        
+    zxAnCfmMepLmLossRatio OBJECT-TYPE
+        SYNTAX      Integer32(0..100)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The near-end frame loss ratio in percent."
+        ::= { zxAnCfmMepEntry 16 }
+        
+    zxAnCfmMepLmStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "A Boolean flag set to true by the MEP LM Initiator State
+             Machine or an MIB manager to indicate
+             that another LM is being transmitted.
+             Reset to false by the MEP LM Initiator State Machine."
+        DEFVAL { false }
+        ::= { zxAnCfmMepEntry 17 }
+   
+    zxAnCfmMepLmResultOk OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the result of the operation:
+          
+             - true       The Loss Measurement Message(s) will be
+                          (or has been) sent.
+             - false      The Loss Measurement Message(s) will not
+                          be sent.
+            "
+        DEFVAL { true }
+        ::= { zxAnCfmMepEntry 18 }
+        
+    zxAnCfmMepLmFarendLossRatio OBJECT-TYPE
+        SYNTAX      Integer32(0..100)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The far-end frame loss ratio in percent."
+        ::= { zxAnCfmMepEntry 19 }
+    
+    zxAnCfmMepDmTargetMacAddress OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The Target MAC Address Field to be transmitted: A unicast
+             destination MAC address.
+             This address will be used if the value of the column
+             dot1agCfmMepDmTargetIsMepId is 'false'.
+            "
+        ::= { zxAnCfmMepEntry 30 }
+
+    zxAnCfmMepDmTargetMepId OBJECT-TYPE
+        SYNTAX      Dot1agCfmMepIdOrZero
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "An indication of the Target MAC Address Field to be
+             transmitted:
+             The Maintenance association End Point Identifier of
+             another MEP in the same Maintenance Association
+             This address will be used if the value of the column
+             dot1agCfmMepDmTargetIsMepId is 'true'.
+            "
+        ::= { zxAnCfmMepEntry 31 }
+        
+    zxAnCfmMepDmTargetIsMepId OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "True indicates that MEPID of the target MEP is used for Linktrace 
+             transmission.
+             False indicates that unicast destination MAC address of the
+             target MEP is used for DM transmission.
+            "
+        ::= { zxAnCfmMepEntry 32 }
+        
+    zxAnCfmMep1dmDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast              ( 1 ) , 
+             multicastclass1     ( 2 ) 
+        } 
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION  "The da type of 1DM."
+        ::= { zxAnCfmMepEntry 33 }
+        
+    zxAnCfmMepDdmDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast              ( 1 ) , 
+             multicastclass1     ( 2 )
+        } 
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION  "The da type of DDM."
+        ::= { zxAnCfmMepEntry 34 }
+    
+    zxAnCfmMepDmWayType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             oneway      ( 1 ) , 
+             twoway     ( 2 ) 
+        } 
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION  "The DM way type."
+        ::= { zxAnCfmMepEntry 35 }
+    
+    zxAnCfmMepDmInterval OBJECT-TYPE
+        SYNTAX      Integer32
+        UNITS       "seconds"
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+            "The interval at which DMMs are sent by a MEP, the default value
+             is 5 seconds."
+        DEFVAL { 5 }             
+         ::= { zxAnCfmMepEntry 36 }
+    
+    zxAnCfmMepDmDuration OBJECT-TYPE
+        SYNTAX      Integer32
+        UNITS       "seconds"
+        MAX-ACCESS  read-create  
+        STATUS  current
+        DESCRIPTION
+            "The time of duration of ETH-DM test, the default value is 
+             60 seconds."
+        DEFVAL { 60 }             
+         ::= { zxAnCfmMepEntry 37 }
+         
+    zxAnCfmMepDmPriority OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..7)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The priority value for DMMs transmitted by the MEP.
+             Default Value is the highest priority value allowed to pass
+             through the bridge port for any of this MEPs VIDs.
+             The management entity can obtain the default value for this 
+             variable from the priority regeneration table by extracting the 
+             highest priority value in this table on this MEPs bridge port.
+             (1 is lowest, then 2, then 0, then 3-7).
+            "
+        ::= { zxAnCfmMepEntry 38 }
+        
+    zxAnCfmMepDmOneWayAvgDelay OBJECT-TYPE
+        SYNTAX      Counter64
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of One-way Frame Delay."
+        ::= { zxAnCfmMepEntry 39 }
+        
+    zxAnCfmMepDmOneWayAvgDv OBJECT-TYPE
+        SYNTAX      Counter64
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of One-way Frame Delay variation."
+        ::= { zxAnCfmMepEntry 40 }
+        
+    zxAnCfmMepDmTwoWayAvgDelay OBJECT-TYPE
+        SYNTAX      Counter64
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of Two-way Frame Delay."
+        ::= { zxAnCfmMepEntry 41 }
+        
+    zxAnCfmMepDmTwoWayAvgDv OBJECT-TYPE
+        SYNTAX      Counter64
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of Two-way Frame Delay variation."
+        ::= { zxAnCfmMepEntry 42 }
+    
+    zxAnCfmMepDmStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+           "A Boolean flag set to true by the MEP DM Initiator State
+            Machine or an MIB manager to indicate that another LBM is 
+            being transmitted.
+            Reset to false by the MEP DM Initiator State Machine."
+        DEFVAL     { false }
+        ::= { zxAnCfmMepEntry 43 }
+       
+    zxAnCfmMepDmResultOk OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+          "Indicates the result of the operation:
+       
+           - true       The Delay Measurement Message(s) will be
+                        (or has been) sent.
+           - false      The Delay Measurement Message(s) will not
+                        be sent.
+          "
+       DEFVAL      { true }
+       ::= { zxAnCfmMepEntry 44 }
+       
+    zxAnCfmMepTestTlvLength  OBJECT-TYPE
+        SYNTAX      Unsigned32(0..200)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The length of test TLV.
+             This object can be used if the value of the column 
+             zxAnCfmMepTestTlvEnable is 'enable'."
+        ::= { zxAnCfmMepEntry 54 }
+       
+    zxAnCfmMepTestEnable         OBJECT-TYPE
+        SYNTAX                  INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION   "Enabled or disabled the ETH-Test functions."
+        DEFVAL      { disable }
+        ::= { zxAnCfmMepEntry 55 }
+        
+    zxAnCfmMepTestAppType       OBJECT-TYPE
+        SYNTAX                  INTEGER
+        {
+            inServiceDiagnostic     (1),
+            outOfServiceDiagnostic  (2)
+        }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION   "Indicates the app type of ETH-Test, which means to
+            perform a bidirectional in-service or out-of-service 
+            diagnostics test between a pair of peer MEPs.
+            This includes verifying bandwidth throughput, frame loss, bit 
+            errors, etc."
+        ::= { zxAnCfmMepEntry 56 }
+        
+    zxAnCfmMepTestDestMacAddress OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The destination MAC address field to be transmitted: A unicast
+             destination MAC address.
+             This address will be used if the value of the column
+             zxAnCfmMepTestDestIsMepId is 'false'."
+        ::= { zxAnCfmMepEntry 57 }
+
+    zxAnCfmMepTestDestMepId OBJECT-TYPE
+        SYNTAX      Dot1agCfmMepIdOrZero
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The maintenance association end point identifier of another
+             MEP in the same maintenance association to which the ETH-Test 
+             message is to be sent.
+             This address will be used if the value of the column
+             zxAnCfmMepTestDestIsMepId is 'true'."
+        ::= { zxAnCfmMepEntry 58 }
+        
+    zxAnCfmMepTestDestIsMepId OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "True indicates that MEPID of the destination MEP is used for
+             ETH-Test transmission.
+             False indicates that unicast destination MAC address of the
+             target MEP is used for ETH-Test transmission."
+        ::= { zxAnCfmMepEntry 59 }
+    
+    zxAnCfmMepTestInterval OBJECT-TYPE
+        SYNTAX      Integer32(100..10000)
+        UNITS       "milliseconds"
+        MAX-ACCESS  read-create  
+        STATUS  current
+        DESCRIPTION
+            "The interval value for ETH-Test messages transmitted by the MEP.
+             the default value is 1000 milliseconds."
+        DEFVAL { 1000 }             
+        ::= { zxAnCfmMepEntry 60 }
+    
+    zxAnCfmMepTestDuration OBJECT-TYPE
+        SYNTAX      Integer32(1..3600)
+        UNITS       "seconds"
+        MAX-ACCESS  read-create  
+        STATUS  current
+        DESCRIPTION
+            "The time of duration of ETH-Test, the default value is 
+             60 seconds."
+        DEFVAL { 60 }             
+        ::= { zxAnCfmMepEntry 61 }
+         
+    zxAnCfmMepTestPriority  OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..7)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The priority value for ETH-Test Messages transmitted by the MEP.
+             Default value is the highest priority value allowed to pass
+             through the bridge port for any of this MEPs VIDs.
+             The management entity can obtain the default value for this 
+             variable from the priority regeneration table by extracting the 
+             highest priority value in this table on this MEPs bridge port.
+             (1 is lowest, then 2, then 0, then 3-7).
+            "
+        ::= { zxAnCfmMepEntry 62 }
+        
+    zxAnCfmMepTestDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast             (1), 
+             multicastClass1     (2)
+        } 
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION  "The destination address type of ETH-Test Message."
+        ::= { zxAnCfmMepEntry 63 }
+        
+    zxAnCfmMepTestTlvEnable      OBJECT-TYPE
+        SYNTAX                   INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION   "Enabled or disabled ETH-Test TLV."
+        ::= { zxAnCfmMepEntry 64 }
+        
+    zxAnCfmMepTestPattern         OBJECT-TYPE
+        SYNTAX                    INTEGER
+        {
+            allZeroesWithoutCrc32   (1), -- Null signal without CRC-32
+            allZeroesWithCrc32      (2), -- Null signal with CRC-32
+            prbsWithoutCrc32        (3), -- PRBS 2-31-1 without CRC-32
+            prbsWithCrc32           (4)  -- PRBS 2-31-1 with CRC-32
+        }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION   "Indicates the test pattern.
+                       This pattern will be used if the value of the column
+                       zxAnCfmMepTestTlvEnable is 'enable'."
+        ::= { zxAnCfmMepEntry 65 }
+        
+    zxAnCfmMepTestStatus      OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+           "A Boolean flag set to true by the MEP TEST initiator state
+            machine or an MIB manager to indicate that another ETH-Test is 
+            being done.
+            Reset to false by the MEP TEST initiator state machine."
+        DEFVAL     { false }
+        ::= { zxAnCfmMepEntry 66 }
+       
+    zxAnCfmMepTestResultOk       OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the result of the operation:
+             - true       The ETH-Test message(s) will be (or has been) sent.
+             - false      The ETH-Test message(s) will not be sent."
+        DEFVAL      { true }
+        ::= { zxAnCfmMepEntry 67 }
+        
+    zxAnCfmMepTestMsgSeqNumber  OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The ETH-Test transaction identifier 
+             (zxAnCfmMepTestNextMsgSeqNumber) of the first ETH-Test 
+             message(to be) sent. The value returned is undefined if 
+             zxAnCfmMepTestResultOk is false."
+        ::= { zxAnCfmMepEntry 68 }
+        
+    zxAnCfmMepTestNextMsgSeqNumber  OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Next sequence number/transaction identifier to be sent in a
+             ETH-Test message. This sequence number can be zero because 
+             it wraps around."
+        ::= { zxAnCfmMepEntry 69 }
+        
+    zxAnCfmMepTestTransmitRate      OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..4294967295)
+        UNITS       "kbps"
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the maximum transmission rate at which frames with 
+             ETH-Test information can be sent."
+        ::= { zxAnCfmMepEntry 70 }
+        
+    zxAnCfmMepTestFarendLossRatio OBJECT-TYPE
+        SYNTAX      Integer32(0..100)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The far-end frame loss ratio in percent."
+        ::= { zxAnCfmMepEntry 71 }
+        
+    zxAnCfmMepTestFarendBitErrRatio OBJECT-TYPE
+        SYNTAX      Integer32(0..100)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The far-end received bit error ratio in percent."
+        ::= { zxAnCfmMepEntry 72 }
+        
+    zxAnCfmMepAisEnable        OBJECT-TYPE
+        SYNTAX                  INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION   "Enabled or disabled the ETH-AIS functions."
+        DEFVAL { disable }
+        ::= { zxAnCfmMepEntry 87 }
+        
+    zxAnCfmMepLckEnable        OBJECT-TYPE
+        SYNTAX                  INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION   "Enabled or disabled the ETH-LCK functions."
+        DEFVAL { disable }
+        ::= { zxAnCfmMepEntry 88 }
+    
+    zxAnCfmMepAisClientMegLevel    OBJECT-TYPE
+        SYNTAX      Integer32(0..7)
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+            "MEG level at which the most immediate client layer MIPs and MEPs 
+             exist."
+        DEFVAL { 1 }             
+        ::= { zxAnCfmMepEntry 89 }
+        
+    zxAnCfmMepLckClientMegLevel    OBJECT-TYPE
+        SYNTAX      Integer32(0..7)
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+            "MEG level at which the most immediate client layer MIPs and MEPs 
+             exist."
+        DEFVAL { 1 }             
+        ::= { zxAnCfmMepEntry 90 }
+        
+    zxAnCfmMepAisLckInterval    OBJECT-TYPE
+        SYNTAX      Integer32(1..600)
+        UNITS       "seconds"
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+            "The interval value for AISMs and LCKMs transmitted by the MEP.
+            the default value is 1 second."
+        DEFVAL { 1 }             
+        ::= { zxAnCfmMepEntry 91 }
+        
+    zxAnCfmMepAisPriority  OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..7)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The priority value for AISMs transmitted by the MEP.
+             Default value is the highest priority value allowed to pass
+             through the bridge port for any of this MEPs VIDs.
+             The management entity can obtain the default value for this 
+             variable from the priority regeneration table by extracting the 
+             highest priority value in this table on this MEPs bridge port.
+             (1 is lowest, then 2, then 0, then 3-7).
+            "
+        ::= { zxAnCfmMepEntry 92 }
+        
+    zxAnCfmMepLckPriority  OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..7)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The priority value for LCKMs transmitted by the MEP.
+             Default value is the highest priority value allowed to pass
+             through the bridge port for any of this MEPs VIDs.
+             The management entity can obtain the default value for this 
+             variable from the priority regeneration table by extracting the 
+             highest priority value in this table on this MEPs bridge port.
+             (1 is lowest, then 2, then 0, then 3-7).
+            "
+        ::= { zxAnCfmMepEntry 93 }
+        
+    zxAnCfmMepAisDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast             (1), 
+             multicastClass1     (2)
+        } 
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION  "The destination address type of AISM."
+        ::= { zxAnCfmMepEntry 94 }
+        
+    zxAnCfmMepLckDaType OBJECT-TYPE
+        SYNTAX INTEGER
+        { 
+             unicast             (1), 
+             multicastClass1     (2)
+        } 
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION  "The destination address type of LCKM."
+        ::= { zxAnCfmMepEntry 95 }
+        
+    zxAnCfmMepAisStatus      OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object represents if MEP is in AIS status or not."
+        ::= { zxAnCfmMepEntry 96 }
+        
+    zxAnCfmMepLckStatus      OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object represents if MEP is in LCK status or not."
+        ::= { zxAnCfmMepEntry 97 }
+        
+    zxAnCfmMepLckSendEnable      OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "This object represents if LCK message can be sent by the MEP."
+        ::= { zxAnCfmMepEntry 98 }
+        
+    zxAnCfmMepRdiStatus      OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object represents if MEP is in RDI status or not."
+        ::= { zxAnCfmMepEntry 99 }
+      
+--------------------------------------------------------------------------------
+-- Remote MEP Config Table
+--------------------------------------------------------------------------------
+   
+    zxAnCfmRemoteMepConfTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ZxAnCfmRemoteMepConfEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Remote Mep Config Table"
+        ::= { zxAnCfmMep 2 }
+
+    zxAnCfmRemoteMepConfEntry OBJECT-TYPE
+        SYNTAX       ZxAnCfmRemoteMepConfEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Remote Mep Config Entry"        
+        INDEX { dot1agCfmMdIndex, dot1agCfmMaIndex, dot1agCfmMepIdentifier }
+        ::= { zxAnCfmRemoteMepConfTable 1 }
+        
+    ZxAnCfmRemoteMepConfEntry ::= SEQUENCE {
+        zxAnCfmRemoteMepMacAddress     MacAddress,
+        zxAnCfmRemoteMepConfRowStatus  RowStatus
+    }    
+    
+    zxAnCfmRemoteMepMacAddress OBJECT-TYPE
+        SYNTAX       MacAddress
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+            "The MAC address of the remote MEP."
+        REFERENCE
+            "802.1ag clause 12.14.7.6.3:d and 20.19.7"
+        ::= { zxAnCfmRemoteMepConfEntry 1 }   
+                
+    zxAnCfmRemoteMepConfRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+           "The rowstatus of this table. "
+        ::= { zxAnCfmRemoteMepConfEntry 20 }
+        
+--------------------------------------------------------------------------------
+-- MIP Table
+--------------------------------------------------------------------------------
+   
+    zxAnCfmMipTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ZxAnCfmMipEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "CFM Mip Table"
+        ::= { zxAnCfmMep 3 }
+
+    zxAnCfmMipEntry OBJECT-TYPE
+        SYNTAX       ZxAnCfmMipEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "CFM Mip Entry"        
+        INDEX { dot1agCfmMdIndex, dot1agCfmMaIndex, dot1agCfmMepIdentifier }
+        ::= { zxAnCfmMipTable 1 }
+        
+    ZxAnCfmMipEntry ::= SEQUENCE {
+        zxAnCfmMipIfIndex    InterfaceIndexOrZero,
+        zxAnCfmMipRowStatus  RowStatus
+    }    
+    
+    zxAnCfmMipIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndexOrZero
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+           "This object is the interface index of the interface either a
+            bridge port, or an aggregated IEEE 802.1 link within a bridge
+            port, to which the MEP is attached.
+       
+            Upon a restart of the system, the system SHALL, if necessary,
+            change the value of this variable so that it indexes the
+            entry in the interface table with the same value of ifAlias
+            that it indexed before the system restart.  If no such
+            entry exists, then the system SHALL set this variable to 0.
+           "
+        ::= { zxAnCfmMipEntry 1 }
+
+    zxAnCfmMipRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+           "The rowstatus of this table. "
+        ::= { zxAnCfmMipEntry 20 }
+
+--------------------------------------------------------------------------------
+-- CFM Compatibility Table
+--------------------------------------------------------------------------------
+
+    zxAnCfmCompatibleObjects  OBJECT IDENTIFIER    ::=  {  zxAnCfmObjects  4  }
+
+    zxAnCfmCompatible  OBJECT-TYPE 
+        SYNTAX      OCTET STRING (SIZE (4))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION   
+            "The compatibility of Device. Every bit denotes the compatibility 
+             of some function. If the value of the bit is not 1, the related 
+             function has compatible problem. The related function of the first 
+             bit is the naming rules of string.
+                       
+            bit 1: value 1 means support ETH-Test, ETH-AIS, ETH-LCK and ETH-RDI
+                   in zxAnCfmMepTable.
+            "
+        ::=  {  zxAnCfmCompatibleObjects  1  }
+        
+--------------------------------------------------------------------------------
+-- CFM Interface Table
+--------------------------------------------------------------------------------
+
+    zxAnCfmInterfaceObjects  OBJECT IDENTIFIER    ::=  {  zxAnCfmObjects  5  }
+    
+    zxAnCfmIfTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ZxAnCfmIfEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "The CFM interface table.
+            This table specifies CFM interface configuration."
+        ::= { zxAnCfmInterfaceObjects 1 }
+
+    zxAnCfmIfEntry OBJECT-TYPE
+        SYNTAX       ZxAnCfmIfEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "The CFM interface entry."
+        INDEX        { zxAnCfmRack, zxAnCfmShelf,
+                       zxAnCfmSlot, zxAnCfmPort,
+                       zxAnCfmOnu, zxAnCfmIfType,
+                       zxAnCfmLogicalId }
+        ::= { zxAnCfmIfTable 1 }
+        
+    ZxAnCfmIfEntry ::= SEQUENCE {
+        zxAnCfmRack                     Integer32,
+        zxAnCfmShelf                    Integer32,
+        zxAnCfmSlot                     Integer32,
+        zxAnCfmPort                     Integer32,
+        zxAnCfmOnu                      Integer32,
+        zxAnCfmIfType                   INTEGER,
+        zxAnCfmLogicalId                OBJECT IDENTIFIER,
+        zxAnCfmIfOamPduFilterEnable     INTEGER
+    }
+    
+    zxAnCfmRack  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Rack number of the port."
+        ::= { zxAnCfmIfEntry 1 }
+        
+    zxAnCfmShelf  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Shelf number of the port."
+        ::= { zxAnCfmIfEntry 2 }
+        
+    zxAnCfmSlot  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Slot number of the port."
+        ::= { zxAnCfmIfEntry 3 }
+        
+    zxAnCfmPort  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The port number."
+        ::= { zxAnCfmIfEntry 4 }
+        
+    zxAnCfmOnu  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+             "The ONU number. It is 0 in DSL port."
+        ::= { zxAnCfmIfEntry 5 }
+        
+    zxAnCfmIfType  OBJECT-TYPE
+        SYNTAX      INTEGER 
+        {
+            physicalPort(1),
+            onuUni(5)                     
+        }
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Type of the interface."
+        ::= { zxAnCfmIfEntry 6 }    
+        
+    zxAnCfmLogicalId OBJECT-TYPE 
+        SYNTAX      OBJECT IDENTIFIER
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION   
+            "Logic index of the interface.
+            
+            If zxAnCfmIfType is 'physicalPort', its value is 0.
+            
+            If zxAnCfmIfType is 'onuUni', this object
+            indicates 'onuSlot.uniId', this type is used for SFUs only.
+            If the ONU slot is not cared about, the onuSlot is 0,
+            such as oid '0.1' indicates 'ONUSlot0.UNIID1'.
+            "
+        ::= { zxAnCfmIfEntry 7 }
+    
+    zxAnCfmIfOamPduFilterEnable OBJECT-TYPE
+        SYNTAX                  INTEGER
+        {
+            enable(1),
+            disable(2)
+        }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object controls whether the Ethernet OAMPDU 
+            filtering is enabled on specific interface. A disable(2) value will 
+            prevent the Ethernet OAMPDU filtering action on specific 
+            interface."
+        DEFVAL { disable }            
+        ::= { zxAnCfmIfEntry 8 }
+             
+--------------------------------------------------------------------------------
+-- Trap Objects
+--------------------------------------------------------------------------------
+
+END

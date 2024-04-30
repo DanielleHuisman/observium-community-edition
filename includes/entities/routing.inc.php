@@ -854,14 +854,18 @@ function discovery_bgp_afisafi($device, $peer, $afi, $safi, &$af_list)
     }
 }
 
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function get_astext($asn)
-{
+/**
+ * Get AS Number description.
+ *
+ * @param string|integer $asn
+ * @return string
+ */
+function get_astext($asn) {
     global $config, $cache;
 
     if (!is_intnum($asn)) {
         $asn = ltrim($asn, 'asAS ');
+        //$asn = bgp_asdot_to_asplain($asn);
     }
 
     // Fetch pre-set AS text from config first
@@ -881,6 +885,84 @@ function get_astext($asn)
     }
 
     return $cache['astext'][$asn];
+}
+
+/**
+ * Get ASN by IP address
+ *
+ * @param string $ip
+ * @return string|false
+ */
+function get_ipas($ip) {
+    $ip_type = get_ip_type($ip);
+
+    if (!$ip_type || in_array($ip_type,  [ 'unspecified', 'loopback', 'private' ])) {
+        return FALSE;
+    }
+
+    $ip = ip_uncompress($ip);
+    if (!isset($cache['ipas'][$ip])) {
+
+        if (str_contains($ip, ':')) {
+            // IPv6
+            $ip_array = str_split(str_replace(':', '', $ip));
+            $dns_host = implode('.', array_reverse($ip_array)) . '.origin6.asn.cymru.com';
+        } else {
+            // IPv4
+            $ip_array = explode('.', $ip);
+            $dns_host = implode('.', array_reverse($ip_array)) . '.origin.asn.cymru.com';
+        }
+
+        $result = dns_get_record($dns_host, DNS_TXT);
+        print_debug_vars($result);
+        $txt                = explode('|', $result[0]['txt']);
+        $cache['ipas'][$ip] = trim(str_replace('"', '', $txt[0]));
+    }
+
+    return $cache['ipas'][$ip];
+}
+
+function get_peer_remote_device_id($peer, $peer_devices, $peer_ip_where) {
+    // Search a remote device if possible
+    //$peer_addr_version = get_ip_version($peer['ip']);
+    $peer_addr_type    = get_ip_type($peer['ip']);
+    $peer_local_type   = get_ip_type($peer['local_ip']);
+
+    if (!in_array($peer_addr_type,  [ 'unspecified', 'loopback' ]) &&
+        !in_array($peer_local_type, [ 'unspecified', 'loopback' ])) {
+
+        //if ($tmp_id = dbFetchCell('SELECT `device_id` FROM `bgpPeers` WHERE `bgpPeerLocalAddr` = ? AND `bgpPeerRemoteAs` = ? AND `bgpPeerRemoteAddr` = ?' . $peer_as_where, array($peer['ip'], $bgpLocalAs, $peer['local_ip'])))
+        print_debug("bgpPeerLocalAddr: " . $peer['ip'] . ", bgpPeerRemoteAddr: " . $peer['local_ip']);
+        if (isset($peer_devices[$peer['ip']][$peer['local_ip']])) {
+            // Simple search remote device by Local IP and Local AS and Remote IP
+            //$peer_device_id = $tmp_id;
+            return $peer_devices[$peer['ip']][$peer['local_ip']];
+
+        }
+
+        if ($ids = get_entity_ids_ip_by_network('device', $peer['ip'], $peer_ip_where)) {
+            // Fetch all devices with peer IP
+            // Peer device will found if device UP and NOT DISABLED, port with IP is UP, bgpLocalAs present on remote device
+
+            /*
+            foreach($ids as $tmp_id)
+            {
+              //if (dbFetchCell('SELECT COUNT(*) FROM `bgpPeers` WHERE `device_id` = ? AND `bgpPeerRemoteAs` = ?', array($tmp_id, $bgpLocalAs)))
+              if (dbExist('bgpPeers', '`device_id` = ? AND `bgpPeerRemoteAs` = ?', array($tmp_id, $bgpLocalAs)))
+              {
+                 // Validate if bgpLocalAs also present on remote device
+                 $peer_device_id = $tmp_id;
+                 break; // Found, stop loop
+              }
+            }
+            */
+
+            return array_shift($ids);
+        }
+
+    }
+
+    return NULL;
 }
 
 function discover_vrf($device, $vrf)

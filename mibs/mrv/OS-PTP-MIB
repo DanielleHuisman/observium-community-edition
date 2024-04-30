@@ -1,0 +1,588 @@
+--  =======================================================================
+--  File        : osPtp.mib
+--  Description : Private MIB support the functionality of 
+--                Packet-based Time Protocol (PTP).
+--  By          : Aviad
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-PTP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE, enterprises,
+                Integer32, Unsigned32                         FROM SNMPv2-SMI
+                InetAddressType, InetAddress,
+                InetAddressPrefixLength                       FROM INET-ADDRESS-MIB                TEXTUAL-CONVENTION, DisplayString,
+                TruthValue                                    FROM SNMPv2-TC
+                oaOptiSwitch                                  FROM OS-COMMON-TC-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP,
+                NOTIFICATION-GROUP                            FROM SNMPv2-CONF;
+
+osPtpMIB        MODULE-IDENTITY
+                LAST-UPDATED "201208080000Z"  -- Aug 08, 2012
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                    "Aviad Itzcovitch
+                     MRV Communication, Inc
+                     http://www.mrv.com
+                     Email:  AItzcovitch@mrv.com"
+                DESCRIPTION
+                    "MRV Configuration of The MIB module for PTP version 2 (IEEE Std. 1588(TM)-2008)"
+
+                -- Revision history
+                -- ================
+
+                REVISION "201208080000Z"  -- Aug 08, 2012
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 22 }
+
+-- ************************************************************
+-- Textual conventions
+-- ************************************************************
+
+ClockDomainType ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT    "d"
+    STATUS          current
+    DESCRIPTION
+        "The Domain is identified by an integer, the domainNumber, in
+        the range of 0 to 255. An integer value that is used to assign
+        each PTP device to a particular domain. The following values
+        define the valid domains.
+
+                 Value       Definition
+                 ---------   -------------------
+                 0           Default domain
+                 1           Alternate domain 1
+                 2           Alternate domain 2
+                 3           Alternate domain 3
+                 4 - 127     User-defined domains
+                 128 - 255   Reserved"
+
+    REFERENCE   "Section 7.1 Domains, Table 2 of [IEEE 1588-2008]"
+    SYNTAX      Unsigned32 (0..255)
+
+ClockIntervalBase2 ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT    "d"
+    STATUS          current
+    DESCRIPTION
+        "The interval included in message types Announce, Sync,
+        Delay_Req, and Pdelay_Req as indicated in section 7.7.2.1 of
+        [IEEE 1588-2008].
+
+        The mean time interval between successive messages shall be
+        represented as the logarithm to the base 2 of this time
+        interval measured in seconds on the local clock of the device
+        sending the message. The values of these logarithmic attributes
+        shall be selected from integers in the range -128 to 127 subject
+        to further limits established in an applicable PTP profile."
+
+    REFERENCE   "Section 7.7.2.1 General interval specification of
+                [IEEE 1588-2008]"
+    SYNTAX      Integer32 (-128..127)
+
+
+
+
+ClockStateType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION
+        "The clock state returned by PTP engine.
+
+        Clock State      Value   Description
+        --------------------------------------------------------------
+        Freerun state       1   Applies to a slave device that is not
+                                locked to a master. This is the initial
+                                state a slave starts out with when it
+                                is not getting any PTP packets from the
+                                master or because of some other input
+                                error (erroneous packets, etc).
+
+        Holdover state      2  In this state the slave device is
+                                locked to a master but communication
+                                with the master is lost or the
+                                timestamps in the ptp packets are
+                                incorrect. But since the slave was
+                                locked to the master, it can run with
+                                the same accuracy for sometime. The
+                                slave can continue to operate in this
+                                state for some time. If communication
+                                with the master is not restored for a
+                                while, the device is moved to the
+                                FREERUN state.
+
+
+
+        Acquiring state     3   The slave device is receiving packets
+                                from a master and is trying to acquire
+                                a lock.
+
+        Freq_locked state   4   Slave device is locked to the Master
+                                with respect to frequency, but not phase
+                                aligned
+
+        Phase_aligned state 5   Locked to the master with respect to
+                                frequency and phase."
+    SYNTAX          INTEGER  {
+                        unknown(0),
+                        freerun(1),
+                        holdover(2),
+                        acquiring(3),
+                        frequencyLocked(4),
+                        phaseAligned(5)
+                    }
+
+
+ClockTxModeType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION
+        "Transmission mode.
+         unicast. Using unicast communication channel.
+         multicast. Using Multicast communication channel.
+         multicast-mix. Using multicast-unicast communication channel"
+    SYNTAX          INTEGER  {
+                        unknown(0),
+                        unicast(1),
+                        multicast(2),
+                        multicastmix(3)
+                    }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osPtpMIBNotifications    OBJECT IDENTIFIER ::= { osPtpMIB 0 }
+osPtpMIBObjects          OBJECT IDENTIFIER ::= { osPtpMIB 1 }
+osPtpMIBInfo             OBJECT IDENTIFIER ::= { osPtpMIBObjects 2 }
+osPtpMIBCfg              OBJECT IDENTIFIER ::= { osPtpMIBObjects 3 }
+osPtpMIBEventParams      OBJECT IDENTIFIER ::= { osPtpMIBInfo 1 }
+osPtpMIBSlaveInfo        OBJECT IDENTIFIER ::= { osPtpMIBInfo 2 }
+osPtpMIBSlaveCfg         OBJECT IDENTIFIER ::= { osPtpMIBCfg 2 }
+osPtpMIBSlaveCfgGen      OBJECT IDENTIFIER ::= { osPtpMIBSlaveCfg 1 }
+osPtpMIBSlaveCfgTbl      OBJECT IDENTIFIER ::= { osPtpMIBSlaveCfg 2 }
+osPtpMIBCapabilities     OBJECT IDENTIFIER ::= { osPtpMIB 3 }
+
+osPtpMIBConformance      OBJECT IDENTIFIER ::= { osPtpMIB 100 }
+osPtpMIBCompliances      OBJECT IDENTIFIER ::= { osPtpMIBConformance 1 }
+osPtpMIBGroups           OBJECT IDENTIFIER ::= { osPtpMIBConformance 2 }
+
+-- ************************************************************
+-- Objects Identifiers Definition
+-- ************************************************************
+
+-- Parameters of alarms --
+
+osPtpSlaveLastEvent OBJECT-TYPE
+    SYNTAX       INTEGER {
+            none                                        (0),
+            inHoldover                                  (1),
+            noCurrentMaster                             (2),
+            noClockInput                                (3),
+            noTimeOfDayInput                            (4),
+            toPSyncTimeNotTAI                           (5),
+            ptpPortNotOperational                       (6),
+            visibleMasterRefusedSyncGrantRequest        (7),
+            visibleMasterIgnoredSyncGrantRequest        (8),
+            visibleMasterRefusedDlyRespGrantRequest     (9),
+            visibleMasterIgnoredDlyRespGrantRequest     (10),
+            visibleMasterTooFewSyncMessages             (11),
+            visibleMasterTooFewFollowUpMessages         (12),
+            visibleMasterTooFewDelayResponseMessages    (13),
+            accMasterRefusedAnnounceGrantRequest        (14),
+            accMasterIgnoredAnnounceGrantRequest        (15),
+            acceptableMasterTooFewAnnounceMessages      (16),
+            currentMasterTooManySyncsWithoutFollowUp    (17),
+            currentMasterTooManyFollowUpsWithoutSync    (18),
+            currentMasterTooManyMissingDlyResponses     (19),
+            m2SPacketDelayVaration                      (20),
+            s2MPacketDelayVaration                      (21),
+            toPSyncUTCOffsetUnknown                     (22)
+    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "Indicates the last event that was received from ptp slave."
+    DEFVAL { none }
+    ::= { osPtpMIBEventParams 1 }
+
+osPtpSlaveEventReason OBJECT-TYPE
+    SYNTAX          INTEGER {
+                      alarmSet(1),
+                      alarmClear(2)
+                    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+       "."
+    ::= { osPtpMIBEventParams 2 }
+
+osPtpSlaveEventDescription OBJECT-TYPE
+   SYNTAX           DisplayString (SIZE(0..120))
+   MAX-ACCESS       read-only
+   STATUS           current
+   DESCRIPTION
+      "Ptp Slave Event Description.
+       Default description : 'Alarm: <alarm itself>'"
+   ::= { osPtpMIBEventParams 3 }
+
+
+-- Parameters of alarms --
+
+osPtpSlaveSupported OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Indicates if PTP slave is supported by hardware or not:
+          false - hardware doesn't support PTP slave
+          true  - hardware supports PTP slav"
+    ::= { osPtpMIBCapabilities 1 }
+
+osPtpSlaveAddressTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  ipv4     (0),
+                  ipv6     (1),
+                  ipv4z    (2),
+                  ipv6z    (3)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of supported Internet address In terms of RFC 3291 (INET-ADDRESS-MIB)."
+    ::= { osPtpMIBCapabilities 2 }
+
+osPtpSlaveNumOfDirectMasterRows OBJECT-TYPE
+      SYNTAX     Unsigned32
+      UNITS      "rows"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+        "Number of rows in osPtpSlaveDirectMasterTable"
+    ::= { osPtpMIBCapabilities 3 }
+
+-- ************************************************************
+-- PTP Slave Port Parameters
+-- ************************************************************
+
+osPtpSlaveAdminStatus OBJECT-TYPE
+          SYNTAX INTEGER { 
+                   unknown     (1),
+                   clear       (2), -- to clear statistics, when they will be…
+                   enabled     (3),
+                   disabled    (4)
+                 }
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	"Enable/Disable/Clear configuration PTP protocol."
+	DEFVAL { disabled } 
+	::= {osPtpMIBSlaveCfgGen  1 }
+
+osPtpSlavePortVifName      OBJECT-TYPE
+     SYNTAX           DisplayString (SIZE (0..20))
+     MAX-ACCESS       read-write
+     STATUS           current
+     DESCRIPTION
+        "vif used by the ptp port and ther ports in the optiswitch
+		 used to communicate with ptp masters"
+	DEFVAL { "" } 
+     ::= { osPtpMIBSlaveCfgGen 2 }
+
+osPtpSlaveAddressType	OBJECT-TYPE
+     SYNTAX			InetAddressType
+     MAX-ACCESS		read-write
+     STATUS			current
+     DESCRIPTION
+        "Type of address used by the ptp Slave"
+     DEFVAL { ipv4 }
+     ::= { osPtpMIBSlaveCfgGen 3 }
+
+osPtpSlaveGatewayAddress    OBJECT-TYPE
+     SYNTAX			InetAddress
+     MAX-ACCESS		read-write
+     STATUS			current
+     DESCRIPTION
+        "Network Address (of the type osPtpSlaveAddressType) of Gateway used 
+         by the ptp port used to find ptp masters outside the subnet
+		 (not needed if the Vif Address can function as a gateway)"
+	DEFVAL { "" } 
+     ::= { osPtpMIBSlaveCfgGen 4 }
+
+osPtpSlavePortAddrPrefixLength  OBJECT-TYPE
+     SYNTAX			InetAddressPrefixLength
+     MAX-ACCESS		read-write
+     STATUS			current
+     DESCRIPTION
+        "Length of the Subnet Prefix that the ptp port is in"
+     DEFVAL { 24 }
+     ::= { osPtpMIBSlaveCfgGen 5 }
+
+osPtpSlavePortAddress	OBJECT-TYPE
+     SYNTAX			InetAddress
+     MAX-ACCESS		read-write
+     STATUS			current
+     DESCRIPTION
+        "Network Address (of the type osPtpSlaveAddressType) of the ptp port"
+     ::= { osPtpMIBSlaveCfgGen 6 }
+
+
+osPtpSlaveDelayRequestInterval OBJECT-TYPE 
+     SYNTAX       ClockIntervalBase2 
+     MAX-ACCESS   read-write 
+     STATUS       current 
+     DESCRIPTION 
+         "The mean time interval between successive DelayRequest messages 
+          represented as the logarithm to the base 2" 
+     DEFVAL { -5 }
+     ::= { osPtpMIBSlaveCfgGen 10 } 
+
+osPtpSlaveAnnounceInterval OBJECT-TYPE 
+     SYNTAX       ClockIntervalBase2 
+     MAX-ACCESS   read-write 
+     STATUS       current 
+     DESCRIPTION 
+         "The mean time interval between successive Announce messages 
+          represented as the logarithm to the base 2" 
+     DEFVAL { 1 }
+     ::= { osPtpMIBSlaveCfgGen 11 } 
+
+ osPtpSlaveSyncInterval OBJECT-TYPE 
+     SYNTAX       ClockIntervalBase2 
+     MAX-ACCESS   read-write 
+     STATUS       current 
+     DESCRIPTION 
+         "The mean time interval between successive Sync messages 
+          represented as the logarithm to the base 2" 
+     DEFVAL { -5 }
+     ::= { osPtpMIBSlaveCfgGen 12 } 
+
+osPtpSlaveTodUartBaudRate	OBJECT-TYPE
+	SYNTAX  INTEGER {
+        unknown     (0),
+		none		(1),
+		baud1200	(2),
+		baud2400	(3),
+		baud4800	(4),
+		baud9600	(5),
+		baud19200	(6)
+	}
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+        "Indicates the ptp Time-Of-Day UART Baud Rate configuration."
+	DEFVAL { baud4800 } 
+	::= { osPtpMIBSlaveCfgGen  20 }
+
+osPtpSlavePortTxMode OBJECT-TYPE
+    SYNTAX          ClockTxModeType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object specifies the clock transmission mode as
+        unicast:       Using unicast communication channel.
+        multicast:     Using Multicast communication channel.
+        multicast-mix: Using multicast-unicast communication channel"
+	DEFVAL { unicast } 
+    ::= { osPtpMIBSlaveCfgGen  21 }
+
+
+osPtpSlaveDirection OBJECT-TYPE
+	SYNTAX  INTEGER
+	{
+        unknown          (0),
+		both			(1),
+		slaveToMaster	(2),
+		masterToSlave	(3)
+	}
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+		"direction of ptp used for time calculation
+		 both: Both directions: SlaveToMaster as well as MasterToSlave are acceptable. (Default.)
+		 slaveToMaster: Only the direction slaveToMaster is acceptable. (Used if traffic in the direction MasterToSlave is significantly higher.)
+		 masterToSlave: Only the direction masterToSlave is acceptable. (Used if traffic in the direction SlaveToMaster is significantly higher.)"
+	DEFVAL { both } 
+::= {osPtpMIBSlaveCfgGen  22 }
+
+osPtpSlaveDomainIndex OBJECT-TYPE
+    SYNTAX          ClockDomainType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object specifies the domain number used to create logical
+        group of PTP devices." 
+	DEFVAL { 0 } 
+    ::= { osPtpMIBSlaveCfgGen 23 }
+
+osPtpSlaveOutClkFrequency OBJECT-TYPE
+    SYNTAX  Integer32(0|1..170000)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "Frequency on PtpOut pin, measured in Khz
+     no output value is 0"
+	DEFVAL { 8 } 
+
+     ::= {osPtpMIBSlaveCfgGen  24 }
+
+osPtpSlaveDirectMasterOnly OBJECT-TYPE
+	SYNTAX        TruthValue
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+		"indicates if masters that are not in the osPtpSlaveDirectMasterTable
+         can be used as masters"
+	DEFVAL { false } 
+	::= { osPtpMIBSlaveCfgGen  30 }
+
+
+-- ************************************************************
+-- PTP Direct Master Table
+-- ************************************************************
+
+osPtpSlaveDirectMasterTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF OsPtpSlaveDirectMasterEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "The table of Adresses of masters
+     if osPtpSlaveDirectMasterOnly is True, only masters from this table are valid
+     the amount of rows in the table is set in osPtpSlaveNumOfDirectMasterRows"
+     ::= { osPtpMIBSlaveCfgTbl  1 }
+ 
+osPtpSlaveDirectMasterEntry OBJECT-TYPE 
+     SYNTAX       OsPtpSlaveDirectMasterEntry 
+     MAX-ACCESS   not-accessible 
+     STATUS       current 
+     DESCRIPTION 
+         "An entry in the table contains addresses 
+          (of the type osPtpSlaveAddressType). each can be used as a master." 
+     INDEX    { osPtpSlaveDirectMasterId } 
+     ::= { osPtpSlaveDirectMasterTable 1 } 
+ 
+OsPtpSlaveDirectMasterEntry ::= SEQUENCE {
+     osPtpSlaveDirectMasterId            Integer32,
+     osPtpSlaveDirectMasterAddress       InetAddress
+    }
+ 
+osPtpSlaveDirectMasterId           OBJECT-TYPE
+   SYNTAX           Integer32 (1..65535)
+   MAX-ACCESS       not-accessible
+   STATUS           current
+   DESCRIPTION
+      "id in a static table of address of a master."
+   ::= { osPtpSlaveDirectMasterEntry 1 }
+   
+osPtpSlaveDirectMasterAddress OBJECT-TYPE 
+   SYNTAX       InetAddress 
+   MAX-ACCESS   read-write 
+   STATUS       current 
+   DESCRIPTION 
+   "Network Address (of the type osPtpSlaveAddressType) of a master"
+   ::= { osPtpSlaveDirectMasterEntry 2 } 
+
+--- *******************************************************************
+---  Notifications
+--- ******************************************************************* 
+
+osPtpMIBSlaveAlarm NOTIFICATION-TYPE
+        OBJECTS {
+            osPtpSlaveLastEvent,
+            osPtpSlaveEventReason,
+            osPtpSlaveEventDescription
+        }
+        STATUS  current
+        DESCRIPTION
+        "The SNMP trap that is generated when
+         Ptp Slave Alarm is generatede by the ptp."
+
+      ::= { osPtpMIBNotifications 1}
+
+--- *******************************************************************
+---  Compliance statements
+--- ******************************************************************* 
+
+osPtpMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+    MODULE -- this module 
+        MANDATORY-GROUPS {
+           osPtpMibMandatoryGroup,
+           osPtpNotificationsGroup
+           }
+    ::= { osPtpMIBCompliances 1 }
+
+--- ******************************************************************* 
+--- Conformance Groups 
+--- ******************************************************************* 
+ 
+osPtpMibMandatoryGroup  OBJECT-GROUP
+  OBJECTS { 
+    osPtpSlaveLastEvent,
+    osPtpSlaveEventReason,
+    osPtpSlaveEventDescription,
+    osPtpSlaveSupported,
+    osPtpSlaveAddressTypesSupported,
+    osPtpSlaveNumOfDirectMasterRows,
+    osPtpSlaveAdminStatus, 
+    osPtpSlavePortVifName, 
+    osPtpSlaveGatewayAddress, 
+    osPtpSlaveAddressType,
+    osPtpSlavePortAddrPrefixLength, 
+    osPtpSlavePortAddress,
+    osPtpSlaveDirectMasterOnly,
+    osPtpSlaveDirectMasterAddress,
+    osPtpSlaveDelayRequestInterval,
+    osPtpSlaveAnnounceInterval,
+    osPtpSlaveSyncInterval,
+    osPtpSlaveTodUartBaudRate,
+    osPtpSlavePortTxMode,
+    osPtpSlaveDirection,
+    osPtpSlaveDomainIndex,
+    osPtpSlaveOutClkFrequency
+  }
+  STATUS  current 
+  DESCRIPTION
+    "."
+  ::= { osPtpMIBGroups 1 } 
+
+osPtpNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+         osPtpMIBSlaveAlarm
+          }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { osPtpMIBGroups 2 }
+
+
+END

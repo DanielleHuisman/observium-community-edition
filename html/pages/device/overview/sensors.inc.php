@@ -4,16 +4,19 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Keep sensors order for base types static
-$sensor_types = ['temperature', 'humidity', 'fanspeed', 'airflow', 'current', 'voltage', 'power', 'apower', 'rpower', 'frequency'];
+$sensor_types = [ 'temperature', 'humidity', 'fanspeed', 'airflow', 'current', 'voltage', 'power', 'apower', 'rpower', 'frequency' ];
 $other_types  = array_diff(array_keys($config['sensor_types']), $sensor_types);
 $sensor_types = array_merge($sensor_types, $other_types);
+
+// Classes without entity association, but with group by measured label
+$measured_label_classes = array_keys($config['sensor_measured']);
 
 $measured_entindex = [];  // collect measured entities
 $measured_ifindex  = [];  // collect measured entities (by ifindex)
@@ -21,11 +24,11 @@ $measured_multi    = [];
 $sensors_db        = [];
 
 $sql = "SELECT * FROM `sensors`";
-$sql .= generate_where_clause(["`device_id` = ? ", generate_query_values_ng($sensor_types, 'sensor_class'), "`sensor_deleted` = 0"]);
+$sql .= generate_where_clause(["`device_id` = ? ", generate_query_values($sensor_types, 'sensor_class'), "`sensor_deleted` = 0"]);
 $sql .= " ORDER BY CAST(`entPhysicalIndex_measured` AS SIGNED), `measured_entity_label`, CAST(`entPhysicalIndex` AS SIGNED), `sensor_descr`";
 
 // Cache all sensors
-foreach (dbFetchRows($sql, [$device['device_id']]) as $entry) {
+foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry) {
     if (is_numeric($entry['measured_entity']) && !safe_empty($entry['measured_class'])) {
         // Collect entPhysical entities
         if (!(isset($measured_entindex[$entry['measured_entity']]) || isset($measured_ifindex[$entry['measured_entity']]))) {
@@ -55,7 +58,7 @@ foreach (dbFetchRows($sql, [$device['device_id']]) as $entry) {
                 $sensors_db['measured'][$entry['measured_class']][$entry['measured_entity']][$entry['sensor_class']][] = $entry;
         }
 
-    } elseif ($entry['measured_class'] === 'outlet' && !safe_empty($entry['measured_entity_label'])) {
+    } elseif (in_array($entry['measured_class'], $measured_label_classes, TRUE) && !safe_empty($entry['measured_entity_label'])) {
         // Outlet currently not have real entity associations
         //r($entry);
         $sensors_db['measured'][$entry['measured_class']][$entry['measured_entity_label']][$entry['sensor_class']][] = $entry;
@@ -108,19 +111,28 @@ if (isset($sensors_db['measured'])) {
 
     $show_compact = $config['sensors']['web_measured_compact'];
     foreach ($sensors_db['measured'] as $measured_class => $measured_entity) {
-        $box_args                    = [
-          'title' => nicecase($measured_class) . ' sensors',
-          'url'   => generate_url(['page' => 'device', 'device' => $device['device_id'], 'tab' => $measured_class . 's', 'view' => 'sensors']),
-          'icon'  => $config['icon']['sensor']
+        if (isset($config['sensor_measured'][$measured_class])) {
+            $measured_title = $config['sensor_measured'][$measured_class]['text'];
+            $measured_icon  = $config['sensor_measured'][$measured_class]['icon'];
+        } else {
+            $measured_title = $config['sensor_types'][$measured_class]['text'];
+            $measured_icon  = $config['sensor_types'][$measured_class]['icon'];
+        }
+        $measured_title = isset($config['sensor_measured'][$measured_class]) ? $config['sensor_measured'][$measured_class]['text'] : $config['sensor_types'][$measured_class]['text'];
+        $box_args       = [
+            'title' => (empty($measured_title) ? nicecase($measured_class) : $measured_title) . ' sensors',
+            'url'   => generate_url(['page' => 'device', 'device' => $device['device_id'], 'tab' => $measured_class . 's', 'view' => 'sensors']),
+            'icon'  => empty($measured_icon) ? $config['icon']['sensor'] : $measured_icon
         ];
         $box_args['header-controls'] = [
-          'controls' => [
-            'compact' => ['text'   => $show_compact ? 'Full View' : 'Compact View',
-                          'icon'   => $show_compact ? 'glyphicon-th-list' : 'glyphicon-th',
-                          'config' => 'sensors|web_measured_compact', // check this config
-                          'value'  => $show_compact ? 'no' : 'yes', // toggle
+            'controls' => [
+                'compact' => [
+                        'text'   => $show_compact ? 'Full View' : 'Compact View',
+                        'icon'   => $show_compact ? 'glyphicon-th-list' : 'glyphicon-th',
+                        'config' => 'sensors|web_measured_compact', // check this config
+                        'value'  => $show_compact ? 'no' : 'yes', // toggle
+                ]
             ]
-          ]
         ];
         echo generate_box_open($box_args);
 
@@ -128,12 +140,14 @@ if (isset($sensors_db['measured'])) {
 
         //r($measured_entity);
         foreach ($measured_entity as $entity_id => $entry) {
-            if ($measured_class === 'outlet') {
+            $rename_from = [];
+            if (in_array($measured_class, $measured_label_classes, TRUE)) {
                 // Outlets not have real entities association
                 $entity       = [];
                 $entity_link  = $entity_id; // Just Outlet Label
-                $entity_type  = ['icon' => 'outlet'];
+                $entity_type  = $config['sensor_measured'][$measured_class];
                 $entity_parts = '';
+                $rename_from[] = $entity_id . ' '; // remove measured_entity_label
             } else {
                 // Common known entities
                 $entity = get_entity_by_id_cache($measured_class, $entity_id);
@@ -155,7 +169,6 @@ if (isset($sensors_db['measured'])) {
                 }
 
                 // Remove port name from sensor description
-                $rename_from = [];
                 if ($measured_class === 'port') {
                     if (is_numeric($entity['port_label'])) {
                         $rename_from[] = $entity['port_label'] . ' ';
@@ -177,7 +190,8 @@ if (isset($sensors_db['measured'])) {
             echo('      <tr>
         <td colspan="6" class="entity">' . get_icon($entity_type['icon']) . '&nbsp;' . $entity_link . $entity_parts . '</td></tr>');
 
-            if ($show_compact && $measured_class !== 'outlet') {
+            if ($show_compact && (!in_array($measured_class, $measured_label_classes, TRUE) ||
+                    $config['sensor_measured'][$measured_class]['compact'])) {
                 // In compact view need multi-lane split
                 $lanes_count = safe_count($measured_multi[$measured_class][$entity_id]);
                 if ($lanes_count > 1) {

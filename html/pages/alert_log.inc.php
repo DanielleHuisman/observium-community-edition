@@ -45,7 +45,7 @@ include($config['html_dir'] . "/includes/alerting-navbar.inc.php");
 
             // Add device_id limit for other fields
             if (isset($vars['device_id']) && device_permitted($vars['device_id'])) {
-                $where = generate_where_clause(generate_query_values_ng($vars['device_id'], 'device_id'));
+                $where = generate_where_clause(generate_query_values($vars['device_id'], 'device_id'));
             }
 
             // Checkers Field

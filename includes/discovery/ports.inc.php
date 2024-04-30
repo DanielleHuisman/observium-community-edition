@@ -197,7 +197,7 @@ foreach ($ports_ids as $port_id => $port) {
 
 // Complete remove duplicates
 if (count($ports_duplicates_ids)) {
-    dbDelete('ports', generate_query_values_ng($ports_duplicates_ids, 'port_id'));
+    dbDelete('ports', generate_query_values($ports_duplicates_ids, 'port_id'));
 }
 // End interfaces clean
 echo(PHP_EOL);

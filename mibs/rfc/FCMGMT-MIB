@@ -1,5 +1,5 @@
 FCMGMT-MIB
--- Last edit date: Mar 5th, 2000
+-- Last edit date: Aug 19th, 2001
 
 DEFINITIONS ::= BEGIN 
   IMPORTS 
@@ -61,7 +61,8 @@ DEFINITIONS ::= BEGIN
                                           -- and access for hetergeneous
                                           -- hosts and heterogeneous devices.
                 wdm(15), -- waveform division mutiplexer
-                ups(16) -- uninterruptable power supply
+                ups(16), -- uninterruptable power supply
+                nas(17)  -- network attached storage (NFS/CIFS)
             } 
 
 ----------------------------------------------------------------------
@@ -90,10 +91,10 @@ DEFINITIONS ::= BEGIN
             The value will be stored as an ASCII value. The
             following is the current value of this object.
                 (0) = '0'
-                (1) = '3'
+                (1) = '4'
                 (2) = '0'
                 (3) = '0'
-            This defines a revision of 03.00
+            This defines a revision of 04.00
             "
         ::= { fcmgmt 3 }
 
@@ -128,6 +129,10 @@ DEFINITIONS ::= BEGIN
                 PASSWORD    - replace with password
                 GLOBALID    - replace with globalid
                 SERIALNO    - replace with serial number
+            A management application will read this object from the
+            MIB, provide values for any of the keywords listed above
+            that are present in the string, and then use the URL to
+            invoke or launch the program referenced.
             If write is not supported, then return invalid.
             This value will be retained across boots."
         DEFVAL { "" }
@@ -171,9 +176,10 @@ DEFINITIONS ::= BEGIN
         ACCESS not-accessible 
         STATUS mandatory 
         DESCRIPTION 
-            "A list of units under a single SNMP agent. The number 
-            of entries is given by the value of uNumber. It is 1 
-            for stand-alone system." 
+            "The connectivity table contains general information
+             on the system's units. This is the list of units under
+             a single SNMP agent. The number of entries is given by
+             the value of uNumber. It is 1 for stand-alone system." 
         ::= { connSet 6 }
 
     connUnitEntry OBJECT-TYPE 
@@ -243,7 +249,13 @@ DEFINITIONS ::= BEGIN
                 connUnitMaxEvents
                     INTEGER,
                 connUnitEventCurrID
-                    INTEGER
+                    INTEGER,
+                connUnitFabricID
+                    FcGlobalId,
+                connUnitNumLinks
+                    INTEGER,
+                connUnitVendorId
+                    DisplayString
             } 
 
         connUnitId OBJECT-TYPE 
@@ -318,7 +330,8 @@ DEFINITIONS ::= BEGIN
             DESCRIPTION 
                 "The type of this connectivity unit." 
             ::= { connUnitEntry 3 } 
-            
+
+
         connUnitNumports OBJECT-TYPE 
             SYNTAX INTEGER 
             ACCESS read-only 
@@ -338,7 +351,11 @@ DEFINITIONS ::= BEGIN
             ACCESS read-only 
             STATUS mandatory 
             DESCRIPTION 
-                "Overall state of the connectivity unit."
+                "This object reports the overall state of the
+                 connectivity unit.  The meaning of all values
+                 is essentially self-explanatory.  Any of these
+                 values may occur with any of the ConnUnitStatus
+                 values."
             ::= { connUnitEntry 5 } 
 
         connUnitStatus OBJECT-TYPE 
@@ -353,10 +370,12 @@ DEFINITIONS ::= BEGIN
             STATUS mandatory 
 
             DESCRIPTION 
-                "Overall status of the connectivity unit. The goal of this object
-                 is to be the single poll point to check the status of the connunit.
-                 If there is any other component that has warning, then this should
-                 be set to warning, etc." 
+                "Overall status of the connectivity unit. The goal of this
+                 object is to be the single poll point to check the status
+                 of the connunit. If there is any other component that has
+                 warning, then this should be set to warning, etc. Any of
+                 these values may occur with any of the ConnUnitState
+                 values." 
             ::= { connUnitEntry 6 } 
 
         connUnitProduct OBJECT-TYPE 
@@ -410,7 +429,7 @@ DEFINITIONS ::= BEGIN
                 Fibre Channel address ID or if it is a switch
                 it would be set to the Domain Controller address.
                 If this value is not applicable,
-                return all bits set to one."
+                return all bits set to 1."
             ::= { connUnitEntry 11 } 
 
         connUnitProxyMaster OBJECT-TYPE 
@@ -624,7 +643,34 @@ DEFINITIONS ::= BEGIN
             STATUS mandatory 
             DESCRIPTION 
                 "The last used event id (connUnitEventIndex)."
-            ::= { connUnitEntry 28 } 
+            ::= { connUnitEntry 28 }
+
+        connUnitFabricID OBJECT-TYPE
+            SYNTAX FcGlobalId
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "A globally unique value to identify the fabric that this
+                ConnUnit belongs to, otherwise empty string. This would
+                typically be equal to the connUnitGlobalID of the
+                primary switch in a Fibre Channel fabric."
+                ::= { connUnitEntry 29 }
+
+        connUnitNumLinks OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The number of links in the link table."
+            ::= { connUnitEntry 30 }
+
+        connUnitVendorId OBJECT-TYPE 
+            SYNTAX DisplayString (SIZE (0..79)) 
+            ACCESS read-only 
+            STATUS mandatory 
+            DESCRIPTION 
+                "The connectivity unit vendor's name." 
+            ::= { connUnitEntry 31 }
 
 ------------------------------------------------------------------
 -- The Table of revisions for hardware and software elements.
@@ -889,7 +935,7 @@ DEFINITIONS ::= BEGIN
                 connUnitPortModuleType 
                     INTEGER, 
                 connUnitPortWwn 
-                    FcNameId, 
+                    FcGlobalId, 
                 connUnitPortFCId 
                     FcAddressId, 
                 connUnitPortSn 
@@ -957,7 +1003,10 @@ DEFINITIONS ::= BEGIN
                 wan           (16),
                 ac            (17), -- AC power line
                 dc            (18), -- DC power line
-                ssa           (19) -- serial storage architecture
+                ssa           (19), -- serial storage architecture
+                wdm           (20), -- optical wave division multiplex
+                ib            (21), -- Infiniband
+                ipstore       (22) -- IP storage
             } 
             ACCESS read-only 
             STATUS mandatory 
@@ -1024,7 +1073,8 @@ DEFINITIONS ::= BEGIN
                                        -- have a loop address
                 initializing      (7), -- protocol is proceeding
                 bypass            (8), -- do not use (4/12/00)
-                ols               (9)  -- FCP offline status
+                ols               (9), -- FCP offline status
+                other             (10) -- status not described above
             } 
             ACCESS read-only 
             STATUS mandatory 
@@ -1074,8 +1124,8 @@ DEFINITIONS ::= BEGIN
             ::= { connUnitPortEntry 9 } 
 
         connUnitPortWwn OBJECT-TYPE 
-            SYNTAX FcNameId 
-            ACCESS read-only
+            SYNTAX FcGlobalId 
+            ACCESS read-only 
             STATUS mandatory 
             DESCRIPTION 
                 "The World Wide Name of the port 
@@ -1294,7 +1344,7 @@ DEFINITIONS ::= BEGIN
                 if applicable, otherwise all zeros.
                 This should have the same value for a
                 group of related ports. The container is
-                defined as the largest physical entity.
+                defined as the largest physical unit.
                 For example, all ports on HBAs on a host
                 will have the same Node WWN. All ports on
                 the same storage subsystem will have the
@@ -1513,6 +1563,7 @@ DEFINITIONS ::= BEGIN
 -- as much as it possesses about any links
 -- from its own connectivity units to others,
 -- including links among its own units.
+
 -- An agent SHOULD include partial information
 -- about links if it is not able to fully
 -- define them.
@@ -1531,8 +1582,9 @@ DEFINITIONS ::= BEGIN
 
 -- A connectivity unit should fill the table in as best it can.
 -- One of the methods to fill this in would be to use the RNID
--- ELS (ANSI document 99-422v0). This allows one to query a
--- port for the information needed for the link table.
+-- ELS (reference ANSI T11.3 draft standard FC-FS). This
+-- allows one to query a port for the information needed for
+-- the link table.
 
 -- This table is accessed either directly if the management
 -- software has an index value or via GetNexts. The value of
@@ -1751,6 +1803,288 @@ DEFINITIONS ::= BEGIN
                 "The last used link index."
             ::= { connUnitLinkEntry 14 } 
 
+-- The Active Zone table is defined by
+-- read-only view of the active zone configuration.
+-- Based on the fabric zone server defined in the FC-GS-3 standard and
+--      the enhanced zone server proposed for FC-GS-4.
+-- Allows alias zone members (GS-4 feature) and includes an alias
+--      table.
+-- Zone table and Alias table are flat, double-indexed MIB tables.
+-- Database view of inactive zone sets is not provided. (Note: This
+--      could be added by adding a third index (connUnitZoneSetIndex)
+--      and an zone set active flag to the connUnitActiveZonesTable
+--      table.)
+-- Undefined, vendor-specific bytes have not been included for the bit
+--      mask objects connUnitZoneCapabilities and
+--      connUnitZoneEnforcementState.
+
+    connUnitZoneTable OBJECT-TYPE 
+        SYNTAX SEQUENCE OF ConnUnitZoneEntry 
+        ACCESS not-accessible 
+        STATUS mandatory 
+        DESCRIPTION 
+            "" 
+        ::= { connSet 13 }
+
+    connUnitZoneEntry OBJECT-TYPE 
+        SYNTAX ConnUnitZoneEntry 
+        ACCESS not-accessible 
+        STATUS mandatory 
+        DESCRIPTION 
+            "" 
+        INDEX { connUnitZoneIndex,
+                  connUnitZoneMemberIndex } 
+            ::= { connUnitZoneTable 1 } 
+
+        ConnUnitZoneEntry ::= 
+            SEQUENCE { 
+                connUnitZoneIndex
+                    INTEGER,
+                connUnitZoneMemberIndex
+                    INTEGER,
+                connUnitZoneSetName
+                    DisplayString,
+                connUnitZoneSetNumZones
+                    INTEGER,
+                connUnitZoneName
+                    DisplayString,
+                connUnitZoneCapabilities
+                    OCTET STRING,
+                connUnitZoneEnforcementState
+                    OCTET STRING,
+                connUnitZoneAttributeBlock
+                    OCTET STRING,
+                connUnitZoneNumMembers
+                    INTEGER,
+                connUnitZoneMemberIdType
+                    INTEGER,
+                connUnitZoneMemberID
+                    FcGlobalId }
+
+        connUnitZoneIndex OBJECT-TYPE
+            SYNTAX INTEGER (1..2147483647)
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Unique table index for each zone.
+                Valid values are between 1 and
+                connUnitZoneSetNumZones."
+            ::= { connUnitZoneEntry 1 }
+
+        connUnitZoneMemberIndex OBJECT-TYPE
+            SYNTAX INTEGER (1..2147483647)
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Unique table index for each zone
+                member. Valid values are between
+                1 and connUnitZoneNumMembers."
+            ::= { connUnitZoneEntry 2 }
+
+        connUnitZoneSetName OBJECT-TYPE
+            SYNTAX DisplayString  (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Name of the active zone set to
+                which the zone and zone member
+                belong."
+            ::= { connUnitZoneEntry 3 }
+        
+        connUnitZoneSetNumZones OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The number of zones in the active
+                zone set."
+            ::= { connUnitZoneEntry 4 }
+
+        connUnitZoneName OBJECT-TYPE
+            SYNTAX DisplayString  (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Name of the zone."
+            ::= { connUnitZoneEntry 5 }
+
+        connUnitZoneCapabilities OBJECT-TYPE
+            SYNTAX OCTET STRING (SIZE(1))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "1-byte bit mask that specifies the
+                zoning capabilities supported by the
+                fabric.
+                Bit 7 - Soft zones supported.
+                Bit 6 - Hard zones supported.
+                Bits 5-0 - Reserved."
+            ::= { connUnitZoneEntry 6 }
+
+        connUnitZoneEnforcementState OBJECT-TYPE
+            SYNTAX OCTET STRING (SIZE(1))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "1-byte bit mask that specifies the
+                current enforcement of the Zone Set.
+                Bit 7 - Soft zone set enforced.
+                Bit 6 - Hard zone set enforced.
+                Bits 5-0 - Reserved."
+            ::= { connUnitZoneEntry 7 }
+
+        connUnitZoneAttributeBlock OBJECT-TYPE
+            SYNTAX OCTET STRING (SIZE(80))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "A variable length structure that
+                contains extended zone attributes
+                defined in the FC-GS-4 enhanced
+                zone server. See FC-GS-4 draft
+                standard for details and format of
+                the structure.
+                Support of this object is optional."
+            ::= { connUnitZoneEntry 8 }
+        
+        connUnitZoneNumMembers OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Number of zone members in the
+                zone: connUnitZoneName."
+            ::= { connUnitZoneEntry 9 }
+
+        connUnitZoneMemberIdType OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Type of zone member ID:
+                1- Port WWN
+                2- Domain & Port ID
+                3- FC Address
+                4- Node WWN
+                5- Alias Name
+                6-'FF'h - Vendor specified."
+            ::= { connUnitZoneEntry 10 }
+
+        connUnitZoneMemberID OBJECT-TYPE
+            SYNTAX FcGlobalId
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "ID of the zone member based on
+                connUnitZoneMemberIdType."
+            ::= { connUnitZoneEntry 11 }
+
+
+-- Zone Alias Table
+
+    connUnitZoningAliasTable OBJECT-TYPE 
+        SYNTAX SEQUENCE OF ConnUnitZoningAliasEntry 
+        ACCESS not-accessible 
+        STATUS mandatory 
+        DESCRIPTION 
+            "" 
+        ::= { connSet 14 }
+
+    connUnitZoningAliasEntry OBJECT-TYPE 
+        SYNTAX ConnUnitZoningAliasEntry 
+        ACCESS not-accessible 
+        STATUS mandatory 
+        DESCRIPTION 
+            "" 
+        INDEX { connUnitZoningAliasIndex,
+                  connUnitZoningAliasMemberIndex } 
+            ::= { connUnitZoningAliasTable 1 } 
+
+        ConnUnitZoningAliasEntry ::= 
+            SEQUENCE { 
+                connUnitZoningAliasIndex
+                    INTEGER,
+                connUnitZoningAliasMemberIndex
+                    INTEGER,
+                connUnitZoningAliasNumAliases
+                    INTEGER,
+                connUnitZoningAliasName
+                    DisplayString,
+                connUnitZoningAliasNumMembers
+                    INTEGER,
+                connUnitZoningAliasMemberIdType
+                    INTEGER,
+                connUnitZoningAliasMemberID
+                    FcGlobalId }
+
+        connUnitZoningAliasIndex OBJECT-TYPE
+            SYNTAX INTEGER (1..2147483647)
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Unique table index for each alias.
+                Valid values are between 1 and
+                connUnitZoningAliasNumAliases."
+            ::= { connUnitZoningAliasEntry 1 }
+
+        connUnitZoningAliasMemberIndex OBJECT-TYPE
+            SYNTAX INTEGER (1..2147483647)
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Unique table index for each alias
+                member. Valid values are between 1
+                and connUnitZoningAliasNumMembers."
+            ::= { connUnitZoningAliasEntry 2 }
+
+        connUnitZoningAliasNumAliases OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The number of aliases defined in this
+                table."
+            ::= { connUnitZoningAliasEntry 3 }
+
+        connUnitZoningAliasName OBJECT-TYPE
+            SYNTAX DisplayString  (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The alias name."
+            ::= { connUnitZoningAliasEntry 4 }
+
+        connUnitZoningAliasNumMembers OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Number of members in the alias:
+                connUnitZoningAliasName."
+            ::= { connUnitZoningAliasEntry 5 }
+
+        connUnitZoningAliasMemberIdType OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Type of alias member ID:
+                1- Port WWN
+                2- Domain & Port ID
+                3- FC Address
+                Others: reserved."
+            ::= { connUnitZoningAliasEntry 6 }
+
+        connUnitZoningAliasMemberID OBJECT-TYPE
+            SYNTAX FcGlobalId
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "ID of the alias member based on
+                connUnitZoningAliasMemberIdType."
+            ::= { connUnitZoningAliasEntry 7 }
+
+
 ------------------------------------------------------------------
 -- The following four tables have been obsoleted. These were used to
 -- keep statistic information based on the type of port type. It was
@@ -1934,9 +2268,10 @@ DEFINITIONS ::= BEGIN
             ACCESS read-only
             STATUS mandatory
             DESCRIPTION
-                "A unique value among all entrys
-                in this table, between 0 and
-                connUnitNumPort[connUnitPortUnitId]."
+                "A unique value among all entries in this
+                table having the same connUnitPortStatUnitId,
+                between 1 and
+                connUnitNumPort[connUnitPortStatUnitId]."
             ::= { connUnitPortStatEntry 2 }
 
         connUnitPortStatCountError OBJECT-TYPE 
@@ -2265,8 +2600,8 @@ DEFINITIONS ::= BEGIN
             ACCESS read-only 
             STATUS mandatory 
             DESCRIPTION 
-                   "Count of Link resets. This is the number of LRs received. 
-		    Note, this is a Fibre Channel only stat."
+                   "Count of Link resets. This is the number of LRs received. Note, this
+                    is a Fibre Channel only stat."
             ::= { connUnitPortStatEntry 33 }
 
         connUnitPortStatCountTxLinkResets OBJECT-TYPE 
@@ -2274,8 +2609,8 @@ DEFINITIONS ::= BEGIN
             ACCESS read-only 
             STATUS mandatory 
             DESCRIPTION 
-                   "Count of Link resets. This is the number LRs transmitted. 
- 		    Note, this is a Fibre Channel only stat."
+                   "Count of Link resets. This is the number LRs  transmitted. Note, this
+                    is a Fibre Channel only stat."
             ::= { connUnitPortStatEntry 34 }
 
         connUnitPortStatCountNumberLinkResets OBJECT-TYPE 
@@ -2407,9 +2742,9 @@ DEFINITIONS ::= BEGIN
             DESCRIPTION 
                    "Count of frames received at this port where the
                     frame length was less than the minimum indicated by the
-                    frame header - normally 24 bytes, but it could be more if
-                    the DFCTL field indicates an optional header should have
-                    been present. Note, this is a FC  only stat."
+                    frame header - normally 24 bytes, but it could be more if the
+                    DFCTL field indicates an optional header should have been
+                    present. Note, this is a Fibre Channel only stat."
             ::= { connUnitPortStatEntry 47 }
 
         connUnitPortStatCountAddressErrors OBJECT-TYPE 
@@ -2418,8 +2753,8 @@ DEFINITIONS ::= BEGIN
             STATUS mandatory 
             DESCRIPTION 
                    "Count of frames received with unknown addressing.
-                    e.x. unknown SID or DID. the SID or DID is not known to
-                    the routing algorithm. Note. this is a FC only stat."
+                    e.x. unknown SID or DID. the SID or DID is not known to the
+                    routing algorithm. Note. this is a Fibre Channel only stat."
             ::= { connUnitPortStatEntry 48 }
 
         connUnitPortStatCountDelimiterErrors OBJECT-TYPE 
@@ -2428,8 +2763,8 @@ DEFINITIONS ::= BEGIN
             STATUS mandatory 
             DESCRIPTION 
                    "Count of invalid frame delimiters received at this
-                    port. An example is a frame with a class 2 start and
-                    a class 3 at the end. Note, this is a FC only stat."
+                    port. An example is a frame with a class 2 start and and a
+                    class 3 at the end. Note, this is a Fibre Channel only stat."
             ::= { connUnitPortStatEntry 49 }
 
         connUnitPortStatCountEncodingDisparityErrors OBJECT-TYPE 
@@ -2451,18 +2786,15 @@ DEFINITIONS ::= BEGIN
 --
 -- This table is accessed either directly if the management
 -- software has an index value or via GetNexts. The value of
--- the indexes are not required to be contiguous. Each entry
--- created in this table will be assigned an index. This
--- relationship is kept persistent until the entry is removed
--- from the table or the system is reset. The total number of
--- entries are defined by the size of the table
+-- the indexes are not required to be contiguous.
+-- The total number of entries are defined by the size of the table
 
     connUnitSnsMaxEntry OBJECT-TYPE
         SYNTAX  INTEGER
         ACCESS  read-only
         STATUS  mandatory
         DESCRIPTION
-            "The maximum number of entries in the table."
+            "The current number of entries in the table."
         ::= { connUnitServiceScalars 1 }
 
     connUnitSnsTable OBJECT-TYPE
@@ -2481,7 +2813,8 @@ DEFINITIONS ::= BEGIN
         DESCRIPTION
             "The Simple Name Server table for the port represented by
              ConnUnitSnsPortIndex ."
-        INDEX { connUnitSnsId, connUnitSnsPortIndex }
+        INDEX { connUnitSnsId, connUnitSnsPortName,
+                connUnitSnsPortIdentifier }
         ::= { connUnitSnsTable 1 }
 
         ConnUnitSnsEntry ::=
@@ -2511,7 +2844,7 @@ DEFINITIONS ::= BEGIN
                 connUnitSnsFabricPortName
                     FcNameId,
                 connUnitSnsHardAddress
-                    FcAddressId,
+                    FcGlobalId,
                 connUnitSnsSymbolicPortName
                     DisplayString, 
                 connUnitSnsSymbolicNodeName
@@ -2542,7 +2875,7 @@ DEFINITIONS ::= BEGIN
         ACCESS      read-only
         STATUS      mandatory
         DESCRIPTION
-            "The Port Identifier for this entry in the SNS table."
+            "The Fibre Channel ID for this entry in the SNS table."
         ::= { connUnitSnsEntry 3 }
 
     connUnitSnsPortName OBJECT-TYPE
@@ -2566,7 +2899,10 @@ DEFINITIONS ::= BEGIN
         ACCESS      read-only
         STATUS      mandatory
         DESCRIPTION
-            "The Classes of Service offered by this entry in the SNS table."
+            "The Classes of Service offered by this entry in the SNS table.
+            This is a bit mask where each bit that represents the class
+            of service is set to a value of one if the class is supported.
+            Class 1 is bit zero."
         ::= { connUnitSnsEntry 6 }
 
     connUnitSnsNodeIPAddress OBJECT-TYPE
@@ -2574,12 +2910,11 @@ DEFINITIONS ::= BEGIN
         ACCESS      read-only
         STATUS      mandatory
         DESCRIPTION
-            "The IPv6 formatted address of the Node for this entry in the SNS
-	    table."
+            "The IPv6 formatted address of the Node for this entry in the SNS table."
         ::= { connUnitSnsEntry 7 }
 
     connUnitSnsProcAssoc OBJECT-TYPE
-        SYNTAX OCTET STRING (SIZE (1))
+        SYNTAX OCTET STRING (SIZE (8))
         ACCESS      read-only
         STATUS      mandatory
         DESCRIPTION
@@ -2587,7 +2922,7 @@ DEFINITIONS ::= BEGIN
         ::= { connUnitSnsEntry 8 }
 
     connUnitSnsFC4Type OBJECT-TYPE
-        SYNTAX OCTET STRING (SIZE (1))
+        SYNTAX OCTET STRING (SIZE (32))
         ACCESS      read-only
         STATUS      mandatory
         DESCRIPTION
@@ -2619,7 +2954,7 @@ DEFINITIONS ::= BEGIN
         ::= { connUnitSnsEntry 12 }
 
     connUnitSnsHardAddress OBJECT-TYPE
-        SYNTAX      FcAddressId
+        SYNTAX      FcGlobalId
         ACCESS      read-only
         STATUS      mandatory
         DESCRIPTION
@@ -2641,6 +2976,192 @@ DEFINITIONS ::= BEGIN
         DESCRIPTION
             "The Symbolic Node Name of this entry in the SNS table."
         ::= { connUnitSnsEntry 15 }
+
+-- Platform Table
+-- Design Objectives and Scope
+--  Simple, read-only view of platform registration entries.
+--  Platform registry is a service hosted by the connectivity unit,
+--  in a very similar manner as the SNS table. I.E., the platform
+--  table is contained by the connectivity unit. A platform can
+--  register it's attributes and platform nodes with the registry 
+--  service. (See FC-GS-3 Configuration Server for details.)
+--  The platform table is a flat, double-indexed MIB table.
+--  To keep the table simple, only one platform management URL is exposed.
+--  If a platform registers more than one management URL, the first
+--  one is reported in this table.
+--  This table is based on the fabric configuration server
+--   defined in the FC-GS-3 standard and enhanced platform
+--   attributes proposed for FC-GS-4.
+--  Note that the information contained in this table may only
+--   contain the platforms that this connUnit can see or it may
+--   contain a fabric wide view of the platforms.
+
+    connUnitPlatformMaxEntry OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "The maximum number of entries in the platform table."
+        ::= { connUnitServiceScalars 2 }
+
+    connUnitPlatformTable OBJECT-TYPE 
+        SYNTAX SEQUENCE OF ConnUnitPlatformEntry 
+        ACCESS not-accessible 
+        STATUS mandatory 
+        DESCRIPTION 
+            "" 
+        ::= { connUnitServiceTables 2 }
+
+    connUnitPlatformEntry OBJECT-TYPE 
+        SYNTAX ConnUnitPlatformEntry 
+        ACCESS not-accessible 
+        STATUS mandatory 
+        DESCRIPTION 
+            "" 
+        INDEX { connUnitPlatformIndex,
+                  connUnitPlatformNodeIndex } 
+            ::= { connUnitPlatformTable 1 } 
+
+        ConnUnitPlatformEntry ::= 
+            SEQUENCE { 
+                connUnitPlatformIndex
+                    INTEGER,
+                connUnitPlatformNodeIndex
+                    INTEGER,
+                connUnitPlatformUnitID
+                    FcGlobalId,
+                connUnitPlatformName
+                    OCTET STRING,
+                connUnitPlatformType
+                    FcUnitType,
+                connUnitPlatformLabel
+                    DisplayString,
+                connUnitPlatformDescription
+                    DisplayString,
+                connUnitPlatformLocation
+                    DisplayString,
+                connUnitPlatformManagementUrl
+                    DisplayString,
+                connUnitPlatformNumNodes
+                    INTEGER,
+                connUnitPlatformNodeName
+                    FcGlobalId }
+
+        connUnitPlatformIndex OBJECT-TYPE
+            SYNTAX INTEGER (1..2147483647)
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Unique table index for each platform.
+                Valid values are between 1 and
+                connUnitPlatformsMaxEntry."
+            ::= { connUnitPlatformEntry 1 }
+
+        connUnitPlatformNodeIndex OBJECT-TYPE
+            SYNTAX INTEGER (1..2147483647)
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Unique table index for each platform
+                node. Valid values are between 1 and
+                connUnitPlatformsNumNodes."
+            ::= { connUnitPlatformEntry 2 }
+
+        connUnitPlatformUnitID OBJECT-TYPE
+            SYNTAX FcGlobalId
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The connUnitId of the connectivity
+                unit that contains this Platform table."
+            ::= { connUnitPlatformEntry 3 }
+
+        connUnitPlatformName OBJECT-TYPE
+            SYNTAX OCTET STRING (SIZE(79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The platform name. May be either a
+                readable string or a unique ID format
+                as specified in the FC-GS-4 draft
+                standard."
+            ::= { connUnitPlatformEntry 4 }
+
+        connUnitPlatformType OBJECT-TYPE
+            SYNTAX FcUnitType
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The platform type."
+            ::= { connUnitPlatformEntry 6 }
+
+
+        connUnitPlatformLabel OBJECT-TYPE
+            SYNTAX DisplayString (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "An administratively assigned symbolic
+                name for the platform. The Platform
+                Label shall only contain print-able
+                ASCII characters."
+            ::= { connUnitPlatformEntry 7 }
+
+        connUnitPlatformDescription OBJECT-TYPE
+            SYNTAX DisplayString (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "A textual description of the platform.
+                This value should include the full name
+                and version identification of
+                the platform's hardware type and
+                software operating system. The
+                Platform Description shall only contain
+                printable ASCII characters."
+            ::= { connUnitPlatformEntry 8 }
+
+        connUnitPlatformLocation OBJECT-TYPE
+            SYNTAX DisplayString (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The physical location of the platform
+                (e.g., telephone closet, 3rd floor). The
+                Platform Location shall only
+                contain printable ASCII characters."
+            ::= { connUnitPlatformEntry 9 }
+        
+        connUnitPlatformManagementUrl OBJECT-TYPE
+            SYNTAX DisplayString (SIZE (0..79))
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Primary management URL for the
+                platform. If the platform registers
+                more than one URL, then this URL is
+                equal to the first in the list."
+            ::= { connUnitPlatformEntry 10 }
+
+        connUnitPlatformNumNodes OBJECT-TYPE
+            SYNTAX INTEGER
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "Number of nodes contained in the
+                platform."
+            ::= { connUnitPlatformEntry 11 }
+
+
+        connUnitPlatformNodeName OBJECT-TYPE
+            SYNTAX FcGlobalId
+            ACCESS read-only
+            STATUS mandatory
+            DESCRIPTION
+                "The name (WWN - world wide name)
+                of the node contained by the platform."
+            ::= { connUnitPlatformEntry 12 }
+
 
  
 -- SNMP trap registration group 
@@ -2817,3 +3338,5 @@ DEFINITIONS ::= BEGIN
         ::= 6
 
 END
+
+

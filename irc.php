@@ -11,6 +11,8 @@
  *
  */
 
+// FIXME. Who still use this bot? It's most likely doesn't work.
+
 chdir(dirname($argv[0]));
 
 # Disable annoying messages... well... all messages actually :)
@@ -285,9 +287,13 @@ if ($config['irc_ssl']) {
 } else {
     $irc -> connect($config['irc_host'], $config['irc_port']);
 }
+if (safe_empty($config['irc_nick'])) {
+    // Set default nick
+    $config['irc_nick'] = "Observium" . random_int(1, 99999);
+}
 $irc -> login($config['irc_nick'], 'Observium Bot', 0, $config['irc_nick']);
 
-if ($config['irc_chankey'] != '') {
+if (!safe_empty($config['irc_chankey'])) {
     $irc -> join($config['irc_chan'], $config['irc_chankey']);
 } else {
     $irc -> join($config['irc_chan']);

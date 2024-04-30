@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -106,8 +105,16 @@ if ($vars['metric'] == "storage") {
 
 print_navbar($navbar);
 
+register_html_title($config['entities'][$vars['metric']]['names']);
+
 if ($vars['metric'] == "sensor") {
+    if (is_string($vars['sensor_class']) && isset($config['sensor_types'][$vars['sensor_class']])) {
+        register_html_title(nicecase($vars['sensor_class']));
+    }
+
     include($config['html_dir'] . '/pages/health/sensor.inc.php');
+} elseif ($vars['metric'] == "status") {
+    include($config['html_dir'] . '/pages/health/status.inc.php');
 } elseif ($vars['metric'] == "counter") {
     include($config['html_dir'] . '/pages/health/counter.inc.php');
 } elseif (isset($datas[$vars['metric']]) && is_file('pages/health/' . $vars['metric'] . '.inc.php')) {
@@ -115,7 +122,5 @@ if ($vars['metric'] == "sensor") {
 } else {
     print_warning("Unknown health metric " . $vars['metric'] . " found.");
 }
-
-register_html_title("Health");
 
 // EOF

@@ -1,4 +1,14 @@
 <?php
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ *
+ */
 
 $graph_data = [];
 
@@ -29,15 +39,15 @@ foreach ($options['groups'] as $type => $data) {
     }
 
     //fetch ports in group using existing observium functioon
-    foreach (get_group_entities($data['group']) as $port) {
-        $octets         = dbFetchRow("SELECT `ifInOctets_rate`, `ifOutOctets_rate` FROM `ports` WHERE `port_id` = ?", [$port]);
-        $totalInOctets  = $totalInOctets + $octets['ifInOctets_rate'];
-        $totalOutOctets = $totalOutOctets + $octets['ifOutOctets_rate'];
+    foreach (get_group_entities($data['group'], 'port') as $port_id) {
+        $octets         = dbFetchRow("SELECT `ifInOctets_rate`, `ifOutOctets_rate` FROM `ports` WHERE `port_id` = ?", [$port_id]);
+        $totalInOctets  += $octets['ifInOctets_rate'];
+        $totalOutOctets += $octets['ifOutOctets_rate'];
     }
     $totals_array[$type]["in"]  = $totalInOctets * 8;
     $totals_array[$type]["out"] = $totalOutOctets * 8;
 
-    $port_ids[$type][] = $port;
+    $port_ids[$type][] = $port_id;
 
     $graph_data[] = ['group_id' => $data['group'],
                      'descr'    => $type,
@@ -141,8 +151,8 @@ echo generate_box_open($box_args);
                         'width'    => 1239,
                         'height'   => 89,
                         'legend'   => 'no',
-                        'from'     => $config['time']['twoday'],
-                        'to'       => $config['time']['now'],
+                        'from'     => get_time('twoday'),
+                        'to'       => get_time('now'),
                         'perc_agg' => TRUE,
                         'data'     => var_encode($graph_data),
                         //                             'width'  => '305'

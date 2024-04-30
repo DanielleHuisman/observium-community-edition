@@ -140,7 +140,7 @@ function generate_p2pradio_row($radio, $vars)
         $row .= '<td colspan=' . $table_cols . '>';
 
         unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-        $graph_array['to'] = $config['time']['now'];
+        $graph_array['to'] = get_time();
         $graph_array['id'] = $radio['radio_id'];
 
         foreach ($graphs as $graph_type) {

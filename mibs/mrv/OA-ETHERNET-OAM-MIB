@@ -1,0 +1,2847 @@
+--  =======================================================================
+--  File        : nbEthOam.mib
+--  Description : Private MIB for to support the functionality 
+--                of IEEE 802.1ag and ITU-T Y.1731
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OA-ETHERNET-OAM-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                NOTIFICATION-TYPE,
+                Unsigned32, Counter64                         FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION,
+                DateAndTime, MacAddress                       FROM SNMPv2-TC
+                NOTIFICATION-GROUP,
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF
+                nbSwitchG1Il, MepList                         FROM OS-COMMON-TC-MIB;
+
+nbEthOam        MODULE-IDENTITY
+                LAST-UPDATED "201812300000Z" -- 30 Dec. 2018
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "Supports groups of IEEE 802.1ag and ITU-T Y.1731"
+
+                REVISION     "201812300000Z" -- 30 Dec. 2018
+                DESCRIPTION
+                  "Import fro general OS-COMMON-TC-MIB"
+
+                REVISION     "201302180000Z" -- 18 february 2013
+                DESCRIPTION
+                    "New values in nbEthOamDmHcLastRunStatus."
+
+                REVISION     "201210210000Z" -- 10 october 2012
+                DESCRIPTION
+                    "New object nbEthOamDmHcLastRunStatus."
+
+                REVISION     "201204150000Z" -- 15 april 2012
+                DESCRIPTION
+                    "New object nbEthOamCcmIntervals."
+
+                REVISION     "201109220000Z"
+                DESCRIPTION
+                    "Ranges of *Priority have fixed."
+
+                REVISION     "201105300000Z"
+                DESCRIPTION
+                    "New tables for high capacity: nbEthOamDmHcHistTable and nbEthOamDmHcLastTable"
+
+                REVISION     "201003150000Z"
+                DESCRIPTION
+                     "The reason of this revision is Multiple destination feature.
+                      1. TEXTUAL-CONVENTIONs MepList and DestinationType have been added.
+                      2. nbEthOam{Lb|Dm}ConfDestIsMepId have now type DestinationType instead
+                         of TruthValue
+                      3. nbEthOam{Lb|Dm}ConfDestIsMepId have default value.
+                      4. New tables nbEthOam{Lb|Dm}ConfExtTable have been inserted to 
+                         define nbEthOam{Lb|Dm}ConfDestMepList
+                      5. Alarms nbEthOamFdAlarm, nbEthOamSDJittAlarm, nbEthOamDSJittAlarm
+                         and nbEthOamPcktLossAlarm have new additional parameters 
+                         nbEthOamDmHistDestMepId and nbEthOamDmHistDestMepMac."
+                REVISION "200701070000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { nbSwitchG1Il 17 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+nbEthOamNotifications  OBJECT IDENTIFIER ::= { nbEthOam 0 }
+nbEthOamCapabilities   OBJECT IDENTIFIER ::= { nbEthOam 1 }
+nbEthOamLb             OBJECT IDENTIFIER ::= { nbEthOam 10 }
+nbEthOamDm             OBJECT IDENTIFIER ::= { nbEthOam 11 }
+
+nbEthOamConformance    OBJECT IDENTIFIER ::= { nbEthOam 100 }
+nbEthOamMIBCompliances OBJECT IDENTIFIER ::= { nbEthOamConformance 1 }
+nbEthOamMIBGroups      OBJECT IDENTIFIER ::= { nbEthOamConformance 2 }
+
+-- ************************************************************
+-- Textual conversions
+-- ************************************************************
+
+NbEthOamMepId ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+       "Maintenance association End Point Identifier (MEPID): A small
+        integer, unique over a given Maintenance Association,
+        identifying a specific MEP."
+    REFERENCE
+       "802.1ag clauses 3.19 and 19.2.1"
+    SYNTAX      Unsigned32 (1..4095)
+
+NbEthOamMepIdOrZero ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+       "MEP Identifier. 0 indicates MEP is identified 
+        by MAC in another object"
+    REFERENCE
+       "."
+    SYNTAX      Unsigned32 (0|1..4095)
+
+TestRunMethod        ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates the method of the test running:
+        slow(2)    
+        fast(3)
+        none(4)
+        When the MEP operation is configured as slow(2) or fast(3), than the test is running 
+        now using this method. When the value is changed the test stops. If the new value is
+        not none(4) new test is set."
+    REFERENCE
+       "."
+    SYNTAX      INTEGER {
+                  slow(2),
+                  fast(3),
+                  none(4)
+                }
+
+NbEthOamCcmHighestDefectPri ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Copied from Dot1agCfmHighestDefectPri of dot1ag.mib.
+        An enumerated value, equal to the contents of the variable
+        highestDefect (20.33.9 and Table 20-1), indicating the
+        highest-priority defect that has been present since the MEP
+        Fault Notification Generator State Machine was last in the 
+        FNG_RESET state, either:
+
+        none(0)           no defects since FNG_RESET
+        defRDICCM(1)      DefRDICCM
+        defMACstatus(2)   DefMACstatus
+        defRemoteCCM(3)   DefRemoteCCM
+        defErrorCCM(4)    DefErrorCCM
+        defXconCCM(5)     DefXconCCM
+
+        The value 0 is used for no defects so that additional higher
+        priority values can be added, if needed, at a later time, and
+        so that these values correspond with those in
+        Dot1agCfmLowestAlarmPri.
+       "
+    REFERENCE
+       "802.1ag clause 20.1.2, 12.14.7.7.2:c and 20.33.9"
+    SYNTAX      INTEGER {
+                  none              (0),
+                  defRDICCM         (1),
+                  defMACstatus      (2),
+                  defRemoteCCM      (3),
+                  defErrorCCM       (4),
+                  defXconCCM        (5)
+                }
+
+DestinationType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "Describes type of destination used."
+    SYNTAX       INTEGER {
+        singleRMepId(1),
+        macAddress(2),
+        listOfRMeps (3),
+        multicastClass1(4),
+        multicastClass2(5)
+    }
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+-- *******************************************************************
+--  nbEthOamCapabilities global configuration, status & capatibilities
+-- ******************************************************************* 
+ 
+nbEthOamFeaturesSupport OBJECT-TYPE
+    SYNTAX       BITS {
+                      mayDoSlowTests (0),
+                      mayDoFastTests (1)
+                    }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates features, that supported by this agent. Additionally this object serves as
+       a SupportValue"
+    ::= { nbEthOamCapabilities 1 }
+
+nbEthOamCcmIntervals OBJECT-TYPE
+    SYNTAX       BITS {
+                        supports300Hz     (0),
+                        supports10ms      (1),
+                        supports100ms     (2),
+                        supports1s        (3),
+                        supports10s       (4),
+                        supports1min      (5),
+                        supports10min     (6)
+                      }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates supported values of CCM intervals (Dot1agCfmCcmInterval)."
+    ::= { nbEthOamCapabilities 2 }
+
+
+---------------------- Loopback -------------------------
+
+nbEthOamLbConfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamLbConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loopback configuration table."
+    REFERENCE
+       "."
+    ::= { nbEthOamLb 1 }
+
+nbEthOamLbConfEntry OBJECT-TYPE
+    SYNTAX      NbEthOamLbConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM Loopback."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamLbConfTable 1 }
+
+NbEthOamLbConfEntry ::= SEQUENCE {
+      nbEthOamMdIndex              Unsigned32,
+      nbEthOamMaIndex              Unsigned32,
+      nbEthOamMepIdentifier        NbEthOamMepId,
+      nbEthOamLbConfHistorySize    Unsigned32,
+      nbEthOamLbConfInterval       Unsigned32,
+      nbEthOamLbConfTimeout        Unsigned32,
+      nbEthOamLbConfDataLength     Unsigned32,
+      nbEthOamLbConfDataFill       OCTET STRING,
+      nbEthOamLbConfPriority       Unsigned32,
+      nbEthOamLbConfDestMepId      NbEthOamMepIdOrZero,
+      nbEthOamLbConfDestMepMac     MacAddress,
+      nbEthOamLbConfDestIsMepId    DestinationType,
+      nbEthOamLbConfMessages       Unsigned32,
+      nbEthOamLbConfBurstInterval  Unsigned32,
+      nbEthOamLbConfNumberOfBursts Unsigned32,
+      nbEthOamLbConfRunMethod      TestRunMethod,
+      nbEthOamLbConfIntervalMicro  Unsigned32
+    }
+
+nbEthOamMdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32(1..8)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Domain level plus 1"
+    REFERENCE
+       "802.1ag clauses 3.19 and 19.2.1"
+    ::= { nbEthOamLbConfEntry 1 }
+
+nbEthOamMaIndex OBJECT-TYPE
+    SYNTAX      Unsigned32(1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association index."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbConfEntry 2 }
+
+
+nbEthOamMepIdentifier OBJECT-TYPE
+    SYNTAX      NbEthOamMepId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Source MEP for the Loopback test"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbConfEntry 3 }
+
+
+nbEthOamLbConfHistorySize OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..65535)
+    UNITS       "lines"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Number of entries in the History Table that contains records
+        of the Loopback results."
+    REFERENCE
+       "."
+    DEFVAL { 5 }
+    ::= { nbEthOamLbConfEntry 5 }
+
+nbEthOamLbConfInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Inter-frame delay between transmitting of Loopback frames
+        to the destination"
+    REFERENCE
+       "."
+    DEFVAL { 100 }
+    ::= { nbEthOamLbConfEntry 6 }
+
+nbEthOamLbConfTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..60000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Timeout for the arrival of Loopback reply"
+    REFERENCE
+       "."
+    DEFVAL { 200 }
+    ::= { nbEthOamLbConfEntry 7 }
+
+nbEthOamLbConfDataLength OBJECT-TYPE
+    SYNTAX      Unsigned32 (60..9000)
+    UNITS       "octets"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Loopback message data length. Used to send Loopback 
+        messages in different lengths"
+    REFERENCE
+       "."
+    DEFVAL { 60 }
+    ::= { nbEthOamLbConfEntry 8 }
+
+nbEthOamLbConfDataFill OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..1436))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Loopback message data fill pattern"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbConfEntry 9 }
+
+nbEthOamLbConfPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7|8)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Loopback message. 
+       The value '8' means 'default'."
+    REFERENCE
+       "."
+    DEFVAL { 8 }
+    ::= { nbEthOamLbConfEntry 10 }
+
+nbEthOamLbConfDestMepId OBJECT-TYPE
+    SYNTAX      NbEthOamMepIdOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP Identifier (1 - 4095). 0 if MEP is identified 
+       by destination MAC in nbEthOamLbConfDestMepMac object."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbConfEntry 11 }
+
+nbEthOamLbConfDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address instead of MEP ID"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbConfEntry 12 }
+
+
+
+nbEthOamLbConfDestIsMepId OBJECT-TYPE
+    SYNTAX      DestinationType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Flag indicating if the destination is specified by destination MEP ID, by destination
+       MAC address or by list of destination MEP IDs."
+    DEFVAL { macAddress }
+    ::= { nbEthOamLbConfEntry 13 }
+
+nbEthOamLbConfMessages OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..1000000)
+    UNITS       "packets"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The number of Loopback messages to send"
+    REFERENCE
+       "."
+    DEFVAL { 3 }
+    ::= { nbEthOamLbConfEntry 14 }
+
+nbEthOamLbConfBurstInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..86400)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Interval between bursts."
+    REFERENCE
+       "burst-interval"
+    DEFVAL { 60 }
+    ::= { nbEthOamLbConfEntry 15 }
+
+nbEthOamLbConfNumberOfBursts OBJECT-TYPE
+    SYNTAX      Unsigned32 (0|1..4294967295)
+    UNITS       "bursts"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Number of bursts in the test. 0 for continuous transmission"
+    REFERENCE
+       "burst-number"
+    DEFVAL { 1 }
+    ::= { nbEthOamLbConfEntry 16 }
+
+nbEthOamLbConfRunMethod OBJECT-TYPE
+    SYNTAX      TestRunMethod
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The method of the test"
+    REFERENCE
+       "."
+    DEFVAL { 4 }
+    ::= { nbEthOamLbConfEntry 21 }
+
+nbEthOamLbConfIntervalMicro OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..1000000)
+    UNITS       "microseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Inter-frame delay between transmitting of Loopback frames
+        to the destination"
+    REFERENCE
+       "."
+    DEFVAL { 100000 }
+    ::= { nbEthOamLbConfEntry 22 }
+
+----------------------------------------------------------------
+
+nbEthOamLbHistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamLbHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loopback results history table."
+    REFERENCE
+       "."
+    ::= { nbEthOamLb 2 }
+
+nbEthOamLbHistEntry OBJECT-TYPE
+    SYNTAX      NbEthOamLbHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains results of Ethernet OAM Loopback test."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier, nbEthOamLbHistSampleIndex }
+    ::= { nbEthOamLbHistTable 1 }
+
+NbEthOamLbHistEntry ::= SEQUENCE {
+      nbEthOamLbHistSampleIndex           Unsigned32,
+      nbEthOamLbHistStarted               DateAndTime,
+      nbEthOamLbHistDestMepId             NbEthOamMepIdOrZero,
+      nbEthOamLbHistDestMepMac            MacAddress,
+      nbEthOamLbHistMsgTransmitted        Unsigned32,
+      nbEthOamLbHistMsgReceived           Unsigned32,
+      nbEthOamLbHistRttMin                Unsigned32,
+      nbEthOamLbHistRttMax                Unsigned32,
+      nbEthOamLbHistRttAverage            Unsigned32,
+      nbEthOamLbHistRttSum2               Unsigned32,
+      nbEthOamLbHistJittNumber            Unsigned32,
+      nbEthOamLbHistJittMin               Unsigned32,
+      nbEthOamLbHistJittMax               Unsigned32,
+      nbEthOamLbHistJittAverage           Unsigned32,
+      nbEthOamLbHistJittSum2              Unsigned32,
+      nbEthOamLbHistJittIA                Unsigned32,
+      nbEthOamLbHistPcktLoss              Unsigned32,
+      nbEthOamLbHistType                  TestRunMethod,
+      nbEthOamLbHistPriority              Unsigned32
+    }
+
+nbEthOamLbHistSampleIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "An index that uniquely identifies the sample. 
+        This index starts at 1 and increases by one
+        as each new sample is taken."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 5 }
+
+nbEthOamLbHistStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Timestamp indicating when the Loopback test started."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 6 }
+
+nbEthOamLbHistDestMepId OBJECT-TYPE
+    SYNTAX      NbEthOamMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP ID used in the Loopback test or 0 if destination 
+        is specified by MAC address"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 7 }
+
+nbEthOamLbHistDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address used in the Loopback test"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 8 }
+
+nbEthOamLbHistMsgTransmitted OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Loopback messages transmitted"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 9 }
+
+nbEthOamLbHistMsgReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Loopback replies received."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 10 }
+
+nbEthOamLbHistRttMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum Round Trip Time result."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 12 }
+
+nbEthOamLbHistRttMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum Round Trip Time result."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 13 }
+
+nbEthOamLbHistRttAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average of Round Trip Time results."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 14 }
+
+nbEthOamLbHistRttSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all Round Trip Time results."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 15 }
+
+nbEthOamLbHistJittNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 23 }
+
+nbEthOamLbHistJittMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum value of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 24 }
+
+nbEthOamLbHistJittMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum value of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 25 }
+
+nbEthOamLbHistJittAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The average of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 26 }
+
+nbEthOamLbHistJittSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 27 }
+
+nbEthOamLbHistJittIA OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter for Loopback"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 30 }
+
+nbEthOamLbHistPcktLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 31 }
+
+nbEthOamLbHistType OBJECT-TYPE
+    SYNTAX      TestRunMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The type of executed Loopback test."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 32 }
+    
+nbEthOamLbHistPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level of the Loopback messages."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbHistEntry 33 }    
+        
+-- Last Lb results
+nbEthOamLbLastTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamLbLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loopback last completed test results Table."
+    REFERENCE
+       "."
+    ::= { nbEthOamLb 3 }
+
+nbEthOamLbLastEntry OBJECT-TYPE
+    SYNTAX      NbEthOamLbLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains results of Ethernet OAM Loopback test."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamLbLastTable 1 }
+
+NbEthOamLbLastEntry ::= SEQUENCE {
+      nbEthOamLbLastStarted               DateAndTime,
+      nbEthOamLbLastDestMepId             NbEthOamMepIdOrZero,
+      nbEthOamLbLastDestMepMac            MacAddress,
+      nbEthOamLbLastMsgTransmitted        Unsigned32,
+      nbEthOamLbLastMsgReceived           Unsigned32,
+      nbEthOamLbLastRttMin                Unsigned32,
+      nbEthOamLbLastRttMax                Unsigned32,
+      nbEthOamLbLastRttAverage            Unsigned32,
+      nbEthOamLbLastRttSum2               Unsigned32,
+      nbEthOamLbLastJittNumber            Unsigned32,
+      nbEthOamLbLastJittMin               Unsigned32,
+      nbEthOamLbLastJittMax               Unsigned32,
+      nbEthOamLbLastJittAverage           Unsigned32,
+      nbEthOamLbLastJittSum2              Unsigned32,
+      nbEthOamLbLastJittIA                Unsigned32,
+      nbEthOamLbLastPcktLoss              Unsigned32,
+      nbEthOamLbLastType                  TestRunMethod,
+      nbEthOamLbLastPriority              Unsigned32,
+      nbEthOamLbLastHistIndx              Unsigned32
+    }
+
+
+nbEthOamLbLastStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Timestamp indicating when the Loopback test started."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 6 }
+
+nbEthOamLbLastDestMepId OBJECT-TYPE
+    SYNTAX      NbEthOamMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP ID used in the Loopback test or 0 if destination 
+        is specified by MAC address"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 7 }
+
+nbEthOamLbLastDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address used in the Loopback test"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 8 }
+
+nbEthOamLbLastMsgTransmitted OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Loopback messages transmitted"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 9 }
+
+nbEthOamLbLastMsgReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Loopback replies received."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 10 }
+
+nbEthOamLbLastRttMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum Round Trip Time result."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 12 }
+
+nbEthOamLbLastRttMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum Round Trip Time result."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 13 }
+
+nbEthOamLbLastRttAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average of Round Trip Time results."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 14 }
+
+nbEthOamLbLastRttSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all Round Trip Time results."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 15 }
+
+nbEthOamLbLastJittNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 23 }
+
+nbEthOamLbLastJittMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum value of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 24 }
+
+nbEthOamLbLastJittMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum value of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 25 }
+
+nbEthOamLbLastJittAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The average of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 26 }
+
+nbEthOamLbLastJittSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all positive jitter values."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 27 }
+
+nbEthOamLbLastJittIA OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter for Loopback"
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 30 }
+
+nbEthOamLbLastPcktLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 31 }
+    
+nbEthOamLbLastType OBJECT-TYPE
+    SYNTAX      TestRunMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The type of executed Loopback test."
+    REFERENCE
+       "."
+    ::= { nbEthOamLbLastEntry 32 }
+
+nbEthOamLbLastPriority    OBJECT-TYPE       
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Loopback message."
+    REFERENCE
+       "."
+      ::= { nbEthOamLbLastEntry 33 }   
+       
+nbEthOamLbLastHistIndx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Corresponding nbEthOamLbHistSampleIndex."
+    ::= { nbEthOamLbLastEntry 50 }
+
+----------------------------------------------------------------
+
+nbEthOamLbConfExtTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamLbConfExtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loopback configuration table."
+    REFERENCE
+       "."
+    ::= { nbEthOamLb 4 }
+
+nbEthOamLbConfExtEntry OBJECT-TYPE
+    SYNTAX      NbEthOamLbConfExtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM Loopback."
+    AUGMENTS    { nbEthOamLbConfEntry }
+--  INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamLbConfExtTable 1 }
+
+NbEthOamLbConfExtEntry ::= SEQUENCE {
+      nbEthOamLbConfDestMepList      MepList
+      }
+
+nbEthOamLbConfDestMepList OBJECT-TYPE
+    SYNTAX      MepList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "List of destination MEP IDs."
+    ::= { nbEthOamLbConfExtEntry 12 }
+
+---------------------- Delay Measure -------------------------
+
+nbEthOamDmConfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamDmConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Delay Measurement configuration table"
+    REFERENCE
+       "."
+    ::= { nbEthOamDm 1 }
+
+nbEthOamDmConfEntry OBJECT-TYPE
+    SYNTAX      NbEthOamDmConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM Delay Measurement test."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamDmConfTable 1 }
+
+NbEthOamDmConfEntry ::= SEQUENCE {
+      nbEthOamDmConfHistorySize    Unsigned32,
+      nbEthOamDmConfInterval       Unsigned32,
+      nbEthOamDmConfTimeout        Unsigned32,
+      nbEthOamDmConfDataLength     Unsigned32,
+      nbEthOamDmConfDataFill       OCTET STRING,
+      nbEthOamDmConfPriority       Unsigned32,
+      nbEthOamDmConfDestMepId      NbEthOamMepIdOrZero,
+      nbEthOamDmConfDestMepMac     MacAddress,
+      nbEthOamDmConfDestIsMepId    DestinationType,
+      nbEthOamDmConfMessages       Unsigned32,
+      nbEthOamDmConfBurstInterval  Unsigned32,
+      nbEthOamDmConfNumberOfBursts Unsigned32,
+      nbEthOamDmConfRunMethod      TestRunMethod,
+      nbEthOamDmConfIntervalMicro  Unsigned32
+    }
+
+nbEthOamDmConfHistorySize OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..65535)
+    UNITS       "lines"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Number of entries in the History Table that contains records
+        of the Delay Measurement results"
+    REFERENCE
+       "."
+    DEFVAL { 5 }
+    ::= { nbEthOamDmConfEntry 5 }
+
+nbEthOamDmConfInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Inter-frame delay between transmitting of Delay Measurement Messages
+        to the destination"
+    REFERENCE
+       "."
+    DEFVAL { 100 }
+    ::= { nbEthOamDmConfEntry 6 }
+
+nbEthOamDmConfTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..60000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Timeout for the arrival of Delay Measurement Reply"
+    REFERENCE
+       "."
+    DEFVAL { 200 }
+    ::= { nbEthOamDmConfEntry 7 }
+
+nbEthOamDmConfDataLength OBJECT-TYPE
+    SYNTAX      Unsigned32 (60..9000)
+    UNITS       "octets"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Delay Measurement message data length. Used to send Delay Measurement 
+        messages in different lengths"
+    REFERENCE
+       "."
+    DEFVAL { 60 }
+    ::= { nbEthOamDmConfEntry 8 }
+
+nbEthOamDmConfDataFill OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..1436))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "Delay Measurement message data fill pattern"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmConfEntry 9 }
+
+nbEthOamDmConfPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7|8)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Delay Measurement message. 
+       The value '8' means 'default'."
+    REFERENCE
+       "."
+    DEFVAL { 8 }
+    ::= { nbEthOamDmConfEntry 10 }
+
+nbEthOamDmConfDestMepId OBJECT-TYPE
+    SYNTAX      NbEthOamMepIdOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP Identifier. 0 if MEP is identified 
+       by destination MAC (nbEthOamDmConfDestMepMac)."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmConfEntry 11 }
+
+nbEthOamDmConfDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address instead of MEP ID."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmConfEntry 12 }
+
+nbEthOamDmConfDestIsMepId OBJECT-TYPE
+    SYNTAX      DestinationType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Flag indicating if the destination is specified by destination MEP ID, by destination
+       MAC address or by list of destination MEP IDs."
+    DEFVAL { macAddress }
+    ::= { nbEthOamDmConfEntry 13 }
+
+nbEthOamDmConfMessages OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..1000000)
+    UNITS       "packets"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The number of Delay Measurement messages to send."
+    DEFVAL { 3 }
+    ::= { nbEthOamDmConfEntry 14 }
+
+nbEthOamDmConfBurstInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..86400)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Interval between bursts."
+    REFERENCE
+       "burst-interval"
+    DEFVAL { 60 }
+    ::= { nbEthOamDmConfEntry 15 }
+
+nbEthOamDmConfNumberOfBursts OBJECT-TYPE
+    SYNTAX      Unsigned32 (0|1..4294967295)
+    UNITS       "bursts"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Number of bursts in the test. 0 for continuous transmission."
+    REFERENCE
+       "burst-number"
+    DEFVAL { 1 }
+    ::= { nbEthOamDmConfEntry 16 }
+
+nbEthOamDmConfRunMethod OBJECT-TYPE
+    SYNTAX      TestRunMethod
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The method of the test"
+    REFERENCE
+       "."
+    DEFVAL { 4 }
+    ::= { nbEthOamDmConfEntry 21 }
+
+nbEthOamDmConfIntervalMicro OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..1000000)
+    UNITS       "microseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Inter-frame delay between transmitting of Delay Measurement Messages
+        to the destination"
+    REFERENCE
+       "."
+    DEFVAL { 100000 }
+    ::= { nbEthOamDmConfEntry 22 }
+
+----------------------------------------------------------------
+
+nbEthOamDmHistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamDmHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Delay Measurement results history Table."
+    REFERENCE
+       "."
+    ::= { nbEthOamDm 2 }
+
+nbEthOamDmHistEntry OBJECT-TYPE
+    SYNTAX      NbEthOamDmHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains results of Ethernet OAM Delay Measurement test."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier, nbEthOamDmHistSampleIndex }
+    ::= { nbEthOamDmHistTable 1 }
+
+NbEthOamDmHistEntry ::= SEQUENCE {
+      nbEthOamDmHistSampleIndex           Unsigned32,
+      nbEthOamDmHistStarted               DateAndTime,
+      nbEthOamDmHistDestMepId             NbEthOamMepIdOrZero,
+      nbEthOamDmHistDestMepMac            MacAddress,
+      nbEthOamDmHistMsgTransmitted        Unsigned32,
+      nbEthOamDmHistMsgReceived           Unsigned32,
+      nbEthOamDmHistRttMin                Unsigned32,
+      nbEthOamDmHistRttMax                Unsigned32,
+      nbEthOamDmHistRttAverage            Unsigned32,
+      nbEthOamDmHistRttSum2               Unsigned32,
+
+      nbEthOamDmHistDSJittNumber          Unsigned32,
+      nbEthOamDmHistDSJittMin             Unsigned32,
+      nbEthOamDmHistDSJittMax             Unsigned32,
+      nbEthOamDmHistDSJittAverage         Unsigned32,
+      nbEthOamDmHistDSJittSum2            Unsigned32,
+      nbEthOamDmHistDSJittIA              Unsigned32,
+
+      nbEthOamDmHistSDJittNumber          Unsigned32,
+      nbEthOamDmHistSDJittMin             Unsigned32,
+      nbEthOamDmHistSDJittMax             Unsigned32,
+      nbEthOamDmHistSDJittAverage         Unsigned32,
+      nbEthOamDmHistSDJittSum2            Unsigned32,
+      nbEthOamDmHistSDJittIA              Unsigned32,
+      
+      nbEthOamDmHistPcktLoss              Unsigned32,
+      nbEthOamDmHistType                  TestRunMethod,
+      nbEthOamDmHistPriority              Unsigned32
+    }
+
+nbEthOamDmHistSampleIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "An index that uniquely identifies the sample. 
+        This index starts at 1 and increases by one
+        as each new sample is taken."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 5 }
+
+nbEthOamDmHistStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Timestamp indicating when the Delay Measurement test started."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 6 }
+
+nbEthOamDmHistDestMepId OBJECT-TYPE
+    SYNTAX      NbEthOamMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP ID or 0 if destination is specified by MAC address"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 7 }
+
+nbEthOamDmHistDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address used in the Delay Measurement test"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 8 }
+
+nbEthOamDmHistMsgTransmitted OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "frames"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Delay Measurement messages transmitted"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 9 }
+
+nbEthOamDmHistMsgReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Delay Measurement messages received"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 10 }
+
+nbEthOamDmHistRttMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum Round Trip Time result"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 12 }
+
+nbEthOamDmHistRttMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum Round Trip Time result"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 13 }
+
+nbEthOamDmHistRttAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average of Round Trip Time results"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 14 }
+
+nbEthOamDmHistRttSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all Round Trip Time results"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 15 }
+
+nbEthOamDmHistDSJittNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of all positive jitter values from 
+       destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 23 }
+
+nbEthOamDmHistDSJittMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of all positive jitter values 
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 24 }
+
+nbEthOamDmHistDSJittMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of all positive jitter values 
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 25 }
+
+nbEthOamDmHistDSJittAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The average of all positive jitter values 
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 26 }
+
+nbEthOamDmHistDSJittSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of square of all positive jitter values
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 27 }
+
+nbEthOamDmHistDSJittIA OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 30 }
+
+nbEthOamDmHistSDJittNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of all positive jitter values
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 36 }
+
+nbEthOamDmHistSDJittMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of negative jitter absolute values 
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 37 }
+
+nbEthOamDmHistSDJittMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of negative jitter absolute values 
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 38 }
+
+nbEthOamDmHistSDJittAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The Average of negative jitter absolute values 
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 39 }
+
+nbEthOamDmHistSDJittSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all positive jitter values
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 40 }
+ 
+nbEthOamDmHistSDJittIA OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter
+ from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 41 }
+    
+nbEthOamDmHistPcktLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 42 }
+
+nbEthOamDmHistType OBJECT-TYPE
+    SYNTAX      TestRunMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The type of executed Delay Measurement test."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHistEntry 43 }
+    
+nbEthOamDmHistPriority  OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Delay Measurement message."
+    REFERENCE
+       "."
+   ::= { nbEthOamDmHistEntry 44 }
+   
+-- Last Dm results
+
+----------------------------------------------------------------
+-- Last Dm results
+
+nbEthOamDmLastTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamDmLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Delay Measurement last completed test results Table."
+    REFERENCE
+       "."
+    ::= { nbEthOamDm 3 }
+
+nbEthOamDmLastEntry OBJECT-TYPE
+    SYNTAX      NbEthOamDmLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains results of Ethernet OAM Delay Measurement test."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamDmLastTable 1 }
+
+NbEthOamDmLastEntry ::= SEQUENCE {
+      nbEthOamDmLastStarted               DateAndTime,
+      nbEthOamDmLastDestMepId             NbEthOamMepIdOrZero,
+      nbEthOamDmLastDestMepMac            MacAddress,
+      nbEthOamDmLastMsgTransmitted        Unsigned32,
+      nbEthOamDmLastMsgReceived           Unsigned32,
+      nbEthOamDmLastRttMin                Unsigned32,
+      nbEthOamDmLastRttMax                Unsigned32,
+      nbEthOamDmLastRttAverage            Unsigned32,
+      nbEthOamDmLastRttSum2               Unsigned32,
+
+      nbEthOamDmLastDSJittNumber          Unsigned32,
+      nbEthOamDmLastDSJittMin             Unsigned32,
+      nbEthOamDmLastDSJittMax             Unsigned32,
+      nbEthOamDmLastDSJittAverage         Unsigned32,
+      nbEthOamDmLastDSJittSum2            Unsigned32,
+      nbEthOamDmLastDSJittIA              Unsigned32,
+
+      nbEthOamDmLastSDJittNumber          Unsigned32,
+      nbEthOamDmLastSDJittMin             Unsigned32,
+      nbEthOamDmLastSDJittMax             Unsigned32,
+      nbEthOamDmLastSDJittAverage         Unsigned32,
+      nbEthOamDmLastSDJittSum2            Unsigned32,
+      nbEthOamDmLastSDJittIA              Unsigned32,
+      
+      nbEthOamDmLastPcktLoss              Unsigned32,
+      nbEthOamDmLastType                  TestRunMethod,
+      nbEthOamDmLastPriority              Unsigned32,
+      nbEthOamDmLastHistIndx              Unsigned32
+    }
+
+
+nbEthOamDmLastStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Timestamp indicating when the Delay Measurement test started."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 6 }
+
+nbEthOamDmLastDestMepId OBJECT-TYPE
+    SYNTAX      NbEthOamMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP ID or 0 if destination is specified by MAC address"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 7 }
+
+nbEthOamDmLastDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address used in the Delay Measurement test"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 8 }
+
+nbEthOamDmLastMsgTransmitted OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "frames"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Delay Measurement messages transmitted"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 9 }
+
+nbEthOamDmLastMsgReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of Delay Measurement messages received"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 10 }
+
+nbEthOamDmLastRttMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum Round Trip Time result"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 12 }
+
+nbEthOamDmLastRttMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum Round Trip Time result"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 13 }
+
+nbEthOamDmLastRttAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average of Round Trip Time results"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 14 }
+
+nbEthOamDmLastRttSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all Round Trip Time results"
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 15 }
+
+nbEthOamDmLastDSJittNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of all positive jitter values from 
+       destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 23 }
+
+nbEthOamDmLastDSJittMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of all positive jitter values 
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 24 }
+
+nbEthOamDmLastDSJittMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of all positive jitter values 
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 25 }
+
+nbEthOamDmLastDSJittAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The average of all positive jitter values 
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 26 }
+
+nbEthOamDmLastDSJittSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of square of all positive jitter values
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 27 }
+
+nbEthOamDmLastDSJittIA OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 30 }
+
+            
+nbEthOamDmLastSDJittNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of all positive jitter values
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 36 }
+
+nbEthOamDmLastSDJittMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of negative jitter absolute values 
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 37 }
+
+nbEthOamDmLastSDJittMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of negative jitter absolute values 
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 38 }
+
+nbEthOamDmLastSDJittAverage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The Average of negative jitter absolute values 
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 39 }
+
+nbEthOamDmLastSDJittSum2 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all positive jitter values
+       from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 40 }
+
+nbEthOamDmLastSDJittIA OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter
+ from source to destination."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 41 }
+
+
+nbEthOamDmLastPcktLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of packet loss value."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 42 }
+
+nbEthOamDmLastType OBJECT-TYPE
+    SYNTAX      TestRunMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The type of executed Delay Measurement test."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 43 }
+    
+nbEthOamDmLastPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Delay Measurement message."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmLastEntry 44 }
+
+nbEthOamDmLastHistIndx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Corresponding nbEthOamDmHistSampleIndex."
+    ::= { nbEthOamDmLastEntry 50 }
+    
+----------------------------------------------------------------
+
+nbEthOamDmConfExtTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamDmConfExtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Delay Measurement configuration table."
+    REFERENCE
+       "."
+    ::= { nbEthOamDm 4 }
+
+nbEthOamDmConfExtEntry OBJECT-TYPE
+    SYNTAX      NbEthOamDmConfExtEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM Delay Measurement."
+    AUGMENTS    { nbEthOamDmConfEntry }
+--  INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamDmConfExtTable 1 }
+
+NbEthOamDmConfExtEntry ::= SEQUENCE {
+      nbEthOamDmConfDestMepList      MepList
+      }
+
+nbEthOamDmConfDestMepList OBJECT-TYPE
+    SYNTAX      MepList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "List of destination MEP IDs."
+    ::= { nbEthOamDmConfExtEntry 12 }
+
+
+----------------------------------------------------------------
+
+nbEthOamDmHcHistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamDmHcHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Delay Measurement high capacity results history Table."
+    REFERENCE
+       "."
+    ::= { nbEthOamDm 5 }
+
+nbEthOamDmHcHistEntry OBJECT-TYPE
+    SYNTAX      NbEthOamDmHcHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains high capacity results of Ethernet OAM Delay Measurement test."
+    -- INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier, nbEthOamDmHistSampleIndex }
+    AUGMENTS { nbEthOamDmHistEntry }
+    ::= { nbEthOamDmHcHistTable 1 }
+
+NbEthOamDmHcHistEntry ::= SEQUENCE {
+      nbEthOamDmHcHistRttMin                Counter64,
+      nbEthOamDmHcHistRttMax                Counter64,
+      nbEthOamDmHcHistRttAverage            Counter64,
+      nbEthOamDmHcHistRttSum2               Counter64,
+
+      nbEthOamDmHcHistDSJittMin             Counter64,
+      nbEthOamDmHcHistDSJittMax             Counter64,
+      nbEthOamDmHcHistDSJittAverage         Counter64,
+      nbEthOamDmHcHistDSJittSum2            Counter64,
+      nbEthOamDmHcHistDSJittIA              Counter64,
+
+      nbEthOamDmHcHistSDJittMin             Counter64,
+      nbEthOamDmHcHistSDJittMax             Counter64,
+      nbEthOamDmHcHistSDJittAverage         Counter64,
+      nbEthOamDmHcHistSDJittSum2            Counter64,
+      nbEthOamDmHcHistSDJittIA              Counter64
+    }
+
+nbEthOamDmHcHistRttMin OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum Round Trip Time result"
+    ::= { nbEthOamDmHcHistEntry 12 }
+
+nbEthOamDmHcHistRttMax OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum Round Trip Time result"
+    ::= { nbEthOamDmHcHistEntry 13 }
+
+nbEthOamDmHcHistRttAverage OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average of Round Trip Time results"
+    ::= { nbEthOamDmHcHistEntry 14 }
+
+nbEthOamDmHcHistRttSum2 OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all Round Trip Time results"
+    ::= { nbEthOamDmHcHistEntry 15 }
+
+nbEthOamDmHcHistDSJittMin OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of all positive jitter values from destination to source."
+    ::= { nbEthOamDmHcHistEntry 24 }
+
+nbEthOamDmHcHistDSJittMax OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of all positive jitter values from destination to source."
+    ::= { nbEthOamDmHcHistEntry 25 }
+
+nbEthOamDmHcHistDSJittAverage OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The average of all positive jitter values 
+       from destination to source."
+    ::= { nbEthOamDmHcHistEntry 26 }
+
+nbEthOamDmHcHistDSJittSum2 OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "square of nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of square of all positive jitter values from destination to source."
+    ::= { nbEthOamDmHcHistEntry 27 }
+
+nbEthOamDmHcHistDSJittIA OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter from destination to source."
+    ::= { nbEthOamDmHcHistEntry 30 }
+
+nbEthOamDmHcHistSDJittMin OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of negative jitter absolute values from source to destination."
+    ::= { nbEthOamDmHcHistEntry 37 }
+
+nbEthOamDmHcHistSDJittMax OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of negative jitter absolute values from source to destination."
+    ::= { nbEthOamDmHcHistEntry 38 }
+
+nbEthOamDmHcHistSDJittAverage OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The Average of negative jitter absolute values from source to destination."
+    ::= { nbEthOamDmHcHistEntry 39 }
+
+nbEthOamDmHcHistSDJittSum2 OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "square of nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all positive jitter values from source to destination."
+    ::= { nbEthOamDmHcHistEntry 40 }
+ 
+nbEthOamDmHcHistSDJittIA OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter from source to destination."
+    ::= { nbEthOamDmHcHistEntry 41 }
+    
+----------------------------------------------------------------
+
+nbEthOamDmHcLastTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamDmHcLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Delay Measurement last completed test high capacity results Table."
+    ::= { nbEthOamDm 6 }
+
+nbEthOamDmHcLastEntry OBJECT-TYPE
+    SYNTAX      NbEthOamDmHcLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains high capacity results of Ethernet OAM Delay Measurement test."
+    -- INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    AUGMENTS { nbEthOamDmLastEntry }
+    ::= { nbEthOamDmHcLastTable 1 }
+
+NbEthOamDmHcLastEntry ::= SEQUENCE {
+      nbEthOamDmHcLastRttMin                Counter64,
+      nbEthOamDmHcLastRttMax                Counter64,
+      nbEthOamDmHcLastRttAverage            Counter64,
+      nbEthOamDmHcLastRttSum2               Counter64,
+
+      nbEthOamDmHcLastDSJittMin             Counter64,
+      nbEthOamDmHcLastDSJittMax             Counter64,
+      nbEthOamDmHcLastDSJittAverage         Counter64,
+      nbEthOamDmHcLastDSJittSum2            Counter64,
+      nbEthOamDmHcLastDSJittIA              Counter64,
+
+      nbEthOamDmHcLastSDJittMin             Counter64,
+      nbEthOamDmHcLastSDJittMax             Counter64,
+      nbEthOamDmHcLastSDJittAverage         Counter64,
+      nbEthOamDmHcLastSDJittSum2            Counter64,
+      nbEthOamDmHcLastSDJittIA              Counter64,
+      nbEthOamDmHcLastRunStatus             INTEGER
+    }
+
+
+nbEthOamDmHcLastRttMin OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum Round Trip Time result"
+    ::= { nbEthOamDmHcLastEntry 12 }
+
+nbEthOamDmHcLastRttMax OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum Round Trip Time result"
+    ::= { nbEthOamDmHcLastEntry 13 }
+
+nbEthOamDmHcLastRttAverage OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average of Round Trip Time results"
+    ::= { nbEthOamDmHcLastEntry 14 }
+
+nbEthOamDmHcLastRttSum2 OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "square of milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all Round Trip Time results"
+    ::= { nbEthOamDmHcLastEntry 15 }
+
+nbEthOamDmHcLastDSJittMin OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of all positive jitter values from destination to source."
+    ::= { nbEthOamDmHcLastEntry 24 }
+
+nbEthOamDmHcLastDSJittMax OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of all positive jitter values from destination to source."
+    ::= { nbEthOamDmHcLastEntry 25 }
+
+nbEthOamDmHcLastDSJittAverage OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The average of all positive jitter values from destination to source."
+    ::= { nbEthOamDmHcLastEntry 26 }
+
+nbEthOamDmHcLastDSJittSum2 OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "square of nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of square of all positive jitter values
+       from destination to source."
+    REFERENCE
+       "."
+    ::= { nbEthOamDmHcLastEntry 27 }
+
+nbEthOamDmHcLastDSJittIA OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter from destination to source."
+    ::= { nbEthOamDmHcLastEntry 30 }
+
+            
+nbEthOamDmHcLastSDJittMin OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The minimum of negative jitter absolute values from source to destination."
+    ::= { nbEthOamDmHcLastEntry 37 }
+
+nbEthOamDmHcLastSDJittMax OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum of negative jitter absolute values from source to destination."
+    ::= { nbEthOamDmHcLastEntry 38 }
+
+nbEthOamDmHcLastSDJittAverage OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The Average of negative jitter absolute values from source to destination."
+    ::= { nbEthOamDmHcLastEntry 39 }
+
+nbEthOamDmHcLastSDJittSum2 OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "square of nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The sum of squares of all positive jitter values from source to destination."
+    ::= { nbEthOamDmHcLastEntry 40 }
+
+nbEthOamDmHcLastSDJittIA OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "nanoseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The calculation of Interarrival Jitter from source to destination."
+    ::= { nbEthOamDmHcLastEntry 41 }
+
+nbEthOamDmHcLastRunStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  unknown   (0),
+                  idle      (1),
+                  running   (2),
+                  scheduled (3),
+                  deferred  (4),
+                  stopped   (5),
+                  noVlan    (6),
+                  error     (7),
+                  noMac     (14),         -- the test is stopped; last burst fell because the dest. MAC does not exist in the LT
+                  deferredForMac (104)    -- the test is deffered; last burst fell because the dest. MAC does not exist in the LT
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Corresponding nbEthOamDmHistSampleIndex."
+    ::= { nbEthOamDmHcLastEntry 59 }
+    
+----------------------------------------------------------------
+
+---------------------- Services -------------------------
+
+nbEthOamServiceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamServiceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Service configuration table."
+    REFERENCE
+       "."
+    ::= { nbEthOam 16 }
+
+nbEthOamServiceEntry OBJECT-TYPE
+    SYNTAX      NbEthOamServiceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM Service."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex }
+    ::= { nbEthOamServiceTable 1 }
+
+NbEthOamServiceEntry ::= SEQUENCE {
+      nbEthOamServiceDmResponderSL      Unsigned32,
+      nbEthOamServiceLbResponderSL      Unsigned32,
+      nbEthOamServiceLmResponderSL      Unsigned32
+    }
+
+nbEthOamServiceDmResponderSL OBJECT-TYPE
+    SYNTAX          Unsigned32 (0|1..8)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Service Level (1-8) for reply messages of OAM Delay Measurement protocol.
+       0 - use default"
+    DEFVAL { 0 }
+    ::= { nbEthOamServiceEntry 20 }
+
+nbEthOamServiceLbResponderSL OBJECT-TYPE
+    SYNTAX          Unsigned32 (0|1..8)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Service Level (1-8) for reply messages of OAM Loopback protocol
+       0 - use default"
+    DEFVAL { 0 }
+    ::= { nbEthOamServiceEntry 21 }
+
+nbEthOamServiceLmResponderSL OBJECT-TYPE
+    SYNTAX          Unsigned32 (0|1..8)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Service Level (1-8) for reply messages of OAM Loss Measurement protocol
+       0 - use default"
+    DEFVAL { 0 }
+    ::= { nbEthOamServiceEntry 22 }
+
+---------------------- Trap control -------------------------
+
+nbEthOamTrapTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NbEthOamTrapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Traps table."
+    REFERENCE
+       "."
+    ::= { nbEthOam 20 }
+
+nbEthOamTrapEntry OBJECT-TYPE
+    SYNTAX      NbEthOamTrapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM trap."
+    INDEX { nbEthOamMdIndex, nbEthOamMaIndex, nbEthOamMepIdentifier }
+    ::= { nbEthOamTrapTable 1 }
+
+NbEthOamTrapEntry ::= SEQUENCE {
+      nbEthOamTrapTrapGeneration        BITS,
+      nbEthOamTrapCcmHighestPrDefect    NbEthOamCcmHighestDefectPri,
+      nbEthOamTrapCcmAlarmType          INTEGER,
+            -- lb/dm trap threasholds 
+
+      nbEthOamTrapDmmReason             INTEGER,
+      nbEthOamFdRiseThold               Unsigned32,
+      nbEthOamFdFallThold               Unsigned32,
+
+      nbEthOamDSJittRiseThold           Unsigned32,
+      nbEthOamDSJittFallThold           Unsigned32,
+      nbEthOamDSJittSum2RiseThold       Unsigned32,
+      nbEthOamDSJittSum2FallThold       Unsigned32,
+
+      nbEthOamSDJittRiseThold           Unsigned32,
+      nbEthOamSDJittFallThold           Unsigned32,
+      nbEthOamSDJittSum2RiseThold       Unsigned32,
+      nbEthOamSDJittSum2FallThold       Unsigned32,
+      
+      nbEthOamPcktLossRiseThold         Unsigned32,
+      nbEthOamPcktLossFallThold         Unsigned32
+    }
+
+nbEthOamTrapTrapGeneration OBJECT-TYPE
+    SYNTAX      BITS {
+                   ccmRecovery(0),
+                   ccmFault(1)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The value of this object determines if
+        to generate different types of notifications for this MEP:
+
+        ccmRecovery(0)  - Generate a nbEthOamCcmAlarm
+            notification when highestDefectPri<=fngPriority, 
+            fngState=FNG_DEFECT_CLEARING and fngWhile=0.
+            This notification will be sent to the management entity
+            whenever a MEP restores contact with one or more other MEPs.
+        ccmFault(1)     - Generate a nbEthOamCcmAlarm
+            notification with nbEthOamTrapCcmAlarmType(1).
+            The conditions of this notification is the same as for 
+            dot1agCfmFaultAlarm. 
+            This notification will be sent to the management entity
+            whenever a MEP loses contact with one or more other MEPs."
+    DEFVAL  { {} }
+    ::= { nbEthOamTrapEntry 1 }
+
+nbEthOamTrapCcmHighestPrDefect OBJECT-TYPE
+    SYNTAX      NbEthOamCcmHighestDefectPri
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Copied from dot1agCfmMepHighestPrDefect of dot1ag.mib.
+        The highest priority defect that has been present since the
+        MEPs Fault Notification Generator State Machine was last in
+        the FNG_RESET state.  "
+    REFERENCE
+       "802.1ag clause 12.14.7.1.3:n  20.33.9 and Table 21-1"
+    ::= { nbEthOamTrapEntry 2 }
+
+nbEthOamTrapCcmAlarmType    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  fault    (1),
+                  recovery (2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Type of last generated nbEthOamCcmAlarm."
+    ::= { nbEthOamTrapEntry 3 }
+
+-- lb/dm trap threasholds 
+nbEthOamTrapDmmReason OBJECT-TYPE
+    SYNTAX          INTEGER {
+                      risingDmAlarm(1),
+                      fallingDmAlarm(2)
+                    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "."
+    ::= { nbEthOamTrapEntry 30 }
+
+nbEthOamFdRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Frame delay (Average of Round Trip Time) Rising threashold.
+        Value 0 means, that this the agent will not check this tipe of threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 35 }
+
+nbEthOamFdFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Frame delay (Average of Round Trip Time) Falling threashold"
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 36 }
+
+nbEthOamDSJittRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Destination-Source positive jitter Rising threashold.
+        Value 0 means, that this the agent will not check this tipe of threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 49 }
+
+nbEthOamDSJittFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Destination-Source positive jitter Falling threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 50 }
+
+nbEthOamDSJittSum2RiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "The sum of squares of all Destination-Source positive jitters Rising threashold.
+        Value 0 means, that this the agent will not check this tipe of threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 51 }
+
+nbEthOamDSJittSum2FallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "The sum of squares of all Destination-Source positive jitters Falling threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 52 }
+
+nbEthOamSDJittRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Source-Destination positive jitter Rising threashold.
+        Value 0 means, that this the agent will not check this tipe of threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 63 }
+
+nbEthOamSDJittFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "microseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Source-Destination positive jitter Falling threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 64 }
+
+nbEthOamSDJittSum2RiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "The sum of squares of all Source-Destination positive jitters Rising threashold.
+        Value 0 means, that this the agent will not check this tipe of threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 66 }
+
+nbEthOamSDJittSum2FallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "The sum of squares of all Source-Destination positive jitters Falling threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 67 }
+
+nbEthOamPcktLossRiseThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "The packet loss Rising threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 68 }
+    
+nbEthOamPcktLossFallThold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "The packet loss Falling threashold."
+    DEFVAL { 0 }
+    ::= { nbEthOamTrapEntry 69 }
+
+-- ******************************************************************
+-- NOTIFICATIONS (TRAPS)
+-- These notifications will be sent to the management entity
+-- whenever a MEP loses/restores contact with one or more other MEPs.
+-- ******************************************************************
+
+nbEthOamCcmAlarm NOTIFICATION-TYPE
+    OBJECTS     { nbEthOamTrapCcmHighestPrDefect,
+                  nbEthOamTrapCcmAlarmType
+                }
+    STATUS      current
+    DESCRIPTION
+       "A MEP has a persistent defect condition. A notification
+        (fault alarm) is sent to the management entity with the OID
+        of the MEP that has detected the fault.
+
+        Whenever a MEP has a persistent defect,
+        it may or may not generate a Fault Alarm to warn the system
+        administrator of the problem, as controlled by the MEP
+        Fault Notification Generator State Machine and associated
+        Managed Objects. Only the highest-priority defect, as shown
+        in Table 20-1, is reported in the Fault Alarm.
+
+        If a defect with a higher priority is raised after a Fault
+        Alarm has been issued, another Fault Alarm is issued.
+
+        The management entity receiving the notification can identify
+        the system from the network source address of the
+        notification, and can identify the MEP reporting the defect
+        by the indices in the OID of the dot1agCfmMepHighestPrDefect
+        variable in the notification:
+
+           dot1agCfmMdIndex - Also the index of the MEP's
+                              Maintenance Domain table entry
+                              (dot1agCfmMdTable).
+           dot1agCfmMaIndex - Also an index (with the MD table index)
+                              of the MEP's Maintenance Association
+                              table entry (dot1agCfmMaTable).
+           dot1agCfmMepIdentifier - MEP Identifier and final index
+                              into the MEP table (dot1agCfmMepTable).
+       "
+    REFERENCE
+       "802.1ag clause 12.14.7.7"
+    ::= { nbEthOamNotifications 1 }
+
+nbEthOamFdAlarm NOTIFICATION-TYPE
+    OBJECTS     { nbEthOamDmLastRttAverage,
+                  nbEthOamTrapDmmReason,
+                  nbEthOamDmLastDestMepId,
+                  nbEthOamDmLastDestMepMac,
+                  nbEthOamDmLastHistIndx
+                }
+    STATUS      current
+    DESCRIPTION
+       "Frame delay trap."
+    ::= { nbEthOamNotifications 4 }
+
+nbEthOamSDJittAlarm NOTIFICATION-TYPE
+    OBJECTS     { nbEthOamDmLastSDJittAverage,
+                  nbEthOamTrapDmmReason,
+                  nbEthOamDmLastDestMepId,
+                  nbEthOamDmLastDestMepMac,
+                  nbEthOamDmLastHistIndx
+                }
+    STATUS      current
+    DESCRIPTION
+       "Frame delay trap."
+    ::= { nbEthOamNotifications 8 }
+
+nbEthOamDSJittAlarm NOTIFICATION-TYPE
+    OBJECTS     { nbEthOamDmLastDSJittAverage,
+                  nbEthOamTrapDmmReason,
+                  nbEthOamDmLastDestMepId,
+                  nbEthOamDmLastDestMepMac,
+                  nbEthOamDmLastHistIndx
+                }
+    STATUS      current
+    DESCRIPTION
+       "Frame delay trap."
+    ::= { nbEthOamNotifications 14 }
+    
+nbEthOamPcktLossAlarm NOTIFICATION-TYPE
+    OBJECTS     { nbEthOamDmLastPcktLoss,
+                  nbEthOamTrapDmmReason,
+                  nbEthOamDmLastDestMepId,
+                  nbEthOamDmLastDestMepMac,
+                  nbEthOamDmLastHistIndx
+                }
+    STATUS      current
+    DESCRIPTION
+       "Packet loss trap."
+    ::= { nbEthOamNotifications 20 }    
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+nbEthOamMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          nbEthOamMandatoryGroup,
+                           nbEthOamNotificationsGroup
+                         }
+
+    ::= { nbEthOamMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+nbEthOamMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+      nbEthOamFeaturesSupport, nbEthOamCcmIntervals,
+
+      nbEthOamLbConfHistorySize,
+      nbEthOamLbConfInterval,
+      nbEthOamLbConfIntervalMicro,      
+      nbEthOamLbConfTimeout,
+      nbEthOamLbConfDataLength,
+      nbEthOamLbConfDataFill,
+      nbEthOamLbConfPriority,
+      nbEthOamLbConfDestMepId,
+      nbEthOamLbConfDestMepMac,
+      nbEthOamLbConfDestMepList,
+      nbEthOamLbConfDestIsMepId,
+      nbEthOamLbConfMessages,
+
+      nbEthOamLbHistStarted,
+      nbEthOamLbHistDestMepId,
+      nbEthOamLbHistDestMepMac,
+      nbEthOamLbHistMsgTransmitted,
+      nbEthOamLbHistMsgReceived,
+      nbEthOamLbHistRttMin,
+      nbEthOamLbHistRttMax,
+      nbEthOamLbHistRttAverage,
+      nbEthOamLbHistRttSum2,
+      nbEthOamLbHistJittNumber,
+      nbEthOamLbHistJittMin,
+      nbEthOamLbHistJittMax,
+      nbEthOamLbHistJittAverage,
+      nbEthOamLbHistJittSum2,
+      nbEthOamLbHistJittIA,
+      nbEthOamLbHistPcktLoss,
+      nbEthOamLbHistType, 
+      nbEthOamLbHistPriority,                
+      
+      nbEthOamDmConfHistorySize,
+      nbEthOamDmConfInterval,
+      nbEthOamDmConfIntervalMicro,
+      nbEthOamDmConfTimeout,
+      nbEthOamDmConfDataLength,
+      nbEthOamDmConfDataFill,
+      nbEthOamDmConfPriority,
+      nbEthOamDmConfDestMepId,
+      nbEthOamDmConfDestMepMac,
+      nbEthOamDmConfDestMepList,
+      nbEthOamDmConfDestIsMepId,
+      nbEthOamDmConfMessages,
+
+      nbEthOamDmHistStarted,
+      nbEthOamDmHistDestMepId,
+      nbEthOamDmHistDestMepMac,
+      nbEthOamDmHistMsgTransmitted,
+      nbEthOamDmHistMsgReceived,
+      nbEthOamDmHistRttMin,
+      nbEthOamDmHistRttMax,
+      nbEthOamDmHistRttAverage,
+      nbEthOamDmHistRttSum2,
+                
+      nbEthOamDmHistDSJittNumber,
+      nbEthOamDmHistDSJittMin,
+      nbEthOamDmHistDSJittMax,
+      nbEthOamDmHistDSJittAverage,
+      nbEthOamDmHistDSJittSum2,
+      nbEthOamDmHistDSJittIA,
+
+      nbEthOamDmHistSDJittNumber,
+      nbEthOamDmHistSDJittMin,
+      nbEthOamDmHistSDJittMax,
+      nbEthOamDmHistSDJittAverage,
+      nbEthOamDmHistSDJittSum2,
+      nbEthOamDmHistSDJittIA,
+     
+      nbEthOamDmHistPcktLoss,
+      nbEthOamDmHistType,
+      nbEthOamDmHistPriority,
+
+      nbEthOamLbLastStarted,
+      nbEthOamLbLastDestMepId,
+      nbEthOamLbLastDestMepMac,
+      nbEthOamLbLastMsgTransmitted,
+      nbEthOamLbLastMsgReceived,
+      nbEthOamLbLastRttMin,
+      nbEthOamLbLastRttMax,
+      nbEthOamLbLastRttAverage,
+      nbEthOamLbLastRttSum2,
+      nbEthOamLbLastJittNumber,
+      nbEthOamLbLastJittMin,
+      nbEthOamLbLastJittMax,
+      nbEthOamLbLastJittAverage,
+      nbEthOamLbLastJittSum2,
+      nbEthOamLbLastJittIA,
+      nbEthOamLbLastPcktLoss,
+      nbEthOamLbLastPriority, nbEthOamLbLastHistIndx,
+      nbEthOamLbLastType,
+      
+      nbEthOamDmLastStarted,
+      nbEthOamDmLastDestMepId,
+      nbEthOamDmLastDestMepMac,
+      nbEthOamDmLastMsgTransmitted,
+      nbEthOamDmLastMsgReceived,
+      nbEthOamDmLastRttMin,
+      nbEthOamDmLastRttMax,
+      nbEthOamDmLastRttAverage,
+      nbEthOamDmLastRttSum2,
+      nbEthOamDmLastDSJittNumber,
+      nbEthOamDmLastDSJittMin,
+      nbEthOamDmLastDSJittMax,
+      nbEthOamDmLastDSJittAverage,
+      nbEthOamDmLastDSJittSum2,
+      nbEthOamDmLastDSJittIA,
+      nbEthOamDmLastSDJittNumber,
+      nbEthOamDmLastSDJittMin,
+      nbEthOamDmLastSDJittMax,
+      nbEthOamDmLastSDJittAverage,
+      nbEthOamDmLastSDJittSum2,
+      nbEthOamDmLastSDJittIA,
+      nbEthOamDmLastPcktLoss,
+      nbEthOamDmLastPriority, nbEthOamDmLastHistIndx, 
+      nbEthOamDmLastType,
+     
+      nbEthOamDmHcHistRttMin, nbEthOamDmHcHistRttMax, nbEthOamDmHcHistRttAverage, nbEthOamDmHcHistRttSum2,
+
+      nbEthOamDmHcHistDSJittMin, nbEthOamDmHcHistDSJittMax, nbEthOamDmHcHistDSJittAverage,
+      nbEthOamDmHcHistDSJittSum2, nbEthOamDmHcHistDSJittIA,
+
+      nbEthOamDmHcHistSDJittMin, nbEthOamDmHcHistSDJittMax, nbEthOamDmHcHistSDJittAverage,
+      nbEthOamDmHcHistSDJittSum2, nbEthOamDmHcHistSDJittIA,
+      
+      nbEthOamDmHcLastRttMin, nbEthOamDmHcLastRttMax, nbEthOamDmHcLastRttAverage, nbEthOamDmHcLastRttSum2,
+
+      nbEthOamDmHcLastDSJittMin, nbEthOamDmHcLastDSJittMax, nbEthOamDmHcLastDSJittAverage,
+      nbEthOamDmHcLastDSJittSum2, nbEthOamDmHcLastDSJittIA,
+
+      nbEthOamDmHcLastSDJittMin, nbEthOamDmHcLastSDJittMax, nbEthOamDmHcLastSDJittAverage,
+      nbEthOamDmHcLastSDJittSum2, nbEthOamDmHcLastSDJittIA,
+      nbEthOamDmHcLastRunStatus,
+
+      nbEthOamLbConfBurstInterval,
+      nbEthOamLbConfNumberOfBursts,
+      nbEthOamLbConfRunMethod,
+      nbEthOamDmConfBurstInterval,
+      nbEthOamDmConfNumberOfBursts,
+      nbEthOamDmConfRunMethod,
+
+      nbEthOamTrapTrapGeneration,
+      nbEthOamTrapCcmHighestPrDefect,
+      nbEthOamTrapCcmAlarmType,
+      nbEthOamTrapDmmReason,
+
+      nbEthOamFdRiseThold,
+      nbEthOamFdFallThold,
+
+      nbEthOamDSJittRiseThold,
+      nbEthOamDSJittFallThold,
+      nbEthOamDSJittSum2RiseThold,
+      nbEthOamDSJittSum2FallThold,
+
+      nbEthOamSDJittRiseThold,
+      nbEthOamSDJittFallThold,
+      nbEthOamSDJittSum2RiseThold,
+      nbEthOamSDJittSum2FallThold,
+      
+      nbEthOamPcktLossRiseThold,
+      nbEthOamPcktLossFallThold,
+            
+      nbEthOamServiceDmResponderSL, nbEthOamServiceLbResponderSL, nbEthOamServiceLmResponderSL
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { nbEthOamMIBGroups 1 }
+
+nbEthOamNotificationsGroup NOTIFICATION-GROUP
+   NOTIFICATIONS {
+             nbEthOamCcmAlarm,
+
+             nbEthOamFdAlarm,
+             nbEthOamSDJittAlarm,
+             nbEthOamDSJittAlarm,
+             nbEthOamPcktLossAlarm
+          }
+   STATUS        current
+   DESCRIPTION
+       "The notification which are required to be supported by
+       implementations of this MIB."
+   ::= { nbEthOamMIBGroups 2 }
+
+END

@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -36,7 +35,7 @@ foreach ($radios_snmp as $index => $radio) {
     $data = snmp_get_multi_oid($device, $get_oids, [], 'UBNT-AirFIBER-MIB');
     $data = $data[$index];
 
-    print_r($data);
+    //print_r($data);
 
     $radio['radio_name']           = $data['linkName'];
     $radio['radio_status']         = $data['radioLinkState'];

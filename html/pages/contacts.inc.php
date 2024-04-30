@@ -28,7 +28,7 @@ include($config['html_dir'] . '/includes/contacts-navbar.inc.php');
             <?php
 
             // Hardcode Device sysContact
-            if (!dbExist('alert_contacts', '`contact_method` = ?', ['syscontact'])) {
+            if (!dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
                 $syscontact = [
                   'contact_descr'    => 'Device sysContact',
                   'contact_method'   => 'syscontact',
@@ -41,28 +41,56 @@ include($config['html_dir'] . '/includes/contacts-navbar.inc.php');
                 dbInsert($syscontact, 'alert_contacts');
             }
 
-            // FIXME. Show for anyone > 5 (also for non-ADMIN) and any contacts?
-            $contacts = dbFetchRows('SELECT * FROM `alert_contacts` WHERE 1');
+            if (isset($vars['sort'])) {
+                $sort_order = get_sort_order($vars);
+                switch ($vars['sort']) {
+                    case "id":
+                    case "contact_id":
+                        $sort = generate_query_sort('contact_id', $sort_order);
+                        break;
 
-            if (count($contacts)) {
+                    case "transport":
+                    case "method":
+                        $sort = generate_query_sort('contact_method', $sort_order);
+                        break;
+
+                    case "description":
+                        $sort = generate_query_sort('contact_descr', $sort_order);
+                        break;
+
+                    case "status":
+                        $sort = generate_query_sort('contact_disabled', $sort_order);
+                        break;
+
+                    default:
+                        $sort = generate_query_sort([ 'contact_method', 'contact_descr' ], $sort_order);
+                }
+            } else {
+                $sort = generate_query_sort([ 'contact_method', 'contact_descr' ]);
+            }
+            //r($sort);
+
+            $contacts = dbFetchRows('SELECT * FROM `alert_contacts`' . $sort);
+
+            if (!safe_empty($contacts)) {
                 //r($contacts);
                 // We have contacts, print the table.
                 echo generate_box_open();
+
+                echo '                <table class="table table-condensed table-striped table-rounded table-hover">' . PHP_EOL;
+                $cols   = [
+                    [ NULL,                           'style' => 'width: 1px;' ],
+                    [ 'id'          => 'Id',          'style' => 'width: 50px;' ],
+                    [ 'transport'   => 'Transport',   'style' => 'width: 100px;' ],
+                    [ 'description' => 'Description', 'style' => 'width: 100px;' ],
+                    [ 'Destination' ],
+                    [ 'Used',                         'style' => 'width: 50px;' ],
+                    [ 'status'      => 'Status',      'style' => 'width: 70px;' ],
+                    [ NULL,                           'style' => 'width: 70px;' ],
+                ];
+                echo  generate_table_header($cols, $vars);
                 ?>
 
-                <table class="table table-condensed table-striped table-rounded table-hover">
-                    <thead>
-                    <tr>
-                        <th style="width: 1px"></th>
-                        <th style="width: 50px">Id</th>
-                        <th style="width: 100px">Transport</th>
-                        <th style="width: 100px">Description</th>
-                        <th>Destination</th>
-                        <th style="width: 60px">Used</th>
-                        <th style="width: 70px">Status</th>
-                        <th style="width: 30px"></th>
-                    </tr>
-                    </thead>
                     <tbody>
 
                     <?php
@@ -125,82 +153,24 @@ include($config['html_dir'] . '/includes/contacts-navbar.inc.php');
                         echo '      <td>' . $transport_status . '</td>';
                         echo '      <td style="text-align: right;">';
                         if ($_SESSION['userlevel'] >= 10 && $transport !== 'syscontact') {
-                            echo '
-      <div class="btn-group btn-group-xs" role="group" aria-label="Contact actions">
-        <a class="btn btn-danger" role="group" title="Delete" href="#modal-contact_delete_' . $contact['contact_id'] . '" data-toggle="modal"><i class="icon-trash"></i></a>
-      </div>';
+                            $buttons = [
+                                [ 'title' => 'Edit',   'event' => 'default', 'url' => generate_url([ 'page' => 'contact' ], [ 'contact_id' => $contact['contact_id'] ]), 'icon' => 'icon-cog text-muted' ],
+                                [ 'event' => 'danger',  'icon' => 'icon-trash',
+                                  'url' => generate_url(['page' => 'contacts'], [ 'action' => 'contact_delete', 'contact_id' => $contact['contact_id'], 'confirm_'.$contact['contact_id'] => 'confirm', 'requesttoken' => $_SESSION['requesttoken'] ]),
+                                  // confirmation dialog
+                                  'attribs'   => [
+                                      'data-title'     => 'Delete Contact ['.$transport_name.'] "'.escape_html($contact['contact_descr']).'"?',
+                                      'data-toggle'    => 'confirm', // Enable confirmation dialog
+                                      'data-placement' => 'left',
+                                      'data-content'   => '<div class="alert alert-warning"><h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>
+                                                 <span class="text-nowrap">Are you sure you want to delete<br />this contact?</span></div>',
+                                  ],
+                                ],
+                            ];
+                            echo PHP_EOL . generate_button_group($buttons, [ 'title' => 'Contact actions' ]);
                         }
                         echo '</td>';
                         echo '    </tr>';
-
-                        /* now in defaults for generate_form_modal()
-                        $modal_args = array(
-                          //'hide'  => TRUE,
-                          //'fade'  => TRUE,
-                          //'role'  => 'dialog',
-                          //'class' => 'modal-md',
-                        );
-                        */
-
-                        $form = ['type'      => 'horizontal',
-                                 'userlevel' => 10,          // Minimum user level for display form
-                                 'id'        => 'modal-contact_delete_' . $contact['contact_id'],
-                                 'title'     => 'Delete Contact "' . escape_html($contact['contact_descr']) .
-                                                '" (Id: ' . $contact['contact_id'] . ', ' . $config['transports'][$contact['contact_method']]['name'] . ')',
-                                 //'modal_args' => $modal_args, // modal specific options
-                                 //'help'      => 'This will delete the selected contact and any alert assocations.',
-                                 //'class'     => '', // Clean default box class (default for modals)
-                                 //'url'       => 'delhost/'
-                        ];
-                        //$form['fieldset']['body']   = array('class' => 'modal-body');   // Required this class for modal body!
-                        //$form['fieldset']['footer'] = array('class' => 'modal-footer'); // Required this class for modal footer!
-
-                        $form['row'][0]['contact_id'] = [
-                          'type'     => 'hidden',
-                          'fieldset' => 'body',
-                          'value'    => $contact['contact_id']];
-                        $form['row'][0]['action']     = [
-                          'type'     => 'hidden',
-                          'fieldset' => 'body',
-                          'value'    => 'delete_contact'];
-
-                        $form['row'][6]['confirm_' . $contact['contact_id']] = [
-                          'type'        => 'checkbox',
-                          'fieldset'    => 'body',
-                          //'offset'      => FALSE,
-                          'name'        => 'Confirm',
-                          'placeholder' => 'Yes, please delete this contact!',
-                          'onchange'    => "javascript: toggleAttrib('disabled', 'delete_button_" . $contact['contact_id'] . "'); showDiv(!this.checked, 'warning_" . $contact['contact_id'] . "_div');",
-                          'value'       => 'confirm'];
-                        $form['row'][7]['warning_' . $contact['contact_id']] = [
-                          'type'      => 'html',
-                          'fieldset'  => 'body',
-                          'html'      => '<h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>' .
-                                         ' Are you sure you want to delete this contact?',
-                          'div_style' => 'display: none', // hide initially
-                          'div_class' => 'alert alert-warning'];
-
-                        $form['row'][8]['close']                                   = [
-                          'type'      => 'submit',
-                          'fieldset'  => 'footer',
-                          'div_class' => '', // Clean default form-action class!
-                          'name'      => 'Close',
-                          'icon'      => '',
-                          'attribs'   => ['data-dismiss' => 'modal',  // dismiss modal
-                                          'aria-hidden'  => 'true']]; // do not sent any value
-                        $form['row'][9]['delete_button_' . $contact['contact_id']] = [
-                          'type'      => 'submit',
-                          'fieldset'  => 'footer',
-                          'div_class' => '', // Clean default form-action class!
-                          'name'      => 'Delete Contact',
-                          'icon'      => 'icon-trash icon-white',
-                          //'right'       => TRUE,
-                          'class'     => 'btn-danger',
-                          'disabled'  => TRUE,
-                          'value'     => 'contact_delete'];
-
-                        $modals .= generate_form_modal($form);
-                        unset($form);
 
                     }
 
@@ -212,9 +182,6 @@ include($config['html_dir'] . '/includes/contacts-navbar.inc.php');
                 <?php
 
                 echo generate_box_close();
-
-                echo $modals;
-                unset($modals);
 
             } else {
                 // We don't have contacts. Say so.

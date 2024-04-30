@@ -261,6 +261,7 @@ if (isset($_SESSION['username'])) {
         if (empty($_SESSION['requesttoken'])) {
             session_set_var('requesttoken', bin2hex(random_bytes(32)));
         }
+        register_html_meta('csrf-token', $_SESSION['requesttoken']);
 
         // Now we can enable debug if user is privileged (Global Secure Read and greater)
         session_set_debug($debug_web_requested);

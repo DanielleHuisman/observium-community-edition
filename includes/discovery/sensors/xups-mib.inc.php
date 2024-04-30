@@ -4,17 +4,16 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
-$xups_array = [];
+$xups_array = snmpwalk_cache_oid($device, "xupsConfig", [], "XUPS-MIB");
 $xups_array = snmpwalk_cache_oid($device, "xupsInput", $xups_array, "XUPS-MIB");
 $xups_array = snmpwalk_cache_oid($device, "xupsOutput", $xups_array, "XUPS-MIB");
 $xups_array = snmpwalk_cache_oid($device, "xupsBypass", $xups_array, "XUPS-MIB");
-$xups_array = snmpwalk_cache_oid($device, "xupsConfig", $xups_array, "XUPS-MIB");
 
 // XUPS-MIB::xupsConfigOutputVoltage.0 = INTEGER: 230 RMS Volts
 // XUPS-MIB::xupsConfigInputVoltage.0 = INTEGER: 230 RMS Volts
@@ -31,8 +30,14 @@ foreach ($xups_array as $index => $entry) {
     // Input
     if (isset($entry['xupsInputPhase'])) {
         $descr = "Input";
+        $options = [];
         if ($xups_base['xupsInputNumPhases'] > 1) {
             $descr .= " Phase $index";
+
+            $options  = [
+                'measured_entity_label' => "Input Phase $index",
+                'measured_class' => 'phase'
+            ];
         }
 
         ## Input voltage
@@ -47,7 +52,7 @@ foreach ($xups_array as $index => $entry) {
                 $limits['limit_low'] = $xups_base['xupsConfigInputVoltage'] - 15;
                 $limits['limit_high'] = $xups_base['xupsConfigInputVoltage'] + 15;
             }
-            discover_sensor('voltage', $device, $oid, "xupsInputEntry." . $index, 'xups', $descr, 1, $value, $limits);
+            discover_sensor('voltage', $device, $oid, "xupsInputEntry." . $index, 'xups', $descr, 1, $value, array_merge($options, $limits));
         }
 
         ## Input current
@@ -56,14 +61,14 @@ foreach ($xups_array as $index => $entry) {
 
         if ($value != 0 && $value < 10000 &&  // xupsInputCurrent.1 = 136137420 ? really? You're nuts.
             !isset($valid['sensor']['current']['mge-ups'][100 + $index])) {
-            discover_sensor('current', $device, $oid, "xupsInputEntry." . $index, 'xups', $descr, 1, $value);
+            discover_sensor('current', $device, $oid, "xupsInputEntry." . $index, 'xups', $descr, 1, $value, $options);
         }
 
         ## Input power
         $oid   = ".1.3.6.1.4.1.534.1.3.4.1.4.$index";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           # XUPS-MIB::xupsInputWatts.$index
         $value = $entry['xupsInputWatts'];
         if ($value != 0) {
-            discover_sensor('power', $device, $oid, "xupsInputEntry." . $index, 'xups', $descr, 1, $value);
+            discover_sensor('power', $device, $oid, "xupsInputEntry." . $index, 'xups', $descr, 1, $value, $options);
         }
     }
 
@@ -91,8 +96,14 @@ foreach ($xups_array as $index => $entry) {
     // XUPS-MIB::xupsOutput.10.0 = INTEGER: 3
     if (isset($entry['xupsOutputPhase'])) {
         $descr = "Output";
+        $options = [];
         if ($xups_base['xupsOutputNumPhases'] > 1) {
             $descr .= " Phase $index";
+
+            $options  = [
+                'measured_entity_label' => "Output Phase $index",
+                'measured_class' => 'phase'
+            ];
         }
 
         ## Output voltage
@@ -106,12 +117,12 @@ foreach ($xups_array as $index => $entry) {
                 $limits['limit_low'] = $xups_base['xupsConfigLowOutputVoltageLimit'];
                 $limits['limit_high'] = $xups_base['xupsConfigHighOutputVoltageLimit'];
             }
-            discover_sensor('voltage', $device, $oid, "xupsOutputEntry." . $index, 'xups', $descr, 1, $value, $limits);
+            discover_sensor('voltage', $device, $oid, "xupsOutputEntry." . $index, 'xups', $descr, 1, $value, array_merge($options, $limits));
         }
 
         ## Output current
         if (!isset($valid['sensor']['current']['mge-ups'][$index])) {
-            $options = ['rename_rrd' => 'xups-xupsOutputEntry.' . $index];
+            $options['rename_rrd'] = 'xups-xupsOutputEntry.' . $index;
             if (isset($entry['xupsOutputCurrentHighPrecision']) && $entry['xupsOutputCurrentHighPrecision'] != 0) {
                 // Prefer High precision
                 $oid = ".1.3.6.1.4.1.534.1.4.4.1.7.$index";
@@ -123,6 +134,7 @@ foreach ($xups_array as $index => $entry) {
                 $value = $entry['xupsOutputCurrent'];
                 discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsOutputCurrent', $oid, $index, NULL, $descr, 1, $value, $options);
             }
+            unset($options['rename_rrd'], $options['limit_auto']);
             //discover_sensor('current', $device, $oid, "xupsOutputEntry.".$index, 'xups', $descr, 1, $value);
         }
 
@@ -135,14 +147,14 @@ foreach ($xups_array as $index => $entry) {
                 $limits['limit_high_warn'] = $xups_base['xupsConfigOutputWatts'] * 0.8;
                 $limits['limit_high']      = $xups_base['xupsConfigOutputWatts'] * 0.95;
             }
-            discover_sensor('power', $device, $oid, "xupsOutputEntry." . $index, 'xups', $descr, 1, $value, $limits);
+            discover_sensor('power', $device, $oid, "xupsOutputEntry." . $index, 'xups', $descr, 1, $value, array_merge($options, $limits));
         }
 
         ## Output Active power
         $oid   = ".1.3.6.1.4.1.534.1.4.4.1.9.$index";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           # XUPS-MIB::xupsOutputVA.$index
         $value = $entry['xupsOutputVA'];
         if ($value != 0) {
-            discover_sensor_ng($device, 'apower', 'XUPS-MIB', 'xupsOutputVA', $oid, $index, NULL, $descr, 1, $value);
+            discover_sensor_ng($device, 'apower', 'XUPS-MIB', 'xupsOutputVA', $oid, $index, NULL, $descr, 1, $value, $options);
         }
     }
 
@@ -160,20 +172,26 @@ foreach ($xups_array as $index => $entry) {
     // XUPS-MIB::xupsBypassAverageCurrent.0 = INTEGER: 0 RMS tenth of Amps
     if (isset($entry['xupsBypassPhase'])) {
         $descr = "Bypass";
+        $options = [];
         if ($xups_base['xupsBypassNumPhases'] > 1) {
             $descr .= " Phase $index";
+
+            $options  = [
+                'measured_entity_label' => "Bypass Phase $index",
+                'measured_class' => 'phase'
+            ];
         }
 
         ## Bypass voltage
         $oid   = ".1.3.6.1.4.1.534.1.5.3.1.2.$index"; # XUPS-MIB::xupsBypassVoltage.$index
         $value = $entry['xupsBypassVoltage'];
         if ($value != 0) {
-            discover_sensor('voltage', $device, $oid, "xupsBypassEntry." . $index, 'xups', $descr, 1, $value);
+            discover_sensor('voltage', $device, $oid, "xupsBypassEntry." . $index, 'xups', $descr, 1, $value, $options);
 
             if (isset($entry['xupsBypassCurrentHighPrecision'])) { // && $entry['xupsBypassCurrentHighPrecision'] != 0)
                 $oid   = ".1.3.6.1.4.1.534.1.5.3.1.5.$index";
                 $value = $entry['xupsBypassCurrentHighPrecision'];
-                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsBypassCurrentHighPrecision', $oid, $index, NULL, $descr, 0.1, $value);
+                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsBypassCurrentHighPrecision', $oid, $index, NULL, $descr, 0.1, $value, $options);
             }
         }
     }

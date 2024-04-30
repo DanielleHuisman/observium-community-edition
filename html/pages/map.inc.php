@@ -20,6 +20,8 @@ if ($_SESSION['userlevel'] < 5) {
 // register javascript to this file
 register_html_resource('js', 'vis-network.min.js');
 
+register_html_title("Network Map");
+
 // build navbar
 $navbar = [ 'brand' => "Network Map", 'class' => "navbar-narrow", 'style' => 'width: 100%;' ];
 

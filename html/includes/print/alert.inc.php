@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -20,75 +20,88 @@
  *
  */
 // TESTME needs unit testing
-function build_alert_table_query($vars)
-{
-    $where = ' WHERE 1 ';
-    // default sort order
-    $sort = ' ORDER BY `device_id`, `alert_test_id`, `entity_type`, `entity_id` DESC ';
+function build_alert_table_query($vars) {
 
     // Loop through the vars building a sql query from relevant values
+    $where_array = [];
     foreach ($vars as $var => $value) {
         if (!safe_empty($value)) {
             switch ($var) {
                 // Search by device_id if we have a device or device_id
                 case 'device_id':
-                    $where .= generate_query_values_and($value, 'device_id');
+                    $where_array[] = generate_query_values($value, 'device_id');
                     break;
+
                 case 'entity_type':
                     if ($value !== 'all') {
-                        $where .= generate_query_values_and($value, 'entity_type');
+                        $where_array[] = generate_query_values($value, 'entity_type');
                     }
                     break;
+
                 case 'entity_id':
-                    $where .= generate_query_values_and($value, 'entity_id');
+                    $where_array[] = generate_query_values($value, 'entity_id');
                     break;
+
                 case 'alert_test_id':
-                    $where .= generate_query_values_and($value, 'alert_test_id');
+                    $where_array[] = generate_query_values($value, 'alert_test_id');
                     break;
                 case 'status':
-                    if ($value === 'failed_delayed') {
-                        $where .= " AND `alert_status` IN (0,2)";
-                    } elseif ($value === 'failed') {
-                        $where .= " AND `alert_status` IN (0)";
-                    } elseif ($value === 'suppressed') {
-                        $where .= " AND `alert_status` = 3";
+                    $values = [];
+                    foreach ((array)$value as $status) {
+                        if ($status === 'failed') {
+                            $values[] = 0;
+                        } elseif ($status === 'ok') {
+                            $values[] = 1;
+                        } elseif ($status === 'delayed') {
+                            $values[] = 2;
+                        } elseif ($status === 'suppressed') {
+                            $values[] = 3;
+                        } elseif ($status === 'all') {
+                            break 2;
+                        }
                     }
-                    break;
-                case 'sort':
-                    if ($value === 'changed') {
-                        $sort = ' ORDER BY `last_changed` DESC ';
-                    } elseif ($value === 'device') {
-                        // fix this to sort by hostname
-                        $sort = ' ORDER BY `device_id` ';
-                    }
+                    $where_array[] = generate_query_values($values, 'alert_status');
                     break;
             }
         }
     }
 
     // Permissions query
-    $query_permitted = generate_query_permitted(['device', 'alert'], ['hide_ignored' => TRUE]);
+    $query_permitted = generate_query_permitted_ng([ 'device', 'alert' ], [ 'hide_ignored' => TRUE ]);
 
     // Base query
-    $query = 'FROM `alert_table` ';
-    //$query .= 'LEFT JOIN `alert_table-state` USING(`alert_table_id`) ';
-    $query .= $where . $query_permitted;
+    $query = 'FROM `alert_table` ' . generate_where_clause($where_array, $query_permitted);
 
     // Build the query to get a count of entries
     $query_count = 'SELECT COUNT(`alert_table_id`) ' . $query;
 
     // Build the query to get the list of entries
     $query = 'SELECT * ' . $query;
-    //$query .= ' ORDER BY `device_id`, `alert_test_id`, `entity_type`, `entity_id` DESC ';
-    $query .= $sort;
+
+    //$sort_order = get_sort_order($vars);
+    switch ($vars['sort']) {
+        case 'device':
+            // fix this to sort by hostname
+            //$query .= generate_query_sort('hostname', get_sort_order($vars));
+            $query .= generate_query_sort('device_id', get_sort_order($vars));
+            break;
+
+        case 'last_changed':
+        case 'changed':
+            $query .= generate_query_sort('last_changed', 'DESC');
+            break;
+
+        default:
+            // default sort order
+            $query .= generate_query_sort([ 'device_id', 'alert_test_id', 'entity_type', 'entity_id' ], 'DESC');
+    }
 
     if (isset($vars['pagination']) && $vars['pagination']) {
         pagination($vars, 0, TRUE); // Get default pagesize/pageno
-        $vars['start'] = $vars['pagesize'] * $vars['pageno'] - $vars['pagesize'];
-        $query         .= 'LIMIT ' . $vars['start'] . ',' . $vars['pagesize'];
+        $query .= generate_query_limit($vars);
     }
 
-    return [$query, [], $query_count];
+    return [ $query, [], $query_count ];
 }
 
 /**
@@ -102,6 +115,9 @@ function build_alert_table_query($vars)
 function print_alert_table($vars)
 {
     global $alert_rules, $config;
+
+    // We use this here.
+    register_html_resource('js', 'bootstrap-confirmation.js');
 
     // This should be set outside, but do it here if it isn't
     if (!is_array($alert_rules)) {
@@ -117,12 +133,12 @@ function print_alert_table($vars)
     }
 
     // Short? (no pagination, small out)
-    $short = (isset($vars['short']) && $vars['short']);
+    $short = isset($vars['short']) && $vars['short'];
 
-    [$query, $param, $query_count] = build_alert_table_query($vars);
+    [ $query, $param, $query_count ] = build_alert_table_query($vars);
 
     // Fetch alerts
-    $count  = dbFetchCell($query_count, $param);
+    //$count  = dbFetchCell($query_count, $param);
     $alerts = dbFetchRows($query, $param);
 
     // Set which columns we're going to show.
@@ -155,6 +171,7 @@ function print_alert_table($vars)
     } // Hide entity types in favour of icons to save space
 
     if ($vars['pagination'] && !$short) {
+        $count  = dbFetchCell($query_count, $param);
         $pagination_html = pagination($vars, $count);
         echo $pagination_html;
     }
@@ -336,7 +353,7 @@ function print_alert_table($vars)
           'value' => $alert['alert_table_id']
         ];
 
-        $form['row'][99]['action'] = [
+        $form['row'][99]['form_alert_table_action'] = [
           'type'      => 'submit',
           'icon_only' => TRUE, // hide button styles
           'name'      => '',
@@ -355,8 +372,11 @@ function print_alert_table($vars)
 
         // Only show ignore-until button if userlevel is above 8
         if ($_SESSION['userlevel'] >= 8) {
-            print_form($form);
+            //print_form($form);
             unset($form);
+
+            echo '<i class="icon-ok-sign text-muted" data-toggle="confirmation" data-placement="left" data-title="Ignore until OK?" onclick="confirmAction(\'alert_entry_ignore_until_ok\', this, event)" data-value="'.$alert['alert_table_id'].'"></i>';
+
         }
 
         echo('</td>');
@@ -372,6 +392,79 @@ function print_alert_table($vars)
     if ($vars['pagination'] && !$short) {
         echo $pagination_html;
     }
+}
+
+function generate_alert_metrics_table($entity_type, &$metrics_list = []) {
+    global $config;
+
+    $metrics_list = [];
+    foreach ($config['entities'][$entity_type]['metrics'] as $metric => $entry) {
+        $metric_list           = [
+            'metric'      => $metric,
+            'description' => $entry['label'],
+        ];
+        $metric_list['values'] = '';
+        if (is_array($entry['values'])) {
+            if (is_array_list($entry['values'])) {
+                $values = $entry['values'];
+            } else {
+                $values = [];
+                foreach ($entry['values'] as $value => $descr) {
+                    $values[] = "$value ($descr)";
+                }
+            }
+            $metric_list['values'] = '<span class="label">' . implode('</span>  <span class="label">', $values) . '</span>';
+        } elseif ($entry['type'] === 'integer') {
+            $metric_list['values'] = escape_html('<numeric>');
+            if (str_contains($metric, 'value')) {
+                $metric_list['values'] .= '<br />';
+                // some table fields
+                foreach (['limit_high', 'limit_high_warn', 'limit_low', 'limit_low_warn'] as $field) {
+                    if (isset($config['entities'][$entity_type]['table_fields'][$field])) {
+                        $metric_list['values'] .= '<span class="label">@' . $config['entities'][$entity_type]['table_fields'][$field] . '</span>  ';
+                    }
+                }
+            }
+        } else {
+            $metric_list['values'] = escape_html('<' . $entry['type'] . '>');
+        }
+        $metrics_list[] = $metric_list;
+        //$metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
+    }
+
+    // Common:
+    $metrics_list[] = [
+        'metric'      => '',
+        'description' => '<Any metric>',
+        'values'      => '<span class="label">@previous</span>'
+    ];
+    $metrics_list[] = [
+        'metric'      => 'time',
+        'description' => 'Time',
+        'values'      => 'Format <code>HHdd</code> like <strong>1630</strong>'
+    ];
+    $metrics_list[] = [
+        'metric'      => 'weekday',
+        'description' => 'Weekday',
+        'values'      => 'Day of the week as a number from Monday as <strong>1</strong> to Sunday as <strong>7</strong>'
+    ];
+
+    $metrics_opts = [
+        'columns'     => [
+            ['Metrics', 'style="width: 5%;"'],
+            'Description',
+            'Values'
+        ],
+        'metric'      => ['class' => 'label'],
+        'description' => ['class' => 'text-nowrap'],
+        'values'      => ['escape' => FALSE]
+    ];
+
+    return '<div class="col-md-12" style="padding: 0;">' . PHP_EOL .
+           generate_box_open([ 'title' => 'List of known metrics:', 'title-style' => 'font-size: 16px;', 'box-style' => 'margin: 10px 0 0;' ]) . PHP_EOL .
+           build_table($metrics_list, $metrics_opts) . PHP_EOL .
+           generate_box_close() . PHP_EOL .
+           '</div>';
 }
 
 // EOF

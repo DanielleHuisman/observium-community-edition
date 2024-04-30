@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -34,7 +34,7 @@ switch ($vtpversion) {
 
         foreach ($vtpdomains as $vtp_domain_index => $vtpdomain) {
             // Skip disabled vtp domains
-            if (in_array($vtpdomain['managementDomainRowStatus'], ['notInService', 'notReady', 'destroy'])) {
+            if (in_array($vtpdomain['managementDomainRowStatus'], [ 'notInService', 'notReady', 'destroy' ])) {
                 continue;
             }
 
@@ -50,14 +50,17 @@ switch ($vtpversion) {
                     continue;
                 }
 
-                $vlan_array                                   = ['ifIndex'      => $vlan['vtpVlanIfIndex'],
-                                                                 'vlan_domain'  => $vtp_domain_index,
-                                                                 'vlan_vlan'    => $vlan_id,
-                                                                 'vlan_name'    => $vlan['vtpVlanName'],
-                                                                 'vlan_mtu'     => $vlan['vtpVlanMtu'],
-                                                                 'vlan_type'    => $vlan['vtpVlanType'],
-                                                                 'vlan_status'  => $vlan['vtpVlanState'],
-                                                                 'vlan_context' => 0]; // Vlan context exist validated below
+                // Vlan context exist validated below
+                $vlan_array = [
+                    'ifIndex'      => $vlan['vtpVlanIfIndex'],
+                    'vlan_domain'  => $vtp_domain_index,
+                    'vlan_vlan'    => $vlan_id,
+                    'vlan_name'    => $vlan['vtpVlanName'],
+                    'vlan_mtu'     => $vlan['vtpVlanMtu'],
+                    'vlan_type'    => $vlan['vtpVlanType'],
+                    'vlan_status'  => $vlan['vtpVlanState'],
+                    'vlan_context' => 0
+                ];
                 $discovery_vlans[$vtp_domain_index][$vlan_id] = $vlan_array;
 
             }
@@ -72,7 +75,7 @@ if ($check_ports_vlans && is_device_mib($device, 'Q-BRIDGE-MIB')) {
     // This shit only seems to work on Cisco (probably only IOS/IOS-XE and NX-OS)
     // But don't worry, walking do only if vlans previously found
 
-    [$ios_version] = explode('(', $device['version']);
+    $ios_version = explode('(', $device['version'])[0];
 
     if (!safe_empty($device['snmp_context'])) {
         // Already configured snmp context
@@ -89,7 +92,9 @@ if ($check_ports_vlans && safe_count($discovery_vlans)) { // Per port vlans walk
     // Fetch first domain index
     $vtp_domain_index = array_key_first($discovery_vlans);
 
-    foreach ($discovery_vlans[$vtp_domain_index] as $vlan_id => $entry) {
+    $vlans = array_keys($discovery_vlans[$vtp_domain_index]);
+    shuffle($vlans); // Shuffle vlans, prevent vlan1 be first
+    foreach ($vlans as $vlan_id) {
         /* Per port vlans */
 
         // /usr/bin/snmpbulkwalk -v2c -c kglk5g3l454@988  -OQUs  -m BRIDGE-MIB -M /opt/observium/mibs/ udp:sw2.ahf:161 dot1dStpPortEntry
@@ -130,7 +135,14 @@ if ($check_ports_vlans && safe_count($discovery_vlans)) { // Per port vlans walk
 
                 // At this point vlan context is validated and exist
                 $discovery_vlans[$vtp_domain_index][$vlan_id]['vlan_context'] = 1;
-            } elseif ($context_valid === FALSE) {
+            } elseif ($context_valid === FALSE &&
+                !snmp_virtual_exist($device, $context, 'dot1dBaseNumPorts')) {
+                // dot1dBaseBridgeAddress.0 = 0:0:0:0:0:0
+                // dot1dBaseNumPorts.0 = 0
+                // dot1dBaseType.0 = transparent-only
+
+                print_debug("VLANs context failed, loop stopped.");
+
                 // Stop loop for other vlans
                 break;
             }
@@ -141,13 +153,15 @@ if ($check_ports_vlans && safe_count($discovery_vlans)) { // Per port vlans walk
             }
 
             foreach ($vlan_data as $vlan_port_id => $vlan_port) {
-                $ifIndex                                   = $vlan_port['dot1dBasePortIfIndex'];
-                $discovery_ports_vlans[$ifIndex][$vlan_id] = ['vlan'     => $vlan_id,
-                                                              // FIXME. move STP to separate table
-                                                              'baseport' => $vlan_port_id,
-                                                              'priority' => $vlan_port['dot1dStpPortPriority'],
-                                                              'state'    => $vlan_port['dot1dStpPortState'],
-                                                              'cost'     => $vlan_port['dot1dStpPortPathCost']];
+                $ifIndex = $vlan_port['dot1dBasePortIfIndex'];
+                $discovery_ports_vlans[$ifIndex][$vlan_id] = [
+                    'vlan'     => $vlan_id,
+                    // FIXME. move STP to separate table
+                    'baseport' => $vlan_port_id,
+                    'priority' => $vlan_port['dot1dStpPortPriority'],
+                    'state'    => $vlan_port['dot1dStpPortState'],
+                    'cost'     => $vlan_port['dot1dStpPortPathCost']
+                ];
             }
         } else {
             unset($module_stats[$vlan_id]);

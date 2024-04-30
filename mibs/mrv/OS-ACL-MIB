@@ -1,0 +1,728 @@
+--  =======================================================================
+--  File        : osAcl.mib
+--  Description : Private MIB support the functionality of access-lists
+--  By          : Inna Levin
+--  Date        : Dec 1,2008
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-ACL-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                enterprises, Integer32, Counter64               FROM SNMPv2-SMI
+                TEXTUAL-CONVENTION                              FROM SNMPv2-TC
+                DisplayString                                   FROM SNMPv2-TC
+                oaOptiSwitch                                    FROM OS-COMMON-TC-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP                 FROM SNMPv2-CONF;
+
+osAcl        MODULE-IDENTITY
+                LAST-UPDATED "201405270000Z"
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Inna Levin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ilevin@mrv.com"
+                DESCRIPTION
+                    "Private MIB support the functionality of access-lists."
+                REVISION "201405270000Z" -- 27 May 2014
+                DESCRIPTION
+                    "Add osAclMatchingCounterTable."
+                REVISION "200801080000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 3 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osAclGenConfGrp         OBJECT IDENTIFIER ::= { osAcl 50 }
+osAclSupportGrp         OBJECT IDENTIFIER ::= { osAcl 100 }
+osAclConformance        OBJECT IDENTIFIER ::= { osAcl 101 }
+osAclMIBCompliances     OBJECT IDENTIFIER ::= { osAclConformance 1 }
+osAclMIBGroups          OBJECT IDENTIFIER ::= { osAclConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+SupportValue      ::= TEXTUAL-CONVENTION
+                      STATUS       current
+                      DESCRIPTION
+                      "Represents a value, that reflects support of the feature on the Device." 
+                      SYNTAX       INTEGER { notSupported(1), supported(2) }
+
+AdminStatus ::= TEXTUAL-CONVENTION
+                      STATUS       current
+                      DESCRIPTION
+                      "Represents a value, that reflects administrative status of the feature on the device." 
+                      SYNTAX       INTEGER { valid (2), invalid (3) }
+
+ParamType ::= TEXTUAL-CONVENTION
+                      STATUS       current
+                      DESCRIPTION
+                      "Represents a value, that reflects administrative status of the feature on the device." 
+                      SYNTAX       INTEGER { integer (2), octetString (3), displayString (4), noParam (5) }
+
+ConditionType ::= TEXTUAL-CONVENTION
+                      STATUS       current
+                      DESCRIPTION
+                      "Represents a relation of the feature to the parameter value." 
+                      SYNTAX       INTEGER { eq (2), neq (3), lt (4), gt (5), le (6), ge (7), mask (8), none (9) }
+
+VlanIdOrNone      ::= TEXTUAL-CONVENTION
+                      DISPLAY-HINT "d"
+                      STATUS       current
+                      DESCRIPTION
+                        "Has been stolen from Q-BRIDGE-MIB.
+                        The VLAN-ID that uniquely identifies a specific VLAN,
+                        or no VLAN.  The special value of zero is used to
+                        indicate that no VLAN-ID is present or used.  This can
+                        be used in any situation where an object or a table entry
+                        must refer either to a specific VLAN, or to no VLAN.
+   
+                        Note that a MIB object that is defined using this
+                        TEXTUAL-CONVENTION should clarify the meaning of
+                        'no VLAN' (i.e., the special value 5000)."
+                      SYNTAX       Integer32 (1..4095 | 5000)
+
+PortIndexOrNone      ::= TEXTUAL-CONVENTION
+                      DISPLAY-HINT "d"
+                      STATUS       current
+                      DESCRIPTION
+                        "The port index that uniquely identifies a specific port,
+                        or no port.  The special value of 5000 is used to
+                        indicate that no port is used.  This can
+                        be used in any situation where an object or a table entry
+                        must refer either to a specific port, or to no port.
+   
+                        Note that a MIB object that is defined using this
+                        TEXTUAL-CONVENTION should clarify the meaning of
+                        'no port' (i.e., the special value 5000)."
+                      SYNTAX       Integer32 (1..4999 | 5000)
+
+-- ************************************************************
+-- The ACLs Table
+-- ************************************************************
+osAclTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsAclEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Table of defined access-list in the device."
+    REFERENCE
+       "CLI commands 'access-list extended WORD' and 'access-list flow WORD'."
+    ::= { osAcl 1 }
+
+osAclEntry   OBJECT-TYPE
+    SYNTAX      OsAclEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osAclName }
+    ::= { osAclTable 1 }
+
+OsAclEntry ::= SEQUENCE {
+    osAclName               DisplayString,
+    osAclType               INTEGER,
+    osAclDefaultPolicy      INTEGER,
+    osAclRemark             DisplayString,
+    osAclActive             INTEGER,
+    osAclAdminStatus        AdminStatus
+}
+
+osAclName   OBJECT-TYPE
+    SYNTAX          DisplayString  (SIZE (0..19))
+    MAX-ACCESS not-accessible
+    STATUS   current
+    DESCRIPTION
+                "Access list name."
+    REFERENCE
+                "."
+    ::= { osAclEntry 1 }
+
+osAclType         OBJECT-TYPE
+        SYNTAX	INTEGER {
+                        extended    (2),
+                        flow        (3),
+                        protocols   (4)
+                      }
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+                "Type of the access-list: extended or flow."
+        REFERENCE
+                "CLI commands 'access-list extended WORD' and 'access-list flow WORD'."
+    ::= { osAclEntry 2 }
+
+osAclDefaultPolicy OBJECT-TYPE
+        SYNTAX  INTEGER  {
+                        deny   (2),
+                        permit (3),
+                        notSupported (4)
+                     }
+        MAX-ACCESS read-write
+        STATUS          current
+        DESCRIPTION
+             "The default action to be performed for packet if no rule is matched."
+        REFERENCE
+                "CLI commands 'default policy (permit|deny)'."
+ ::= { osAclEntry 3 }
+
+osAclRemark OBJECT-TYPE
+        SYNTAX          DisplayString -- (SIZE (0..100))
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+         "Access list entry comment."
+        REFERENCE
+                "CLI commands 'remark .LINE'."
+ ::= { osAclEntry 4 }
+
+osAclActive OBJECT-TYPE
+        SYNTAX INTEGER {
+                        active     (1),
+                        notActive  (2)
+        } 
+        MAX-ACCESS read-only
+        STATUS          current
+        DESCRIPTION
+         "Whether the Acl is bound or not."
+        REFERENCE
+                "See value of the 'state' field in the CLI commands 'show access-list'."
+ ::= { osAclEntry 5 } 
+
+osAclAdminStatus OBJECT-TYPE
+        SYNTAX AdminStatus
+        MAX-ACCESS read-write
+        STATUS          current
+        DESCRIPTION
+              "."
+        REFERENCE
+              "."
+ ::= { osAclEntry 6 }
+
+-- ************************************************************
+-- The ACL Rules Table
+-- ************************************************************
+osAclRuleTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsAclRuleEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Table of ACL rules."
+    REFERENCE
+       "CLI command under ACL node: 'rule RULE_NUM'."
+    ::= { osAcl 2 }
+
+osAclRuleEntry   OBJECT-TYPE
+    SYNTAX      OsAclRuleEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osAclName, osAclRuleIndex }
+    ::= { osAclRuleTable 1 }
+
+OsAclRuleEntry ::= SEQUENCE {              
+    osAclRuleIndex                  Integer32,
+    osAclRuleAdminStatus            INTEGER
+}
+
+osAclRuleIndex        OBJECT-TYPE
+    SYNTAX            Integer32  (1..65535)
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "."
+    REFERENCE
+       "."
+    ::= { osAclRuleEntry 1 }
+
+osAclRuleAdminStatus OBJECT-TYPE
+        SYNTAX INTEGER  {
+                        enable  (2),
+                        disable (3),
+                        invalid (4)
+                     }
+        MAX-ACCESS read-write
+        STATUS          current
+        DESCRIPTION
+  "."
+        REFERENCE
+  "."
+        ::= { osAclRuleEntry 2 }
+
+-- ************************************************************
+-- The ACL Rule Actions Table
+-- ************************************************************
+osAclRuleActionTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsAclRuleActionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Table of ACL rule actions."
+    REFERENCE
+       "CLI command under ACL rule node: 'action ...'."
+    ::= { osAcl 3 }
+
+osAclRuleActionEntry   OBJECT-TYPE
+    SYNTAX      OsAclRuleActionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osAclName, osAclRuleIndex,  osAclRuleActionType }
+    ::= { osAclRuleActionTable 1 }
+
+OsAclRuleActionEntry ::= SEQUENCE {              
+        osAclRuleActionType                 INTEGER,
+        osAclRuleActionParamType            ParamType,
+        osAclRuleActionParamValue           OCTET STRING,
+        osAclRuleActionAdminStatus          AdminStatus
+}
+
+osAclRuleActionType        OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        osAclRuleActionDeny 		    (2),  -- ParamType=noParam value="N/A"
+                        osAclRuleActionPermit  		    (3),  -- ParamType=noParam value="N/A"
+                        osAclRuleActionLayer2Loopback 	(4),  -- ParamType=integer value=r_port
+                        osAclRuleActionTrapToCpu 	    (5),  -- ParamType=noParam value="N/A"
+                        osAclRuleActionMirrorToCpu 	    (6),  -- ParamType=noParam value="N/A"
+                        osAclRuleActionMirrorToAnalyser (7),  -- ParamType=noParam value="N/A"
+                        osAclRuleActionRedirectPort	    (8),  -- ParamType=integer value=r_port
+                        osAclRuleActionRedirectTag  	(9),  -- ParamType=integer value=r_tag
+                        osAclRuleActionWithActionList  	(10), -- ParamType=displayString value=al_name
+                        osAclRuleActionMarkServiceLevel (11), -- ParamType=integer value=<1-8>
+                        osAclRuleActionMarkDscp  	    (12), -- ParamType=integer value=<0-63>
+                        osAclRuleActionMarkVpt  	    (13), -- ParamType=integer value=<0-7>
+                        osAclRuleActionMarkByDiffserv  	(14), -- ParamType=noParam value="N/A"
+                        osAclRuleActionMarkSlByDscp  	(15), -- ParamType=noParam value="N/A"
+                        osAclRuleActionSwapVlan  	    (16), -- ParamType=integer value=tag
+                        osAclRuleActionNestedVlan  	    (17), -- ParamType=integer value=tag
+                        osAclRuleActionSwapToClientTag  (18), -- ParamType=integer value=tag
+                        osAclRuleActionSwapToServerTag  (19), -- ParamType=integer value=tag
+                        osAclRuleActionRedirectToCpu    (20)  -- ParamType=noParam value="N/A"
+    }
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "."
+    REFERENCE
+       "."
+    ::= { osAclRuleActionEntry 1 }
+
+osAclRuleActionParamType        OBJECT-TYPE
+    SYNTAX              ParamType
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+       "."
+    REFERENCE
+       "."
+    ::= { osAclRuleActionEntry 2 }
+
+osAclRuleActionParamValue   OBJECT-TYPE
+        SYNTAX          OCTET STRING  (SIZE (0..255))
+        MAX-ACCESS read-write
+        STATUS   current
+        DESCRIPTION
+                "ACL rule action parameter."
+        REFERENCE
+                "."
+    ::= { osAclRuleActionEntry 3 }
+
+osAclRuleActionAdminStatus OBJECT-TYPE
+        SYNTAX AdminStatus
+        MAX-ACCESS read-write
+        STATUS          current
+        DESCRIPTION
+  "."
+        REFERENCE
+  "."
+        ::= { osAclRuleActionEntry 4 }
+
+
+-- ************************************************************
+-- The ACL Rule Classifications Table
+-- ************************************************************
+osAclRuleClassTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsAclRuleClassEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Table of ACL rule classifications."
+    REFERENCE
+       "CLI commands under ACL rule node."
+    ::= { osAcl 4 }
+
+osAclRuleClassEntry   OBJECT-TYPE
+    SYNTAX      OsAclRuleClassEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osAclName, osAclRuleIndex,  osAclRuleClassType, osAclRuleClassCondition }
+    ::= { osAclRuleClassTable 1 }
+
+OsAclRuleClassEntry ::= SEQUENCE {              
+       osAclRuleClassType                         INTEGER,
+       osAclRuleClassCondition                    ConditionType,
+       osAclRuleClassParamType                    ParamType,
+       osAclRuleClassParamValue                   OCTET STRING,
+       osAclRuleClassAdminStatus                  AdminStatus
+}
+
+osAclRuleClassType        OBJECT-TYPE
+    SYNTAX            INTEGER {
+              osAclRuleClassSrcIp        	    (2) , -- There are 2 osAclRuleClassCondition indexes: eq and mask. 
+                                                      -- Value="x x x x" ("0 0 0 0" means any)example of /etc/dhcp.conf for LINUX DHCP Server with option82 support
+              osAclRuleClassDestIp          	(3) , -- There are 2 osAclRuleClassCondition indexes: eq and mask. 
+                                                      -- Value="x x x x" ("0 0 0 0" means any)
+              osAclRuleClassSrcPort    	        (4) , -- There are 2 options: 
+                                                      -- 1) 2 osAclRuleClassCondition indexes (for range): ge (start) and le(end). 
+                                                      --    Values are begin_port and end_port.
+                                                      -- 2) 1 osAclRuleClassCondition index (for one port): eq. 
+                                                      --    Value is one_port.
+              osAclRuleClassDestPort    	    (5) , -- 1) 2 osAclRuleClassCondition indexes (for range): ge (start) and le(end). 
+                                                      --    Values are begin_port and end_port.
+                                                      -- 2) 1 osAclRuleClassCondition index (for one port): eq. 
+                                                      --    Value is one_port.
+              osAclRuleClassProtocol         	(6) , -- 1 osAclRuleClassCondition index : eq. value=<0-255>
+              osAclRuleClassMacLookupResults  	(7) , -- 1 osAclRuleClassCondition index : eq. value={1(found), 2(not-found)}
+              osAclRuleClassMacDaType   	    (8) , -- 1 osAclRuleClassCondition index : eq.
+                                                      -- value={1(unicast), 2(multicast), 3(broadcast), 4(arp-broadcast)}
+              osAclRuleClassVpt         	    (9) , --  1 osAclRuleClassCondition index : eq. value=<0-7>
+              osAclRuleClassClientVpt       	(10) , -- 1 osAclRuleClassCondition index : eq. value=<0-7>
+              osAclRuleClassDscp                (11) , -- There are 2 options: 
+                                                       -- 1) 2 osAclRuleClassCondition indexes there is eq and mask
+                                                       --    Values are dscp_value <0x0 - 0x3f> and dscp_mask <0x0 - 0x3f>
+                                                       -- 2) 1 osAclRuleClassCondition index (for one port): eq. 
+                                                       --    Value is one_port.
+              osAclRuleClassMplsExp     	    (12) , -- 1 osAclRuleClassCondition index : eq. value=<0-7>. 
+                                                       --    Used by MX and untagged packets for DX.
+              osAclRuleClassMplsExpTagged   	(13) , -- 1 osAclRuleClassCondition index : eq. value=<0-7>. Used by tagged packets for DX.
+              osAclRuleClassTag             	(14) , -- Packet tag or external (service) tag for q-in-q. 
+                                                       -- 1 osAclRuleClassCondition index : eq. value= 2..4095
+              osAclRuleClassClientTag       	(15) , -- Internal (client) tag for q-in-q. 
+                                                       -- 1 osAclRuleClassCondition index : eq. value= 2..4095
+              osAclRuleClassEthertype          	(16) , -- Ethertype for packet tag for non q-in-q or for external (service) tag for q-in-q. 
+                                                       -- 1 osAclRuleClassCondition index : eq. value= 0x0000..0xffff
+              osAclRuleClassClientEthertype    	(17) , -- Ethertype for internal (client) packet tag for q-in-q. 
+                                                       -- 1 osAclRuleClassCondition index : eq. value= 0x0000..0xffff
+              osAclRuleClassSrcMac          	(18) , -- 1 osAclRuleClassCondition index : eq. value=x:x:x:x:x:x
+              osAclRuleClassDestMac        	    (19) , -- 1 osAclRuleClassCondition index : eq. value=x:x:x:x:x:x
+              osAclRuleClassSrcPhyPort      	(20) , -- 1 osAclRuleClassCondition index : eq. value=port
+              osAclRuleClassArp               	(21) , -- 1 osAclRuleClassCondition index : none.
+              osAclRuleClassTaggedArp         	(22)   -- 1 osAclRuleClassCondition index : none.
+    }
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "."
+    REFERENCE
+       "."
+    ::= { osAclRuleClassEntry 1 }
+
+osAclRuleClassCondition        OBJECT-TYPE
+    SYNTAX            ConditionType
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "."
+    REFERENCE
+       "Example 1: parameter value for port range <110..150> in rule#10 of acl1 will be represented as following:
+                   osAclRuleClassParamValue.acl1.10.osAclRuleClassSrcPort.ge == 110 , where osAclRuleClassCondition is ge
+                   osAclRuleClassParamValue.acl1.10.osAclRuleClassSrcPort.le == 150 , where osAclRuleClassCondition is le
+        Example 2: parameter value for source ip 194.90.136.111/24 in rule#10 of acl1 will be represented as following:
+                   osAclRuleClassParamValue.acl1.10.osAclRuleClassSrcIp.eq == 194.90.136.111 , where osAclRuleClassCondition is eq
+                   osAclRuleClassParamValue.acl1.10.osAclRuleClassSrcIp.mask == 255.255.255.0 , where osAclRuleClassCondition is mask
+        Example 3: parameter value for protocol 23 will be represented as following:
+                   osAclRuleClassParamValue.acl1.10.osAclRuleClassProtocol.eq == 23 , where osAclRuleClassCondition is eq
+        Example 4: parameter value for ARP untagged packet will be represented as following:
+                   osAclRuleClassParamValue.acl1.10.osAclRuleClassArp.none == '' , where osAclRuleClassCondition is eq"
+
+    ::= { osAclRuleClassEntry 2 }
+
+osAclRuleClassParamType        OBJECT-TYPE
+    SYNTAX           ParamType
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+       "."
+    REFERENCE
+       "."
+    ::= { osAclRuleClassEntry 3 }
+
+osAclRuleClassParamValue   OBJECT-TYPE
+        SYNTAX          OCTET STRING  (SIZE (0..255))
+        MAX-ACCESS read-write
+        STATUS   current
+        DESCRIPTION
+                "ACL rule classification parameter."
+        REFERENCE
+                "."
+    ::= { osAclRuleClassEntry 4 }
+
+osAclRuleClassAdminStatus OBJECT-TYPE
+        SYNTAX AdminStatus
+        MAX-ACCESS read-write
+        STATUS          current
+        DESCRIPTION
+  "."
+        REFERENCE
+  "."
+        ::= { osAclRuleClassEntry 5 }
+
+-- ************************************************************
+-- The ACL Binding Table
+-- ************************************************************
+osAclBindingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsAclBindingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Table of ACL bindings."
+    REFERENCE
+       "."
+    ::= { osAcl 5 }
+
+osAclBindingEntry   OBJECT-TYPE
+    SYNTAX      OsAclBindingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains entry of the table."
+    INDEX { osAclBindingPort, osAclBindingTag }
+    ::= { osAclBindingTable 1 }
+
+OsAclBindingEntry ::= SEQUENCE {              
+        osAclBindingPort                          PortIndexOrNone,
+        osAclBindingTag                           VlanIdOrNone,
+        osAclBindingAclName                       DisplayString,
+        osAclBindingAdminStatus                   AdminStatus
+}
+
+osAclBindingPort        OBJECT-TYPE
+    SYNTAX            PortIndexOrNone
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "If the binding is by port, then this is port to which acl is bound.
+        If the binding is by vlan, then the port is not-care."
+    REFERENCE
+       "."
+    ::= { osAclBindingEntry 1 }
+
+osAclBindingTag        OBJECT-TYPE
+    SYNTAX            VlanIdOrNone
+    MAX-ACCESS   not-accessible
+    STATUS            current
+    DESCRIPTION
+       "If the binding is by vlan, then this is tag of the interface to which acl is bound.
+        If the binding is by port, then the tag is not-care."
+    REFERENCE
+       "."
+    ::= { osAclBindingEntry 2 }
+
+
+osAclBindingAclName        OBJECT-TYPE
+    SYNTAX            DisplayString  (SIZE (0..19))
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+       "The name of the bound ACL ."
+    REFERENCE
+       "."
+    ::= { osAclBindingEntry 3 }
+
+osAclBindingAdminStatus OBJECT-TYPE
+        SYNTAX AdminStatus
+        MAX-ACCESS read-write
+        STATUS          current
+        DESCRIPTION
+  "."
+        REFERENCE
+  "."
+        ::= { osAclBindingEntry 4 }
+
+-- ************************************************************
+-- The ACL Matching Counters Table
+-- ************************************************************
+osAclMatchingCounterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsAclMatchingCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Table of ACL matching counters."
+    ::= { osAcl 6 }
+
+osAclMatchingCounterEntry  OBJECT-TYPE
+    SYNTAX      OsAclMatchingCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osAclMatchingCounterIndex }
+    ::= { osAclMatchingCounterTable 1 }
+
+OsAclMatchingCounterEntry ::= SEQUENCE {
+        osAclMatchingCounterIndex        Integer32,
+        osAclMatchingCounterPackets      Counter64,
+        osAclMatchingCounterBytes        Counter64,
+        osAclMatchingCounterAdminStatus  INTEGER,
+        osAclMatchingCounterOperStatus   INTEGER
+}
+
+osAclMatchingCounterIndex OBJECT-TYPE
+    SYNTAX            Integer32 (1..2048)
+    MAX-ACCESS        not-accessible
+    STATUS            current
+    DESCRIPTION
+       "Index of the matching counter."
+    ::= { osAclMatchingCounterEntry 1 }
+
+osAclMatchingCounterPackets OBJECT-TYPE
+    SYNTAX            Counter64
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+       "Number of packets that matched rules with this counter."
+    ::= { osAclMatchingCounterEntry 2 }
+
+osAclMatchingCounterBytes OBJECT-TYPE
+    SYNTAX            Counter64
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+       "Total bytes in packets that matched rules with this counter."
+    ::= { osAclMatchingCounterEntry 3 }
+
+osAclMatchingCounterAdminStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+          nothing    (1),
+          clear      (2)
+        }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+          "."
+        ::= { osAclMatchingCounterEntry 98 }
+
+osAclMatchingCounterOperStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+          inactive    (1),
+          active      (2)
+        }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+          "."
+        ::= { osAclMatchingCounterEntry 99 }
+
+osAclGenConfExtendedProfile OBJECT-TYPE
+        SYNTAX  INTEGER {
+            notSupported (0),
+            normal       (1),
+            doubleTag    (2),
+            mplsExp      (3)
+        }       
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "Global extended profile configuration per Device."
+        ::= { osAclGenConfGrp 5 }
+
+
+-- ************************************************************
+-- The feature support 
+-- ************************************************************
+
+osAclMibSupport    OBJECT-TYPE
+        SYNTAX     SupportValue
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+                       "The device supports osAcl mib objects."
+             ::= { osAclSupportGrp 1 }
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osAclMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osAclMandatoryGroup
+                         }
+
+    ::= { osAclMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osAclMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+        osAclType,
+        osAclDefaultPolicy,
+        osAclRemark,
+        osAclActive,
+        osAclAdminStatus,
+        osAclRuleAdminStatus,
+        osAclRuleActionParamType,
+        osAclRuleActionParamValue,
+        osAclRuleActionAdminStatus,
+        osAclRuleClassParamType,
+        osAclRuleClassParamValue,
+        osAclRuleClassAdminStatus,
+        osAclBindingAclName,
+        osAclBindingAdminStatus,
+        osAclMatchingCounterPackets,
+        osAclMatchingCounterBytes,
+        osAclMatchingCounterAdminStatus,
+        osAclMatchingCounterOperStatus,
+        osAclMibSupport,
+        osAclGenConfExtendedProfile
+    }
+    STATUS current  
+   DESCRIPTION 
+        "."
+
+    ::= { osAclMIBGroups 1 }
+
+
+END
+

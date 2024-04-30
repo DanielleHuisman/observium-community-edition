@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -22,7 +22,7 @@ if (!$vars['entity_type']) {
 $navbar['class'] = "navbar-narrow";
 $navbar['brand'] = "Alert Types";
 
-$types = dbFetchRows("SELECT DISTINCT `entity_type` FROM `alert_table` WHERE 1" . generate_query_permitted(['alert']));
+$types = dbFetchRows("SELECT DISTINCT `entity_type` FROM `alert_table` " . generate_where_clause(generate_query_permitted_ng([ 'alert' ])));
 
 $types_count = safe_count($types);
 
@@ -44,59 +44,11 @@ foreach ($types as $thing) {
         $navbar['options'][$thing['entity_type']]['url'] = generate_url($vars, ['page' => 'alerts', 'entity_type' => $thing['entity_type']]);
     }
     $navbar['options'][$thing['entity_type']]['icon'] = $config['entities'][$thing['entity_type']]['icon'];
-    $navbar['options'][$thing['entity_type']]['text'] = escape_html(nicecase($thing['entity_type']));
+    $navbar['options'][$thing['entity_type']]['text'] = $config['entities'][$thing['entity_type']]['names'];
 }
 
-$navbar['options_right']['filters']['url']  = '#';
-$navbar['options_right']['filters']['text'] = 'Filter';
-$navbar['options_right']['filters']['icon'] = $config['icon']['filter'];
-//$navbar['options_right']['filters']['link_opts'] = 'data-hover="dropdown" data-toggle="dropdown"';
-
-$filters = [
-  'all'            => [
-    'url'   => generate_url($vars, ['page' => 'alerts', 'status' => 'all']),
-    'url_o' => generate_url($vars, ['page' => 'alerts', 'status' => 'all']),
-    'icon'  => $config['icon']['info'],
-    'text'  => 'All'
-  ],
-  'failed_delayed' => [
-    'url'   => generate_url($vars, ['page' => 'alerts', 'status' => 'failed_delayed']),
-    'url_o' => generate_url($vars, ['page' => 'alerts', 'status' => 'all']),
-    'icon'  => $config['icon']['important'],
-    'text'  => 'Failed & Delayed'
-  ],
-  'failed'         => [
-    'url'   => generate_url($vars, ['page' => 'alerts', 'status' => 'failed']),
-    'url_o' => generate_url($vars, ['page' => 'alerts', 'status' => 'all']),
-    'icon'  => $config['icon']['stop'],
-    'text'  => 'Failed'
-  ],
-  'suppressed'     => [
-    'url'   => generate_url($vars, ['page' => 'alerts', 'status' => 'suppressed']),
-    'url_o' => generate_url($vars, ['page' => 'alerts', 'status' => 'all']),
-    'icon'  => $config['icon']['shutdown'],
-    'text'  => 'Suppressed'
-  ]
-];
-
-foreach ($filters as $option => $option_array) {
-
-    $navbar['options_right']['filters']['suboptions'][$option]['text'] = $option_array['text'];
-    $navbar['options_right']['filters']['suboptions'][$option]['icon'] = $option_array['icon'];
-
-    if ($vars['status'] == $option) {
-        $navbar['options_right']['filters']['suboptions'][$option]['class'] = "active";
-        if ($vars['status'] !== "all") {
-            $navbar['options_right']['filters']['class'] = "active";
-        }
-        $navbar['options_right']['filters']['suboptions'][$option]['url'] = $option_array['url_o'];
-        $navbar['options_right']['filters']['text']                       .= " (" . $option_array['text'] . ")";
-        $navbar['options_right']['filters']['icon']                       = $option_array['icon'];
-
-    } else {
-        $navbar['options_right']['filters']['suboptions'][$option]['url'] = $option_array['url'];
-    }
-}
+// Add filters to navbar
+navbar_alerts_filter($navbar, $vars);
 
 // Print out the navbar defined above
 print_navbar($navbar);
@@ -110,5 +62,10 @@ if ($vars['status'] !== 'failed') {
 }
 
 print_alert_table($vars);
+
+register_html_title('Alerts');
+if (is_string($vars['entity_type']) && isset($config['entities'][$vars['entity_type']]['names'])) {
+    register_html_title($config['entities'][$vars['entity_type']]['names']);
+}
 
 // EOF

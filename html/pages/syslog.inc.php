@@ -44,10 +44,10 @@
 
             // Add device_id limit for other fields
             $where_dev_array   = [];
-            $where_dev_array[] = generate_query_values_ng($form_devices, 'device_id'); // Convert NOT IN to IN for correctly use indexes
+            $where_dev_array[] = generate_query_values($form_devices, 'device_id'); // Convert NOT IN to IN for correctly use indexes
             if (isset($vars['device_id'])) {
-                $where_dev_array[] = generate_query_values_ng($vars['device_id'], 'device_id');
-                $where_array[]     = generate_query_values_ng($vars['device_id'], 'device_id');
+                $where_dev_array[] = generate_query_values($vars['device_id'], 'device_id');
+                $where_array[]     = generate_query_values($vars['device_id'], 'device_id');
             }
 
             $where     = generate_where_clause($where_array);

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -31,6 +31,50 @@ function session_remote_address() {
     }
 
     return $remote_addr;
+}
+
+/**
+ * Store cached device/port/etc permitted IDs into $_SESSION['cache']
+ *
+ * IDs collected in html/includes/cache-data.inc.php
+ * This function used mostly in print_search() or print_form(), see html/includes/print/search.inc.php
+ * Cached IDs from $_SESSION used in ajax forms by generate_query_permitted()
+ *
+ * @return null
+ */
+function permissions_cache_session() {
+    if (!$_SESSION['authenticated']) {
+        return;
+    }
+
+    if (isset($GLOBALS['permissions_cached_session'])) {
+
+        $cache_expire = (get_time() - $GLOBALS['permissions_cached_session']) >= 300;
+        if (!$cache_expire) {
+            return;
+        }
+    } // skip if this function already run. FIXME?
+
+    @session_start(); // Re-enable write to session
+
+    if ($cache_expire) {
+        unset($_SESSION['cache']);
+    }
+
+    // Store device IDs in SESSION var for use to check permissions with ajax queries
+    foreach (['permitted', 'disabled', 'ignored'] as $key) {
+        $_SESSION['cache']['devices'][$key] = $GLOBALS['cache']['devices'][$key];
+    }
+
+    // Store port IDs in SESSION var for use to check permissions with ajax queries
+    // FIXME. Not actual, need different way for ajax
+    foreach (['permitted', 'deleted', 'errored', 'ignored', 'poll_disabled', 'device_disabled', 'device_ignored'] as $key) {
+        $_SESSION['cache']['ports'][$key] = $GLOBALS['cache']['ports'][$key];
+    }
+
+    $GLOBALS['permissions_cached_session'] = get_time();
+
+    session_write_close(); // Write and close session
 }
 
 function session_set_debug($debug_web_requested = FALSE) {
@@ -85,8 +129,9 @@ function session_logout($relogin = FALSE, $message = NULL)
               'user_agent' => $_SERVER['HTTP_USER_AGENT'],
               'result'     => $auth_log], 'authlog');
     if (isset($_COOKIE['ckey'])) {
+        // Remove old ckeys from DB
         dbDelete('users_ckeys', "`username` = ? AND `user_ckey` = ?", [$_SESSION['username'], $_COOKIE['ckey']]);
-    } // Remove old ckeys from DB
+    }
     // Unset cookies
     $cookie_params = session_get_cookie_params();
     $past          = time() - 3600;
@@ -100,9 +145,10 @@ function session_logout($relogin = FALSE, $message = NULL)
     unset($_COOKIE);
 
     // Clean cache if possible
-    $cache_tags = ['__anonymous'];
     if ($_SESSION['authenticated']) {
-        $cache_tags = ['__username=' . $_SESSION['username']];
+        $cache_tags = [ '__username=' . safe_cache_key($_SESSION['username']) ];
+    } else {
+        $cache_tags = [ '__anonymous' ];
     }
     del_cache_items($cache_tags);
 
@@ -240,18 +286,20 @@ function session_regenerate($lifetime_id = 1800)
 }
 
 /**
- * Store encrypted password in $_SESSION['user_encpass'], required for some auth mechanism, ie ldap
+ * Store encrypted password in $_SESSION['user_encpass'], required for some auth mechanism, i.e. ldap
  *
  * @param string $auth_password Plain password
  * @param string $key           Key for password encrypt
  *
- * @return string                Encrypted password
+ * @return string               Encrypted password
+ * @throws Exception
  */
-function session_encrypt_password($auth_password, $key)
-{
+function session_encrypt_password($auth_password, $key) {
+    global $config;
+
     // Store encrypted password
-    if ($GLOBALS['config']['auth_mechanism'] === 'ldap' &&
-        !($GLOBALS['config']['auth_ldap_bindanonymous'] || !safe_empty($GLOBALS['config']['auth_ldap_binddn'] . $GLOBALS['config']['auth_ldap_bindpw']))) {
+    if ($config['auth_mechanism'] === 'ldap' &&
+        !($config['auth_ldap_bindanonymous'] || !safe_empty($config['auth_ldap_binddn'] . $config['auth_ldap_bindpw']))) {
         if (OBS_ENCRYPT) {
             if (OBS_ENCRYPT_MODULE === 'mcrypt') {
                 $key .= get_unique_id();
@@ -265,6 +313,18 @@ function session_encrypt_password($auth_password, $key)
     }
 
     return $_SESSION['user_encpass'];
+}
+
+function session_decrypt_password() {
+    if (!isset($_SESSION['encrypt_required'])) {
+        $key = session_unique_id();
+        if (OBS_ENCRYPT_MODULE === 'mcrypt') {
+            $key .= get_unique_id();
+        }
+        return decrypt($_SESSION['user_encpass'], $key);
+    }
+    // WARNING, requires mcrypt or sodium
+    return base64_decode($_SESSION['user_encpass'], TRUE);
 }
 
 // DOCME needs phpdoc block
@@ -496,12 +556,12 @@ function cookie_set_keys($user_unique_id, $auth_password, $cookie_expire, $cooki
         $ckey    = md5(random_string());
         $dkey    = md5(random_string());
         $encpass = encrypt($auth_password, $dkey);
-        dbDelete('users_ckeys', "`username` = ? AND `expire` < ?", [ $_SESSION['username'], get_time() - 3600 ]); // Remove old ckeys from DB
-        dbInsert(['user_encpass' => $encpass,
-                  'expire'       => $cookie_expire,
-                  'username'     => $_SESSION['username'],
-                  'user_uniq'    => $user_unique_id,
-                  'user_ckey'    => $ckey], 'users_ckeys');
+        dbDelete('users_ckeys', "`username` = ? AND `expire` < ?", [ $_SESSION['username'], get_time('1hour') ]); // Remove old ckeys from DB
+        dbInsert([ 'user_encpass' => $encpass,
+                   'expire'       => $cookie_expire,
+                   'username'     => $_SESSION['username'],
+                   'user_uniq'    => $user_unique_id,
+                   'user_ckey'    => $ckey ], 'users_ckeys');
         // AJAX request not have access to cookies with httponly, and for example widgets lost auth
         //setcookie("ckey", $ckey, $cookie_expire, $cookie_path, $cookie_domain, $cookie_https, $cookie_httponly);
         //setcookie("dkey", $dkey, $cookie_expire, $cookie_path, $cookie_domain, $cookie_https, $cookie_httponly);

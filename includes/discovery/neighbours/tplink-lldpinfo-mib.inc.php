@@ -1,12 +1,12 @@
 <?php
-/*
+/**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -81,12 +81,13 @@ foreach ($lldp_array as $index => $lldp) {
     }
 
     $neighbour = [
-      'remote_port_id'  => $remote_port_id,
-      'remote_hostname' => $lldp['lldpNeighborDeviceName'],
-      'remote_port'     => $lldp['lldpNeighborPortIdDescr'],
-      'remote_platform' => $lldp['lldpNeighborDeviceDescr'],
-      'remote_version'  => NULL,
-      'remote_address'  => $lldp['lldpNeighborManageIpAddr']
+        'remote_device_id' => $remote_device_id,
+        'remote_port_id'   => $remote_port_id,
+        'remote_hostname'  => $lldp['lldpNeighborDeviceName'],
+        'remote_port'      => $lldp['lldpNeighborPortIdDescr'],
+        'remote_platform'  => $lldp['lldpNeighborDeviceDescr'],
+        'remote_version'   => NULL,
+        'remote_address'   => $lldp['lldpNeighborManageIpAddr']
     ];
     discover_neighbour($port, 'lldp', $neighbour);
 }

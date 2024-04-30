@@ -33,7 +33,7 @@ echo '<form id="settings" name="settings" method="post" action="" class="form fo
 // This is only done on this page, so there is no performance issue for the rest of Observium
 foreach ($config_subsections as $section => $subdata) {
   if (isset($config_sections[$section]['edition']) && $config_sections[$section]['edition'] != OBSERVIUM_EDITION) {
-    // Skip sections not allowed for current Observium edition
+    // Skip sections not allowed for a current Observium edition
     continue;
   }
 

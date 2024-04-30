@@ -1,0 +1,440 @@
+--  =======================================================================
+--  File        : osProvVif.mib
+--  Description : Private MIB support the IP configuration
+--                of Provision services.
+--  By          : Alex
+
+-- Copyright (c) 2008 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+
+OS-PROV-VIF-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+                MODULE-IDENTITY, OBJECT-TYPE,
+                Unsigned32                                    FROM SNMPv2-SMI
+                TruthValue, MacAddress                        FROM SNMPv2-TC
+                oaOptiSwitch, EntryValidator                  FROM OS-COMMON-TC-MIB
+                InetAddress, InetAddressType,
+                InetAddressPrefixLength                       FROM INET-ADDRESS-MIB   -- [RFC4001]
+                osEthServId, osEthServEntry                   FROM OS-ETH-SERV-MIB
+                MODULE-COMPLIANCE, OBJECT-GROUP               FROM SNMPv2-CONF;
+
+osProvVif       MODULE-IDENTITY
+                LAST-UPDATED "201905260000Z"  -- May 26, 2019
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Alex Rozin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  ARozin@mrv.com"
+                DESCRIPTION
+                    "This MIB allows to configurate IP address of the
+                    Provision services. It may be used to send RFC2544 or
+                    IpSla requests of Layer 3 (for example, ICMP echo, RFC792) from
+                    an edge point of a service. It is also necessary to ensure that the
+                    edge point os a servcie could respond to RFC2544 Layer 3
+                    and IpSla requests."
+              
+                REVISION     "201905260000Z"  -- May 26, 2019
+                DESCRIPTION
+                "1. New objects osProvVifIpv6Dhcp, osProvVifIpv6Addr, osProvVifIpv6PrefixLength.
+                 2. Object osProvVifIpType became obsolete, it always returns value ipv4(1). SET for this object is ignored.
+                 2. New values in osProvVifMgmtPrtcls"
+
+                REVISION     "201710220000Z" -- 22 Oct. 2017
+                DESCRIPTION
+                "The values of osProvVifSlaAvailable are extended as backward compatible as possible."
+                    
+                REVISION     "201501180000Z"  -- January 18, 2015 
+                DESCRIPTION
+                    "New object osProvVifIpDhcp."
+
+                REVISION     "201110240000Z"  -- Oct 24, 2011
+                DESCRIPTION
+                "Revision 1.2: 
+                    Changes:
+                      1. new object osProvVifMgmtTypesSupported.
+                      2. new table osProvVifMgmtTable."
+
+                REVISION     "201010240000Z"  -- Oct 24, 2010
+                DESCRIPTION
+                "Revision 1.1:
+                    Changes:
+                       1. Object osProvVifMtuProfile is replaced by osProvVifMtuSize                       
+                       "
+                                              
+                REVISION     "200901090000Z"                
+                DESCRIPTION
+                    "Revision 1.0: Initial edition."
+                ::= { oaOptiSwitch 12 }
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osProvVifCapabilities      OBJECT IDENTIFIER ::= { osProvVif 1 }
+osProvVifConformance       OBJECT IDENTIFIER ::= { osProvVif 100 }
+osProvVifMIBCompliances    OBJECT IDENTIFIER ::= { osProvVifConformance 1 }
+osProvVifMIBGroups         OBJECT IDENTIFIER ::= { osProvVifConformance 2 }
+
+-- ************************************************************
+-- Textual converions
+-- ************************************************************
+
+--3456789a123456789b123456789c123456789d123456789e123456789f123456789g123456789
+ 
+osProvVifAddrTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  ipv4     (0),
+                  ipv6     (1),
+                  ipv4z    (2),
+                  ipv6z    (3)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of supported Internet address (in terms
+      of INET-ADDRESS-MIB).
+      Additionally this object serves as a SupportValue."
+    ::= { osProvVifCapabilities 1 }
+
+osProvVifMgmtTypesSupported OBJECT-TYPE
+    SYNTAX       BITS
+                 {
+                  ipv4     (0),
+                  ipv6     (1),
+                  ipv4z    (2),
+                  ipv6z    (3),
+                  dns      (4),
+                  all      (5)
+                 }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+      "Indicates types of supported Internet address (in terms
+      of INET-ADDRESS-MIB) for osProvVifMgmtIpType."
+    ::= { osProvVifCapabilities 2 }
+
+
+
+-- osProvVifMinRespMac  OBJECT-TYPE
+--    SYNTAX           MacAddress
+--    MAX-ACCESS       read-only
+--    STATUS           current
+--    DESCRIPTION
+--       "The minimum valid value for osProvVifRespMac."
+--    ::= { osProvVifCapabilities 2 }
+
+--osProvVifMaxRespMac  OBJECT-TYPE
+--    SYNTAX           MacAddress
+--    MAX-ACCESS       read-only
+--    STATUS           current
+--    DESCRIPTION
+--       "The maximum valid value for osProvVifRespMac."
+--    ::= { osProvVifCapabilities 3 }
+
+-- ************************************************************
+-- The osProvVifTable Table
+-- ************************************************************
+osProvVifTable   OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsProvVifEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table allows to define source IP address for the virtual interface of the
+       service on the edge point."
+    REFERENCE
+       "."
+    ::= { osProvVif 5 }
+
+osProvVifEntry   OBJECT-TYPE
+    SYNTAX       OsProvVifEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    AUGMENTS { osEthServEntry }
+--  INDEX { osEthServId } 
+    ::= { osProvVifTable 1 }
+
+OsProvVifEntry ::= SEQUENCE {
+      osProvVifIpDhcp             TruthValue,
+      osProvVifIpType             InetAddressType,
+      osProvVifIpAddr             InetAddress,
+      osProvVifPrefixLength       InetAddressPrefixLength,
+      osProvVifSlaAvailable       INTEGER,
+      osProvVifRespMac            MacAddress,
+      osProvVifMtuSize            Unsigned32,
+      osProvVifIpv6Dhcp           TruthValue,
+      osProvVifIpv6Addr           InetAddress,
+      osProvVifIpv6PrefixLength   InetAddressPrefixLength
+}
+
+osProvVifIpDhcp      OBJECT-TYPE
+    SYNTAX           TruthValue
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "CLI command '[no ]ip dhcp'."
+    DEFVAL { false }
+    ::= { osProvVifEntry 4 }
+
+osProvVifIpType      OBJECT-TYPE
+    SYNTAX           InetAddressType
+    MAX-ACCESS       read-write
+    STATUS           obsolete
+    DESCRIPTION
+       "Always is equal ipv4(1)"
+    ::= { osProvVifEntry 5 }
+
+osProvVifIpAddr      OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "IPv4 address, CLI command 'no ip (A.B.C.D/M|)'."
+    ::= { osProvVifEntry 6 }
+
+osProvVifPrefixLength OBJECT-TYPE
+    SYNTAX           InetAddressPrefixLength
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "Prefix length for osProvVifIpAddr.
+        CLI command 'no ip (A.B.C.D/M|)'."
+    DEFVAL { 0 }
+    ::= { osProvVifEntry 7 }
+
+osProvVifSlaAvailable OBJECT-TYPE
+    SYNTAX           INTEGER {
+                        inService      (0),
+                        serviceTurnUp  (1),                        
+                        disabled       (2)
+                     }
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "Service participation mode in RFC2544 tests:
+       If this this object is set to inService(0), then in-service tests are supported (slow rates) 
+       If this this object is set to serviceTurnUp(1), then service turn-up tests are supported (fast rates)
+       If this this object is set to disabled(2), then turn-up/in-service tests are disabled.
+       The corresponding CLI commands in the interface node are:
+       ip-sla (equivalent to serviceTurnUp)
+       ip-sla in-service (equivalent to inService)"
+    DEFVAL { disabled }
+    ::= { osProvVifEntry 8 }
+
+osProvVifRespMac     OBJECT-TYPE
+    SYNTAX           MacAddress
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "If this object is set to the value, not equal to 00:00:00:00:00:00, then the service
+       may reply on requests of RFC2544 tests with osProvRfc2544PrflProtocol equal to dmmITUtY1731(1),
+       wich contains osProvOamExtRespMac with this value."
+    ::= { osProvVifEntry 9 }
+
+osProvVifMtuSize     OBJECT-TYPE
+    SYNTAX           Unsigned32 (64..16000)
+    UNITS            "bytes"
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+      "Bind MTU size for the virtual interface. Obsolete by osEthServVcMtuSize, is not deleted
+       for backward compatibility."
+    DEFVAL { 1632 }
+    ::= { osProvVifEntry 11 }
+
+osProvVifIpv6Dhcp    OBJECT-TYPE
+    SYNTAX           TruthValue
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "CLI command '[no ]ipv6 dhcp'."
+    DEFVAL { false }
+    ::= { osProvVifEntry 14 }
+
+osProvVifIpv6Addr    OBJECT-TYPE
+    SYNTAX           InetAddress
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "IPv6 address, CLI command '[no ]ipv6 (X:X::X:X/M)'."
+    ::= { osProvVifEntry 16 }
+
+osProvVifIpv6PrefixLength OBJECT-TYPE
+    SYNTAX           InetAddressPrefixLength
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+       "Prefix length for osProvVifIpv6Addr.
+        CLI command '[no ]ipv6 (X:X::X:X/M)'."
+    DEFVAL { 0 }
+    ::= { osProvVifEntry 17 }
+
+
+-- ************************************************************
+-- The osProvVifMgmtTable Table
+-- ************************************************************
+osProvVifMgmtTable   OBJECT-TYPE
+    SYNTAX       SEQUENCE OF OsProvVifMgmtEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table allows to define for EService management IP addresses
+       for one or several management protocols."
+    ::= { osProvVif 6 }
+
+osProvVifMgmtEntry   OBJECT-TYPE
+    SYNTAX       OsProvVifMgmtEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osEthServId, osProvVifMgmtIpType, osProvVifMgmtIpAddr, osProvVifMgmtPfxLen } 
+    ::= { osProvVifMgmtTable 1 }
+
+OsProvVifMgmtEntry ::= SEQUENCE {
+      osProvVifMgmtIpType         INTEGER,
+      osProvVifMgmtIpAddr         OCTET STRING,
+      osProvVifMgmtPfxLen         InetAddressPrefixLength,
+      osProvVifMgmtPrtcls         BITS,
+      osProvVifMgmtValidator      EntryValidator
+}
+
+osProvVifMgmtIpType  OBJECT-TYPE
+    SYNTAX           INTEGER {
+                       unknown(0),
+                       ipv4   (1),
+                       ipv6   (2),
+                       ipv4z  (3),
+                       ipv6z  (4),
+                       dns    (16),
+                       all    (99)
+                     }
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "ipV4(1) means that osProvVifMgmtIpAddr corresponds
+       to InetAddressIPv4 from INET-ADDRESS-MIB and actual
+       size of osProvVifMgmtIpAddr must be 4.
+       ipV6(1) means that osProvVifMgmtIpAddr corresponds
+       to InetAddressIPv6 from INET-ADDRESS-MIB and actual
+       size of osProvVifMgmtIpAddr must be 16."
+    ::= { osProvVifMgmtEntry 1 }
+
+osProvVifMgmtIpAddr  OBJECT-TYPE
+    SYNTAX           OCTET STRING (SIZE (4 | 16))
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osProvVifMgmtEntry 2 }
+
+osProvVifMgmtPfxLen  OBJECT-TYPE
+    SYNTAX           InetAddressPrefixLength
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osProvVifMgmtEntry 3 }
+
+osProvVifMgmtPrtcls  OBJECT-TYPE
+    SYNTAX           BITS{
+                       ssh    (0),
+                       telnet (1),
+                       tftp   (2),
+                       snmp   (3),
+                       http   (4),
+                       reserved (5),
+                       netconf(6)
+                     }
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osProvVifMgmtEntry 4 }
+
+osProvVifMgmtValidator OBJECT-TYPE
+    SYNTAX           EntryValidator
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+       "."
+    ::= { osProvVifMgmtEntry 5 }
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+osProvVifMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osProvVifMandatoryGroup
+                         }
+
+    ::= { osProvVifMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+osProvVifMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+              osProvVifAddrTypesSupported, osProvVifMgmtTypesSupported,
+           -- osProvVifMinRespMac, osProvVifMaxRespMac,
+              osProvVifIpDhcp,
+           -- osProvVifIpType,
+              osProvVifIpAddr, osProvVifPrefixLength,
+              osProvVifSlaAvailable, osProvVifRespMac, 
+              osProvVifMtuSize,
+              osProvVifIpv6Dhcp, osProvVifIpv6Addr, osProvVifIpv6PrefixLength,
+
+              osProvVifMgmtPrtcls, osProvVifMgmtValidator
+            }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osProvVifMIBGroups 1 }
+
+osProvVifObsoleteGroup OBJECT-GROUP
+    OBJECTS { 
+              osProvVifIpType
+            }
+    STATUS  obsolete
+    DESCRIPTION
+            "A collection of objects made obsolete by this MIB module."
+    ::= { osProvVifMIBGroups 3 }
+
+END
+

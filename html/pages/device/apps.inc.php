@@ -142,7 +142,7 @@ if (is_file($app_filename)) {
 
         foreach ($app_graphs[$vars['app_section']] as $key => $text) {
             $graph_type          = $key;
-            $graph_array['to']   = $config['time']['now'];
+            $graph_array['to']   = get_time();
             $graph_array['id']   = $app['app_id'];
             $graph_array['type'] = "application_" . $key;
             echo '<tr><td>';

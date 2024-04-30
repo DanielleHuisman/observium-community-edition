@@ -4,15 +4,15 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
+ * @package    observium
+ * @subpackage web
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 /// SEARCH ACCESSPOINTS
 $results = dbFetchRows("SELECT * FROM `wifi_aps`" .
-                       generate_where_clause($cache['where']['device_permitted'], '`ap_name` LIKE ?') .
+                       generate_where_clause($GLOBALS['cache']['where']['devices_permitted'], '`ap_name` LIKE ?') .
                        " ORDER BY `ap_name` LIMIT $query_limit", [$query_param]);
 
 if (!safe_empty($results)) {

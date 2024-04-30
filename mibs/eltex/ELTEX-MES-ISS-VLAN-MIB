@@ -1,0 +1,785 @@
+ELTEX-MES-ISS-VLAN-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+        Unsigned32, Integer32, TimeTicks
+                FROM SNMPv2-SMI
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        RowStatus, TEXTUAL-CONVENTION, TruthValue, MacAddress, DisplayString
+                FROM SNMPv2-TC
+        eltMesIss
+                FROM ELTEX-MES-ISS-MIB
+        ifIndex
+                FROM IF-MIB
+        dot1qFutureVlanPortEntry, dot1qFutureVlanPortMacMapEntry
+                FROM ARICENT-VLAN-MIB
+        dot1qVlanIndex, VlanIndex
+                FROM Q-BRIDGE-MIB
+        fsDot1qVlanContextId
+                FROM ARICENTQ-BRIDGE-MIB;
+
+eltMesIssVlanMIB MODULE-IDENTITY
+        LAST-UPDATED "202302150000Z"
+        ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+                "eltex-co.ru"
+        DESCRIPTION
+                "MIB extensions for IEEE 802.1Q Virtual Local Area Networks."
+        REVISION "202302150000Z"
+        DESCRIPTION "Added Vlan Current Database Table"
+        REVISION "202212060000Z"
+        DESCRIPTION "Added eltMesIssVoiceVlanGlobalVlanIndex object"
+        REVISION "202210100000Z"
+        DESCRIPTION "Added Port Security Violation notification Trap"
+        REVISION "202208050000Z"
+        DESCRIPTION "Added Voice VLAN Сonfiguration Tables"
+        REVISION "202106290000Z"
+        DESCRIPTION "Added Vlan Forwarding/Filtering Database Port Table"
+        REVISION "201912120000Z"
+        DESCRIPTION "Added Mac-based Vlan Classification Tables"
+        REVISION "201812080000Z"
+        DESCRIPTION "Initial revision."
+    ::= { eltMesIss 3 }
+
+-- -------------------------------------------------------------------------- --
+-- Top level MIB structure
+-- -------------------------------------------------------------------------- --
+
+    eltMesIssVlanObjects       OBJECT IDENTIFIER ::= { eltMesIssVlanMIB 1 }
+
+-- -------------------------------------------------------------------------- --
+-- MIB Groups
+-- -------------------------------------------------------------------------- --
+
+    eltMesIssVlanGlobals        OBJECT IDENTIFIER ::= { eltMesIssVlanObjects 1 }
+    eltMesIssVlanPortConfig     OBJECT IDENTIFIER ::= { eltMesIssVlanObjects 2 }
+    eltMesIssVlanConfig         OBJECT IDENTIFIER ::= { eltMesIssVlanObjects 3 }
+    eltMesIssVlanStatistics     OBJECT IDENTIFIER ::= { eltMesIssVlanObjects 4 }
+    eltMesIssPortSecViolationObjects
+                                OBJECT IDENTIFIER ::= { eltMesIssVlanObjects 5 }
+
+    eltMesIssPortSecViolationNotifications
+                                OBJECT IDENTIFIER ::= { eltMesIssVlanObjects 6 }
+
+-- -------------------------------------------------------------------------- --
+-- Textual Conventions
+-- -------------------------------------------------------------------------- --
+
+EltMesIssPortSecurityMode ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Learning limitation on the secured interface.
+         disabled - learning is stopped. The dynamic addresses associated with
+            the port are not aged out or relearned on other port as long as the
+            port is locked.
+         dynamic - dynamic addresses can be learned up to the maximum dynamic
+            addresses allowed on the port. Relearning and aging of the dynamic
+            addresses are enabled. The learned addresses aren't kept after
+            reset.
+         secure-permanent - secure addresses can be learned up to the maximum
+            addresses allowed on the port. Relearning and aging of addresses
+            are disabled. The learned addresses are kept after reset.
+         secure-delete-on-reset - secure addresses can be learned up to
+            the maximum addresses allowed on the port. Relearning and aging of
+            addresses are disabled. The learned addresses are not kept after
+            reset."
+    SYNTAX  INTEGER {
+        disabled(1),
+        dynamic(2),
+        secure-permanent(3),
+        secure-delete-on-reset(4)
+    }
+
+-- -------------------------------------------------------------------------- --
+-- Vlan Forwarding/Filtering Database Port Table
+-- -------------------------------------------------------------------------- --
+
+eltMesIssVlanFdbPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssVlanFdbPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains information about unicast entries
+        for which the device has forwarding and/or filtering
+        information sorted additionally by port. This information
+        is used by the transparent bridging function in determining
+        how to propagate a received frame."
+    ::= { eltMesIssVlanGlobals 1 }
+
+eltMesIssVlanFdbPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssVlanFdbPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information about a specific unicast MAC address for which the device
+         has some forwarding and/or filtering information."
+    INDEX       { ifIndex,
+                  eltMesIssVlanFdbPortVlanId,
+                  eltMesIssVlanFdbPortMacAddress }
+    ::= { eltMesIssVlanFdbPortTable 1 }
+
+EltMesIssVlanFdbPortEntry ::=
+    SEQUENCE {
+        eltMesIssVlanFdbPortVlanId              VlanIndex,
+        eltMesIssVlanFdbPortMacAddress          MacAddress,
+        eltMesIssVlanFdbPortEntryStatus         INTEGER
+    }
+
+eltMesIssVlanFdbPortVlanId OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A FDB id or VLAN id for which vlan the device has forwarding and/or
+         filtering information."
+    ::= { eltMesIssVlanFdbPortEntry 1 }
+
+eltMesIssVlanFdbPortMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A unicast MAC address for which the device has forwarding and/or
+         filtering information."
+    ::= { eltMesIssVlanFdbPortEntry 2 }
+
+eltMesIssVlanFdbPortEntryStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        other(1),
+        invalid(2),
+        learned(3),
+        self(4),
+        mgmt(5)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The status of this entry. The meanings of the values are:
+            other(1) - none of the following. This may include
+                the case where some other MIB object (not the
+                corresponding instance of eltMesIssVlanFdbPort, nor an
+                entry in the eltMesIssVlanStaticUnicastTable) is being
+                used to determine if and how frames addressed to
+                the value of the corresponding instance of
+                eltMesIssVlanFdbAddress are being forwarded.
+            invalid(2) - this entry is no longer valid (e.g., it
+                was learned but has since aged out), but has not
+                yet been flushed from the table.
+            learned(3) - the value of the corresponding instance
+                of eltMesIssVlanFdbPort was learned and is being used.
+            self(4) - the value of the corresponding instance of
+                eltMesIssVlanFdbAddress represents one of the device's
+                addresses. The corresponding instance of
+                eltMesIssVlanFdbPort indicates which of the device's
+                ports has this address.
+            mgmt(5) - the value of the corresponding instance of
+                eltMesIssVlanFdbAddress is also the value of an
+                existing instance of eltMesIssVlanStaticAddress."
+    ::= { eltMesIssVlanFdbPortEntry 3 }
+
+-- -------------------------------------------------------------------------- --
+-- Vlan Port Table Extension
+-- -------------------------------------------------------------------------- --
+
+eltMesIssVlanPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssVlanPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table augments the dot1qFutureVlanPortTable table."
+    ::= { eltMesIssVlanPortConfig 1 }
+
+eltMesIssVlanPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssVlanPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table is an interface in the system such as
+         physical port or port-channel."
+    AUGMENTS    { dot1qFutureVlanPortEntry }
+    ::= { eltMesIssVlanPortTable 1 }
+
+EltMesIssVlanPortEntry ::=
+    SEQUENCE {
+        eltMesIssVlanDot1qTunnelStatus              TruthValue,
+        eltMesIssVlanPortSecurityMacLimit           Unsigned32,
+        eltMesIssVlanPortSecurityStatus             TruthValue,
+        eltMesIssVlanPortSecurityMode               EltMesIssPortSecurityMode,
+        eltMesIssVlanPortDefaultVlanTagged          TruthValue,
+        eltMesIssVlanPortMvrVlanId                  Unsigned32,
+        eltMesIssVlanPortMvrVlanTagged              TruthValue,
+        eltMesIssVlanPortDefaultVlanForbidden       TruthValue,
+        eltMesIssVlanPortEgressFiltering            TruthValue
+    }
+
+eltMesIssVlanDot1qTunnelStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "802.1q tunneling feature allows to transparently transmit customer
+         traffic through a provider network by encapsulating the outer (Q-in-Q)
+         VLAN tag into the customer packets.
+
+         If 802.1q tunnel is enabled on a port, it'll make its forwarding
+         decision based on the outer VID and keep inner VLAN tag unchanged.
+         If a packet with no outer tag is received on a tunneling port, PVID
+         will be encapsulated in the packet as an outer tag and the packet
+         will be forwarded based on its new outer VID. If a tunneling port holds
+         an untagged membership in some VLANs, the outer tags with these VLANs
+         will be decapsulated before sending out the packets from this port."
+    DEFVAL      { false }
+    ::= { eltMesIssVlanPortEntry 1 }
+
+eltMesIssVlanPortSecurityMacLimit OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Limiting value on the number of distinct unicast destination MAC
+         addresses that can be dynamically learnt over this interface.
+         The lower limit and upper limit value that can be SET for this object
+         is determined by the underlying hardware. This Limit is applicable for
+         only dynamically learned entries and NOT for static unicast entries."
+    ::= { eltMesIssVlanPortEntry 2 }
+
+eltMesIssVlanPortSecurityStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This variable indicates whenever port security feature is enabled on
+         port."
+    DEFVAL      { false }
+    ::= { eltMesIssVlanPortEntry 3 }
+
+eltMesIssVlanPortSecurityMode OBJECT-TYPE
+    SYNTAX      EltMesIssPortSecurityMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This variable indicates what is the learning limitation on the locked
+         interface."
+    ::= { eltMesIssVlanPortEntry 4 }
+
+eltMesIssVlanPortDefaultVlanTagged OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Default Vlan Tagged feature allows to configure the default VLAN
+         on this port to be tagged, while untagged default VLAN is the default
+         setting. This might be useful in case of setting up all 4K VLANs as
+         tagged is required. Note that setting this value to true will not add
+         port to the default VLAN; it only changes the type of membership
+         when it exists."
+    DEFVAL      { false }
+    ::= { eltMesIssVlanPortEntry 5 }
+
+eltMesIssVlanPortMvrVlanId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4094)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to configure switchport multicast-vlan on port.
+         To remove multicast TV vlan from port use eltMesIssVlanPortMvrVlanId = 0."
+    DEFVAL      { 0 }
+    ::= { eltMesIssVlanPortEntry 6 }
+
+eltMesIssVlanPortMvrVlanTagged OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This configuration allows to set multicast TV vlan on this
+         port to be tagged or untagged."
+    DEFVAL      { false }
+    ::= { eltMesIssVlanPortEntry 7 }
+
+eltMesIssVlanPortDefaultVlanForbidden OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This configuration allows to prohibit default vlan on this port."
+    DEFVAL      { false }
+    ::= { eltMesIssVlanPortEntry 8 }
+
+eltMesIssVlanPortEgressFiltering OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This configuration allows to transmit packets from
+         egress port without appropriate VLAN tag.
+
+         When this is true(1) the device will discard outcoming frames for
+         VLANs which do not include this Port in its Member set. When false(2),
+         the port will allow all outcoming frames."
+    DEFVAL      { true }
+    ::= { eltMesIssVlanPortEntry 9 }
+
+-- -------------------------------------------------------------------------- --
+-- Vlan Mac Map Table Extension
+-- -------------------------------------------------------------------------- --
+
+eltMesIssVlanPortMacMapTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssVlanPortMacMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A table that contains information on VLAN-MAC address mapping."
+    ::= { eltMesIssVlanPortConfig 2 }
+
+eltMesIssVlanPortMacMapEntry OBJECT-TYPE
+    SYNTAX      EltMesIssVlanPortMacMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "This object specifies the entry that contains VLAN-MAC address mapping."
+    AUGMENTS    { dot1qFutureVlanPortMacMapEntry }
+    ::= { eltMesIssVlanPortMacMapTable 1 }
+
+EltMesIssVlanPortMacMapEntry ::=
+    SEQUENCE {
+        eltMesIssVlanPortMacMapMask         MacAddress
+    }
+
+eltMesIssVlanPortMacMapMask OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "This object specifies the mask for MAC address for which the VLAN
+         mapping is present in the entry."
+    ::= { eltMesIssVlanPortMacMapEntry 1 }
+
+-- -------------------------------------------------------------------------- --
+-- Mac-based Vlan to Port Table
+-- -------------------------------------------------------------------------- --
+
+eltMesIssMacBasedVlanPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssMacBasedVlanPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains VID sets used for MAC-based VLAN Classification."
+    ::= { eltMesIssVlanPortConfig 3 }
+
+eltMesIssMacBasedVlanPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssMacBasedVlanPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A VID set for a port and group."
+    INDEX       { ifIndex,
+                  eltMesIssMacBasedVlanPortGroupId }
+    ::= { eltMesIssMacBasedVlanPortTable 1 }
+
+EltMesIssMacBasedVlanPortEntry ::=
+    SEQUENCE {
+        eltMesIssMacBasedVlanPortGroupId                INTEGER,
+        eltMesIssMacBasedVlanPortGroupVid               VlanIndex,
+        eltMesIssMacBasedVlanPortMcastBcastOption       INTEGER,
+        eltMesIssMacBasedVlanPortRowStatus              RowStatus
+    }
+
+eltMesIssMacBasedVlanPortGroupId OBJECT-TYPE
+    SYNTAX      INTEGER (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Designates a group of Ranges in the ranges Group Database."
+    ::= { eltMesIssMacBasedVlanPortEntry 1 }
+
+eltMesIssMacBasedVlanPortGroupVid OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The VID associated with a group of range MAC addresses for each port."
+    ::= { eltMesIssMacBasedVlanPortEntry 2 }
+
+eltMesIssMacBasedVlanPortMcastBcastOption OBJECT-TYPE
+    SYNTAX      INTEGER { allow(1), suppress(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configurable option for discarding/allowing Multicast/Broadcast 
+         untagged frames. The value allow (1) indicates that Multicast/Broadcast
+         frames with source MAC address as in the MAC VLAN entry will be dropped
+         if MAC based VLAN is enabled on that port. The value suppress (2)
+         indicates that Multicast/Broadcast frames with source MAC address as
+         in the MAC VLAN entry will be processed if MAC based VLAN is enabled on
+         that port."
+    DEFVAL      { allow }
+    ::= { eltMesIssMacBasedVlanPortEntry 3 }
+
+eltMesIssMacBasedVlanPortRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry."
+    ::= { eltMesIssMacBasedVlanPortEntry 4 }
+
+-- -------------------------------------------------------------------------- --
+-- eltMesIssDot1qVlanStaticTable
+-- -------------------------------------------------------------------------- --
+
+eltMesIssDot1qVlanStaticTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltDot1qVlanStaticEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table lists the per vlan parameters."
+    ::= { eltMesIssVlanConfig 1 }
+
+eltMesIssDot1qVlanStaticEntry OBJECT-TYPE
+    SYNTAX      EltDot1qVlanStaticEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table expands existing table dot1qVlanStaticTable."
+    INDEX       { dot1qVlanIndex }
+    ::= { eltMesIssDot1qVlanStaticTable 1 }
+
+EltDot1qVlanStaticEntry ::=
+    SEQUENCE {
+        eltMesIssDot1qVlanStaticCos  INTEGER
+}
+
+eltMesIssDot1qVlanStaticCos OBJECT-TYPE
+    SYNTAX      INTEGER (0..7 | 255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Vlan egress CoS value for traffic being sent from CPU."
+    DEFVAL      { 255 }
+    ::= { eltMesIssDot1qVlanStaticEntry 1 }
+
+-- -------------------------------------------------------------------------- --
+-- Mac-based Vlan Classification Group Table
+-- -------------------------------------------------------------------------- --
+
+eltMesIssMacBasedVlanGroupTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssMacBasedVlanGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains mappings from Range of MAC addresses to Group
+         Identifiers used for MAC-based VLAN Classification."
+    ::= { eltMesIssVlanConfig 2 }
+
+eltMesIssMacBasedVlanGroupEntry OBJECT-TYPE
+    SYNTAX      EltMesIssMacBasedVlanGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A mapping from a Range of MAC addresses to a Group Identifier."
+    INDEX       { eltMesIssMacBasedVlanMacAddress,
+                  eltMesIssMacBasedVlanMacMask }
+    ::= { eltMesIssMacBasedVlanGroupTable 1 }
+
+EltMesIssMacBasedVlanGroupEntry ::=
+    SEQUENCE {
+        eltMesIssMacBasedVlanMacAddress         MacAddress,
+        eltMesIssMacBasedVlanMacMask            MacAddress,
+        eltMesIssMacBasedVlanGroupId            INTEGER,
+        eltMesIssMacBasedVlanGroupRowStatus     RowStatus
+    }
+
+eltMesIssMacBasedVlanMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The base MAC address of the range."
+    ::= { eltMesIssMacBasedVlanGroupEntry 1 }
+
+eltMesIssMacBasedVlanMacMask OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The MAC mask of the range."
+    ::= { eltMesIssMacBasedVlanGroupEntry 2 }
+
+eltMesIssMacBasedVlanGroupId OBJECT-TYPE
+    SYNTAX      INTEGER (1..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Represents a group of ranges of MAC addresses that are associated
+         together when assigning a VID to a frame."
+    ::= { eltMesIssMacBasedVlanGroupEntry 3 }
+
+eltMesIssMacBasedVlanGroupRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry."
+    ::= { eltMesIssMacBasedVlanGroupEntry 4 }
+
+-- ----------------------------------------------------------------------------
+-- Voice Vlan global configuration
+-- ----------------------------------------------------------------------------
+
+eltMesIssVoiceVlanGlobalVlanIndex OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object contains information about the globally defined
+         voice VLAN ID. All ports will use this VLAN unless other
+         voice VLAN specified for a port. Default value means no setting."
+    DEFVAL { 0 }
+    ::= { eltMesIssVlanGlobals 2 }
+
+-- ----------------------------------------------------------------------------
+-- Voice Vlan OUI configuration Table
+-- ----------------------------------------------------------------------------
+
+eltMesIssVoiceVlanOUITable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssVoiceVlanOUIEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing static global configuration information
+         for Voice VLANs OUI MAC Prefixes. All entries are permanent
+         and will be restored after the device is reset."
+    ::= { eltMesIssVlanConfig 3 }
+
+eltMesIssVoiceVlanOUIEntry OBJECT-TYPE
+    SYNTAX      EltMesIssVoiceVlanOUIEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information for a Voice VLANs OUI MAC Prefixes configured
+         into the device by management."
+    INDEX { eltMesIssVoiceVlanOUIPrefix }
+    ::= { eltMesIssVoiceVlanOUITable 1 }
+
+EltMesIssVoiceVlanOUIEntry ::=
+    SEQUENCE {
+        eltMesIssVoiceVlanOUIPrefix
+            OCTET STRING,
+        eltMesIssVoiceVlanOUIDescription
+            DisplayString,
+        eltMesIssVoiceVlanOUIEntryRowStatus
+            RowStatus
+}
+
+eltMesIssVoiceVlanOUIPrefix OBJECT-TYPE
+    SYNTAX      OCTET STRING(SIZE(3))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The index value used to identify the OUI MAC Prefix
+             component associated with this entry. Voice VLANs OUI
+             prefix is the first 3 most significant octets
+             of the MAC address."
+    ::= { eltMesIssVoiceVlanOUIEntry 1 }
+
+eltMesIssVoiceVlanOUIDescription OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..64))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "An optional text that describes the OUI."
+    DEFVAL {""}
+    ::= { eltMesIssVoiceVlanOUIEntry 2 }
+
+eltMesIssVoiceVlanOUIEntryRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry."
+    ::= { eltMesIssVoiceVlanOUIEntry 3 }
+
+-- ----------------------------------------------------------------------------
+-- Voice Vlan Per Port Configuration Table
+-- ----------------------------------------------------------------------------
+
+eltMesIssVoiceVlanPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssVoiceVlanPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing per port configuration information
+         for Voice VLAN. All entries are permanent and will be
+         restored after the device is reset."
+    ::= { eltMesIssVlanPortConfig 4 }
+
+eltMesIssVoiceVlanPortEntry OBJECT-TYPE
+    SYNTAX      EltMesIssVoiceVlanPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Per port information for a Voice VLAN."
+    INDEX { ifIndex }
+    ::= { eltMesIssVoiceVlanPortTable 1 }
+
+EltMesIssVoiceVlanPortEntry ::=
+    SEQUENCE {
+        eltMesIssVoiceVlanPortEnable
+            TruthValue,
+        eltMesIssVoiceVlanPortVlanIndex
+            VlanIndex,
+        eltMesIssVoiceVlanPortAuthenticationBypass
+            TruthValue
+}
+
+eltMesIssVoiceVlanPortEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field contains the Voice VLAN state."
+    DEFVAL { false }
+    ::= { eltMesIssVoiceVlanPortEntry 1 }
+
+eltMesIssVoiceVlanPortVlanIndex OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field contains the Voice VLAN ID, default value means using setting
+         from eltMesIssVoiceVlanGlobalVlanIndex. Per port Voice VLAN ID takes
+         precedence over global setting."
+    DEFVAL { 0 }
+    ::= { eltMesIssVoiceVlanPortEntry 2 }
+
+eltMesIssVoiceVlanPortAuthenticationBypass OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "An optional parameter that allows to assign voice VLAN
+         without authentication via dot1x."
+    DEFVAL { false }
+    ::= { eltMesIssVoiceVlanPortEntry 3 }
+
+-- -------------------------------------------------------------------------- --
+-- Vlan Current Database Table
+-- -------------------------------------------------------------------------- --
+
+eltMesIssVlanCurrentTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesIssVlanCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing current configuration information
+         for each VLAN currently configured into the device by
+         (local or network) management, or dynamically created
+         as a result of GVRP requests received. This table
+         maintains context ID as one more index to support
+         Multiple Instances."
+    ::= { eltMesIssVlanStatistics 1 }
+
+eltMesIssVlanCurrentEntry OBJECT-TYPE
+    SYNTAX      EltMesIssVlanCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information for a VLAN configured into the device by
+         (local or network) management, or dynamically created
+         as a result of GVRP requests received."
+    INDEX   { fsDot1qVlanContextId, dot1qVlanIndex }
+    ::= { eltMesIssVlanCurrentTable 1 }
+
+EltMesIssVlanCurrentEntry ::=
+    SEQUENCE {
+        eltMesIssVlanFdbId
+            Unsigned32,
+        eltMesIssVlanStatus
+            INTEGER,
+        eltMesIssVlanCreationTime
+            TimeTicks
+    }
+
+eltMesIssVlanFdbId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Filtering Database used by this VLAN. This is one
+         of the fsDot1qFdbId values in the fsDot1qFdbTable. This
+         value is allocated automatically by the device whenever
+         the VLAN is created: either dynamically by GVRP, or by
+         management, in fsDot1qVlanStaticTable. Allocation of this
+         value follows the learning constraints defined for this
+         VLAN in fsDot1qLearningConstraintsTable."
+    ::= { eltMesIssVlanCurrentEntry 1 }
+
+eltMesIssVlanStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    other(1),
+                    permanent(2),
+                    dynamicGvrp(3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry.
+            other(1) - this entry is currently in use but the
+                conditions under which it will remain so differ
+                from the following values.
+            permanent(2) - this entry, corresponding to an entry
+                in fsDot1qVlanStaticTable, is currently in use and
+                will remain so after the next reset of the
+                device. The port lists for this entry include
+                ports from the equivalent fsDot1qVlanStaticTable
+                entry and ports learnt dynamically.
+            dynamicGvrp(3) - this entry is currently in use
+                and will remain so until removed by GVRP. There
+                is no static entry for this VLAN and it will be
+                removed when the last port leaves the VLAN."
+    ::= { eltMesIssVlanCurrentEntry 2 }
+
+eltMesIssVlanCreationTime OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of sysUpTime when this VLAN was created."
+    ::= { eltMesIssVlanCurrentEntry 3 }
+
+-- -------------------------------------------------------------------------- --
+-- Port-Security Violation Objects
+-- -------------------------------------------------------------------------- --
+
+eltMesIssPortSecLastViolationAddress OBJECT-TYPE
+    SYNTAX     MacAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Indicates the last MAC address that is exceeded port-security
+         violation constraints.
+         
+         The 00:00:00:00:00:00 MAC address means that no MAC address exceed
+         port-security violation constraints after the last system reload."
+    ::= { eltMesIssPortSecViolationObjects 1 }
+
+-- -------------------------------------------------------------------------- --
+-- Port-Security Violation notifications
+-- -------------------------------------------------------------------------- --
+
+eltMesIssPortSecViolationNotificationsPrefix
+    OBJECT IDENTIFIER ::= { eltMesIssPortSecViolationNotifications 0 }
+
+eltMesIssVlanLastMacConstraintTrap NOTIFICATION-TYPE
+    OBJECTS     {
+        eltMesIssPortSecLastViolationAddress,
+        ifIndex
+    }
+    STATUS      current
+    DESCRIPTION
+        "An eltMesIssVlanLastMacConstraintTrap is generated when the number of
+         MAC constraints is exceeded."
+    ::= { eltMesIssPortSecViolationNotificationsPrefix 1 }
+
+END

@@ -10,7 +10,7 @@
  *
  */
 
-if ($metric !== 'sensors' && device_permitted($device)) {
+if ($vars['metric'] !== 'sensors' && $metric !== 'sensors' && device_permitted($device)) {
 
     // Don't show aggregate graphs to people without device permissions, or for "all sensors" view.
 

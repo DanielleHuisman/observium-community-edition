@@ -1,0 +1,768 @@
+
+-- Copyright (C) 2009-2012 Aricent Group . All Rights Reserved
+
+-- /************************************************************************* 
+-- *  $Id: fsmptcp.mib,v 1.3 2013/06/07 13:29:41 siva Exp $                   
+-- *   
+-- *   this mib adds MI support in tcp
+-- *
+-- ************************************************************************/
+
+
+ARICENT-MI-TCP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Integer32, IpAddress, enterprises, NOTIFICATION-TYPE, Counter32 
+                                                  FROM SNMPv2-SMI
+    TruthValue                                    FROM SNMPv2-TC 
+    fsMIStdTcpConnectionEntry                     FROM ARICENT-MI-TCP-IPVX-MIB
+    InetAddress, InetAddressType, InetPortNumber       
+                                                  FROM INET-ADDRESS-MIB;
+
+fsMITcp MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "IETF SNMPv2 Working Group"
+    CONTACT-INFO "support@aricent.com"
+    DESCRIPTION
+            "This mib module is for manging TCP module with virtual routing
+             and forwarding support."
+    ::=  { enterprises aricent-communication-holding-ltd(29601) iss(2) 76 }
+
+-- Scalar object
+
+fsMITcpGlobalTraceDebug OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"This object is used to trace statements in Tcp Module."
+	::= { fsMITcp 1 }		
+
+-- End of scalar object
+
+-- Table(for making Scalar objects in fstcp.mib  to Tabular objects )
+
+fsMIContextTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF FsMIContextEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+    "This table contains the global configurations of the TCP module
+     for each VRF."
+    ::= { fsMITcp 2 }
+
+fsMIContextEntry OBJECT-TYPE
+    SYNTAX FsMIContextEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+    "An context Table Entry for particular VR."
+    INDEX { fsMITcpContextId } 
+    ::= { fsMIContextTable 1 }
+
+FsMIContextEntry ::= SEQUENCE {
+                fsMITcpContextId          Integer32,
+                fsMITcpAckOption          INTEGER,
+                fsMITcpTimeStampOption    TruthValue,
+                fsMITcpBigWndOption       TruthValue,
+                fsMITcpIncrIniWnd         TruthValue,
+                fsMITcpMaxNumOfTCB        Integer32,
+                fsMITcpTraceDebug         Integer32,
+                fsMITcpMaxReTries         Integer32,
+                fsMITcpClearStatistics    INTEGER,
+		fsMITcpTrapAdminStatus    INTEGER
+}                
+
+            fsMITcpContextId OBJECT-TYPE
+                SYNTAX Integer32 (0..65535)
+                MAX-ACCESS not-accessible
+                STATUS current
+                DESCRIPTION
+                    "The virtual router identifier to identify the VRF."
+                ::= { fsMIContextEntry 1 }
+
+            fsMITcpAckOption OBJECT-TYPE
+              SYNTAX      INTEGER {
+                          none(1),            -- Default Cumulative ACK
+                          sack(2),            -- SACK Option
+                          nak(3),             -- NACK Option
+                          fstrxmt(4)          -- FastRetransmit
+                      }
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "The algorithm used to determine the acknowledgement
+                       policy to be followed by the receiving TCP"
+              ::= { fsMIContextEntry 2  }
+
+            fsMITcpTimeStampOption OBJECT-TYPE
+              SYNTAX      TruthValue
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "A flag to note whether the Time Stamp option is
+                       enabled"
+              ::= { fsMIContextEntry 3 }
+
+            fsMITcpBigWndOption OBJECT-TYPE
+              SYNTAX      TruthValue
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "A flag to note whether the Big Window option is
+                       enabled"
+              ::= { fsMIContextEntry 4 }
+
+            fsMITcpIncrIniWnd OBJECT-TYPE
+              SYNTAX      TruthValue
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "A flag to note whether the Increased Initial
+                       Window feature is enabled"
+              ::= { fsMIContextEntry 5 }
+
+            fsMITcpMaxNumOfTCB OBJECT-TYPE
+              SYNTAX      Integer32
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "Maximum Number of TCP connections."
+              ::= { fsMIContextEntry 6 }
+
+            fsMITcpTraceDebug OBJECT-TYPE
+              SYNTAX      Integer32
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      " This is used to enable Trace Statements in context table.
+                A four byte integer value is specified for enabling the level
+                of tracing.Each Bit in the four byte integer variable represents
+                a level of Trace. The bits represents the levels as
+                follows: 0 - Init and Shutdown, 1 - Management, 2 - Data Path,
+                3 - Control Plane, 4 - packet Dump, 5 - All resources except
+                buffer, 6 - All Failures, 7 - Buffer, 8 - Function Entry And
+                Exit, 9 - Finite State Machine and 10 - Output State Machine.
+                The remaining bits are unused. The combination of levels are
+                allowed."
+              ::= { fsMIContextEntry 7 }
+
+            fsMITcpMaxReTries OBJECT-TYPE
+              SYNTAX      Integer32 (1..12)
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      " When data send is not acknowledged , TCP re-transmits the data.
+                      This object is used to configure either INDEX or AUGMENTS may be used, but not boththe maximum retries for
+                      re-transmission in Tcp Module."
+              ::= { fsMIContextEntry 8 }
+
+            fsMITcpClearStatistics OBJECT-TYPE
+	      SYNTAX      INTEGER {
+		disable(0),
+		enable(1)
+		} 
+	       MAX-ACCESS  read-write
+	      STATUS      current
+              DESCRIPTION
+		     "When this object is set to enable this will reset the statistics obtained for that context. This object cannot be
+			set to disable. Get of the object will always return disable"
+              DEFVAL  { 0 }
+		::= { fsMIContextEntry 9 }
+	    
+	    fsMITcpTrapAdminStatus OBJECT-TYPE
+              SYNTAX        INTEGER
+                            {
+                                enabled (1),
+                                disabled (2)
+                            }
+              MAX-ACCESS    read-write
+              STATUS        current
+              DESCRIPTION
+                    "If this object is set to disable, then the NOTIFICATION 
+                     messages wont be sent to the SNMP Manager.
+                     If enabled, NOTIFICATION messages are sent."
+              DEFVAL  { disabled }
+              ::= { fsMIContextEntry 10 }
+
+-- End of Context Table
+
+
+-- Tcp Connection Table
+
+ fsMITcpConnTable OBJECT-TYPE
+              SYNTAX      SEQUENCE OF FsMITcpConnEntry
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "A table containing TCP connection-specific
+                      information for each virtual router."
+              ::= { fsMITcp 3 }
+
+          fsMITcpConnEntry OBJECT-TYPE
+              SYNTAX      FsMITcpConnEntry
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "Information about a particular current TCP
+                      connection.  An object of this type is transient,
+                      in that it ceases to exist when (or soon after)
+                      the connection makes the transition to the CLOSED
+                      state."	
+              INDEX   { fsMITcpContextId,
+			fsMITcpConnLocalAddress,
+                        fsMITcpConnLocalPort,
+                        fsMITcpConnRemAddress,
+                        fsMITcpConnRemPort }
+              ::= { fsMITcpConnTable 1 }
+
+ FsMITcpConnEntry ::= SEQUENCE {
+                  fsMITcpConnLocalAddress IpAddress,
+                  fsMITcpConnLocalPort    Integer32,
+                  fsMITcpConnRemAddress   IpAddress,
+                  fsMITcpConnRemPort      Integer32,
+                  fsMITcpConnOutState     Integer32,
+                  fsMITcpConnSWindow      Integer32,
+                  fsMITcpConnRWindow      Integer32,
+                  fsMITcpConnCWindow      Integer32,
+                  fsMITcpConnSSThresh     Integer32,
+                  fsMITcpConnSMSS        Integer32,
+                  fsMITcpConnRMSS        Integer32,
+                  fsMITcpConnSRT         Integer32,
+                  fsMITcpConnRTDE        Integer32,
+                  fsMITcpConnPersist     Integer32,
+                  fsMITcpConnRexmt       Integer32,
+                  fsMITcpConnRexmtCnt    Integer32,
+                  fsMITcpConnSBCount     Integer32,
+                  fsMITcpConnSBSize      Integer32,
+                  fsMITcpConnRBCount     Integer32,
+                  fsMITcpConnRBSize      Integer32,
+                  fsMITcpKaMainTmr       Integer32,
+                  fsMITcpKaRetransTmr    Integer32,
+                  fsMITcpKaRetransCnt    Integer32
+}
+
+              
+            fsMITcpConnLocalAddress OBJECT-TYPE
+              SYNTAX      IpAddress
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "The local IP address for this TCP connection.  In
+                      the case of a connection in the listen state which
+                      is willing to accept connections for any IP
+                      interface associated with the node, the value
+                      0.0.0.0 is used."
+              ::= { fsMITcpConnEntry 2 }
+
+            fsMITcpConnLocalPort OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "The local port number for this TCP connection."
+              ::= { fsMITcpConnEntry 3 }
+
+            fsMITcpConnRemAddress OBJECT-TYPE
+              SYNTAX      IpAddress
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "The remote IP address for this TCP connection."
+              ::= { fsMITcpConnEntry 4 }
+
+            fsMITcpConnRemPort OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "The remote port number for this TCP connection."
+              ::= { fsMITcpConnEntry 5 }
+
+            fsMITcpConnOutState OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The output state for this TCP connection."
+              ::= { fsMITcpConnEntry 6 }
+
+            fsMITcpConnSWindow OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The send window(SND.WND) for this TCP connection. It
+                       indicates the amount of data that the peer TCP is willing
+                       to accept."
+              ::= { fsMITcpConnEntry 7 }
+
+            fsMITcpConnRWindow OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The receive window(RCV.WND) for this TCP connection. It
+                       indicates the amount of data that TCP is willing to
+                       accept."
+              ::= { fsMITcpConnEntry 8 }
+
+            fsMITcpConnCWindow OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The congestion window for this TCP connection."
+              ::= { fsMITcpConnEntry 9 }
+
+            fsMITcpConnSSThresh OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The slow start thresh-hold for this TCP connection. It
+                       indicates the window size limit crossing which TCP
+                       transitions from the slow start phase to congestion
+                       avoidance phase."
+              ::= { fsMITcpConnEntry 10 }
+
+            fsMITcpConnSMSS OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The send maximum segment size for this TCP connection.
+                       It is negotiated during connection establishment."
+              ::= { fsMITcpConnEntry 11 }
+
+            fsMITcpConnRMSS OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The receive maximum segment size for this TCP connection"
+              ::= { fsMITcpConnEntry 12 }
+
+            fsMITcpConnSRT OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The smooth round trip time for this TCP connection. It is
+                       updated based on the round trip time."
+              ::= { fsMITcpConnEntry 13 }
+
+            fsMITcpConnRTDE OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The round trip deviation estimator for this TCP
+                       connection. It is updated based on the round trip time."
+              ::= { fsMITcpConnEntry 14 }
+
+            fsMITcpConnPersist OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The persist timeout value for this TCP connection"
+              ::= { fsMITcpConnEntry 15 }
+
+            fsMITcpConnRexmt OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The retransmit timeout value for this TCP connection"
+              ::= { fsMITcpConnEntry 16 }
+
+            fsMITcpConnRexmtCnt OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The no of retransmissions for this TCP connection"
+              ::= { fsMITcpConnEntry 17 }
+
+            fsMITcpConnSBCount OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The number of valid bytes from the send buffer which are
+                       to be sent to the peer TCP for this TCP connection"
+              ::= { fsMITcpConnEntry 18 }
+
+            fsMITcpConnSBSize OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The send buffer size for this TCP connection"
+              ::= { fsMITcpConnEntry 19 }
+
+            fsMITcpConnRBCount OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The number of valid bytes from the receive buffer which
+                       are to be sent to the upper application for this TCP
+                       connection."
+              ::= { fsMITcpConnEntry 20 }
+
+            fsMITcpConnRBSize OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The receive buffer size for this TCP connection."
+              ::= { fsMITcpConnEntry 21 }
+
+            fsMITcpKaMainTmr OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "The main timeout value used for Keepalive"
+              ::= { fsMITcpConnEntry 22 }
+
+            fsMITcpKaRetransTmr OBJECT-TYPE
+              SYNTAX      Integer32 (0..255)
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "The retransmission timeout used for Keepalive"
+              ::= { fsMITcpConnEntry 23 }
+
+            fsMITcpKaRetransCnt OBJECT-TYPE
+              SYNTAX      Integer32 (0..255)
+              MAX-ACCESS  read-write
+              STATUS      current
+              DESCRIPTION
+                      "The no. of retransmissions before aborting the connection during Keepalive"
+              ::= { fsMITcpConnEntry 24 }
+
+-- End of TCP connection Table
+
+-- TCP Connection Extension Table (RFC 2385 & RFC 5925)
+
+          fsMITcpExtConnTable OBJECT-TYPE
+              SYNTAX      SEQUENCE OF FsMITcpExtConnEntry
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "A table containing TCP connection-specific
+                      TCP MD5 & TCP-AO  information."
+              ::= { fsMITcp 4 }
+
+
+          fsMITcpExtConnEntry OBJECT-TYPE
+              SYNTAX      FsMITcpExtConnEntry
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "Information about a particular current TCP
+                      connection.  An object of this type is transient,
+                      in that it ceases to exist when (or soon after)
+                      the connection makes the transition to the CLOSED
+                      state."	
+            AUGMENTS { fsMIStdTcpConnectionEntry }
+              ::= { fsMITcpExtConnTable 1 }
+
+          FsMITcpExtConnEntry ::= SEQUENCE {
+                  fsMITcpConnMD5Option TruthValue,
+                  fsMITcpConnMD5ErrCtr Integer32,
+                  fsMITcpConnTcpAOOption TruthValue,
+                  fsMITcpConTcpAOCurKeyId  Integer32,
+                  fsMITcpConTcpAORnextKeyId Integer32,
+                  fsMITcpConTcpAORcvKeyId    Integer32,
+                  fsMITcpConTcpAORcvRnextKeyId Integer32,
+                  fsMITcpConTcpAOConnErrCtr Counter32,
+                  fsMITcpConTcpAOSndSne Integer32,
+                  fsMITcpConTcpAORcvSne Integer32
+              } 
+	
+          fsMITcpConnMD5Option OBJECT-TYPE
+              SYNTAX      TruthValue
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "A flag to note if MD5 option is enabled for this TCP connection."
+              ::= { fsMITcpExtConnEntry 1 }
+
+          fsMITcpConnMD5ErrCtr OBJECT-TYPE
+              SYNTAX      Integer32 (0..65535)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                      "The number of incoming segments dropped due to MD5 authentication failure"
+              ::= { fsMITcpExtConnEntry 2 }
+          fsMITcpConnTcpAOOption OBJECT-TYPE
+              SYNTAX      TruthValue
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "A flag to note if TCP-AO option is enabled for 
+                     this TCP connection."
+              ::= { fsMITcpExtConnEntry 3 }
+
+          fsMITcpConTcpAOCurKeyId OBJECT-TYPE
+              SYNTAX      Integer32 (0..255)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "Indicates the send key id of the MKT currently 
+                     used by this TCP session"
+              ::= { fsMITcpExtConnEntry 4 }
+          fsMITcpConTcpAORnextKeyId OBJECT-TYPE
+              SYNTAX      Integer32 (0..255)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "Indicates the receive key id of the MKT currently 
+                     preferred by the sender for authenticating 
+                     incoming packets. If the sender wants to change the
+                     currently used MKT this field will be updated
+                     with receive id of the new MKT. It is filled
+                     in the RnextKeyId field of the outgoing packets"
+              ::= { fsMITcpExtConnEntry 5 }
+          fsMITcpConTcpAORcvKeyId OBJECT-TYPE
+              SYNTAX      Integer32 (0..255)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "Indicates the value in the keyId field of 
+                     the latest received packet on this connection"
+              ::= { fsMITcpExtConnEntry 6 }
+          fsMITcpConTcpAORcvRnextKeyId OBJECT-TYPE
+              SYNTAX      Integer32 (0..255)
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "Indicates the value in the RNextKeyId field of 
+                     the latest received packet on this connection"
+              ::= { fsMITcpExtConnEntry 7 }
+          fsMITcpConTcpAOConnErrCtr OBJECT-TYPE
+              SYNTAX      Counter32 
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "The number of incoming segments dropped due to 
+                     TCP-AO authentication failure"
+              ::= { fsMITcpExtConnEntry 8 }
+          fsMITcpConTcpAOSndSne  OBJECT-TYPE
+              SYNTAX      Integer32
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "Send side SNE(Sequence Number Extension). 
+                     SNE increments whenever the tcp sequence number 
+                     rolls over, so that differentiation between TCP
+                     segments with same sequence number at different 
+                     times in a connection is possible."
+              ::= { fsMITcpExtConnEntry 9 }
+          fsMITcpConTcpAORcvSne  OBJECT-TYPE
+              SYNTAX      Integer32
+              MAX-ACCESS  read-only
+              STATUS      current
+              DESCRIPTION
+                    "Receive side SNE(Sequence Number Extension). 
+                     SNE increments whenever the tcp sequence number 
+                     rolls over, so that differentiation between TCP
+                     segments with same sequence number at different 
+                     times in a connection is possible."
+              ::= { fsMITcpExtConnEntry 10 }
+-- End of TCP Connection Extension Table
+-- TCP traps
+          fsMITcpNotification OBJECT IDENTIFIER ::= {fsMITcp 5}
+          fsMITcpTrap         OBJECT IDENTIFIER ::= {fsMITcpNotification 0}
+          fsMITcpObjects      OBJECT IDENTIFIER ::= {fsMITcpNotification 1}
+          fsMITcpAoLocalAddressType OBJECT-TYPE
+              SYNTAX      InetAddressType
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the addresstype of local address of 
+                    a tcp connection. Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 1 }
+          fsMITcpAoLocalAddress OBJECT-TYPE
+              SYNTAX      InetAddress
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the local address of a 
+                    tcp connection. Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 2 }
+          fsMITcpAoLocalPort OBJECT-TYPE
+              SYNTAX      InetPortNumber
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the local port of a 
+                    tcp connection. Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 3 }
+          fsMITcpAoRemAddressType OBJECT-TYPE
+              SYNTAX      InetAddressType
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the addresstype of remote address of 
+                    a tcp connection. Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 4 }
+          fsMITcpAoRemAddress OBJECT-TYPE
+              SYNTAX      InetAddress
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the remote address of a 
+                    tcp connection. Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 5 }
+          fsMITcpAoRemPort OBJECT-TYPE
+              SYNTAX      InetPortNumber
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the remote port of a 
+                    tcp connection. Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 6 }
+          fsMITcpAoContextId OBJECT-TYPE
+              SYNTAX      Integer32 
+              MAX-ACCESS  accessible-for-notify
+              STATUS      current
+              DESCRIPTION
+                   "The virtual router identifier to identify the VRF. 
+                    Used for sending TCP specific Traps."
+              ::= { fsMITcpObjects 7 }
+          fsMITcpAoAuthError NOTIFICATION-TYPE
+              OBJECTS  {
+                         fsMITcpAoContextId,
+                         fsMITcpAoLocalAddressType,
+                         fsMITcpAoLocalAddress,
+                         fsMITcpAoLocalPort,
+                         fsMITcpAoRemAddressType,
+                         fsMITcpAoRemAddress,
+                         fsMITcpAoRemPort,
+                         fsMITcpConTcpAOConnErrCtr  
+                       }
+              STATUS      current
+              DESCRIPTION
+                  "A fsMITcpTcpAoAuthError trap is generated when TCP-AO
+                   authentication fails for incoming packets on a
+                   particular TCP connection"
+              ::= {fsMITcpTrap 1}
+-- TCP objects for TCP-AO testing
+          fsMITcpAoConnTestTable OBJECT-TYPE
+              SYNTAX      SEQUENCE OF FsMITcpAoConnTestEntry
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "A table containing TCP connection-specific
+                       TCP-AO information for testing purpose alone."
+              ::= { fsMITcp 6 }
+          fsMITcpAoConnTestEntry OBJECT-TYPE
+              SYNTAX      FsMITcpAoConnTestEntry
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                      "Information about a particular current TCP
+                      connection for testing."
+              INDEX {
+                        fsMITcpContextId,
+                        fsMITcpAoConnTestLclAdrType,
+                        fsMITcpAoConnTestLclAdress,
+                        fsMITcpAoConnTestLclPort,
+                        fsMITcpAoConnTestRmtAdrType,
+                        fsMITcpAoConnTestRmtAdress,
+                        fsMITcpAoConnTestRmtPort
+                    }
+              ::= { fsMITcpAoConnTestTable 1 }
+          FsMITcpAoConnTestEntry ::=
+              SEQUENCE {
+                  fsMITcpAoConnTestLclAdrType
+                      InetAddressType,
+                  fsMITcpAoConnTestLclAdress
+                      InetAddress,
+                  fsMITcpAoConnTestLclPort
+                      InetPortNumber,
+                  fsMITcpAoConnTestRmtAdrType
+                      InetAddressType,
+                  fsMITcpAoConnTestRmtAdress
+                      InetAddress,
+                  fsMITcpAoConnTestRmtPort
+                      InetPortNumber,
+                  fsMITcpConTcpAOIcmpIgnCtr
+                      Counter32,
+                  fsMITcpConTcpAOSilentAccptCtr
+                      Counter32
+              }
+          fsMITcpAoConnTestLclAdrType OBJECT-TYPE
+              SYNTAX      InetAddressType
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the addresstype of local address of 
+                    a tcp connection. Used for testing TCP-AO."
+              ::= { fsMITcpAoConnTestEntry 2 }
+          fsMITcpAoConnTestLclAdress OBJECT-TYPE
+              SYNTAX      InetAddress
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the local address of a 
+                    tcp connection. Used for testing TCP-AO"
+              ::= { fsMITcpAoConnTestEntry 3 }
+          fsMITcpAoConnTestLclPort OBJECT-TYPE
+              SYNTAX      InetPortNumber
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the local port of a 
+                    tcp connection. Used for testing TCP-AO"
+              ::= { fsMITcpAoConnTestEntry 4 }
+          fsMITcpAoConnTestRmtAdrType OBJECT-TYPE
+              SYNTAX      InetAddressType
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the addresstype of local address of 
+                    a tcp connection. Used for testing TCP-AO."
+              ::= { fsMITcpAoConnTestEntry 5 }
+          fsMITcpAoConnTestRmtAdress OBJECT-TYPE
+              SYNTAX      InetAddress
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the local address of a 
+                    tcp connection. Used for testing TCP-AO"
+              ::= { fsMITcpAoConnTestEntry 6 }
+          fsMITcpAoConnTestRmtPort OBJECT-TYPE
+              SYNTAX      InetPortNumber
+              MAX-ACCESS  not-accessible
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the local port of a 
+                    tcp connection. Used for testing TCP-AO"
+              ::= { fsMITcpAoConnTestEntry 7 }
+          fsMITcpConTcpAOIcmpIgnCtr OBJECT-TYPE
+              SYNTAX      Counter32
+              MAX-ACCESS  read-only 
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the number of ICMPv4 
+                    type 3 and ICMPv6 type 1 messages ignored on 
+                    this tcp connection. Used for testing TCP-AO"
+              ::= { fsMITcpAoConnTestEntry 8 }
+          fsMITcpConTcpAOSilentAccptCtr OBJECT-TYPE
+              SYNTAX      Counter32
+              MAX-ACCESS  read-only 
+              STATUS      current
+              DESCRIPTION
+                   "This object refers to the number of TCP-AO silent 
+                    accepts (due to no matching MKT config for 
+                    a received segment with TCP-AO option) 
+                    on this connection.  Used for testing TCP-AO"
+              ::= { fsMITcpAoConnTestEntry 9 }
+END

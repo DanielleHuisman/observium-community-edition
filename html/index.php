@@ -53,14 +53,12 @@ ob_start('html_callback');
 <head>
     <base href="<?php echo(escape_html($config['base_url'])); ?>"/>
     <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
 
+    <!-- ##META-EQUIV_CACHE## -->
     <!-- ##META_CACHE## -->
     <!-- ##CSS_CACHE## -->
     <!-- ##STYLE_CACHE## -->
     <!-- ##JS_CACHE## -->
-    <!--[if lt IE 9]>
-    <script src="js/html5shiv.min.js"></script><![endif]-->
     <?php
 
     ini_set('allow_url_fopen', 0);
@@ -91,10 +89,23 @@ ob_start('html_callback');
         $_SESSION['mode'] = $config['themes'][$_SESSION['theme']]['type'];
     }
 
+
+?>
+
+    <script type="text/javascript">
+        var themeName = "<?php echo $_SESSION['theme']; ?>";
+        var themeMode = "<?php echo $_SESSION['mode']; ?>";
+        console.log(themeName, themeMode);
+    </script>
+
+<?php
+
+
     register_html_resource('css', $config['themes'][$_SESSION['theme']]['css'] ?? 'observium.css');
 
     //register_html_resource('css', 'jquery.qtip.min.css');
-    register_html_resource('css', 'sprite.css');
+    //register_html_resource('css', 'sprite.css');
+    register_html_resource('css', 'svg-sprite.css');
 
     register_html_resource('js', 'jquery.min.js');
     register_html_resource('js', 'jquery-migrate.min.js'); // required for unsupported js libs (ie qtip2)
@@ -113,12 +124,13 @@ ob_start('html_callback');
         register_html_resource('css', 'c3.min.css');
 
         register_html_resource('js', 'observium.js');
+        register_html_resource('js', 'observium-entities.js');
         register_html_resource('js', 'd3.min.js');
         register_html_resource('js', 'c3.min.js');
 
         $vars = get_vars(); // Parse vars from GET/POST/URI
 
-        if ($vars['export'] === 'yes') // This is for display XML on export pages
+        if (get_var_true($vars['export'])) // This is for display XML on export pages
         {
             // Code prettify (but it's still horrible)
             register_html_resource('js', 'google-code-prettify.js');
@@ -158,7 +170,16 @@ ob_start('html_callback');
 
 if ($_SESSION['authenticated']) {
     // Determine type of web browser.
-    $browser_type = detect_browser()['type'];
+    $browser = detect_browser();
+
+    // FIXME. Old MS IE..Someone still use it (for observium)???
+    // https://stackoverflow.com/questions/22059060/is-it-still-valid-to-use-ie-edge-chrome-1
+    if ($browser['browser'] === 'MSIE') {
+        register_html_resource('js', 'html5shiv.min.js');
+        register_html_meta('X-UA-Compatible', 'IE=edge,chrome=1', 'http-equiv');
+    }
+
+    $browser_type = $browser['type'];
     if ($browser_type === 'mobile' || $browser_type === 'tablet') {
         session_set_var('touch', 'yes');
     }
@@ -202,11 +223,8 @@ if ($_SESSION['authenticated']) {
 
 <?php
 
-// Execute form actions
-if (isset($vars['action']) && is_alpha($vars['action']) &&
-    is_file($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php")) {
-    include($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php");
-}
+// Execute (not ajax) form actions
+form_action($vars);
 
 // Output UI Alerts
 echo '##UI_ALERTS##';
@@ -264,7 +282,7 @@ if (is_alpha($vars['page'])) {
 }
 
 // HTTP runtime and memory size
-$gentime  = utime() - $runtime_start;
+$gentime  = elapsed_time($runtime_start);
 $fullsize = memory_get_usage();
 unset($cache);
 $cachesize = $fullsize - memory_get_usage();
@@ -306,6 +324,10 @@ if (get_obs_attrib('alerts_require_rebuild')) {
 }
 
 foreach ($alerts as $alert) {
+    if (isset($alert['markdown']) && $alert['markdown']) {
+        $alert['text']  = get_markdown($alert['text'], TRUE, TRUE);
+        $alert['title'] = get_markdown($alert['title'], TRUE, TRUE);
+    }
     register_html_alert($alert['text'], $alert['title'], $alert['severity']);
 }
 

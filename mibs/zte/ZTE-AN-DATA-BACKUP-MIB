@@ -1,0 +1,480 @@
+ZTE-AN-DATA-BACKUP-MIB    DEFINITIONS ::= BEGIN
+    IMPORTS     
+        DisplayString                     FROM SNMPv2-TC
+        DateAndTime                       FROM SNMPv2-TC
+        MODULE-IDENTITY                   FROM SNMPv2-SMI
+        OBJECT-TYPE                       FROM SNMPv2-SMI
+        Integer32                         FROM SNMPv2-SMI
+        NOTIFICATION-TYPE                 FROM SNMPv2-SMI
+        MODULE-COMPLIANCE                 FROM SNMPv2-CONF
+        OBJECT-GROUP                      FROM SNMPv2-CONF
+        NOTIFICATION-GROUP                FROM SNMPv2-CONF
+        zxAn                              FROM ZTE-AN-TC-MIB;
+
+
+    zxAnDataBackupMib  MODULE-IDENTITY
+        LAST-UPDATED    "201105260000Z"
+        ORGANIZATION    "ZTE Corporation"
+        CONTACT-INFO    "Zhou YuBin      ZTE Corporation
+                         Mail: zhou.yubing@zte.com.cn
+                         Tel : +86-21-68897315"
+        DESCRIPTION  "This MIB defines zte Access Node data backup management."
+        
+        REVISION      "201105260000Z"
+        DESCRIPTION
+        "Initial version of this MIB module."
+        ::=  {  zxAn   18  }  
+    
+-------------------------------------------------------------------------------
+-- Following management objects are defined.
+-- 1. Automatic Backup Configuration Table
+-- 2. Manual Backup Configuration Table
+-- 3. Backup Status Table
+
+-- Following notification objects are defined.
+-- 21. Backup Notification
+
+-- Following conformance information is defined.
+-- 31. Backup Conformance
+
+-------------------------------------------------------------------------------
+zxAnDataBackupObjects        OBJECT IDENTIFIER ::= {zxAnDataBackupMib 2}
+
+zxAnDataBackupNotifications  OBJECT IDENTIFIER ::= {zxAnDataBackupMib 3}
+
+-------------------------------------------------------------------------------
+-- 1. Automatic Backup Configuration Table
+------------------------------------------------------------------------------- 
+
+    zxAnDataAutoBackupConfTable   OBJECT-TYPE
+        SYNTAX          SEQUENCE  OF  ZxAnDataAutoBackupConfEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "Automatic backup configuration table."
+        ::=  { zxAnDataBackupObjects  5 }
+        
+    zxAnDataAutoBackupConfEntry   OBJECT-TYPE
+        SYNTAX          ZxAnDataAutoBackupConfEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "Automatic backup configuration entry.   
+            
+            The multi-variables binding rule should be complied with when a 
+            manager configure automatic data backup. According to this rule, 
+            all the related mib variables must be included in one SNMP set 
+            operation.
+                    
+            There are two types of variables: mandatory and optional.
+            All of the mandatory variables must be included in one SNMP set 
+            operation. Optional variables may be included in one SNMP set 
+            operation with the mandatory variables, but must not be used alone. 
+                    
+            To configure automatic data backup, there are several cases 
+            based on the variable zxAnDataAutoBackupType. The mandatory and 
+            optional variables are different in each case.
+             
+            Case 1: to enable periodic data backup
+            when zxAnDataAutoBackupType is 
+            periodBackupConfiguration(1):    
+            periodBackupLog(3):
+            periodBackupSoftware(5):
+                mandatoty: zxAnDataAutoBackupEnable, 
+                           zxAnDataAutoBackupStartTime, 
+                           zxAnDataAutoBackupInterval
+                optional : none
+
+            Case 2: to enable periodic data backup when configuration is 
+            changed when zxAnDataAutoBackupType is 
+            backupConfigurationWhenChanged(31):
+                mandatoty: zxAnDataAutoBackupEnable, 
+                           zxAnDataAutoBackupHoldOffTime,
+                           zxAnDataAutoBackupMaxHoldOffTime
+                optional : none
+            "        
+            
+        INDEX   { zxAnDataAutoBackupType }
+        ::=  { zxAnDataAutoBackupConfTable 1 }
+    
+    ZxAnDataAutoBackupConfEntry  ::=  SEQUENCE {
+        zxAnDataAutoBackupType            INTEGER,
+        zxAnDataAutoBackupEnable          INTEGER,
+        zxAnDataAutoBackupStartTime       DateAndTime,
+        zxAnDataAutoBackupInterval        Integer32,
+        zxAnDataAutoBackupHoldOffTime     Integer32,
+        zxAnDataAutoBackupMaxHoldOffTime  Integer32     
+        }
+        
+    zxAnDataAutoBackupType      OBJECT-TYPE 
+        SYNTAX          INTEGER  {
+            periodBackupConfiguration(1),
+            periodBackupLog(3),
+            periodBackupSoftware(5),
+            backupConfigurationWhenChanged(31)               
+        }       
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "The type of automatic backup.
+            periodBackupConfiguration(1): The configuration files are backed up 
+            to the server periodically.
+            periodBackupLog(3): The logs are backed up to the server 
+            periodically.
+            periodBackupSoftware(5): The software files are backed up to 
+            the server periodically.
+            backupConfigurationWhenChanged(31): The configuration files are 
+            backed up to the server on condition that configuration is changed.
+            "
+        ::=  {  zxAnDataAutoBackupConfEntry  1  }
+        
+    zxAnDataAutoBackupEnable       OBJECT-TYPE 
+        SYNTAX          INTEGER  {
+            enable(1),
+            disable(2)            
+        }       
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     
+            "Enables or disables automatic backup function."
+        DEFVAL  { disable }
+        ::=  {  zxAnDataAutoBackupConfEntry  2  }    
+              
+    zxAnDataAutoBackupStartTime       OBJECT-TYPE 
+        SYNTAX          DateAndTime
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     
+            "The start time of periodical automatic backup.            
+            For example:yyyy-mm-dd HH:MM:SS.(2001-01-01 02:22:33)."          
+        ::=  {  zxAnDataAutoBackupConfEntry  3  }
+     
+    zxAnDataAutoBackupInterval   OBJECT-TYPE 
+        SYNTAX          Integer32( 0..8760 )
+        UNITS           "hours"   
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+            "The interval of periodical automatic backup.
+            Value 0 means unconfigured." 
+        DEFVAL    { 24 }      
+        ::=  {  zxAnDataAutoBackupConfEntry  4  }
+        
+    zxAnDataAutoBackupHoldOffTime   OBJECT-TYPE 
+        SYNTAX          Integer32( 0..8760 ) 
+        UNITS           "hours"   
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+            "The hold off time of automatic backup.
+            This variable is valid if zxAnDataAutoBackupType is 
+            backupConfigurationWhenChanged(31).
+            Value 0 means unconfigured." 
+        DEFVAL    { 1 }      
+        ::=  {  zxAnDataAutoBackupConfEntry  5  }
+    
+    zxAnDataAutoBackupMaxHoldOffTime   OBJECT-TYPE 
+        SYNTAX          Integer32( 0..8760 )  
+        UNITS           "hours"   
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+            "The maximum hold off time of automatic backup.
+            This variable is valid if zxAnDataAutoBackupType is 
+            backupConfigurationWhenChanged(31).
+            Value 0 means unconfigured."              
+        DEFVAL    { 24 }      
+        ::=  {  zxAnDataAutoBackupConfEntry  6  }
+
+-------------------------------------------------------------------------------
+-- 2. Automatic Backup Configuration Table
+-------------------------------------------------------------------------------
+    zxAnDataManualBackupConfTable   OBJECT-TYPE
+        SYNTAX          SEQUENCE  OF  ZxAnDataManualBackupConfEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "Automatic backup configuration table."
+        ::=  { zxAnDataBackupObjects  6 }
+        
+    zxAnDataManualBackupConfEntry   OBJECT-TYPE
+        SYNTAX          ZxAnDataManualBackupConfEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "Manual backup configuration entry.    
+            "
+        INDEX   { zxAnDataManualBackupType }
+        ::=  { zxAnDataManualBackupConfTable 1 }
+    
+    ZxAnDataManualBackupConfEntry  ::=  SEQUENCE {
+        zxAnDataManualBackupType    INTEGER,
+        zxAnDataManualBackupAction  INTEGER  
+        }
+        
+    zxAnDataManualBackupType      OBJECT-TYPE
+        SYNTAX          INTEGER  {
+            manualBackupConfiguration(2),
+            manualBackupLog(4),
+            manualBackupSoftware(6)
+        }       
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "The type of manual backup.
+            ManualBackupConfiguration(2): The configuration files are backed up 
+            to the server manually.
+            ManualBackupLog(4): The logs are backed up to the server 
+            manually.
+            manualBackupSoftware(6): The software files are backed up to 
+            the server manually."
+        ::=  {  zxAnDataManualBackupConfEntry  1  }
+        
+    zxAnDataManualBackupAction       OBJECT-TYPE 
+        SYNTAX          INTEGER  {
+            start(1)            
+        }       
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     
+            "It means to start the manual backup immediately.
+            This variable is valid if it is a periodical automatic backup."
+        ::=  {  zxAnDataManualBackupConfEntry   2  }
+-------------------------------------------------------------------------------
+-- 3. Backup Status Table
+-------------------------------------------------------------------------------  
+
+    zxAnDataBackupStatusTable   OBJECT-TYPE
+        SYNTAX          SEQUENCE  OF  ZxAnDataBackupStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "Automatic backup status table."
+        ::=  { zxAnDataBackupObjects  7 }
+        
+    zxAnDataBackupStatusEntry   OBJECT-TYPE
+        SYNTAX          ZxAnDataBackupStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "Automatic backup status entry."
+        INDEX   { zxAnDataBackupType }
+        ::=  { zxAnDataBackupStatusTable 1 } 
+
+    ZxAnDataBackupStatusEntry  ::=  SEQUENCE {
+        zxAnDataBackupType                 INTEGER,
+        zxAnDataBackupCurrStartTime        DateAndTime,
+        zxAnDataBackupCurrFileName         DisplayString,
+        zxAnDataBackupCurrFileSize         Integer32,
+        zxAnDataBackupCurrFileProgress     Integer32,
+        zxAnDataBackupTotalFiles           Integer32,
+        zxAnDataBackupSuccessFiles         Integer32,     
+        zxAnDataBackupStatus               INTEGER,
+        zxAnDataBackupFailedReason         INTEGER     
+        }     
+   
+    zxAnDataBackupType      OBJECT-TYPE 
+        SYNTAX          INTEGER  {
+            periodBackupConfiguration(1),
+            manualBackupConfiguration(2),
+            periodBackupLog(3),
+            manualBackupLog(4),
+            periodBackupSoftware(5),
+            manualBackupSoftware(6),
+            backupConfigurationWhenChanged(31)               
+        }       
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "The type of backup.
+            periodBackupConfiguration(1): The configuration files are backed up 
+                                          to the server periodically.
+            ManualBackupConfiguration(2): The configuration files are backed up 
+                                          to the server manually.
+            periodBackupLog(3):           The logs are backed up to the server 
+                                          periodically.
+            ManualBackupLog(4):           The logs are backed up to the server 
+                                          manually.
+            periodBackupSoftware(5):      The software files are backed up to 
+                                          the server periodically.
+            ManualBackupSoftware(6):      The software files are backed up to 
+                                          the server manually.
+            backupConfigurationWhenChanged(31): The configuration files are 
+                                          backed up to the server on condition 
+                                          that configuration is changed.
+            "
+        ::=  {  zxAnDataBackupStatusEntry  1  }
+   
+   zxAnDataBackupCurrStartTime       OBJECT-TYPE 
+        SYNTAX          DateAndTime 
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The start time of current backup.            
+            For example:yyyy-mm-dd HH:MM:SS.(2001-01-01 02:22:33)."      
+        ::=  {  zxAnDataBackupStatusEntry  2  } 
+        
+    zxAnDataBackupCurrFileName       OBJECT-TYPE 
+        SYNTAX          DisplayString  ( SIZE ( 0 .. 64  ) ) 
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The name of current file which is backed up to the server."
+        ::=  {  zxAnDataBackupStatusEntry  3  }  
+
+    zxAnDataBackupCurrFileSize       OBJECT-TYPE 
+        SYNTAX          Integer32
+        UNITS           "bytes"
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The size of current file which is backed up to the server."
+        ::=  {  zxAnDataBackupStatusEntry  4  }  
+    
+    zxAnDataBackupCurrFileProgress       OBJECT-TYPE 
+        SYNTAX          Integer32  ( 0 .. 100  )  
+        UNITS           "percent"   
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION 
+             "The backing up progress of current file." 
+        ::=  {  zxAnDataBackupStatusEntry  5  }
+        
+    zxAnDataBackupTotalFiles       OBJECT-TYPE     
+        SYNTAX          Integer32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "Total count of files will be backed up."
+        ::=  {  zxAnDataBackupStatusEntry  6  }     
+
+    zxAnDataBackupSuccessFiles       OBJECT-TYPE     
+        SYNTAX          Integer32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "Count of files which are backed up successfully."           
+        ::=  {  zxAnDataBackupStatusEntry  7  }     
+        
+    zxAnDataBackupStatus       OBJECT-TYPE 
+        SYNTAX          INTEGER  {
+            notStarted(1),
+            inProgress(2),
+            success(3),
+            failed(4)               
+        }       
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "Backup status."
+        ::=  {  zxAnDataBackupStatusEntry  8  }
+
+    zxAnDataBackupFailedReason       OBJECT-TYPE     
+        SYNTAX          INTEGER  {
+            noError(1),        
+            configSaving(2),
+            backupInProgress(3),
+            fileServerUnconfigured(4),
+            fileServerConnectFailed(5),
+            fileServerLoginFailed(6), 
+            fileServerPathError(7),
+            fileServerProtocolTypeError(8),      
+            fileAccessError(9), 
+            otherErrors(255)            
+        }         
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The failed reason of backup."
+        ::=  {  zxAnDataBackupStatusEntry  9  } 
+        
+-------------------------------------------------------------------------------
+-- 21 Backup Notification
+-------------------------------------------------------------------------------
+
+    zxAnDataBackupFinished NOTIFICATION-TYPE
+        OBJECTS { zxAnDataBackupCurrStartTime, zxAnDataBackupStatus,
+                  zxAnDataBackupFailedReason}
+        STATUS  current
+        DESCRIPTION
+            "A zxAnDataBackupFinished is sent when the agent has detected that 
+            the file backup is finished."
+        ::= { zxAnDataBackupNotifications 1 }
+        
+-------------------------------------------------------------------------------
+-- 31. Backup Conformance
+-------------------------------------------------------------------------------   
+    zxAnDataBackupConformance OBJECT IDENTIFIER::={zxAnDataBackupMib         4}
+
+    zxAnDataBackupCompliances OBJECT IDENTIFIER::={zxAnDataBackupConformance 1}
+    zxAnDataBackupGroups      OBJECT IDENTIFIER::={zxAnDataBackupConformance 2}
+
+    zxAnDataBackupCompliance MODULE-COMPLIANCE
+        STATUS current
+        DESCRIPTION 
+            "The compliance statement for SNMP entities which implement the
+            ZTE-AN-BACKUP-MGMT-MIB."
+        MODULE -- this module
+        
+            MANDATORY-GROUPS { 
+                  zxAnDataAutoBackupConfGroup,
+                  zxAnDataManualBackupConfGroup,
+                  zxAnDataBackupStatusGroup, 
+                  zxAnDataBackuptrapsGroup
+                }
+        ::= { zxAnDataBackupCompliances 1 }
+        
+    zxAnDataAutoBackupConfGroup OBJECT-GROUP
+        OBJECTS { zxAnDataAutoBackupEnable, 
+                  zxAnDataAutoBackupStartTime, 
+                  zxAnDataAutoBackupInterval,
+                  zxAnDataAutoBackupHoldOffTime, 
+                  zxAnDataAutoBackupMaxHoldOffTime
+        }
+        STATUS current
+        DESCRIPTION 
+            "The collection of objects which are used to backup NE file to file 
+            server automatic.
+            Backup file include logging file, software file and 
+            configuration file."
+        ::= { zxAnDataBackupGroups 1 }
+        
+    zxAnDataManualBackupConfGroup OBJECT-GROUP
+        OBJECTS { zxAnDataManualBackupAction
+        }
+        STATUS current
+        DESCRIPTION 
+            "The collection of objects which are used to backup NE file to file 
+            server manual.
+            Backup file include logging file, software file and 
+            configuration file."
+        ::= { zxAnDataBackupGroups 2 }
+        
+    zxAnDataBackupStatusGroup OBJECT-GROUP
+        OBJECTS { zxAnDataBackupCurrStartTime, 
+                  zxAnDataBackupCurrFileName, 
+                  zxAnDataBackupCurrFileSize,
+                  zxAnDataBackupCurrFileProgress, 
+                  zxAnDataBackupTotalFiles, 
+                  zxAnDataBackupSuccessFiles,
+                  zxAnDataBackupStatus, 
+                  zxAnDataBackupFailedReason
+        }
+        STATUS current
+        DESCRIPTION 
+            "The collection of objects which are used to represent backup 
+            status. Backup file include logging file, software file and 
+            configuration file."
+        ::= { zxAnDataBackupGroups 3 }     
+           
+
+    zxAnDataBackuptrapsGroup OBJECT-GROUP
+        OBJECTS { zxAnDataBackupFinished
+        }
+        STATUS current
+        DESCRIPTION 
+            "The notifications which indicate specific changes, 
+            include backup status."
+        ::= { zxAnDataBackupGroups 4 }
+
+END

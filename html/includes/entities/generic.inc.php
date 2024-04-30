@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -95,7 +95,7 @@ function generate_entity_popup_graphs($entity, $vars)
 
             foreach ($graph_array as $key => $val) {
                 // Check to see if we need to do any substitution
-                if (substr($val, 0, 1) == "@") {
+                if (substr($val, 0, 1) === "@") {
                     $nval              = substr($val, 1);
                     $graph_array[$key] = $entity[$nval];
                 }
@@ -109,8 +109,8 @@ function generate_entity_popup_graphs($entity, $vars)
             $content = generate_box_open(array('title' => nicecase(str_replace("_", " ", $graph_array['type'])),
                                                'body-style' => 'white-space: nowrap;'));
             */
-            foreach (['day', 'month'] as $period) {
-                $graph_array['from'] = $config['time'][$period];
+            foreach ([ 'day', 'month' ] as $period) {
+                $graph_array['from'] = get_time($period);
                 $content             .= generate_graph_tag($graph_array);
             }
             $content .= "</div>";
@@ -356,8 +356,8 @@ function generate_entity_popup_multi($entities, $vars)
 
 // Measured specific functions
 
-function build_entity_measured_where($entity_type, $vars)
-{
+function generate_query_entity_measured($entity_type, $vars) {
+
     $entity_array = entity_type_translate_array($entity_type);
 
     $column_measured_id   = $entity_array['table_fields']['measured_id'];
@@ -383,7 +383,7 @@ function build_entity_measured_where($entity_type, $vars)
                     switch ($measured_type) {
                         case 'port':
                         case 'printersupply':
-                            $measure_sql = generate_query_values_ng($measured_type, $column_measured_type);
+                            $measure_sql = generate_query_values($measured_type, $column_measured_type);
                             $measure_sql .= generate_query_values_and($entities, $column_measured_id);
                             break;
                     }
@@ -397,7 +397,7 @@ function build_entity_measured_where($entity_type, $vars)
                 //$value = (array)$value;
                 // Select all without measured entities
                 if (in_array('none', $value)) {
-                    $measure_array[] = generate_query_values_ng(1, $column_measured_id);
+                    $measure_array[] = generate_query_values(1, $column_measured_id);
                     $value           = array_diff($value, ['none']);
                 }
                 if (count($value)) {
@@ -418,7 +418,7 @@ function build_entity_measured_where($entity_type, $vars)
                                 $entities   = dbFetchColumn($entity_sql);
                                 //$entities = dbFetchColumn($entity_sql, NULL, TRUE);
                                 //r($entities);
-                                $measure_sql = generate_query_values_ng($measured_type, $column_measured_type);
+                                $measure_sql = generate_query_values($measured_type, $column_measured_type);
                                 $measure_sql .= generate_query_values_and($entities, $column_measured_id);
                                 break;
                             case 'printersupply':
@@ -436,16 +436,14 @@ function build_entity_measured_where($entity_type, $vars)
 
     switch (count($measure_array)) {
         case 0:
-            $sql = '';
-            break;
+            return '';
+
         case 1:
-            $sql = ' AND ' . $measure_array[0];
-            break;
-        default:
-            $sql = ' AND ((' . implode(') OR (', $measure_array) . '))';
+            return $measure_array[0];
     }
 
-    return $sql;
+    //r($measure_array);
+    return '((' . implode(') OR (', $measure_array) . '))';
 }
 
 // EOF

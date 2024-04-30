@@ -314,14 +314,12 @@ function poll_device($device, $options)
 
             include($config['install_dir'] . "/includes/polling/$module.inc.php");
 
-            $m_end = utime();
-
-            $m_run                                    = round($m_end - $m_start, 4);
+            $m_run                                    = elapsed_time($m_start, 4);
             $device_state['poller_mod_perf'][$module] = $m_run;
-            print_cli_data("Module time", number_format($m_run, 4) . "s");
+            print_cli_data("Module time", format_number_short($m_run, 4) . "s");
 
             if (!isset($options['m'])) {
-                rrdtool_update_ng($device, 'perf-pollermodule', ['val' => $m_run], $module);
+                rrdtool_update_ng($device, 'perf-pollermodule', [ 'val' => $m_run ], $module);
 
                 if ($device['status'] == 0) {
                     log_event("WARNING! Stopped polling of other modules because device became unavailable in $module module.", $device, 'device', $device['device_id'], 7);
@@ -383,7 +381,7 @@ function poll_device($device, $options)
             dbInsertMulti($graphs_insert, 'device_graphs');
         }
         if (safe_count($graphs_delete)) {
-            dbDelete('device_graphs', generate_query_values_ng($graphs_delete, 'device_graph_id'));
+            dbDelete('device_graphs', generate_query_values($graphs_delete, 'device_graph_id'));
         }
 
         // Print graphs stats
@@ -393,11 +391,9 @@ function poll_device($device, $options)
             }
         }
 
-        $device_end  = utime();
-        $device_run  = $device_end - $device_start;
-        $device_time = round($device_run, 4);
+        $device_time = elapsed_time($device_start, 4);
 
-        $update_array['last_polled']           = ['NOW()'];
+        $update_array['last_polled']           = [ 'NOW()' ];
         $update_array['last_polled_timetaken'] = $device_time;
 
         #echo("$device_end - $device_start; $device_time $device_run");
@@ -413,7 +409,7 @@ function poll_device($device, $options)
             $old_device_state = safe_unserialize($old_device_state);
 
             // Add first entry
-            $poller_history = [(int)$device_start => $device_time]; // start => duration
+            $poller_history = [ (int)$device_start => $device_time ]; // start => duration
             // Add and keep not more than 288 (24 hours with 5min interval) last entries
             if (isset($old_device_state['poller_history'])) {
                 print_debug_vars($old_device_state['poller_history']);
@@ -456,18 +452,17 @@ function poll_device($device, $options)
         $alert_metrics['device_la_5min']  = $device_state['la']['5min'];
         $alert_metrics['device_la_15min'] = $device_state['la']['15min'];
 
-        $alert_metrics['device_uptime']        = $device['uptime'];
-        $alert_metrics['device_rebooted']      = $rebooted; // 0 - not rebooted, 1 - rebooted
-        $alert_metrics['device_duration_poll'] = $device['last_polled_timetaken'];
+        // $uptimes var from system module
+        $alert_metrics['device_uptime']        = $uptimes['uptime'];
+        $alert_metrics['device_rebooted']      = $uptimes['rebooted']; // 0 - not rebooted, 1 - rebooted
+        $alert_metrics['device_duration_poll'] = $device_time;
 
         unset($cache_storage); // Clear cache of hrStorage ** MAYBE FIXME? ** (ok, later)
         unset($cache);         // Clear cache (unify all things here?)
 
     } elseif (!$options['m']) {
-        // State is 0, also collect poller time for down devices, since it not zero!
-        $device_end  = utime();
-        $device_run  = $device_end - $device_start;
-        $device_time = round($device_run, 4);
+        // State is 0, also collect poller time for down devices, since it's not zero!
+        $device_time = elapsed_time($device_start, 4);
 
         // partially update device table
         if (isset($update_array['ip'])) {

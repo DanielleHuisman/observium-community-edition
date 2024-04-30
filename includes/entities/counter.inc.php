@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -58,10 +58,7 @@ function discover_counter_definition($device, $mib, $entry)
     foreach ($counter_array as $index => $counter) {
         $options = [];
 
-        $counter['index'] = $index;            // Index in descr
-        foreach (explode('.', $index) as $k => $i) {
-            $counter['index' . $k] = $i;           // Index parts
-        }
+        $counter = array_merge($counter, entity_index_tags($index));
 
         // Determine the counter class
         $class = entity_class_definition($device, $entry, $counter, 'counter');

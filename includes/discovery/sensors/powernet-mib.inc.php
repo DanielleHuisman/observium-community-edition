@@ -4,11 +4,16 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
+
+if (match_oid_num($device['sysObjectID'], '.1.3.6.1.4.1.(5528|52674)')) {
+    // NetBotz v4/v5
+    return;
+}
 
 $mib = 'PowerNet-MIB';
 
@@ -195,6 +200,15 @@ if ($inputs || $outputs) {
               discover_sensor('load', $device, $oid_num, $pindex, $type, "$descr Load", 1, $value);
             }
             */
+
+            // New Oid: upsPhaseOutputEnergyUsage kWh
+            $oid_name = 'upsPhaseOutputEnergyUsage';
+            $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.23.$pindex";
+            $value = $cache['apc'][$pindex][$oid_name];
+
+            if ($value != '' && $value != -1) {
+                discover_counter($device, 'energy', $mib, $oid_name, $oid_num, $pindex, $descr, 1000, $value);
+            }
         }
 
         // Frequency is reported only once per output

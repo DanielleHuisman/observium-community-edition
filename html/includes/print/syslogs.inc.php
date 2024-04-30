@@ -59,7 +59,7 @@ function print_syslogs($vars)
                     break;
                 case 'tag':
                 case 'program':
-                    $condition = str_contains_array($value, '*') ? 'LIKE' : '=';
+                    $condition = str_contains($value, '*') ? 'LIKE' : '=';
                     $value     = get_var_csv($value);
                     $where     .= generate_query_values_and($value, $var, $condition);
                     break;
@@ -389,28 +389,57 @@ function print_syslog_rules_table($vars)
 {
 
     if (isset($vars['la_id'])) {
-        $las = dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_id` = ?", [$vars['la_id']]);
+        $las = dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_id` = ?", [ $vars['la_id'] ]);
     } else {
-        $las = dbFetchRows("SELECT * FROM `syslog_rules` ORDER BY `la_name`");
+
+        if (isset($vars['sort'])) {
+            $sort_order = get_sort_order($vars);
+            switch ($vars['sort']) {
+                case "descr":
+                    $sort = generate_query_sort('la_descr', $sort_order);
+                    break;
+
+                case "rule":
+                    $sort = generate_query_sort('la_rule', $sort_order);
+                    break;
+
+                case "severity":
+                    $sort = generate_query_sort('la_severity', $sort_order);
+                    break;
+
+                case "status":
+                    $sort = generate_query_sort('la_disable', $sort_order);
+                    break;
+
+                case 'name':
+                default:
+                    $sort = generate_query_sort('la_name', $sort_order);
+            }
+        } else {
+            $sort = generate_query_sort('la_name');
+        }
+        //r($sort);
+
+        $las = dbFetchRows("SELECT * FROM `syslog_rules`" . $sort);
     }
 
-    if (safe_count($las)) {
+    if (!safe_empty($las)) {
 
         $modals = '';
         $string = generate_box_open();
         $string .= '<table class="table table-striped table-hover table-condensed">' . PHP_EOL;
 
         $cols = [
-          [NULL, 'class="state-marker"'],
-          'name'     => ['Name', 'style="width: 160px;"'],
-          'descr'    => ['Description', 'style="width: 400px;"'],
-          'rule'     => 'Rule',
-          'severity' => ['Severity', 'style="width: 60px;"'],
-          'disabled' => ['Status', 'style="width: 60px;"'],
-          'controls' => ['', 'style="width: 60px;"'],
+            'state-marker' => '',
+            [ 'name'     => 'Name',        'style' => 'width: 160px;' ],
+            [ 'descr'    => 'Description', 'style' => 'width: 400px;'],
+            [ 'rule'     => 'Rule' ],
+            [ 'severity' => 'Severity',    'style' => 'width: 60px;' ],
+            [ 'status'   => 'Status',      'style' => 'width: 60px;' ],
+            [ NULL,                        'style' => 'width: 70px;' ],
         ];
 
-        $string .= get_table_header($cols, $vars);
+        $string .= generate_table_header($cols, $vars);
 
         foreach ($las as $la) {
 
@@ -430,82 +459,26 @@ function print_syslog_rules_table($vars)
             $string .= '    <td>' . ($la['la_disable'] ? '<span class="label label-error">disabled</span>' : '<span class="label label-success">enabled</span>') . '</td>' . PHP_EOL;
             $string .= '    <td style="text-align: right;">';
             if ($_SESSION['userlevel'] >= 10) {
-                $string .= '
-      <div class="btn-group btn-group-xs" role="group" aria-label="Rule actions">
-        <a class="btn btn-default" role="group" title="Edit" href="#modal-edit_syslog_rule_' . $la['la_id'] . '" data-toggle="modal"><i class="icon-cog text-muted"></i></a>
-        <a class="btn btn-danger"  role="group" title="Delete" href="#modal-delete_syslog_rule_' . $la['la_id'] . '" data-toggle="modal"><i class="icon-trash"></i></a>
-      </div>';
+                $buttons = [
+                    [ 'title' => 'Edit',   'event' => 'default', 'url' => '#modal-edit_syslog_rule_' . $la['la_id'], 'icon' => 'icon-cog text-muted', 'attribs' => [ 'data-toggle' => 'modal' ] ],
+                    [ 'event' => 'danger',  'icon' => 'icon-trash',
+                      'url' => generate_url(['page' => 'syslog_rules'], [ 'action' => 'syslog_rule_delete', 'la_id' => $la['la_id'], 'confirm' => 'confirm', 'requesttoken' => $_SESSION['requesttoken'] ]),
+                        // confirmation dialog
+                        'attribs'   => [
+                            'data-title'     => 'Delete Rule "'.escape_html($la['la_name']).'"?',
+                            'data-toggle'    => 'confirm', // Enable confirmation dialog
+                            'data-placement' => 'left',
+                            'data-content'   => '<div class="alert alert-warning"><h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>
+                                                 <span class="text-nowrap">This rule and all history<br />will be completely deleted!</span></div>',
+                        ],
+                        //'attribs' => [ 'data-toggle' => 'modal' ]
+                    ],
+                ];
+                $string .= PHP_EOL . generate_button_group($buttons, [ 'title' => 'Rule actions' ]);
             }
             $string .= '</td>';
             $string .= '  </tr>' . PHP_EOL;
 
-
-            // Delete Rule Modal
-            $modal_args = [
-              'id'    => 'modal-delete_syslog_rule_' . $la['la_id'],
-              'title' => 'Delete Syslog Rule "' . escape_html($la['la_descr']) . '"',
-              //'hide'  => TRUE,
-              //'fade'  => TRUE,
-              //'role'  => 'dialog',
-              //'class' => 'modal-md',
-            ];
-
-            $form                       = ['type'       => 'horizontal',
-                                           'id'         => 'delete_syslog_rule_' . $la['la_id'],
-                                           'userlevel'  => 10,          // Minimum user level for display form
-                                           'modal_args' => $modal_args, // !!! This generate modal specific form
-                                           //'help'     => 'This will completely delete the rule and all associations and history.',
-                                           'class'      => '', // Clean default box class!
-                                           'url'        => generate_url(['page' => 'syslog_rules'])
-            ];
-            $form['fieldset']['body']   = ['class' => 'modal-body'];   // Required this class for modal body!
-            $form['fieldset']['footer'] = ['class' => 'modal-footer']; // Required this class for modal footer!
-
-            $form['row'][0]['la_id']  = [
-              'type'     => 'hidden',
-              'fieldset' => 'body',
-              'value'    => $la['la_id']];
-            $form['row'][0]['action'] = [
-              'type'     => 'hidden',
-              'fieldset' => 'body',
-              'value'    => 'delete_syslog_rule'];
-
-            $form['row'][5]['confirm']                 = [
-              'type'        => 'checkbox',
-              'fieldset'    => 'body',
-              'name'        => 'Confirm',
-              'placeholder' => 'Yes, please delete this rule.',
-              'onchange'    => "javascript: toggleAttrib('disabled', 'delete_button_" . $la['la_id'] . "'); showDiv(!this.checked, 'warning_" . $la['la_id'] . "_div');",
-              'value'       => 'confirm'];
-            $form['row'][6]['warning_' . $la['la_id']] = [
-              'type'      => 'html',
-              'fieldset'  => 'body',
-              'html'      => '<h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>' .
-                             ' This rule and all history will be completely deleted!',
-              'div_class' => 'alert alert-warning',
-              'div_style' => 'display:none;'];
-
-            $form['row'][8]['close']                         = [
-              'type'      => 'submit',
-              'fieldset'  => 'footer',
-              'div_class' => '', // Clean default form-action class!
-              'name'      => 'Close',
-              'icon'      => '',
-              'attribs'   => ['data-dismiss' => 'modal',
-                              'aria-hidden'  => 'true']];
-            $form['row'][9]['delete_button_' . $la['la_id']] = [
-              'type'      => 'submit',
-              'fieldset'  => 'footer',
-              'div_class' => '', // Clean default form-action class!
-              'name'      => 'Delete Rule',
-              'icon'      => 'icon-trash icon-white',
-              //'right'       => TRUE,
-              'class'     => 'btn-danger',
-              'disabled'  => TRUE,
-              'value'     => 'delete_syslog_rule'];
-
-            $modals .= generate_form_modal($form);
-            unset($form);
 
             // Edit Rule Modal
 
@@ -518,13 +491,14 @@ function print_syslog_rules_table($vars)
               'class' => 'modal-lg',
             ];
 
-            $form                       = ['type'       => 'horizontal',
-                                           'id'         => 'edit_syslog_rule_' . $la['la_id'],
-                                           'userlevel'  => 10,          // Minimum user level for display form
-                                           'modal_args' => $modal_args, // !!! This generate modal specific form
-                                           //'help'     => 'This will completely delete the rule and all associations and history.',
-                                           'class'      => '', // Clean default box class!
-                                           'url'        => generate_url(['page' => 'syslog_rules'])
+            $form = [
+                'type'       => 'horizontal',
+                'id'         => 'edit_syslog_rule_' . $la['la_id'],
+                'userlevel'  => 10,          // Minimum user level for display form
+                'modal_args' => $modal_args, // !!! This generate modal specific form
+                //'help'     => 'This will completely delete the rule and all associations and history.',
+                'class'      => '', // Clean default box class!
+                'url'        => generate_url(['page' => 'syslog_rules'])
             ];
             $form['fieldset']['body']   = ['class' => 'modal-body'];   // Required this class for modal body!
             $form['fieldset']['footer'] = ['class' => 'modal-footer']; // Required this class for modal footer!
@@ -552,7 +526,8 @@ function print_syslog_rules_table($vars)
               'fieldset' => 'body',
               'name'     => 'Regular Expression',
               'class'    => 'input-xxlarge',
-              'value'    => $la['la_rule']];
+              'value'    => $la['la_rule']
+            ];
             $form['row'][6]['la_disable'] = [
               'type'      => 'switch-ng',
               'fieldset'  => 'body',
@@ -562,7 +537,8 @@ function print_syslog_rules_table($vars)
               'off-text'  => 'Enabled',
               'off-color' => 'success',
               'size'      => 'small',
-              'value'     => $la['la_disable']];
+              'value'     => $la['la_disable']
+            ];
 
             $form['row'][8]['close']  = [
               'type'      => 'submit',
@@ -571,7 +547,8 @@ function print_syslog_rules_table($vars)
               'name'      => 'Close',
               'icon'      => '',
               'attribs'   => ['data-dismiss' => 'modal',
-                              'aria-hidden'  => 'true']];
+                              'aria-hidden'  => 'true']
+            ];
             $form['row'][9]['action'] = [
               'type'      => 'submit',
               'fieldset'  => 'footer',
@@ -580,7 +557,8 @@ function print_syslog_rules_table($vars)
               'icon'      => 'icon-ok icon-white',
               //'right'       => TRUE,
               'class'     => 'btn-primary',
-              'value'     => 'edit_syslog_rule'];
+              'value'     => 'syslog_rule_edit'
+            ];
 
             $modals .= generate_form_modal($form);
             unset($form);
@@ -592,13 +570,13 @@ function print_syslog_rules_table($vars)
 
         echo $string;
 
+        echo $modals;
+
     } else {
 
         print_warning("There are currently no Syslog alerting filters defined.");
 
     }
-
-    echo $modals;
 
 }
 

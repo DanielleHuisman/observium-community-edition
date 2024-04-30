@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -65,6 +65,7 @@ const OBS_SNMP_ERROR_TOO_LONG_RESPONSE = 3;
 const OBS_SNMP_ERROR_TOO_BIG_MAX_REPETITION_IN_GETBULK = 4;
 const OBS_SNMP_ERROR_GETNEXT_EMPTY_RESPONSE = 5;
 const OBS_SNMP_ERROR_ISSNMPABLE = 900;
+const OBS_SNMP_ERROR_AUTHORIZATION_ERROR = 990;
 const OBS_SNMP_ERROR_AUTHENTICATION_FAILURE = 991;
 const OBS_SNMP_ERROR_UNSUPPORTED_ALGO = 992;
 const OBS_SNMP_ERROR_OID_NOT_INCREASING = 993;
@@ -156,9 +157,10 @@ const OBS_PATTERN_ALPHA    = '/^[\w\.\-]+$/';
 const OBS_PATTERN_NOPRINT  = '/[^\p{L}\p{N}\p{P}\p{S} ]/u'; // Non-printable UTF8 chars
 const OBS_PATTERN_NOLATIN  = '/[^\p{Common}\p{Latin}]/u';   // Non Latin (UTF8?) chars
 const OBS_PATTERN_VAR_NAME = '/^\w[\w\s\.\-+]*(\[[\w\.\-+]*\])*$/';
-const OBS_PATTERN_REGEXP   = '/^\s*(?<delimiter>[//!#@%+])(?<pattern>.+)(\1)(?<modifiers>[imsxu])?\s*$/s';        // Detect string is common pattern
+const OBS_PATTERN_REGEXP   = '/^\s*(?<delimiter>[\/!#@%+])(?<pattern>.+)(\1)(?<modifiers>[imsxu]+)?\s*$/s'; // Detect string is common pattern
 const OBS_PATTERN_PATH_UNIX = '!^\/$|(^(?=\/)|^\.|^\.\.)(\/(?=[^/\0\n\r])[^/\0\n\r]+)*\/?$!'; // https://stackoverflow.com/questions/6416065/c-sharp-regex-for-file-paths-e-g-c-test-test-exe/42036026#42036026
 const OBS_PATTERN_PATH_WIN = '@(^([a-z]|[A-Z]):(?=\\(?![\0-\37<>:"/\\|?*])|\/(?![\0-\37<>:"/\\|?*])|$)|^\\(?=[\\\/][^\0-\37<>:"/\\|?*]+)|^(?=(\\|\/)$)|^\.(?=(\\|\/)$)|^\.\.(?=(\\|\/)$)|^(?=(\\|\/)[^\0-\37<>:"/\\|?*]+)|^\.(?=(\\|\/)[^\0-\37<>:"/\\|?*]+)|^\.\.(?=(\\|\/)[^\0-\37<>:"/\\|?*]+))((\\|\/)[^\0-\37<>:"/\\|?*]+|(\\|\/)$)*()$@';
+const OBS_PATTERN_XSS      = '!((^|<.+=.*?)\s*(J\s*A\s*V\s*A\s*)?S\s*C\s*R\s*I\s*P\s*T\s*:|<\s*/?\s*S\s*C\s*R\s*I\s*P\s*T\s*>|(<\s*\w+.*[\s\/&](o\s*n[\w\s]+|s\s*c\s*r\s*i\s*p\s*t))\s*=|<\s*(i\s*f\s*r\s*a\s*m\s*e|s\s*c\s*r\s*i\s*p\s*t).+s\s*r\s*c\s*=|<.*?=\s*e\s*v\s*a\s*l\s*\(|\s*e\s*v\s*a\s*l\s*\(.*?(a\s*t\s*o\s*b|f\s*r\s*o\s*m\s*C\s*h\s*a\s*r\s*C\s*o\s*d\s*e)\s*\()!i';
 
 // Json flags
 define('OBS_JSON_BIGINT_AS_STRING', PHP_VERSION_ID >= 50400 && PHP_INT_SIZE > 4 && !(defined('JSON_C_VERSION'))); // Check if BIGINT supported
@@ -201,8 +203,8 @@ ini_set('serialize_precision', -1);
 // NOTE. Minimum supported versions equals to latest in minimum supported RHEL (7.x at 02.2021)
 const OBS_MIN_PHP_VERSION = '7.1.30';                                                                             // PHP (30 May 2019, https://www.php.net/releases/index.php)
 //define('OBS_MIN_PYTHON2_VERSION', '2.7.12'); // Python 2 (26 June 2016, https://www.python.org/doc/versions/)
-const OBS_MIN_PYTHON2_VERSION = '2.7.5';                                                                          // last in RHEL/CentOS 7 (and Ubuntu LTS 14.04)
-const OBS_MIN_PYTHON3_VERSION = '3.5.2';                                                                          // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
+const OBS_MIN_PYTHON2_VERSION = '2.8.0';                                                                          // Python 2.7.18 is the last release of Python 2 (EOL 2020-01-01)
+const OBS_MIN_PYTHON3_VERSION = '3.6.6';                                                                          // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
 //const OBS_MIN_MYSQL_VERSION   = '5.6.5';  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
 const OBS_MIN_MYSQL_VERSION = '5.7.0';                                                                            // JSON data type was added in 5.7
 //const OBS_MIN_MARIADB_VERSION = '5.5.68'; // 5.5.68 last in RHEL/CentOS 7 and 5.5.63 in Ubuntu LTS 14.04
@@ -217,6 +219,8 @@ const OBS_MIN_UNIXTIME = 504921600;                                             
 // OBSERVIUM URLs
 const OBSERVIUM_URL      = 'https://www.observium.org';
 const OBSERVIUM_DOCS_URL = 'https://docs.observium.org';
+const OBSERVIUM_CHANGELOG_URL = 'https://changelog.observium.org';
+const OBSERVIUM_BUG_URL  = 'https://jira.observium.org';
 const OBSERVIUM_MIBS_URL = 'https://mibs.observium.org/mib';
 
 // DB constants

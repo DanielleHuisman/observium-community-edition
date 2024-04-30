@@ -58,12 +58,12 @@ foreach ($devices as $device) {
             if (preg_match(OBS_PATTERN_RRDTIME, $vars['to'])) {
                 $graph_array['to'] = $vars['to'];
             } else {
-                $graph_array['to'] = $config['time']['now'];
+                $graph_array['to'] = get_time();
             }
             if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) {
                 $graph_array['from'] = $vars['from'];
             } else {
-                $graph_array['from'] = $config['time']['day'];
+                $graph_array['from'] = get_time('day');
             }
 
             $graph_array['device'] = $device['device_id'];

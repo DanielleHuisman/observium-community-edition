@@ -56,7 +56,7 @@ if (isset($vars['aggregate']) && $vars['aggregate'] == 'show') {
 
     if ($port_list) {
         $graph_array['type']   = 'multi-port_bits_separate';
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['legend'] = 'no';
         $graph_array['id']     = $port_list;
 
@@ -129,7 +129,7 @@ foreach ($customers as $customer => $ports) {
         echo('<tr><td colspan="7">');
 
         $graph_array['type'] = "customer_bits";
-        $graph_array['to']   = $config['time']['now'];
+        $graph_array['to']   = get_time();
         $graph_array['id']   = '"' . $port['port_descr_descr'] . '"'; // use double quotes for prevent split var by commas
 
         print_graph_row($graph_array);

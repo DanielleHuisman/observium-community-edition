@@ -1,21 +1,17 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
-if (!isset($vars['section'])) {
-    $vars['section'] = 'eventlog';
-}
-
-$sections = ['eventlog'];
+// Allowed sections: eventlog, syslog, logalert, alertlog
+$sections = [ 'eventlog' ];
 if ($config['enable_syslog']) {
     $sections[] = 'syslog';
     if (OBSERVIUM_EDITION != 'community') {
@@ -25,13 +21,21 @@ if ($config['enable_syslog']) {
 
 $sections[] = 'alertlog';
 
+if (empty($vars['section'])) {
+    $vars['section'] = 'eventlog';
+} elseif (!is_alpha($vars['section']) || !in_array($vars['section'], $sections, TRUE)) {
+    //r($vars['section']);
+    print_error_permission("Unknown Logs section.");
+    return;
+}
+
 $navbar['brand'] = "Logging";
 $navbar['class'] = "navbar-narrow";
 
 foreach ($sections as $section) {
     $type = strtolower($section);
     if (!isset($vars['section'])) {
-        $vars['section'] = $section;
+        $vars['section'] = escape_html($section);
     }
 
     if ($vars['section'] == $section) {
@@ -43,16 +47,6 @@ foreach ($sections as $section) {
 
 print_navbar($navbar);
 
-switch ($vars['section']) {
-    case 'syslog':
-    case 'eventlog':
-    case 'alertlog':
-    case 'logalert':
-        include($config['html_dir'] . '/pages/device/logs/' . $vars['section'] . '.inc.php');
-        break;
-    default:
-        echo('<h2>Error. No section ' . $vars['section'] . '.<br /> Please report this to observium developers.</h2>');
-        break;
-}
+include($config['html_dir'] . '/pages/device/logs/' . $vars['section'] . '.inc.php');
 
 // EOF

@@ -4,26 +4,26 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage db
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
-/* Here common DB functions which uses calls to specific api functions */
+/* Here common DB functions which use calls to specific api functions */
 
 // Initial variables
 $db_stats = [
-  'insert'    => 0, 'insert_sec' => 0,
-  'update'    => 0, 'update_sec' => 0,
-  'delete'    => 0, 'delete_sec' => 0,
-  'fetchcell' => 0, 'fetchcell_sec' => 0,
-  'fetchrow'  => 0, 'fetchrow_sec' => 0,
-  'fetchrows' => 0, 'fetchrows_sec' => 0,
-  'fetchcol'  => 0, 'fetchcol_sec' => 0
+    'insert'    => 0, 'insert_sec'    => 0,
+    'update'    => 0, 'update_sec'    => 0,
+    'delete'    => 0, 'delete_sec'    => 0,
+    'fetchcell' => 0, 'fetchcell_sec' => 0,
+    'fetchrow'  => 0, 'fetchrow_sec'  => 0,
+    'fetchrows' => 0, 'fetchrows_sec' => 0,
+    'fetchcol'  => 0, 'fetchcol_sec'  => 0
 ];
 
-// Include DB api. Default and recommended mysqli, legacy mysql
+// Include DB api.
 if (@function_exists('mysqli_connect')) {
     require($config['install_dir'] . '/includes/db/mysqli.inc.php');
 } else {
@@ -38,22 +38,23 @@ if (@function_exists('mysqli_connect')) {
  *
  * @return array Array with server status variables
  */
-function dbShowStatus($scope = 'SESSION')
-{
-    switch ($scope) {
-        case 'GLOBAL':
-            $sql = 'SHOW GLOBAL STATUS;';
-            break;
-        default:
-            $sql = 'SHOW STATUS;';
+function dbShowStatus($scope = 'SESSION') {
+    if ($scope === 'GLOBAL') {
+        $sql = 'SHOW GLOBAL STATUS';
+    } else {
+        $sql = 'SHOW STATUS';
     }
 
+    //return dbFetchAssocRows('Variable_name=>Value', $sql);
+    return dbFetchKeyValue($sql);
+    /*
     $rows = [];
     foreach (dbFetchRows($sql) as $row) {
         $rows[$row['Variable_name']] = $row['Value'];
     }
 
     return $rows;
+    */
 }
 
 /**
@@ -64,42 +65,40 @@ function dbShowStatus($scope = 'SESSION')
  *
  * @return array Array with variables
  */
-function dbShowVariables($where = '', $scope = 'SESSION')
-{
-    switch ($scope) {
-        case 'GLOBAL':
-            $sql = 'SHOW GLOBAL VARIABLES';
-            break;
-        default:
-            $sql = 'SHOW VARIABLES';
+function dbShowVariables($where = '', $scope = 'SESSION') {
+    if ($scope === 'GLOBAL') {
+        $sql = 'SHOW GLOBAL VARIABLES';
+    } else {
+        $sql = 'SHOW VARIABLES';
     }
-    if (strlen($where)) {
+    if (!safe_empty($where)) {
         $sql .= ' ' . $where;
     }
 
+    //return dbFetchAssocRows('Variable_name=>Value', $sql);
+    return dbFetchKeyValue($sql);
+    /*
     $rows = [];
     foreach (dbFetchRows($sql) as $row) {
         $rows[$row['Variable_name']] = $row['Value'];
     }
 
     return $rows;
+    */
 }
 
-function dbSetVariable($var, $value, $scope = 'SESSION')
-{
-    if (!is_string($var) || !preg_match('/^[A-Z_]+$/i', $var) || !strlen($value)) {
+function dbSetVariable($var, $value, $scope = 'SESSION') {
+    if (!is_string($var) || safe_empty($value) || !preg_match('/^[A-Z_]+$/i', $var)) {
         return;
     }
 
-    if (!in_array($scope, ['GLOBAL', 'SESSION'])) {
+    if (!in_array($scope, [ 'GLOBAL', 'SESSION' ])) {
         $scope = 'SESSION';
     }
 
     // Define DB NAME for later use (same as in get_versions())
     if (!defined('OBS_DB_NAME')) {
-        $mysql_version = dbFetchCell("SELECT version();");
-        $mysql_name    = str_icontains_array($mysql_version, 'Maria') ? 'MariaDB' : 'MySQL';
-        define('OBS_DB_NAME', $mysql_name);
+        get_versions('mariadb');
     }
 
     // Override MySQL variable with MariaDB analog
@@ -108,11 +107,11 @@ function dbSetVariable($var, $value, $scope = 'SESSION')
         $value /= 1000;
     }
 
-    if (is_intnum($value) || is_float($value)) {
-        $value = [$value];
+    if (is_float($value) || is_intnum($value)) {
+        $value = [ $value ]; // pass as raw
     }
 
-    return dbQuery("SET $scope $var=?;", [$value]);
+    return dbQuery("SET $scope $var=?;", [ $value ]);
 }
 
 /**
@@ -123,21 +122,23 @@ function dbSetVariable($var, $value, $scope = 'SESSION')
  *
  * @return array Array with table indexes: array()->$key_name->$column_name
  */
-function dbShowIndexes($table, $index_name = NULL)
-{
+function dbShowIndexes($table, $index_name = NULL) {
     $table = dbEscape($table);
     if ($index_name) {
-        $sql = 'SHOW INDEX FROM `' . $table . '` WHERE ' . generate_query_values_ng($index_name, 'Key_name');
+        $sql = 'SHOW INDEX FROM `' . $table . '` WHERE ' . generate_query_values($index_name, 'Key_name');
     } else {
         $sql = 'SHOW INDEX FROM `' . $table . '`;';
     }
 
+    return dbFetchAssocRows('Key_name->Column_name', $sql);
+    /*
     $rows = [];
     foreach (dbFetchRows($sql) as $row) {
         $rows[$row['Key_name']][$row['Column_name']] = $row;
     }
 
     return $rows;
+    */
 }
 
 /**
@@ -146,17 +147,18 @@ function dbShowIndexes($table, $index_name = NULL)
  * @param string $table       Table name
  * @param string $column_name Column name (if empty get all indexes)
  *
- * @return array Array with columns list
+ * @return array Array with a column list
  */
-function dbShowColumns($table, $column_name = NULL)
-{
+function dbShowColumns($table, $column_name = NULL) {
     $table = dbEscape($table);
     if ($column_name) {
-        $sql = 'SHOW COLUMNS FROM `' . $table . '` WHERE ' . generate_query_values_ng($column_name, 'Field');
+        $sql = 'SHOW COLUMNS FROM `' . $table . '` WHERE ' . generate_query_values($column_name, 'Field');
     } else {
         $sql = 'SHOW COLUMNS FROM `' . $table . '`;';
     }
 
+    return dbFetchAssocRows('Field', $sql);
+    /*
     $columns = [];
     foreach (dbFetchRows($sql) as $entry) {
         //print_vars($entry);
@@ -164,6 +166,7 @@ function dbShowColumns($table, $column_name = NULL)
     }
 
     return $columns;
+    */
 }
 
 /**
@@ -173,26 +176,21 @@ function dbShowColumns($table, $column_name = NULL)
  *
  * @return integer Next auti increment id
  */
-function dbShowNextID($table)
-{
+function dbShowNextID($table) {
     $table = dbEscape($table);
     $sql   = "SHOW TABLE STATUS LIKE '$table';";
 
     $row = dbFetchRow($sql);
     //print_debug_vars($row);
-    if (isset($row['Auto_increment'])) {
-        return $row['Auto_increment'];
-    }
 
-    return FALSE;
+    return $row['Auto_increment'] ?? FALSE;
 }
 
 /*
  * Performs a query using the given string.
  * Used by the other _query functions.
  * */
-function dbQuery($sql, $parameters = [], $print_query = FALSE)
-{
+function dbQuery($sql, $parameters = [], $print_query = FALSE) {
     global $fullSql;
 
     //r($_REQUEST);
@@ -202,6 +200,10 @@ function dbQuery($sql, $parameters = [], $print_query = FALSE)
 
     $fullSql = dbMakeQuery($sql, $parameters);
 
+    // if (!$print_query && $GLOBALS['config']['devel'] &&
+    //     PHP_SAPI !== 'cli' && str_contains($_SERVER['REQUEST_URI'], '/print_query')) {
+    //     $print_query = TRUE;
+    // }
     $debug = defined('OBS_DEBUG') ? OBS_DEBUG : 0;
     if ($debug > 0 || $print_query) {
         // Pre query debug output
@@ -227,7 +229,7 @@ function dbQuery($sql, $parameters = [], $print_query = FALSE)
     $result = dbCallQuery($fullSql); // sets $this->result
 
     if ($debug > 0 || $GLOBALS['config']['profile_sql']) {
-        $runtime   = number_format(microtime(TRUE) - $time_start, 8);
+        $runtime   = elapsed_time($time_start, 8);
         $debug_msg .= 'SQL RUNTIME[' . ($runtime > 0.05 ? '%r' : '%g') . $runtime . 's%n]';
         if ($GLOBALS['config']['profile_sql']) {
             $backtrace                        = debug_backtrace();
@@ -236,7 +238,7 @@ function dbQuery($sql, $parameters = [], $print_query = FALSE)
 
             // Loop through the call stack in reverse order
             for ($i = count($backtrace) - 1; $i >= 0; $i--) {
-                if (isset($backtrace[$i]['function']) && substr($backtrace[$i]['function'], 0, 2) === 'db') {
+                if (isset($backtrace[$i]['function']) && str_starts_with($backtrace[$i]['function'], 'db')) {
                     $function = $backtrace[$i]['function'];
                     $location = $backtrace[$i]['file'];
                     $line     = $backtrace[$i]['line'];
@@ -283,62 +285,113 @@ function dbQuery($sql, $parameters = [], $print_query = FALSE)
     return $result;
 }
 
-/*
- * This is intended to be the method used for large result sets.
- * It is intended to return an iterator, and act upon buffered data.
- * */
-function dbFetch($sql, $parameters = [], $print_query = FALSE)
-{
-    return dbFetchRows($sql, $parameters, $print_query);
-}
-
-/*
+/**
  * This method is quite different from fetchCell(), actually
  * It fetches one cell from each row and places all the values in 1 array
- * */
-function dbFetchColumn($sql, $parameters = [], $print_query = FALSE)
-{
+ */
+function dbFetchColumnNg($sql, $parameters = [], $print_query = FALSE) {
+    $func = static function($row, $i) {
+        return [ $i => reset($row) ];
+    };
+    return dbFetchFunc($func, $sql, $parameters, $print_query);
+}
+
+function dbFetchColumn($sql, $parameters = [], $print_query = FALSE) {
     $time_start = microtime(TRUE);
     $cells      = [];
     foreach (dbFetchRows($sql, $parameters, $print_query) as $row) {
         $cells[] = array_shift($row);
     }
-    $time_end = microtime(TRUE);
 
-    $GLOBALS['db_stats']['fetchcol_sec'] += number_format($time_end - $time_start, 8);
+    $GLOBALS['db_stats']['fetchcol_sec'] += elapsed_time($time_start, 8);
     $GLOBALS['db_stats']['fetchcol']++;
 
     return $cells;
 }
 
-/*
+/**
  * Should be passed a query that fetches two fields
  * The first will become the array key
  * The second the key's value
  */
-function dbFetchKeyValue($sql, $parameters = [], $print_query = FALSE)
-{
-    $data = [];
-    foreach (dbFetchRows($sql, $parameters, $print_query) as $row) {
-        $key = array_shift($row);
-        if (is_array($row) && count($row) === 1) { // if there were only 2 fields in the result
-            // use the second for the value
-            $data[$key] = array_shift($row);
-        } else { // if more than 2 fields were fetched
-            // use the array of the rest as the value
-            $data[$key] = $row;
-        }
-    }
+function dbFetchKeyValue($sql, $parameters = [], $print_query = FALSE) {
 
-    return $data;
+    $func = static function($row) {
+        if (count($row) === 2) {
+            return [ reset($row) => next($row) ];
+        }
+        // dbFetchKeyRows
+        return [ reset($row) => $row ];
+    };
+    return dbFetchFunc($func, $sql, $parameters, $print_query);
 }
 
-/*
+function dbFetchKeyRows($sql, $parameters = [], $print_query = FALSE) {
+
+    $func = static function($row) {
+        return [ reset($row) => $row ];
+    };
+    return dbFetchFunc($func, $sql, $parameters, $print_query);
+}
+
+/**
+ * Examples of usage.
+ * Same results:
+ * $query = "SELECT `sysObjectID`, COUNT(*) AS `count` FROM `devices` WHERE `os` = 'generic' GROUP BY `sysObjectID`";
+ * // 1. Double foreach(). High memory usage
+ * $stats = [];
+ * foreach (dbFetchRows($query) as $data) {
+ *     $stats[$data['sysObjectID']] = $data['count'];
+ * }
+ *
+ * // 2. Single foreach(). Less memory usage. NOT checking of keys on association
+ * $stats = dbFetchKeyValue($query);
+ *
+ * // 3. Single foreach(). Less memory usage. Associate key=>value
+ * $stats = dbFetchAssocRows('sysObjectID=>count', $query);
+ *
+ * @param string $keys
+ * @param string $sql
+ * @param array $parameters
+ * @param bool $print_query
+ *
+ * @return array
+ */
+function dbFetchAssocRows($keys, $sql, $parameters = [], $print_query = FALSE) {
+
+    $func = static function($row) use ($keys) {
+        $keys = explode('->', $keys);
+        $len = count($keys) - 1;
+        $array = [];
+        $current = &$array;
+        foreach ($keys as $i => $key) {
+            if ($last = ($i === $len)) {
+                // last key with value association, ie: device_id=>sensor_value
+                [ $key, $key_value ] = explode('=>', $key, 2);
+            }
+            if (!array_key_exists($key, (array)$row)) {
+                break;
+            }
+            $value = $row[$key];
+            if ($last) {
+                // last key
+                $current[$value] = !is_null($key_value) ? $row[$key_value] : $row;
+                break;
+            }
+
+            $current = &$current[$value];
+        }
+        return $array;
+    };
+
+    return dbFetchFunc($func, $sql, $parameters, $print_query);
+}
+
+/**
  * Passed an array and a table name, it attempts to insert the data into the table.
  * Check for boolean false to determine whether insert failed
- * */
-function dbInsert($data, $table, $print_query = FALSE)
-{
+ */
+function dbInsert($data, $table, $print_query = FALSE) {
     global $fullSql;
 
     // the following block swaps the parameters if they were given in the wrong order.
@@ -367,15 +420,13 @@ function dbInsert($data, $table, $print_query = FALSE)
         $id = FALSE;
     }
 
-    $time_end                          = microtime(TRUE);
-    $GLOBALS['db_stats']['insert_sec'] += number_format($time_end - $time_start, 8);
+    $GLOBALS['db_stats']['insert_sec'] += elapsed_time($time_start, 8);
     $GLOBALS['db_stats']['insert']++;
 
     return $id;
 }
 
-function dbInsertRowMulti($row, $table, $id_key = NULL)
-{
+function dbInsertRowMulti($row, $table, $id_key = NULL) {
     global $cache_db;
 
     if (is_string($id_key) && isset($row[$id_key])) {
@@ -391,8 +442,7 @@ function dbInsertRowMulti($row, $table, $id_key = NULL)
  * Passed an array and a table name, it attempts to insert the data into the table.
  * Check for boolean false to determine whether insert failed
  */
-function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
-{
+function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE) {
     global $fullSql;
 
     // the following block swaps the parameters if they were given in the wrong order.
@@ -411,10 +461,15 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
     $first_data = reset($data);
     if (!is_array($first_data)) {
         $first_data = $data;
-        $data       = [$data];
+        $data       = [ $data ];
     }
 
-    // Columns, if not passed use keys from first element
+    if (safe_empty($data)) {
+        print_debug("Passed empty data array to dbInsertMulti().");
+        return FALSE;
+    }
+
+    // Columns, if not passed, use keys from a first element
     if (empty($columns)) {
         $columns = array_keys($first_data);
     }
@@ -424,7 +479,7 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
     foreach ($data as $entry) {
         $entry = dbPrepareData($entry); // Escape data
 
-        // Keep same columns order as in first entry
+        // Keep the same columns order as in the first entry
         $entries = [];
         foreach ($columns as $column) {
             $entries[$column] = $entry[$column];
@@ -437,8 +492,7 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
 
     $time_start = microtime(TRUE);
     //dbBeginTransaction();
-    $result = dbQuery($sql, NULL, $print_query);
-    if ($result) {
+    if ($result = dbQuery($sql, NULL, $print_query)) {
         // This should return true if insert succeeded, but no ID was generated
         $id = dbLastID();
         //dbCommitTransaction();
@@ -447,8 +501,7 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
         $id = FALSE;
     }
 
-    $time_end                          = microtime(TRUE);
-    $GLOBALS['db_stats']['insert_sec'] += number_format($time_end - $time_start, 8);
+    $GLOBALS['db_stats']['insert_sec'] += elapsed_time($time_start, 8);
     $GLOBALS['db_stats']['insert']++;
 
     return $id;
@@ -458,8 +511,7 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
  * Passed an array, table name, WHERE clause, and placeholder parameters, it attempts to update a record.
  * Returns the number of affected rows
  * */
-function dbUpdate($data, $table, $where = NULL, $parameters = [], $print_query = FALSE)
-{
+function dbUpdate($data, $table, $where = NULL, $parameters = [], $print_query = FALSE) {
     global $fullSql;
 
     // the following block swaps the parameters if they were given in the wrong order.
@@ -494,15 +546,14 @@ function dbUpdate($data, $table, $where = NULL, $parameters = [], $print_query =
     } else {
         $return = FALSE;
     }
-    $time_end                          = microtime(TRUE);
-    $GLOBALS['db_stats']['update_sec'] += number_format($time_end - $time_start, 8);
+
+    $GLOBALS['db_stats']['update_sec'] += elapsed_time($time_start, 8);
     $GLOBALS['db_stats']['update']++;
 
     return $return;
 }
 
-function dbUpdateRowMulti($row, $table, $id_key = NULL)
-{
+function dbUpdateRowMulti($row, $table, $id_key = NULL) {
     global $cache_db;
 
     if (is_string($id_key) && isset($row[$id_key])) {
@@ -521,8 +572,7 @@ function dbUpdateRowMulti($row, $table, $id_key = NULL)
  * For key really better use only ID field!
  * https://stackoverflow.com/questions/25674737/mysql-update-multiple-rows-with-different-values-in-one-query/25674827
  */
-function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
-{
+function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE) {
     global $fullSql;
 
     // the following block swaps the parameters if they were given in the wrong order.
@@ -543,8 +593,21 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
         $first_data = $data;
         $data       = [$data];
     }
+    if (safe_empty($data)) {
+        print_debug("Passed empty data array to dbUpdateMulti().");
+        return FALSE;
+    }
 
-    // Columns, if not passed use keys from first element
+    if (!defined('OBS_DB_NAME')) {
+        get_versions('mysql');
+    }
+    $ng = OBS_DB_NAME === 'MySQL' && version_compare(get_versions('mysql'), '8.0', '>=');
+    if ($ng) {
+        // https://stackoverflow.com/questions/63609570/mysql-values-function-is-deprecated
+        print_debug('dbUpdateMulti() used new style of values insert for MySQL 8+.');
+    }
+
+    // Columns, if not passed, use keys from a first element
     $all_columns = array_keys($first_data); // All columns data and UNIQUE indexes
     if (!empty($columns)) {
         // Update only passed columns from param
@@ -558,7 +621,11 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
     // Columns which will updated
     $update_keys = [];
     foreach ($update_columns as $key) {
-        $update_keys[] = '`' . $key . '`=VALUES(`' . $key . '`)';
+        if ($ng) {
+            $update_keys[] = '`' . $key . '`=`mvalues`.`' . $key . '`';
+        } else {
+            $update_keys[] = '`' . $key . '`=VALUES(`' . $key . '`)';
+        }
     }
 
     $values = [];
@@ -576,8 +643,11 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
     }
 
     $sql = 'INSERT INTO `' . $table . '` (`' . implode('`,`', $all_columns) . '`)  VALUES ' . implode(',', $values);
+    if ($ng) {
+        $sql .= ' AS `mvalues`';
+    }
 
-    // This is only way for update multiple rows at once
+    // This is an only way for update multiple rows at once
     $sql .= ' ON DUPLICATE KEY UPDATE ' . implode(',', $update_keys);
 
     $time_start = microtime(TRUE);
@@ -588,15 +658,13 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
         $return = FALSE;
     }
 
-    $time_end                          = microtime(TRUE);
-    $GLOBALS['db_stats']['update_sec'] += number_format($time_end - $time_start, 8);
+    $GLOBALS['db_stats']['update_sec'] += elapsed_time($time_start, 8);
     $GLOBALS['db_stats']['update']++;
 
     return $return;
 }
 
-function dbProcessMulti($table, $print_query = FALSE)
-{
+function dbProcessMulti($table, $print_query = FALSE) {
     global $cache_db;
 
     print_debug_vars($cache_db);
@@ -622,8 +690,7 @@ function dbProcessMulti($table, $print_query = FALSE)
     }
 }
 
-function dbExist($table, $where = NULL, $parameters = [], $print_query = FALSE)
-{
+function dbExist($table, $where = NULL, $parameters = [], $print_query = FALSE) {
     $sql = 'SELECT EXISTS (SELECT 1 FROM `' . $table . '`';
     if ($where) {
         // Remove WHERE clause at the beginning and ; at end
@@ -638,8 +705,7 @@ function dbExist($table, $where = NULL, $parameters = [], $print_query = FALSE)
     return (bool)$return;
 }
 
-function dbDelete($table, $where = NULL, $parameters = [], $print_query = FALSE)
-{
+function dbDelete($table, $where = NULL, $parameters = [], $print_query = FALSE) {
     $sql = 'DELETE FROM `' . $table . '`';
     if ($where) {
         // Remove WHERE clause at the beginning and ; at end
@@ -653,8 +719,8 @@ function dbDelete($table, $where = NULL, $parameters = [], $print_query = FALSE)
     } else {
         $return = FALSE;
     }
-    $time_end                          = microtime(TRUE);
-    $GLOBALS['db_stats']['delete_sec'] += number_format($time_end - $time_start, 8);
+
+    $GLOBALS['db_stats']['delete_sec'] += elapsed_time($time_start, 8);
     $GLOBALS['db_stats']['delete']++;
 
     return $return;
@@ -664,8 +730,7 @@ function dbDelete($table, $where = NULL, $parameters = [], $print_query = FALSE)
  * This combines a query and parameter array into a final query string for execution
  * PDO drivers don't need to use this
  */
-function dbMakeQuery($sql, $parameters)
-{
+function dbMakeQuery($sql, $parameters) {
     // bypass extra logic if we have no parameters
 
     if (safe_count($parameters) === 0) {
@@ -685,7 +750,7 @@ function dbMakeQuery($sql, $parameters)
     }
 
     if (safe_count($namedParams) === 0) {
-        // use simple pattern if named params not used (this broke some queries)
+        // use a simple pattern if named params not used (this broke some queries)
         $pattern = '/(\?)/';
     } else {
         // sort namedParams in reverse to stop substring squashing
@@ -717,8 +782,7 @@ function dbMakeQuery($sql, $parameters)
     return $query;
 }
 
-function dbPrepareData($data)
-{
+function dbPrepareData($data) {
     $values = [];
 
     foreach ($data as $key => $value) {
@@ -727,21 +791,18 @@ function dbPrepareData($data)
         // as a "decorator" that tells us not to escape the
         // value contained in the array IF there is one item in the array
         if (is_array($value) && !is_object($value)) {
+            $escape = FALSE; // we'll escape on our own, thanks.
             if (count($value) === 1) {
-                $escape = FALSE;
                 $value  = array_shift($value);
                 $value  = dbEscape($value);
                 // Probably we use this only for pass NULL,
-                // but currently allow pass any other values and quote if space found
+                // but currently allow to pass any other values and quote if space found
                 if (preg_match('/\s+/', $value)) {
                     $value = "'" . $value . "'";
                 }
             } else {
                 // if this is a multi-value array, implode this as it's probably
                 // (hopefully) used in an IN statement.
-                $escape = FALSE; // we'll escape on our own, thanks.
-                // escape each entry by itself, unfortunately requires an extra array
-                // but implode() can't first escape each string, of course.
                 $escaped = [];
                 foreach ($value as $entry) {
                     $escaped[] = "'" . dbEscape($entry) . "'";
@@ -768,8 +829,7 @@ function dbPrepareData($data)
  * Given a data array, this returns an array of placeholders
  * These may be question marks, or ":email" type
  */
-function dbPlaceHolders($values)
-{
+function dbPlaceHolders($values) {
     $data = [];
     foreach ($values as $key => $value) {
         if (is_numeric($key)) {
@@ -779,6 +839,40 @@ function dbPlaceHolders($values)
         }
     }
     return $data;
+}
+
+function db_config() {
+    global $config;
+
+    // Check host params
+    if (str_contains($config['db_host'], ':')) {
+        $host_array = explode(':', $config['db_host']);
+        if ($host_array[0] === 'p') {
+            // p:example.com
+            // p:::1
+            array_shift($host_array);
+            $config['db_host']       = implode(':', $host_array);
+            $config['db_persistent'] = TRUE;
+        } elseif (count($host_array) === 2) {
+            // This is for compatibility with an old style host option (from mysql extension)
+            // IPv6 host not possible here
+            $config['db_host'] = $host_array[0];
+            if (is_valid_param($host_array[1], 'port')) {
+                // example.com:3306
+                $config['db_port'] = $host_array[1];
+            } elseif (is_valid_param($host_array[1], 'path')) {
+                // example.com:/tmp/mysql.sock
+                $config['db_socket'] = $host_array[1];
+            }
+        }
+    }
+
+    // Server port
+    if (!isset($config['db_port']) || !is_numeric($config['db_port'])) {
+        if ($port = ini_get("mysqli.default_port")) {
+            $config['db_port'] = $port;
+        }
+    }
 }
 
 /**
@@ -794,22 +888,9 @@ function dbPlaceHolders($values)
  *
  * @return string             Generated query
  */
-function generate_query_values_and($value, $column, $condition = NULL, $options = [])
-{
+function generate_query_values_and($value, $column, $condition = NULL, $options = []) {
     $options[] = 'leading_and';
-    return generate_query_values_ng($value, $column, $condition, $options);
-}
-
-// DEPRECATED
-function generate_query_values($value, $column, $condition = NULL, $options = [])
-{
-    if (is_bool($options) && !$options) {
-        $options = [];
-    } elseif (!in_array('no_leading_and', (array)$options)) {
-        // Compat with old
-        $options[] = 'leading_and';
-    }
-    return generate_query_values_ng($value, $column, $condition, $options);
+    return generate_query_values($value, $column, $condition, $options);
 }
 
 /**
@@ -824,28 +905,179 @@ function generate_query_values($value, $column, $condition = NULL, $options = []
  *
  * @return string             Generated query
  */
-function generate_query_values_ng($value, $column, $condition = NULL, $options = [])
+function generate_query_valuesxxx($value, $column, $condition = NULL, $options = [])
 {
-    //if (!is_array($value)) { $value = explode(',', $value); }
+
+    global $int_stats;
+
+    $start = utime();
+
     if (!is_array($value)) {
-        $value = [(string)$value];
+        $value = [ (string)$value ];
     }
-    $column    = '`' . str_replace(['`', '.'], ['', '`.`'], $column) . '`'; // I.column -> `I`.`column`
-    $condition = ($condition === TRUE ? 'LIKE' : strtoupper(trim($condition)));
-    if (str_contains_array($condition, ['NOT', '!='])) {
+    $column    = '`' . str_replace([ '`', '.' ], [ '', '`.`' ], $column) . '`'; // I.column -> `I`.`column`
+    $condition = $condition === TRUE ? 'LIKE' : strtoupper(trim($condition));
+    if (str_contains_array($condition, [ 'NOT', '!=' ])) {
         $negative  = TRUE;
-        $condition = str_replace(['NOT', '!=', ' '], '', $condition);
+        $condition = str_replace([ 'NOT', '!=', ' ' ], '', $condition);
     } else {
         $negative = FALSE;
     }
 
     // Options
-    //$leading_and = !in_array('no_leading_and', (array)$options);
     $leading_and = in_array('leading_and', (array)$options, TRUE);
     $ifnull      = in_array('ifnull', (array)$options, TRUE);
 
-    $search  = ['%', '_'];
-    $replace = ['\%', '\_'];
+    $search  = [ '%', '_' ];
+    $replace = [ '\%', '\_' ];
+    $values  = [];
+
+    // Pre-check to avoid unnecessary processing for default case
+    $auto_condition = in_array($condition, ['LIKE', '%LIKE%', '%LIKE', 'LIKE%', 'REGEXP']);
+
+    foreach ($value as $v) {
+        // Determine the condition for the current value
+        $current_condition = $condition;
+
+        if ($auto_condition) {
+            // Determine the condition for the current value
+            if (strpos($v, '*') !== false || strpos($v, '?') !== false) {
+                if ($current_condition === '%LIKE%') {
+                    $current_condition = 'LIKE';
+                }
+            }
+
+            // Check for regex pattern and switch condition to REGEXP
+            if (preg_match('/^\/.*\/$/', $v)) {
+                $current_condition = 'REGEXP';
+                $v = substr($v, 1, -1); // Remove the surrounding slashes
+            }
+        }
+
+        switch ($current_condition) {
+            case 'LIKE':
+            case '%LIKE%':
+            case '%LIKE':
+            case 'LIKE%':
+                $searchLike  = $search;
+                $replaceLike = $replace;
+                // Replace (* by %) and (? by _) only for LIKE condition
+                if ($current_condition === 'LIKE' || $current_condition === '%LIKE%' || $current_condition === '%LIKE' || $current_condition === 'LIKE%') {
+                    $searchLike[]  = '*'; // any string
+                    $replaceLike[] = '%';
+                    $searchLike[]  = '?'; // any single char
+                    $replaceLike[] = '_';
+                }
+                if ($negative) {
+                    $implode = ' AND ';
+                    $cond    = ' NOT LIKE ';
+                } else {
+                    $implode = ' OR ';
+                    $cond    = ' LIKE ';
+                }
+                $v        = dbEscape($v); // Escape BEFORE replace!
+                $v        = str_replace($searchLike, $replaceLike, $v);
+                $v        = str_replace('LIKE', $v, $current_condition);
+                $values[] = $column . $cond . "'" . $v . "'";
+                break;
+
+            case 'REGEXP':
+                if ($negative) {
+                    $implode = ' AND ';
+                    $cond    = ' NOT REGEXP ';
+                } else {
+                    $implode = ' OR ';
+                    $cond    = ' REGEXP ';
+                }
+                $values[] = $column . $cond . "'" . dbEscape($v) . "'";
+                break;
+
+            // Use NULL condition
+            case 'NULL':
+                $value = array_shift($value);
+                $value = ($negative) ? !$value : (bool)$value; // When required negative null condition (NOT NULL), reverse $value sign
+                //r($value);
+                if ($value) {
+                    $where = $column . ' IS NULL';
+                } else {
+                    $where = $column . ' IS NOT NULL';
+                }
+                //$where = ($leading_and ? ' AND ' : ' ') . $where;
+                break;
+
+            // Use IN condition
+            default:
+                $where    = '';
+                $add_null = FALSE;
+                foreach ($value as $v) {
+                    if ($v === OBS_VAR_UNSET || $v === '') {
+                        $add_null = TRUE; // Add check NULL values at end
+                        $values[] = "''";
+                    } else {
+                        $values[] = is_intnum($v) ? $v : "'" . dbEscape($v) . "'";
+                    }
+                }
+                $count = count($values);
+                if ($count === 1) {
+                    $where .= ($add_null || $ifnull) ? "IFNULL($column, '')" : $column;
+                    $where .= ($negative ? ' != ' : ' = ') . $values[0];
+                } elseif ($count) {
+                    $values = array_unique($values); // Removes duplicate values
+                    $where  .= ($add_null || $ifnull) ? "IFNULL($column, '')" : $column;
+                    $where  .= ($negative ? ' NOT IN (' : ' IN (') . implode(',', $values) . ')';
+                } else {
+                    // Empty values
+                    $where = $negative ? '1' : '0';
+                }
+                break;
+        }
+    }
+
+    if ($leading_and) {
+        $where = 'AND ' . $where;
+    }
+
+    $elapsed = elapsed_time($start, 5);
+    $int_stats['gen_query_values_sec'] += $elapsed;
+    $int_stats['gen_query_values']++;
+
+    r($elapsed);
+    r($where);
+
+    return ' ' . $where;
+}
+
+/**
+ * This function generates WHERE condition string from array with values
+ * NOTE, value should be exploded by comma before use generate_query_values(), for example in get_vars()
+ *
+ * @param mixed  $value       Values
+ * @param string $column      Table column name
+ * @param string $condition   Compare condition, known:
+ *                              =, !=, NOT, NULL, NOT NULL, REGEXP, NOT REGEXP
+ *                              LIKE (and variants %LIKE%, %LIKE, LIKE%)
+ * @param array  $options     leading_and - Add leading AND to result query,
+ *                            ifnull      - Add IFNULL(column, '')
+ *
+ * @return string             Generated query
+ */
+function generate_query_values($value, $column, $condition = NULL, $options = []) {
+
+    if (!is_array($value)) {
+        $value = [ (string)$value ];
+    }
+    $column    = '`' . str_replace([ '`', '.' ], [ '', '`.`' ], $column) . '`'; // I.column -> `I`.`column`
+    $condition = $condition === TRUE ? 'LIKE' : strtoupper(trim($condition));
+    if ($negative = str_contains_array($condition, [ 'NOT', '!=' ])) {
+        $condition = trim(str_replace([ 'NOT', '!=' ], '', $condition));
+    }
+
+    // Options
+    $leading_and = in_array('leading_and', (array)$options, TRUE);
+    $ifnull      = in_array('ifnull', (array)$options, TRUE);
+
+    $search  = [ '%', '_' ];
+    $replace = [ '\%', '\_' ];
     $values  = [];
     switch ($condition) {
         // Use LIKE condition
@@ -867,7 +1099,7 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
             }
             foreach ($value as $v) {
                 if ($v === '*') {
-                    $values = ["ISNULL($column, 1)" . $cond . "'%'"];
+                    $values = [ "ISNULL($column, 1)" . $cond . "'%'" ];
                     break;
                 }
                 if ($v === '') {
@@ -886,7 +1118,6 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
                 // Empty values
                 $where = $negative ? '1' : '0';
             }
-            //$where = ($leading_and ? ' AND ' : ' ') . $where;
             break;
 
         // Use REGEXP condition
@@ -910,7 +1141,6 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
                 // Empty values
                 $where = $negative ? '1' : '0';
             }
-            //$where = ($leading_and ? ' AND ' : ' ') . $where;
             break;
 
         // Use NULL condition
@@ -923,10 +1153,26 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
             } else {
                 $where = $column . ' IS NOT NULL';
             }
-            //$where = ($leading_and ? ' AND ' : ' ') . $where;
             break;
 
-        // Use IN condition
+        // Numeric compare conditions
+        case '>':
+        case '>=':
+        case '<':
+        case '<=':
+            $num   = str_starts_with($condition, '<') ? min($value) : max($value);
+            $value = array_shift($value);
+            if (is_numeric($num)) {
+                $where = $column . " $condition " . $num;
+            } elseif (!empty($value) && !str_contains($value, ';')) {
+                $where = $column . " $condition " . dbEscape($value);
+            } else {
+                // Empty values
+                $where = $negative ? '1' : '0';
+            }
+            break;
+
+        // Use IN or = or != condition
         default:
             $where    = '';
             $add_null = FALSE;
@@ -935,7 +1181,7 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
                     $add_null = TRUE; // Add check NULL values at end
                     $values[] = "''";
                 } else {
-                    $values[] = "'" . dbEscape($v) . "'";
+                    $values[] = is_intnum($v) ? $v : "'" . dbEscape($v) . "'";
                 }
             }
             $count = count($values);
@@ -960,11 +1206,10 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
             //   $where = " AND ($where)";
             // } else {
             //$where = " AND " . $where;
-            //$where = ($leading_and ? ' AND ' : ' ') . $where;
             // }
             break;
     }
-    //if (!$leading_and) { $where = preg_replace('/^(\ )+AND/', '', $where); }
+
     if ($leading_and) {
         // Append leading AND
         return ' AND ' . $where;
@@ -972,10 +1217,19 @@ function generate_query_values_ng($value, $column, $condition = NULL, $options =
     return ' ' . $where;
 }
 
-function generate_query_sort($columns, $sort_order = '')
-{
+
+/**
+ * Generate ORDER BY query string.
+ *
+ * @param string|array $columns list of columns
+ * @param string $sort_order ASC, DESC, ''
+ * @param string|null $default_type Force cast column as datatype: number/decimal, integer
+ *
+ * @return string
+ */
+function generate_query_sort($columns, $sort_order = '', $default_type = NULL) {
     if (!is_array($columns)) {
-        $columns = [$columns];
+        $columns = explode(',', $columns);
     }
 
     $order_array = [];
@@ -985,10 +1239,28 @@ function generate_query_sort($columns, $sort_order = '')
             $null_sort = '-'; // this trick sort null values at last
             $column    = substr($column, 1);
         }
+        // Column with sort order, when multiple columns with own order
+        $column_order = $sort_order;
+        if (str_contains($column, ' ')) {
+            [ $column, $column_order ] = explode(' ', $column, 2);
+        }
+        // Column type: integer/decimal
+        $column_type = $default_type;
+        if (str_contains($column, ':')) {
+            [ $column, $column_type ] = explode(':', $column, 2);
+        }
         $column_array = explode('.', $column);
-        $sort_column  = '`' . implode('`.`', $column_array) . '`';
+        $sort_column  = $null_sort . '`' . implode('`.`', $column_array) . '`';
 
-        $order_array[] = $null_sort . $sort_column . ($sort_order ? ' ' . strtoupper($sort_order) : '');
+        if ($column_type === 'number' || $column_type === 'decimal') {
+            // https://dba.stackexchange.com/questions/21156/sort-a-varchar-field-numerically-in-mysql
+            //$sort_column .= ' + 0';
+            $sort_column = 'CAST(' . $sort_column . ' AS DECIMAL)';
+        } elseif ($column_type === 'integer') {
+            //$sort_column .= ' + 0';
+            $sort_column = 'CAST(' . $sort_column . ' AS SIGNED INTEGER)';
+        }
+        $order_array[] = $sort_column . ($column_order ? ' ' . strtoupper($column_order) : '');
     }
 
     if (!empty($order_array)) {
@@ -998,23 +1270,36 @@ function generate_query_sort($columns, $sort_order = '')
     return '';
 }
 
-function get_sort_order(&$vars = [])
-{
+/**
+ * Get sort order key from vars: ASC, DESC, ''
+ *
+ * @param array $vars
+ * @param bool $invert
+ *
+ * @return string
+ */
+function get_sort_order(&$vars = [], $invert = FALSE) {
     switch ($vars['sort_order']) {
         case 'desc':
-            $sort_order = 'DESC';
-            $sort_neg   = 'ASC';
-            break;
+            $sort_neg = 'ASC';
+            return $invert ? 'ASC' : 'DESC';
         case 'reset':
-            $sort_order = '';
             unset($vars['sort'], $vars['sort_order']);
-        // no break here
+            return '';
         default:
-            $sort_order = 'ASC';
-            $sort_neg   = 'DESC';
+            $sort_neg = 'DESC';
+            return $invert ? 'DESC' : 'ASC';
     }
+}
 
-    return $sort_order;
+function generate_query_limit(&$vars, $total = 0) {
+    if (!isset($vars['pageno'])) {
+        pagination($vars, $total, TRUE); // Get default pagesize/pageno
+    }
+    $start    = $vars['pagesize'] * $vars['pageno'] - $vars['pagesize'];
+    $pagesize = $vars['pagesize'];
+
+    return " LIMIT $start,$pagesize";
 }
 
 /**
@@ -1025,8 +1310,7 @@ function get_sort_order(&$vars = [])
  *
  * @return array|string
  */
-function export_db_schema($format = 'json')
-{
+function export_db_schema($format = 'json') {
     // Export current schema
     $db_schema = [];
     $db_tables = dbFetchRows('SHOW TABLE STATUS;');
@@ -1037,10 +1321,10 @@ function export_db_schema($format = 'json')
 
         // Main table params
         $db_schema[$table_name] = [
-          'table'     => $table_name,
-          'engine'    => $db_table['Engine'],
-          'collation' => $db_table['Collation'],
-          'comment'   => $db_table['Comment'],
+            'table'     => $table_name,
+            'engine'    => $db_table['Engine'],
+            'collation' => $db_table['Collation'],
+            'comment'   => $db_table['Comment'],
         ];
 
         //print_cli("Table: ".$table_name.PHP_EOL);
@@ -1048,15 +1332,18 @@ function export_db_schema($format = 'json')
         foreach (dbFetchRows('SHOW INDEX FROM `' . $table_name . '`;') as $entry) {
             //print_vars($entry);
             if (isset($db_schema[$table_name]['indexes'][$entry['Key_name']])) {
-                $db_schema[$table_name]['indexes'][$entry['Key_name']]['columns'][$entry['Seq_in_index']] = ['column' => $entry['Column_name'], 'size' => $entry['Sub_part']];
+                $db_schema[$table_name]['indexes'][$entry['Key_name']]['columns'][$entry['Seq_in_index']] = [
+                    'column' => $entry['Column_name'],
+                    'size' => $entry['Sub_part']
+                ];
             } else {
                 $db_schema[$table_name]['indexes'][$entry['Key_name']] = [
-                  'name'    => $entry['Key_name'],
-                  'columns' => [$entry['Seq_in_index'] => ['column' => $entry['Column_name'], 'size' => $entry['Sub_part']]],
-                  'unique'  => $entry['Non_unique'] ? FALSE : TRUE,
-                  //'type'      => $entry['Index_type'],
-                  //'collation' => $entry['Collation'],
-                  'comment' => $entry['Index_comment'],
+                    'name'    => $entry['Key_name'],
+                    'columns' => [ $entry['Seq_in_index'] => [ 'column' => $entry['Column_name'], 'size' => $entry['Sub_part'] ] ],
+                    'unique'  => !$entry['Non_unique'],
+                    //'type'      => $entry['Index_type'],
+                    //'collation' => $entry['Collation'],
+                    'comment' => $entry['Index_comment'],
                 ];
             }
         }
@@ -1101,7 +1388,7 @@ function export_db_schema($format = 'json')
                 $entry['Extra'] = rtrim('DEFAULT_GENERATED ' . $entry['Extra']);
             }
 
-            $type                                               = preg_replace('/ \/\* mariadb-\S+ \*\//', '', implode(' ', $types));
+            $type = preg_replace('/ \/\* mariadb-\S+ \*\//', '', implode(' ', $types));
             $db_schema[$table_name]['columns'][$entry['Field']] = [
               'column'    => $entry['Field'],
               'seq'       => $seq,
@@ -1119,7 +1406,7 @@ function export_db_schema($format = 'json')
         // Data
         if ($table_name === 'observium_attribs') {
             // Add schema version
-            $db_schema[$table_name]['data'][] = ['attrib_type' => 'dbSchema', 'attrib_value' => get_db_version() . ''];
+            $db_schema[$table_name]['data'][] = [ 'attrib_type' => 'dbSchema', 'attrib_value' => get_db_version() . '' ];
         }
 
         // Create table
@@ -1134,10 +1421,6 @@ function export_db_schema($format = 'json')
     print_debug_vars($db_schema);
     if ($format === 'array') {
         return $db_schema;
-        // }
-        // elseif ($format == 'yaml' && function_exists('yaml_emit'))
-        // {
-        //   return yaml_emit($db_schema, YAML_UTF8_ENCODING);
     }
 
     // Default JSON

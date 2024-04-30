@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -28,7 +28,7 @@ if (isset($options['V'])) {
 }
 
 // Prevent running housekeeping on remote pollers (not needed, won't work properly, potential data loss vector)
-if ($config['poller_id'] !== 0) {
+if (!isset($options['f']) && $config['poller_id'] !== 0) {
     print_message("%yHousekeeping only needs to be run on the main node. Do not run housekeeping on partitioned pollers.%n\n", 'color');
     exit;
 }
@@ -113,6 +113,7 @@ OPTIONS:
  -p                                          Clean up deleted ports
  -b                                          Clean up stale database entries
  -A <age>                                    Specifies maximum age for all modules (overrides configuration)
+ -f                                          Force run Housekeeping on Poller ID other than 0 (main)
 
 DEBUGGING OPTIONS:
  -T                                          Testing, not do any actions, only show counts.

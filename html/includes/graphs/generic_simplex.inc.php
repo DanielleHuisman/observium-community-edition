@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -27,9 +26,10 @@ if (!isset($colour_area)) {
 // Draw generic bits graph
 // args: ds_in, ds_out, unit_integer, rrd_filename, bg, legend, from, to, width, height, inverse, percentile
 
-$graph_return['valid_options'][] = "trend";
-
 include($config['html_dir'] . "/includes/graphs/common.inc.php");
+
+$graph_return['valid_options'][] = "alt_y";
+$graph_return['valid_options'][] = "trend";
 
 // Fix length before escaping for layout purposes
 $unit_text = rrdtool_escape(str_pad(truncate($unit_text, 17, ''), 17));

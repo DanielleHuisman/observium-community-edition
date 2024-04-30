@@ -44,6 +44,7 @@ IMPORTS
 	DisplayString,
 	RowStatus,
 	MacAddress,
+	TEXTUAL-CONVENTION, 
 	TestAndIncr	  		FROM SNMPv2-TC
 	SnmpAdminString     FROM SNMP-FRAMEWORK-MIB
 	SnmpTagValue,
@@ -53,7 +54,7 @@ IMPORTS
 	hmLastLoginUserName FROM HMPRIV-MGMT-SNMP-MIB;
 
 hmSecurity2 MODULE-IDENTITY
-    LAST-UPDATED "201501231200Z" -- Jan 23, 2015
+    LAST-UPDATED "201601261200Z" -- Jan 26, 2016
     ORGANIZATION "Hirschmann Automation and Control GmbH"
     CONTACT-INFO 
           "Customer Support
@@ -88,7 +89,20 @@ hmSecurity2 MODULE-IDENTITY
     REVISION        "201501231200Z" -- Jan 23, 2015
     DESCRIPTION
             "Published as is."
+    REVISION        "201601261200Z" -- Jan 26, 2016
+    DESCRIPTION
+            "Published as is."
    ::= { hirschmann 52 }
+
+--
+-- Textual conventions for this MIB --
+--
+
+DIFwRuleActivate ::= TEXTUAL-CONVENTION 
+    STATUS       current
+    DESCRIPTION  "Digital-Input dependent Firewall rules activation"
+    SYNTAX       INTEGER { high-active(1), low-active(2) }
+
 
 --
 -- hmSecurity2 / Hirschmann Security Devices MIB Revision 2 --
@@ -772,6 +786,30 @@ hmSec2LoggingGeneral OBJECT IDENTIFIER ::= { hmSec2LoggingGroup 1 }
 
 			 ::= { hmSec2LoggingGeneral 5 }
 
+	hmSec2SyslogServer2IPAddr   OBJECT-TYPE
+			 SYNTAX 		IpAddress
+			 MAX-ACCESS 	read-write
+			 STATUS 		current
+			 DESCRIPTION
+                 "IP address of second syslog server for logging.
+				  Set this value to 0.0.0.0 to disable transmission to syslog server."
+			 DEFVAL  { '00000000'H } -- 0.0.0.0
+
+			 ::= { hmSec2LoggingGeneral 6 }
+
+
+	hmSec2SyslogServer2UdpPort   OBJECT-TYPE
+		     SYNTAX         InetPortNumber
+			 MAX-ACCESS 	read-write
+			 STATUS 		current
+			 DESCRIPTION
+                 "UDP port used for second syslog server transmission. If this value is
+                  zero then the default port 514 is used."
+			 DEFVAL  { 514 }
+
+			 ::= { hmSec2LoggingGeneral 7 }
+
+
 
 
 --
@@ -1277,6 +1315,19 @@ HmSec2UsrFwUserEntry ::= SEQUENCE {
                      createAndWait(5) - Accept row values and wait.
                      destroy(6)       - Set to this value to remove this user account."
          ::= { hmSec2UsrFwUserEntry 6 }
+
+hmSec2UsrFwUserStateRemoval OBJECT-TYPE
+		 SYNTAX 		INTEGER {
+		 				remove (1),
+		 				keep (2)
+						}
+		 MAX-ACCESS 	read-write
+		 STATUS 		current
+		 DESCRIPTION
+			 "Set to remove or keep the Firewall state entries
+			 for User Firewall users at Logout."
+		 DEFVAL  { keep }				 
+		 ::= { hmSec2UsrFwUserGroup 3 }
 
 
 --
@@ -2032,6 +2083,273 @@ hmSec2FwL3PfInLogNonMatching   OBJECT-TYPE
 			 ::= { hmSec2FirewallL3PfIncomingGroup 2 }
 
 --
+-- IP Rules for incoming traffic table dependent on Digital Input --
+--
+hmSec2FwL3PfDIInTable	OBJECT-TYPE
+			 SYNTAX SEQUENCE OF HmSec2FwL3PfDIInEntry
+			 MAX-ACCESS not-accessible
+			 STATUS current
+			 DESCRIPTION
+				 "A list of the IP rules for incoming traffic
+				 controlled by the digital input to
+				 activate or deactivate the rules."
+			 ::= { hmSec2FirewallL3PfIncomingGroup 3 }
+
+hmSec2FwL3PfDIInEntry   OBJECT-TYPE
+			 SYNTAX HmSec2FwL3PfDIInEntry
+			 MAX-ACCESS not-accessible
+			 STATUS current
+			 DESCRIPTION ""
+			 INDEX { hmSec2FwL3PfDIInIndex }
+			 ::= { hmSec2FwL3PfDIInTable 1 }
+ 
+HmSec2FwL3PfDIInEntry ::= SEQUENCE {
+			 hmSec2FwL3PfDIInIndex		Integer32,
+			 hmSec2FwL3PfDIInSrcNet		DisplayString,
+			 hmSec2FwL3PfDIInSrcPort	DisplayString,
+			 hmSec2FwL3PfDIInDstNet		DisplayString,
+			 hmSec2FwL3PfDIInDstPort	DisplayString,
+			 hmSec2FwL3PfDIInProto		DisplayString,
+			 hmSec2FwL3PfDIInAction		INTEGER,
+			 hmSec2FwL3PfDIInLog		INTEGER,
+			 hmSec2FwL3PfDIInDesc		DisplayString,
+			 hmSec2FwL3PfDIInErrorText	DisplayString,
+			 hmSec2FwL3PfDIInRowStatus	RowStatus
+			 }
+
+hmSec2FwL3PfDIInIndex   OBJECT-TYPE
+			 SYNTAX 		 Integer32
+			 MAX-ACCESS 	 read-only
+			 STATUS 		 current
+			 DESCRIPTION
+				 "An index that uniquely identifies the entry in the table. The
+				  index must be choosen in ascending and compact order. It may
+				  change if a rule (not the last in list) is deleted or a new
+				  row is inserted."
+			 ::= { hmSec2FwL3PfDIInEntry 1 }
+
+hmSec2FwL3PfDIInSrcNet   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Single address (a.b.c.d) or address range in
+                  CIDR notation (a.b.c.d/n) or the keywords 'me'
+                  or 'any'."
+			 DEFVAL  { "any" }
+			 ::= { hmSec2FwL3PfDIInEntry 2 }
+
+hmSec2FwL3PfDIInSrcPort   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Port expression or the keyword 'any'. A port expressions is
+                  structured as 'port' (default), 'op port' or 'port1 op port2',
+                  where 'op' is a mathematical operator for:
+                  o  equal (default)           =
+                  o  unequal                   !=
+                  o  less than                 <
+                  o  less than or equal        <=
+                  o  greater than              >
+                  o  greater than or equal to  >=
+                  o  outside range             <>
+                  o  inside range              ><
+
+                  The port must be specified as a decimal number or one of the
+                  aliases:
+                  o  tcp/udp: echo (7)
+                  o  tcp/udp: discard, sink, null (9)
+                  o  tcp: ftp-data (20)
+                  o  tcp: ftp (21)
+                  o  tcp/udp: ssh (22)
+                  o  tcp: telnet (23)
+                  o  tcp/udp: domain, nameserver (53)
+                  o  tcp/udp: bootps (67)
+                  o  tcp/udp: bootpc (68)
+                  o  udp: tftp (69)
+                  o  tcp/udp: www, http (80)
+                  o  tcp/udp: kerberos, krb5 (88)
+                  o  tcp: sftp (115)
+                  o  tcp/udp: ntp (123)
+                  o  udp: snmp (161)
+                  o  udp: snmp-trap, snmptrap (162)
+                  o  tcp/udp: bgp (179)
+                  o  tcp/udp: ldap (389)
+                  o  tcp/udp: https (443)
+                  
+                  For ICMP only:
+                  ICMP type and code can be specified as:
+                  o 'type <i>'
+                  o 'type <i> code <j>'
+                  where <i> and <j> are decimal numbers (0..255)."
+			 DEFVAL  { "any" }                
+			 ::= { hmSec2FwL3PfDIInEntry 3 }
+
+hmSec2FwL3PfDIInDstNet   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Single address (a.b.c.d) or address range in CIDR notation
+                  (a.b.c.d/n) or the keywords 'me' or 'any'."
+			 DEFVAL  { "any" }                
+			 ::= { hmSec2FwL3PfDIInEntry 4 }
+
+hmSec2FwL3PfDIInDstPort   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Port expression or the keyword 'any'. A port expressions is
+                  structured as 'port' (default), 'op port' or 'port1 op port2',
+                  where 'op' is a mathematical operator for:
+                  o  equal (default)           =
+                  o  unequal                   !=
+                  o  less than                 <
+                  o  less than or equal        <=
+                  o  greater than              >
+                  o  greater than or equal to  >=
+                  o  outside range             <>
+                  o  inside range              ><
+
+                  The port must be specified as a decimal number or one of the
+                  aliases:
+                  o  tcp/udp: echo (7)
+                  o  tcp/udp: discard, sink, null (9)
+                  o  tcp: ftp-data (20)
+                  o  tcp: ftp (21)
+                  o  tcp/udp: ssh (22)
+                  o  tcp: telnet (23)
+                  o  tcp/udp: domain, nameserver (53)
+                  o  tcp/udp: bootps (67)
+                  o  tcp/udp: bootpc (68)
+                  o  udp: tftp (69)
+                  o  tcp/udp: www, http (80)
+                  o  tcp/udp: kerberos, krb5 (88)
+                  o  tcp: sftp (115)
+                  o  tcp/udp: ntp (123)
+                  o  udp: snmp (161)
+                  o  udp: snmp-trap, snmptrap (162)
+                  o  tcp/udp: bgp (179)
+                  o  tcp/udp: ldap (389)
+                  o  tcp/udp: https (443)"
+			 DEFVAL  { "any" }                
+			 ::= { hmSec2FwL3PfDIInEntry 5 }
+
+hmSec2FwL3PfDIInProto   OBJECT-TYPE
+		   	 SYNTAX			 DisplayString (SIZE (0..10))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "The IP protocol (RFC 791) as a decimal number (in range 1 -
+                  255), a name or the keyword 'any' for protocol-independent
+                  filtering. The following protocol names are currently
+                  supported:
+                  o  'icmp': internet control message protocol (RFC 792)
+                  o  'igmp': internet group management protocol
+                  o  'ipip': IP in IP tunneling (RFC 1853)
+                  o  'tcp': transmission control protocol (RFC 793)
+                  o  'udp': user datagram protocol (RFC 768)
+                  o  'esp': IPsec encapsulated security payload (RFC 2406)
+                  o  'ah': IPsec authentication header (RFC 2402)
+                  o  'ipv6-icmp': internet control message protocol for IPv6"
+			 DEFVAL  { "any" }
+			 ::= { hmSec2FwL3PfDIInEntry 6 }
+
+hmSec2FwL3PfDIInAction   OBJECT-TYPE
+		   	 SYNTAX			 INTEGER {
+							 accept(1),
+							 drop(2),
+							 reject(3)
+					  }
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Action to be performed if the firewall rule matches."
+			 DEFVAL  { accept }                
+			 ::= { hmSec2FwL3PfDIInEntry 7 }
+
+hmSec2FwL3PfDIInLog	   OBJECT-TYPE
+		     SYNTAX			 INTEGER {
+							 enable(1),
+							 disable(2),
+							 logAndTrap(3)
+					  }
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Enables or disables logging for packets matching this rule."
+			 DEFVAL  { disable }                
+			 ::= { hmSec2FwL3PfDIInEntry 8 }
+
+hmSec2FwL3PfDIInDesc   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..128))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "User defined text."
+			 DEFVAL  { "" }                
+			 ::= { hmSec2FwL3PfDIInEntry 9 }
+
+hmSec2FwL3PfDIInErrorText   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..128))
+			 MAX-ACCESS 	 read-only
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Error text."
+			 DEFVAL  { "" }                
+			 ::= { hmSec2FwL3PfDIInEntry 10 }
+
+hmSec2FwL3PfDIInRowStatus   OBJECT-TYPE
+			 SYNTAX 		 RowStatus
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "The row status of this table entry."
+			 ::= { hmSec2FwL3PfDIInEntry 11 }
+
+hmSec2FwL3PfDIInLevel   OBJECT-TYPE
+		     SYNTAX			 DIFwRuleActivate
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Set this variable to change the behavior of
+				 the digital input to activate the Firewall
+				 rules in the Digital Input Rule table when
+				 the digital input value is high (high-active) 
+				 or low (low-active)."
+			 DEFVAL  { high-active }
+			 ::= { hmSec2FirewallL3PfIncomingGroup 4 }
+
+hmSec2FwL3PfDIInStateRemoval OBJECT-TYPE
+			 SYNTAX 		INTEGER {
+			 				remove (1),
+			 				keep (2)
+							}
+			 MAX-ACCESS 	read-write
+			 STATUS 		current
+			 DESCRIPTION
+				 "Set to remove or keep the Firewall state entries
+				 for Digital Input Firewall rules when the state switches."
+			 DEFVAL  { remove }				 
+			 ::= { hmSec2FirewallL3PfIncomingGroup 5 }
+
+hmSec2FwL3PfDIInOperStatus   OBJECT-TYPE
+ 			 SYNTAX			INTEGER {
+								active(1),
+								inactive(2)
+							}
+			 MAX-ACCESS 	 read-only
+			 STATUS 		 current
+			 DESCRIPTION
+				 "This value shows if the rules for digital input
+				  are currently active or inactive (depends on the
+				  activation level hmSec2FwL3PfDIInLevel)."
+			 ::= { hmSec2FirewallL3PfIncomingGroup 6 }
+
+
+--
 -- IP Rules for outgoing traffic table --
 --
 hmSec2FwL3PfOutTable	OBJECT-TYPE
@@ -2268,6 +2586,273 @@ hmSec2FwL3PfOutLogNonMatching   OBJECT-TYPE
 				 "Log incoming packets not matching any rule."
 			 DEFVAL  { disable }                
 			 ::= { hmSec2FirewallL3PfOutgoingGroup 2 }
+
+--
+-- IP Rules for outgoing traffic table dependent on Digital Input --
+--
+hmSec2FwL3PfDIOutTable	OBJECT-TYPE
+			 SYNTAX SEQUENCE OF HmSec2FwL3PfDIOutEntry
+			 MAX-ACCESS not-accessible
+			 STATUS current
+			 DESCRIPTION
+				 "A list of the IP rules for outgoing traffic
+				 controlled by the digital input to
+				 activate or deactivate the rules."
+			 ::= { hmSec2FirewallL3PfOutgoingGroup 3 }
+
+hmSec2FwL3PfDIOutEntry   OBJECT-TYPE
+			 SYNTAX HmSec2FwL3PfDIOutEntry
+			 MAX-ACCESS not-accessible
+			 STATUS current
+			 DESCRIPTION ""
+			 INDEX { hmSec2FwL3PfDIOutIndex }
+			 ::= { hmSec2FwL3PfDIOutTable 1 }
+ 
+HmSec2FwL3PfDIOutEntry ::= SEQUENCE {
+			 hmSec2FwL3PfDIOutIndex		Integer32,
+			 hmSec2FwL3PfDIOutSrcNet	DisplayString,
+			 hmSec2FwL3PfDIOutSrcPort	DisplayString,
+			 hmSec2FwL3PfDIOutDstNet	DisplayString,
+			 hmSec2FwL3PfDIOutDstPort	DisplayString,
+			 hmSec2FwL3PfDIOutProto		DisplayString,
+			 hmSec2FwL3PfDIOutAction	INTEGER,
+			 hmSec2FwL3PfDIOutLog		INTEGER,
+			 hmSec2FwL3PfDIOutDesc		DisplayString,
+			 hmSec2FwL3PfDIOutErrorText	DisplayString,
+			 hmSec2FwL3PfDIOutRowStatus	RowStatus
+			 }
+
+hmSec2FwL3PfDIOutIndex   OBJECT-TYPE
+			 SYNTAX 		 Integer32
+			 MAX-ACCESS 	 read-only
+			 STATUS 		 current
+			 DESCRIPTION
+				 "An index that uniquely identifies the entry in the table. The
+				  index must be choosen in ascending and compact order. It may
+				  change if a rule (not the last in list) is deleted or a new
+				  row is inserted."
+			 ::= { hmSec2FwL3PfDIOutEntry 1 }
+
+hmSec2FwL3PfDIOutSrcNet   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Single address (a.b.c.d) or address range in CIDR notation
+                  (a.b.c.d/n) or the keywords 'me' or 'any'."
+			 DEFVAL  { "any" }
+			 ::= { hmSec2FwL3PfDIOutEntry 2 }
+
+hmSec2FwL3PfDIOutSrcPort   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Port expression or the keyword 'any'. A port expressions is
+                  structured as 'port' (default), 'op port' or 'port1 op port2',
+                  where 'op' is a mathematical operator for:
+                  o  equal (default)           =
+                  o  unequal                   !=
+                  o  less than                 <
+                  o  less than or equal        <=
+                  o  greater than              >
+                  o  greater than or equal to  >=
+                  o  outside range             <>
+                  o  inside range              ><
+
+                  The port must be specified as a decimal number or one of the
+                  aliases:
+                  o  tcp/udp: echo (7)
+                  o  tcp/udp: discard, sink, null (9)
+                  o  tcp: ftp-data (20)
+                  o  tcp: ftp (21)
+                  o  tcp/udp: ssh (22)
+                  o  tcp: telnet (23)
+                  o  tcp/udp: domain, nameserver (53)
+                  o  tcp/udp: bootps (67)
+                  o  tcp/udp: bootpc (68)
+                  o  udp: tftp (69)
+                  o  tcp/udp: www, http (80)
+                  o  tcp/udp: kerberos, krb5 (88)
+                  o  tcp: sftp (115)
+                  o  tcp/udp: ntp (123)
+                  o  udp: snmp (161)
+                  o  udp: snmp-trap, snmptrap (162)
+                  o  tcp/udp: bgp (179)
+                  o  tcp/udp: ldap (389)
+                  o  tcp/udp: https (443)
+                  
+                  For ICMP only:
+                  ICMP type and code can be specified as:
+                  o 'type <i>'
+                  o 'type <i> code <j>'
+                  where <i> and <j> are decimal numbers (0..255)."
+			 DEFVAL  { "any" }                
+			 ::= { hmSec2FwL3PfDIOutEntry 3 }
+
+hmSec2FwL3PfDIOutDstNet   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Single address (a.b.c.d) or address range in
+                  CIDR notation (a.b.c.d/n) or the keywords 'me'
+                  or 'any'."
+			 DEFVAL  { "any" }
+			 ::= { hmSec2FwL3PfDIOutEntry 4 }
+
+hmSec2FwL3PfDIOutDstPort   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..20))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+                 "Port expression or the keyword 'any'. A port expressions is
+                  structured as 'port' (default), 'op port' or 'port1 op port2',
+                  where 'op' is a mathematical operator for:
+                  o  equal (default)           =
+                  o  unequal                   !=
+                  o  less than                 <
+                  o  less than or equal        <=
+                  o  greater than              >
+                  o  greater than or equal to  >=
+                  o  outside range             <>
+                  o  inside range              ><
+
+                  The port must be specified as a decimal number or one of the
+                  aliases:
+                  o  tcp/udp: echo (7)
+                  o  tcp/udp: discard, sink, null (9)
+                  o  tcp: ftp-data (20)
+                  o  tcp: ftp (21)
+                  o  tcp/udp: ssh (22)
+                  o  tcp: telnet (23)
+                  o  tcp/udp: domain, nameserver (53)
+                  o  tcp/udp: bootps (67)
+                  o  tcp/udp: bootpc (68)
+                  o  udp: tftp (69)
+                  o  tcp/udp: www, http (80)
+                  o  tcp/udp: kerberos, krb5 (88)
+                  o  tcp: sftp (115)
+                  o  tcp/udp: ntp (123)
+                  o  udp: snmp (161)
+                  o  udp: snmp-trap, snmptrap (162)
+                  o  tcp/udp: bgp (179)
+                  o  tcp/udp: ldap (389)
+                  o  tcp/udp: https (443)"
+			 DEFVAL  { "any" }                
+			 ::= { hmSec2FwL3PfDIOutEntry 5 }
+
+hmSec2FwL3PfDIOutProto   OBJECT-TYPE
+		   	 SYNTAX			 DisplayString (SIZE (0..10))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "The IP protocol (RFC 791) as a decimal number (in range 1 -
+                  255), a name or the keyword 'any' for protocol-independent
+                  filtering. The following protocol names are currently
+                  supported:
+                  o  'icmp': internet control message protocol (RFC 792)
+                  o  'igmp': internet group management protocol
+                  o  'ipip': IP in IP tunneling (RFC 1853)
+                  o  'tcp': transmission control protocol (RFC 793)
+                  o  'udp': user datagram protocol (RFC 768)
+                  o  'esp': IPsec encapsulated security payload (RFC 2406)
+                  o  'ah': IPsec authentication header (RFC 2402)
+                  o  'ipv6-icmp': internet control message protocol for IPv6"
+			 DEFVAL  { "any" }                
+			 ::= { hmSec2FwL3PfDIOutEntry 6 }
+
+hmSec2FwL3PfDIOutAction   OBJECT-TYPE
+		   	 SYNTAX			 INTEGER {
+							 accept(1),
+							 drop(2),
+							 reject(3)
+					  }
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Action to be performed if the firewall rule matches."
+			 DEFVAL  { drop }                
+			 ::= { hmSec2FwL3PfDIOutEntry 7 }
+
+hmSec2FwL3PfDIOutLog	   OBJECT-TYPE
+		   	 SYNTAX			 INTEGER {
+							 enable(1),
+							 disable(2),
+							 logAndTrap(3)
+					  }
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Enables or disables logging for packets matching this rule."
+			 DEFVAL  { disable }                
+			 ::= { hmSec2FwL3PfDIOutEntry 8 }
+
+hmSec2FwL3PfDIOutDesc   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..128))
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "User defined text."
+			 DEFVAL  { "" }                
+			 ::= { hmSec2FwL3PfDIOutEntry 9 }
+
+hmSec2FwL3PfDIOutErrorText   OBJECT-TYPE
+			 SYNTAX 		 DisplayString (SIZE (0..128))
+			 MAX-ACCESS 	 read-only
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Error text."
+			 DEFVAL  { "" }                
+			 ::= { hmSec2FwL3PfDIOutEntry 10 }
+
+hmSec2FwL3PfDIOutRowStatus   OBJECT-TYPE
+			 SYNTAX 		 RowStatus
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "The row status for this table entry."
+			 ::= { hmSec2FwL3PfDIOutEntry 11 }
+
+hmSec2FwL3PfDIOutLevel   OBJECT-TYPE
+		     SYNTAX			 DIFwRuleActivate
+			 MAX-ACCESS 	 read-write
+			 STATUS 		 current
+			 DESCRIPTION
+				 "Set this variable to change the behavior of
+				 the digital input to activate the Firewall
+				 rules in the Digital Input Rule table when
+				 the digital input value is high (high-active) 
+				 or low (low-active)."
+			 DEFVAL  { high-active }
+			 ::= { hmSec2FirewallL3PfOutgoingGroup 4 }
+
+hmSec2FwL3PfDIOutStateRemoval OBJECT-TYPE
+			 SYNTAX 		INTEGER {
+			 				remove (1),
+			 				keep (2)
+							}
+			 MAX-ACCESS 	read-write
+			 STATUS 		current
+			 DESCRIPTION
+				 "Set to remove or keep the Firewall state entries
+				 for Digital Input Firewall rules when the state switches."
+			 DEFVAL  { remove }				 
+			 ::= { hmSec2FirewallL3PfOutgoingGroup 5 }
+
+hmSec2FwL3PfDIOutOperStatus   OBJECT-TYPE
+ 			 SYNTAX			INTEGER {
+								active(1),
+								inactive(2)
+							}
+			 MAX-ACCESS 	 read-only
+			 STATUS 		 current
+			 DESCRIPTION
+				 "This value shows if the rules for digital input
+				  are currently active or inactive (depends on the
+				  activation level hmSec2FwL3PfDIOutLevel)."
+			 ::= { hmSec2FirewallL3PfOutgoingGroup 6 }
+
 
 --
 -- IP template definitions
@@ -6622,6 +7207,18 @@ hmSec2MiscTrapText OBJECT-TYPE
         When read, it will always return an empty string."
     ::= { hmSec2Info 2 }
 
+hmSec2DigitalInStatus	OBJECT-TYPE
+	SYNTAX			INTEGER {
+						high(1),
+						low(2),
+						not-available(3)
+					}
+	MAX-ACCESS		read-only
+	STATUS			current
+	DESCRIPTION		"The status of the digital input or not-available,
+					if the status can not be determined or digtal-input
+					not available."
+	::= { hmSec2Info 3 }
 
 -- **************************************************************************
 -- *																		*

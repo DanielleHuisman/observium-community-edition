@@ -87,7 +87,7 @@ class Crypt_CHAP extends PEAR
      */
     function __construct()
     {
-        //$this->PEAR();
+        parent::__construct();
         $this->generateChallenge();
     }
     
@@ -169,7 +169,7 @@ class Crypt_CHAP_MSv1 extends Crypt_CHAP
      */
     function __construct()
     {
-        //$this->Crypt_CHAP();
+        parent::__construct();
         $this->loadExtension('hash');        
     }
     
@@ -437,7 +437,7 @@ class Crypt_CHAP_MSv2 extends Crypt_CHAP_MSv1
      */
     function __construct()
     {
-        //$this->Crypt_CHAP_MSv1();
+        parent::__construct();
         $this->generateChallenge('peerChallenge', 16);
         $this->generateChallenge('authChallenge', 16);
     }    

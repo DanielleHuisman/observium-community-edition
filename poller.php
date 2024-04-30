@@ -55,7 +55,7 @@ if (isset($options['M'])) {
     exit;
 }
 
-if (!isset($options['q'])) {
+if (!isset($options['q']) && !is_cron()) {
 
     print_cli_banner();
 
@@ -74,8 +74,20 @@ if (!isset($options['q'])) {
     }
 }
 
+$where = '';
 $doing_single = FALSE; // Poll single device? mostly from poller wrapper
 
+if ($options['h'] === "pollers") {
+    // Distributed pollers only
+    if (OBS_DISTRIBUTED) {
+        poll_pollers_distributed();
+    } elseif (OBSERVIUM_EDITION === 'community') {
+        print_debug("Distribution pollers not available in CE.");
+    } else {
+        print_debug("Distribution pollers not exist on install.");
+    }
+    exit(); // Silent exit
+}
 if ($options['h'] === "odd") {
     $options['n'] = "1";
     $options['i'] = "2";
@@ -99,7 +111,7 @@ if ($options['h'] === "odd") {
     }
 }
 
-if (isset($options['i']) && $options['i'] && isset($options['n'])) {
+if (isset($options['i'], $options['n']) && $options['i']) {
     $where = TRUE; // FIXME
 
     $query    = 'SELECT `device_id` FROM (SELECT @rownum :=0) r,
@@ -127,6 +139,7 @@ EXAMPLE:
 -h even                                      Poll even numbered devices (same as -i 2 -n 1)
 -h all                                       Poll all devices
 -h new                                       Poll all devices that have not had a discovery run before
+-h pollers                                   Poll remote pollers (except devices)
 
 -i <instances> -n <id/number>                Poll as instance <id/number> of <instances>
                                              Instance numbers start at 0. 0-3 for -i 4
@@ -142,7 +155,8 @@ OPTIONS:
  -n                                          Instance id (number), must start from 0 and to be less than instances count.
  -q                                          Quiet output.
  -M                                          Show globally enabled/disabled modules and exit.
- -V                                          Show version and exit.
+ -V                                          Show observium version and exit.
+ -VV                                         Show observium and used programs versions and exit.
 
 DEBUGGING OPTIONS:
  -r                                          Do not create or update RRDs
@@ -170,15 +184,13 @@ if (!isset($query)) {
     $params[] = $config['poller_id'];
 }
 
-foreach (dbFetch($query, $params) as $device) {
-    $device = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", [$device['device_id']]);
+foreach (dbFetchColumn($query, $params) as $device_id) {
+    $device = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", [ $device_id ]);
     poll_device($device, $options);
     $polled_devices++;
 }
 
-$poller_end  = utime();
-$poller_run  = $poller_end - $poller_start;
-$poller_time = substr($poller_run, 0, 5);
+$poller_time = elapsed_time($poller_start, 4);
 
 if ($polled_devices) {
     if (is_numeric($doing)) {
@@ -211,8 +223,8 @@ print_debug_vars($db_stats);
 // Store MySQL/Memory stats per device polling (only for single device poll)
 if ($doing_single && !isset($options['m'])) {
     rrdtool_update_ng($device, 'perf-pollerdb', $db_stats);                                     // MySQL usage stats
-    rrdtool_update_ng($device, 'perf-pollermemory', ['usage' => memory_get_usage(TRUE),        // Memory usage stats
-                                                     'peak'  => memory_get_peak_usage(TRUE)]);
+    rrdtool_update_ng($device, 'perf-pollermemory', [ 'usage' => memory_get_usage(TRUE),        // Memory usage stats
+                                                      'peak'  => memory_get_peak_usage(TRUE) ]);
 
     print_debug_vars($GLOBALS['snmp_stats']);
     $poller_snmp_stats  = ['total' => 0, 'total_sec' => 0];
@@ -247,7 +259,7 @@ if (!isset($options['q'])) {
     print_cli_data('Poller Time', $poller_time . " secs", 0);
     print_cli_data('Definitions', $defs_time . " secs", 0);
     print_cli_data('Memory usage', format_bytes(memory_get_usage(TRUE), 2, 4) . ' (peak: ' . format_bytes(memory_get_peak_usage(TRUE), 2, 4) . ')', 0);
-    print_cli_data('MySQL Usage', implode(" ", $mysql_times) . ' (' . round($mysql_time, 3) . 's ' . round($mysql_time / $poller_time * 100, 3) . '%)', 0);
+    print_cli_data('MySQL Usage', implode(" ", $mysql_times) . ' (' . round($mysql_time, 3) . 's ' . percent($mysql_time, $poller_time, 3) . '%)', 0);
 
     $rrd_time  = 0;
     $rrd_times = [];
@@ -256,7 +268,7 @@ if (!isset($options['q'])) {
         $rrd_time    += $data['time'];
     }
 
-    print_cli_data('RRDTool Usage', implode(" ", $rrd_times) . ' (' . round($rrd_time, 3) . 's ' . round($rrd_time / $poller_time * 100, 3) . '%)', 0);
+    print_cli_data('RRDTool Usage', implode(" ", $rrd_times) . ' (' . round($rrd_time, 3) . 's ' . percent($rrd_time, $poller_time, 3) . '%)', 0);
 
     $snmp_time  = 0;
     $snmp_times = [];
@@ -265,12 +277,12 @@ if (!isset($options['q'])) {
         $snmp_time    += $data['time'];
     }
 
-    print_cli_data('SNMP Usage', implode(" ", $snmp_times) . ' (' . round($snmp_time, 3) . 's ' . round($snmp_time / $poller_time * 100, 3) . '%)', 0);
+    print_cli_data('SNMP Usage', implode(" ", $snmp_times) . ' (' . round($snmp_time, 3) . 's ' . percent($snmp_time, $poller_time, 3) . '%)', 0);
 
     if ($GLOBALS['influxdb_stats']) {
         $s = $GLOBALS['influxdb_stats'];
         $t = $s['time'];
-        print_cli_data('InfluxDB Usage', $s['count'] . ' data points (' . round($t, 3) . 's ' . round($t / $poller_time * 100, 3) . '%)', 0);
+        print_cli_data('InfluxDB Usage', $s['count'] . ' data points (' . round($t, 3) . 's ' . percent($t, $poller_time, 3) . '%)', 0);
     }
 
 }

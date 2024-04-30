@@ -1,0 +1,495 @@
+NEWTEC-ALARM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    Counter32,
+    Unsigned32,
+    MODULE-IDENTITY,
+    OBJECT-IDENTITY,
+    OBJECT-TYPE
+        FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP
+        FROM SNMPv2-CONF
+    
+    NtcAlarmState,
+    NtcSystemTime
+        FROM NEWTEC-TC-MIB
+
+    DisplayString
+        FROM SNMPv2-TC
+
+    ntcFunction
+        FROM NEWTEC-MAIN-MIB;
+
+
+--
+--  Module Identification
+--
+
+ntcAlarm   MODULE-IDENTITY
+    LAST-UPDATED "201409090900Z"
+    ORGANIZATION "Newtec Cy"
+    CONTACT-INFO
+        "Newtec Cy
+         Postal: Newtec Cy
+                 Laarstraat 5
+                 B-9100 Sint-Niklaas
+                 Belgium
+
+                Tel: +32 3 780 65 00
+                Fax: +32 3 780 65 49
+                Web: www.newtec.be
+                E-mail: techsupport@newtec.be"
+    DESCRIPTION
+        "Newtec modular MIB containing management tables for the consolidated alarms."
+
+    REVISION  "201409090900Z"
+    DESCRIPTION
+        "Minimum value of string keys adjusted"
+    REVISION  "201403181200Z"
+    DESCRIPTION
+        "Alarm definition of severity set to read_only"
+    REVISION  "201303271000Z"
+    DESCRIPTION
+        "Release for M6100 R1.3"
+    REVISION  "201206281200Z"
+    DESCRIPTION
+        "Release for M6100 R1.2"
+    ::= { ntcFunction  200 }
+    
+
+--
+-- Top-Level Structure
+--
+
+-- ntcAlarm content
+
+ntcAlmObjects                    OBJECT-IDENTITY
+    STATUS        current
+    DESCRIPTION   "Container holding ntcAlmObjects definitions."
+    ::= { ntcAlarm 1 }
+    
+ntcAlmConformance                OBJECT-IDENTITY
+    STATUS        current
+    DESCRIPTION   "Conformance requirements."
+    ::= { ntcAlarm 2 }
+    
+-- ntcAlmConformance content
+
+ntcAlmConfCompliance             OBJECT-IDENTITY
+    STATUS        current
+    DESCRIPTION   "Device compliance statements."
+    ::= { ntcAlmConformance 1 }
+    
+ntcAlmConfGroup                  OBJECT-IDENTITY
+    STATUS        current
+    DESCRIPTION   "Groups used by device compliance statements."
+    ::= { ntcAlmConformance 2 }
+    
+
+--
+-- Managed Objects
+--
+
+ntcAlmReset                      OBJECT-TYPE
+    SYNTAX      INTEGER { none(0), reset(1) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "By setting this variable it is possible to clear all alarmcounters which is
+        something one would typically do when throubleshooting a setup to find out
+        which alarms are being triggered overnight for example. Of course some NMS
+        implementation will never need this function as they keep counters themselves."
+    DEFVAL { none }
+    ::= { ntcAlmObjects 1 }
+    
+ntcAlmDefinitionTable            OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NtcAlmDefinitionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table describes all possible alarms that can occur in the device and
+        their associated severity (in first releases of M6xxx this severity cannot be
+        changed by the operator, in future releases this will be an editable
+        parameter). This table is static unless there is a SW or license upgrade of
+        the device (which can result in more or less features being enabled and thus
+        more or less alarms being potentially applicable). The alarm definition tables
+        contains a description of all the alarms supported by the device."
+    ::= { ntcAlmObjects 2 }
+
+ntcAlmDefinitionEntry            OBJECT-TYPE
+    SYNTAX      NtcAlmDefinitionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row of the ntcAlmDefinitionTable."
+    INDEX   { ntcAlmDefinitionName  }
+    ::= { ntcAlmDefinitionTable 1 }
+
+NtcAlmDefinitionEntry            ::= SEQUENCE {
+    ntcAlmDefinitionName           DisplayString,
+    ntcAlmDefinitionSeverity       DisplayString,
+    ntcAlmDefinitionDescription    DisplayString
+    }
+    
+ntcAlmDefinitionName             OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..64))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The name of an Alarm."
+    ::= { ntcAlmDefinitionEntry 1 }
+    
+ntcAlmDefinitionSeverity         OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The default severity of an Alarm."
+    ::= { ntcAlmDefinitionEntry 2 }
+    
+ntcAlmDefinitionDescription      OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The description of an Alarm."
+    ::= { ntcAlmDefinitionEntry 3 }
+    
+ntcAlmActiveTable                OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NtcAlmActiveEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains the list of currently active alarm and all associated data
+        (description, alarmcount, etc). Rows in this table will disappear as soon as
+        an alarm goes to the off state. When a GETNEXT on this table gives a response
+        outside this table it means there are no active alarms on this device. This is
+        actually the fastest way to check the alarmstate of a device."
+    ::= { ntcAlmObjects 3 }
+
+ntcAlmActiveEntry                OBJECT-TYPE
+    SYNTAX      NtcAlmActiveEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row of the ntcAlmActiveTable."
+    INDEX   { ntcAlmActiveName  }
+    ::= { ntcAlmActiveTable 1 }
+
+NtcAlmActiveEntry                ::= SEQUENCE {
+    ntcAlmActiveName             DisplayString,
+    ntcAlmActiveSeverity         DisplayString,
+    ntcAlmActiveTime             NtcSystemTime,
+    ntcAlmActiveCount            Counter32,
+    ntcAlmActiveSource           DisplayString,
+    ntcAlmActiveDescription      DisplayString,
+    ntcAlmActiveProbableCause    DisplayString
+    }
+    
+ntcAlmActiveName                 OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..64))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The name of an Alarm."
+    ::= { ntcAlmActiveEntry 1 }
+    
+ntcAlmActiveSeverity             OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual severity of an Alarm."
+    ::= { ntcAlmActiveEntry 2 }
+    
+ntcAlmActiveTime                 OBJECT-TYPE
+    SYNTAX      NtcSystemTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when an alarm was modified."
+    ::= { ntcAlmActiveEntry 3 }
+    
+ntcAlmActiveCount                OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The alarm count indicates the number of times an alarm transitioned from off
+        to on."
+    ::= { ntcAlmActiveEntry 4 }
+    
+ntcAlmActiveSource               OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The functional block object that caused an Alarm (Root Cause)."
+    ::= { ntcAlmActiveEntry 5 }
+    
+ntcAlmActiveDescription          OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The description of an Alarm."
+    ::= { ntcAlmActiveEntry 6 }
+    
+ntcAlmActiveProbableCause        OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The probable cause of an Alarm."
+    ::= { ntcAlmActiveEntry 7 }
+    
+ntcAlmHistoryTable               OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NtcAlmHistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table has the same number of rows as the ntcAlmDefinitionTable and is
+        mainly intended to allow at all times to request the last occurrence and the
+        occurrence counter of each alarm, even when the alarm is not currently active."
+    ::= { ntcAlmObjects 4 }
+
+ntcAlmHistoryEntry               OBJECT-TYPE
+    SYNTAX      NtcAlmHistoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row of the ntcAlmHistoryTable."
+    INDEX   { ntcAlmHistoryName  }
+    ::= { ntcAlmHistoryTable 1 }
+
+NtcAlmHistoryEntry               ::= SEQUENCE {
+    ntcAlmHistoryName             DisplayString,
+    ntcAlmHistorySeverity         DisplayString,
+    ntcAlmHistoryTime             NtcSystemTime,
+    ntcAlmHistoryCount            Counter32,
+    ntcAlmHistorySource           DisplayString,
+    ntcAlmHistoryDescription      DisplayString,
+    ntcAlmHistoryProbableCause    DisplayString
+    }
+    
+ntcAlmHistoryName                OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..64))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The name of an Alarm."
+    ::= { ntcAlmHistoryEntry 1 }
+    
+ntcAlmHistorySeverity            OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual severity of an Alarm."
+    ::= { ntcAlmHistoryEntry 2 }
+    
+ntcAlmHistoryTime                OBJECT-TYPE
+    SYNTAX      NtcSystemTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when an alarm was modified."
+    ::= { ntcAlmHistoryEntry 3 }
+    
+ntcAlmHistoryCount               OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The alarm count indicates the number of times an alarm transitioned from off
+        to on."
+    ::= { ntcAlmHistoryEntry 4 }
+    
+ntcAlmHistorySource              OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The functional block object that caused an Alarm (Root Cause)."
+    ::= { ntcAlmHistoryEntry 5 }
+    
+ntcAlmHistoryDescription         OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The description of an Alarm."
+    ::= { ntcAlmHistoryEntry 6 }
+    
+ntcAlmHistoryProbableCause       OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The probable cause of an Alarm."
+    ::= { ntcAlmHistoryEntry 7 }
+    
+ntcAlmLogTable                   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF NtcAlmLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table will contain the 255 last alarm occurrences in an ordered list and
+        can be used to check the order in which the alarms have occurred."
+    ::= { ntcAlmObjects 5 }
+
+ntcAlmLogEntry                   OBJECT-TYPE
+    SYNTAX      NtcAlmLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row of the ntcAlmLogTable."
+    INDEX   { ntcAlmLogLogIndex  }
+    ::= { ntcAlmLogTable 1 }
+
+NtcAlmLogEntry                   ::= SEQUENCE {
+    ntcAlmLogLogIndex          Unsigned32,
+    ntcAlmLogName              DisplayString,
+    ntcAlmLogState             NtcAlarmState,
+    ntcAlmLogSeverity          DisplayString,
+    ntcAlmLogTime              NtcSystemTime,
+    ntcAlmLogCount             Counter32,
+    ntcAlmLogSource            DisplayString,
+    ntcAlmLogDescription       DisplayString,
+    ntcAlmLogProbableCause     DisplayString,
+    ntcAlmLogSequenceNumber    Counter32
+    }
+    
+ntcAlmLogLogIndex                OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Table index."
+    ::= { ntcAlmLogEntry 1 }
+    
+ntcAlmLogName                    OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of an Alarm."
+    ::= { ntcAlmLogEntry 2 }
+    
+ntcAlmLogState                   OBJECT-TYPE
+    SYNTAX      NtcAlarmState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational state of an alarm (on/off)."
+    ::= { ntcAlmLogEntry 3 }
+    
+ntcAlmLogSeverity                OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual severity of an Alarm."
+    ::= { ntcAlmLogEntry 4 }
+    
+ntcAlmLogTime                    OBJECT-TYPE
+    SYNTAX      NtcSystemTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when an alarm was modified."
+    ::= { ntcAlmLogEntry 5 }
+    
+ntcAlmLogCount                   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The alarm count indicates the number of times an alarm transitioned from off
+        to on."
+    ::= { ntcAlmLogEntry 6 }
+    
+ntcAlmLogSource                  OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The functional block object that caused an Alarm (Root Cause)."
+    ::= { ntcAlmLogEntry 7 }
+    
+ntcAlmLogDescription             OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The description of an Alarm."
+    ::= { ntcAlmLogEntry 8 }
+    
+ntcAlmLogProbableCause           OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The probable cause of an Alarm."
+    ::= { ntcAlmLogEntry 9 }
+    
+ntcAlmLogSequenceNumber          OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The sequence number of the trap in which this logentry was reported."
+    ::= { ntcAlmLogEntry 10 }
+    
+
+--
+--  Module Conformance
+--
+
+ntcAlmConfGrpV1Standard          OBJECT-GROUP
+    OBJECTS    {
+                   ntcAlmReset,
+                   ntcAlmDefinitionSeverity,
+                   ntcAlmDefinitionDescription,
+                   ntcAlmActiveSeverity,
+                   ntcAlmActiveTime,
+                   ntcAlmActiveCount,
+                   ntcAlmActiveSource,
+                   ntcAlmActiveDescription,
+                   ntcAlmActiveProbableCause,
+                   ntcAlmHistorySeverity,
+                   ntcAlmHistoryTime,
+                   ntcAlmHistoryCount,
+                   ntcAlmHistorySource,
+                   ntcAlmHistoryDescription,
+                   ntcAlmHistoryProbableCause,
+                   ntcAlmLogName,
+                   ntcAlmLogState,
+                   ntcAlmLogSeverity,
+                   ntcAlmLogTime,
+                   ntcAlmLogCount,
+                   ntcAlmLogSource,
+                   ntcAlmLogDescription,
+                   ntcAlmLogProbableCause,
+                   ntcAlmLogSequenceNumber
+               }
+    STATUS      current
+    DESCRIPTION
+        "Managed objects that constitute version 1 of a system device with standard capabilities."
+    ::= { ntcAlmConfGroup 1}
+    
+ntcAlmConfCompV1Standard         MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Compliance statement for Newtec device MIB implementations."
+    MODULE  -- this module
+    MANDATORY-GROUPS
+                  {
+                      ntcAlmConfGrpV1Standard
+                  }
+    ::= { ntcAlmConfCompliance  1 }
+    
+
+END

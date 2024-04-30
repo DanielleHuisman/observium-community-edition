@@ -1,0 +1,462 @@
+--  =======================================================================
+--  File        : osaTwap.mib
+--  Description : Private MIB for TWAMP (Two Way Active Measurments Protocol)
+--  By          : Maoz
+--  Version     : $Revision: 1.1.1.1 $
+--  Date        : $Date: 2021/02/07 
+--  =======================================================================
+OSA-TWAMP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32,
+    IpAddress, Unsigned32,
+    NOTIFICATION-TYPE                         FROM SNMPv2-SMI
+--  TEXTUAL-CONVENTION,
+    DisplayString,
+    RowStatus                                 FROM SNMPv2-TC
+    VlanId                                    FROM IEEE8021-CFM-MIB
+    MODULE-COMPLIANCE, OBJECT-GROUP,
+    NOTIFICATION-GROUP                        FROM SNMPv2-CONF
+    advaMIB                                   FROM ADVA-MIB;
+
+
+osaTwamp MODULE-IDENTITY
+    LAST-UPDATED "202108150000Z"  -- August 15, 2021
+    ORGANIZATION "ADVA AG Optical Networking"
+    CONTACT-INFO
+        "ADVA AG Optical Networking
+        Justus-von-Liebig-Str. 7
+        12489 Berlin, Germany
+
+        Support Europe:
+        Phone:  +49 89 89 0665 848
+        Fax:    +49 89 89 0665 22848
+        e-mail: support@advaoptical.com
+
+        Support USA:
+        Phone:  +1 201 995 0080
+        Fax:    +1 201 995 0081
+        e-mail: support-usa@advaoptical.com
+
+        Support Asia:
+        Phone:  +81 3 5408 5891
+        Fax:    +81 3 5408 5899
+        e-mail: support-asia@advaoptical.com"
+    DESCRIPTION
+        "TWAMP ADVA Private MIB for XG150 family products."
+
+    REVISION    "202108150000Z"  -- August 15, 2021
+    DESCRIPTION
+        "Initial revision."
+    ::= { advaMIB 8 }  
+                
+
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+osaTwampNotifications     OBJECT IDENTIFIER ::= { osaTwamp 0 }
+osaTwampGlobals           OBJECT IDENTIFIER ::= { osaTwamp 1 }
+osaTwampConformance       OBJECT IDENTIFIER ::= { osaTwamp 100 }
+osaTwampMIBCompliances    OBJECT IDENTIFIER ::= { osaTwampConformance 1 }
+osaTwampMIBGroups         OBJECT IDENTIFIER ::= { osaTwampConformance 2 }
+
+-- ************************************************************
+-- Textual convention
+-- ************************************************************
+
+-- ************************************************************
+-- osaTwampGlobals
+-- ************************************************************
+
+osaTwampResponderIgnoreEs OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  ignore    (1),
+                  notIgnore (2)
+    			      }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "According to RFC5357 Error estimate multiplier field MUST NOT be set to zero.
+         If multiplier is zero the packet considered corrupt and should be discarded.
+         For backward compatiblity and in order to support senders who can not support 
+         this requirements `ignore` option exists."
+      DEFVAL { ignore }
+    ::= { osaTwampGlobals 1 }
+
+-- ************************************************************
+-- The osaTwampResponderTable Table
+-- ************************************************************
+osaTwampResponderTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsaTwampResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains TWAMP Responders."
+    ::= { osaTwamp 2 }
+
+osaTwampResponderEntry  OBJECT-TYPE
+    SYNTAX      OsaTwampResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osaTwampResponderIndex }
+    ::= { osaTwampResponderTable 1 }
+
+OsaTwampResponderEntry ::= SEQUENCE {
+    osaTwampResponderIndex                  Integer32,
+    osaTwampResponderAlias                  DisplayString,
+    osaTwampResponderControlMode            INTEGER,
+    osaTwampResponderIdleTimeout            Unsigned32,
+    osaTwampResponderAgingTimeout           Unsigned32,
+    osaTwampResponderVlanTag                VlanId,
+    osaTwampResponderSourceIpAddress        DisplayString,
+    osaTwampResponderRemoteClientIpAddress  DisplayString,
+    osaTwampResponderSourceUdpPort          Unsigned32,
+    osaTwampResponderRemoteClientUdpPort    Unsigned32,
+    osaTwampResponderSequenceAction         INTEGER,
+    osaTwampResponderState                  INTEGER,
+    osaTwampResponderRowStatus              RowStatus
+    
+}
+
+osaTwampResponderIndex  OBJECT-TYPE
+    SYNTAX          Integer32 (1..2147483647)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "An integer index used to uniquely identify a TWAMP Responder."
+    ::= { osaTwampResponderEntry 1 }
+
+osaTwampResponderAlias  OBJECT-TYPE
+    SYNTAX          DisplayString (SIZE (0..63))
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "An alias associated with the TWAMP Responder."
+    ::= { osaTwampResponderEntry 2 }
+    
+osaTwampResponderControlMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  controlDisabled (1),
+                  controlEnabled (2)		
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Responder control mode. When ControlMode is set to 
+		 ControlDisabled - TWAMP Light Mode is used."
+    DEFVAL { controlDisabled }   
+    ::= { osaTwampResponderEntry 3 }
+    
+osaTwampResponderIdleTimeout OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "When a TWAMP Test packet Is not received for this timeout period the
+        TWAMP Session will go to IDLE state where Aging timer is started. This
+        time is specified in seconds."
+     DEFVAL { 5 }
+    ::= { osaTwampResponderEntry 4 }
+
+osaTwampResponderAgingTimeout OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..9000)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "After a Session goes into IDLE state this timer with this timeout
+        is started and on expiry the Session will terminate. This
+        time is specified in seconds."
+    DEFVAL { 900 }
+    ::= { osaTwampResponderEntry 5 }        
+    
+osaTwampResponderVlanTag OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+           "This is the outer VLAN ID of the received TWAMP test packets."
+     ::= { osaTwampResponderEntry 6 }
+         
+osaTwampResponderSourceIpAddress OBJECT-TYPE
+    SYNTAX     DisplayString(SIZE (8..48)) 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+       "IPv4/IPv6 Address of the local Responder interface."
+    ::= { osaTwampResponderEntry 7 }
+
+osaTwampResponderRemoteClientIpAddress OBJECT-TYPE
+    SYNTAX     DisplayString(SIZE (8..48)) 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+       "IPv4/IPv6 Address of the remote client sender."
+    ::= { osaTwampResponderEntry 8 }
+    
+osaTwampResponderSourceUdpPort OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..65535)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+       "This is the UDP Port of the local Responder."
+    DEFVAL { 862 }
+    ::= { osaTwampResponderEntry 9 }
+
+osaTwampResponderRemoteClientUdpPort OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..65535)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+       "This is the UDP Port of the remote client. This UDP port
+       is used by the TWAMP sender as the source udp port"
+    ::= { osaTwampResponderEntry 10 }
+    
+osaTwampResponderSequenceAction OBJECT-TYPE
+    SYNTAX          INTEGER {
+        noAction            (1),
+        clearSequenceNumber (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Sequence number action clearSequenceNumber will reset the 
+		 reflector sequence numbering."
+    ::= { osaTwampResponderEntry 11 }
+
+osaTwampResponderState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                 init (1),
+                 testReady (2),
+                 waitingForTransitTimeout (3),
+                 end (4)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This is the state describing the reflector status"
+    ::= { osaTwampResponderEntry 12 }    
+
+osaTwampResponderRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The status of this row, by which new entries may be
+            created, or old entries deleted from this table."
+    ::= { osaTwampResponderEntry 13 }
+    
+-- ************************************************************
+-- The osaTwampResponderSessionTable Table
+-- ************************************************************
+osaTwampResponderSessionTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsaTwampResponderSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains TWAMP dynamic sessions related to specific responder."
+    ::= { osaTwamp 3 }
+
+osaTwampResponderSessionEntry  OBJECT-TYPE
+    SYNTAX      OsaTwampResponderSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains an entry of the table."
+    INDEX { osaTwampResponderServerIndex, osaTwampResponderSessionIndex }
+    ::= { osaTwampResponderSessionTable 1 }
+
+OsaTwampResponderSessionEntry ::= SEQUENCE {
+    osaTwampResponderServerIndex                   Integer32,
+    osaTwampResponderSessionIndex                  Integer32,
+    osaTwampResponderSessionIdleTimeout            Unsigned32,
+    osaTwampResponderSessionAgingTimeout           Unsigned32,
+    osaTwampResponderSessionVlanTag                VlanId,
+    osaTwampResponderSessionSourceIpAddress        DisplayString,
+    osaTwampResponderSessionRemoteClientIpAddress  DisplayString,
+    osaTwampResponderSessionSourceUdpPort          Unsigned32,
+    osaTwampResponderSessionRemoteClientUdpPort    Unsigned32,
+    osaTwampResponderSessionSequenceNumber         Unsigned32,
+    osaTwampResponderSessionState                  INTEGER
+}
+
+osaTwampResponderServerIndex  OBJECT-TYPE
+    SYNTAX          Integer32 (1..2147483647)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "An integer index used to uniquely identify a TWAMP Responder."
+    ::= { osaTwampResponderSessionEntry 1 }
+
+osaTwampResponderSessionIndex  OBJECT-TYPE
+    SYNTAX          Integer32 (1..500)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "An integer index used to uniquely identify a TWAMP session."
+    ::= { osaTwampResponderSessionEntry 2 }
+
+osaTwampResponderSessionIdleTimeout OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "When a TWAMP Test packet Is not received for this timeout period the
+        TWAMP Session will go to IDLE state where Aging timer is started. This
+        time is specified in seconds."
+     DEFVAL { 5 }
+    ::= { osaTwampResponderSessionEntry 3 }
+
+osaTwampResponderSessionAgingTimeout OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "After a Session goes into IDLE state this timer with this timeout
+        is started and on expiry the Session will terminate. This
+        time is specified in seconds."
+    DEFVAL { 900 }
+    ::= { osaTwampResponderSessionEntry 4 }        
+    
+osaTwampResponderSessionVlanTag OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+           "This is the outer VLAN ID of the received TWAMP test packets."
+     ::= { osaTwampResponderSessionEntry 5 }
+         
+osaTwampResponderSessionSourceIpAddress OBJECT-TYPE
+    SYNTAX     DisplayString(SIZE (8..48)) 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "IPv4/IPv6 Address of the local Responder interface."
+    ::= { osaTwampResponderSessionEntry 6 }
+
+osaTwampResponderSessionRemoteClientIpAddress OBJECT-TYPE
+    SYNTAX     DisplayString(SIZE (8..48)) 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "IPv4/IPv6 Address of the remote client sender."
+    ::= { osaTwampResponderSessionEntry 7 }
+    
+osaTwampResponderSessionSourceUdpPort OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..65535)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This is the UDP Port of the local Responder."
+    DEFVAL { 862 }
+    ::= { osaTwampResponderSessionEntry 8 }
+
+osaTwampResponderSessionRemoteClientUdpPort OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..65535)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This is the UDP Port of the remote client. This UDP port
+       is used by the TWAMP sender as the source udp port"
+    ::= { osaTwampResponderSessionEntry 9 }
+    
+osaTwampResponderSessionSequenceNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sequence number is the sequence number of the test packet 
+		 according to its transmit order."
+    ::= { osaTwampResponderSessionEntry 10 }
+    
+osaTwampResponderSessionState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                 init (1),
+                 testInProgress (2),
+                 idle (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This is the state describing the session status"
+    ::= { osaTwampResponderSessionEntry 11 }    
+    
+
+-- ************************************************************
+-- osaTwampNotifications (Traps)
+-- ************************************************************
+
+osaTwampMaxSessionsExceeded NOTIFICATION-TYPE
+    STATUS      current
+    DESCRIPTION
+       "This notification is generated when number of sessions exceeding the 
+       maximum number supported sessions."
+    ::= { osaTwampNotifications 1 }
+
+-- *******************************************************************
+--  Conformance Information
+-- *******************************************************************
+
+osaTwampMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+      "The core compliance statement for all the implementations."
+    MODULE -- this module
+        MANDATORY-GROUPS {
+            osaTwampMandatoryGroup,
+            osaTwampNotificationGroup
+            }
+
+    ::= { osaTwampMIBCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups
+-- ...................................................................
+
+osaTwampMandatoryGroup  OBJECT-GROUP
+    OBJECTS {
+    		osaTwampResponderIgnoreEs,
+            osaTwampResponderAlias,
+            osaTwampResponderControlMode,
+            osaTwampResponderIdleTimeout,
+            osaTwampResponderAgingTimeout,
+            osaTwampResponderVlanTag,
+            osaTwampResponderSourceIpAddress,
+            osaTwampResponderRemoteClientIpAddress,
+            osaTwampResponderSourceUdpPort,
+            osaTwampResponderRemoteClientUdpPort,
+            osaTwampResponderSequenceAction,
+            osaTwampResponderState,
+            osaTwampResponderRowStatus,
+            osaTwampResponderSessionIdleTimeout,
+            osaTwampResponderSessionAgingTimeout,
+            osaTwampResponderSessionVlanTag,
+            osaTwampResponderSessionSourceIpAddress,
+            osaTwampResponderSessionRemoteClientIpAddress,
+            osaTwampResponderSessionSourceUdpPort,
+            osaTwampResponderSessionRemoteClientUdpPort,
+            osaTwampResponderSessionSequenceNumber,
+            osaTwampResponderSessionState
+        }
+    STATUS current
+    DESCRIPTION
+      "."
+    ::= { osaTwampMIBGroups 1 }
+    
+-- ...................................................................
+--  NOTIFICATION-GROUP
+-- ................................................................... 
+osaTwampNotificationGroup  NOTIFICATION-GROUP
+    NOTIFICATIONS  { 
+      osaTwampMaxSessionsExceeded
+    }
+    STATUS current 
+    DESCRIPTION 
+        "The notification which are required to be supported by implementations 
+        of this MIB. "
+    ::= { osaTwampMIBGroups 2 }
+    
+
+END
+

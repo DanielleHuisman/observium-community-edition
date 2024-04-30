@@ -41,10 +41,10 @@ if ($service['service_checked']) {
     $checked = "Never";
 }
 
-$mini_url = "graph.php?id=" . $service['service_id'] . "&amp;type=service_availability&amp;from=" . $config['time']['day'] . "&amp;to=" . $config['time']['now'] . "&amp;width=80&amp;height=20&amp;bg=efefef";
+$mini_url = "graph.php?id=" . $service['service_id'] . "&amp;type=service_availability&amp;from=" . get_time('day') . "&amp;to=" . get_time('now') . "&amp;width=80&amp;height=20&amp;bg=efefef";
 
 $popup = "onmouseover=\"return overlib('<div class=entity-title>" . $device['hostname'] . " - " . $service['service_type'];
-$popup .= "</div><img src=\'graph.php?id=" . $service['service_id'] . "&amp;type=service_availability&amp;from=" . $config['time']['day'] . "&amp;to=" . $config['time']['now'] . "&amp;width=400&amp;height=125\'>";
+$popup .= "</div><img src=\'graph.php?id=" . $service['service_id'] . "&amp;type=service_availability&amp;from=" . get_time('day') . "&amp;to=" . get_time('now') . "&amp;width=400&amp;height=125\'>";
 $popup .= "', RIGHT" . $config['overlib_defaults'] . ");\" onmouseout=\"return nd();\"";
 
 echo('

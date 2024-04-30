@@ -4,8 +4,8 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
+ * @package    observium
+ * @subpackage graphs
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
@@ -15,7 +15,7 @@
 // Define this is graph
 define('OBS_GRAPH', TRUE);
 
-$start = microtime(TRUE); // Needs common.php
+$gstart = microtime(TRUE); // Needs common.php
 
 include_once("../includes/observium.inc.php");
 
@@ -44,7 +44,7 @@ $vars = get_vars('GET', $auth);
 
 include($config['html_dir'] . "/includes/graphs/graph.inc.php");
 
-$runtime = microtime(TRUE) - $start;
+$runtime = elapsed_time($gstart);
 
 print_debug("Runtime " . $runtime . " secs");
 

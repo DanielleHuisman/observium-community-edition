@@ -1,0 +1,1057 @@
+-- Copyright (C) 2015 Aricent. All Rights Reserved.
+
+-- $Id: fsmrp.mib,v 1.9 2015/05/26 13:06:58 siva Exp $
+
+--    MRP Proprietary MIB Definition
+
+--    This file explains the proprietary MIB implemented
+--    for MRP product.
+
+ARICENT-MRP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+    OBJECT-TYPE, MODULE-IDENTITY, Integer32, enterprises, 
+    Counter64, NOTIFICATION-TYPE 
+        FROM SNMPv2-SMI
+    TruthValue, MacAddress, DisplayString, TEXTUAL-CONVENTION 
+        FROM SNMPv2-TC
+    ieee8021BridgeBaseComponentId, ieee8021BridgeBasePortComponentId, 
+    ieee8021BridgeBasePort 
+        FROM IEEE8021-BRIDGE-MIB
+    IEEE8021BridgePortNumber, IEEE8021VlanIndex 
+        FROM IEEE8021-TC-MIB;
+    
+fsmrp MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "ARICENT COMMUNICATIONS SOFTWARE"
+    CONTACT-INFO "support@aricent.com"
+         DESCRIPTION
+         "The proprietary  MIB module for MRP."
+	 REVISION "201209050000Z"
+         DESCRIPTION
+         "The proprietary  MIB module for MRP."
+::= { enterprises aricent-communication-holding-ltd(29601) iss(2) 27 }
+
+-- *****************************************************************************
+--              subtrees in the MRP MIB
+-- *****************************************************************************
+    fsMrpScalars          OBJECT IDENTIFIER ::= { fsmrp 1 }
+    fsMrpInstance         OBJECT IDENTIFIER ::= { fsmrp 2 }
+    fsMrpPortConfig       OBJECT IDENTIFIER ::= { fsmrp 3 }
+    fsMrpStatistics       OBJECT IDENTIFIER ::= { fsmrp 4 }
+    fsMrpApplicantInfo    OBJECT IDENTIFIER ::= { fsmrp 5 }
+    fsMrpStateMachine     OBJECT IDENTIFIER ::= { fsmrp 6 }
+    fsMrpTraps            OBJECT IDENTIFIER ::= { fsmrp 7 }
+    
+-- *****************************************************************************
+--              Textual conventions
+-- *****************************************************************************
+
+EnabledStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A simple status value for the object."
+    SYNTAX      INTEGER { enabled(1), disabled(2) }
+
+RegAdminControlType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A value representing the type of the registrar admin control. 
+         The value can be one of the following: 
+        
+         normal(0)      -  If registrar admin control of a port is 
+                           configured as normal then the Registrar State 
+                           Machine responds to incoming MRP messages.
+         fixed(1)       -  If registrar admin control of a port is 
+                           configured as fixed, then the Registrar State Machine
+                           ignores all MRP messages. The learnt attributes will 
+                           be aged out through the LeaveAll mechanism.
+         forbidden(2)   -  If registrar admin control of a port is configured
+                           as forbidden then the Registrar State Machine
+                           ignores all MRP messages. The learnt attributes 
+                           will be removed immediately."
+    SYNTAX      INTEGER { normal(0), fixed(1), forbidden(2) }
+
+-- *****************************************************************************
+--              fsMrpScalars subtree
+-- *****************************************************************************
+
+fsMrpGlobalTraceOption OBJECT-TYPE
+   SYNTAX        TruthValue
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION
+      "This object is used to enable the trace statements present outside the 
+       scope of the virtual context. For example, 
+              - Traces present in the Task Initialization. 
+              - Trace statement before identifying the virtual context in 
+                MRP APIs."
+   DEFVAL  { false }
+   ::= { fsMrpScalars 1 }
+
+-- *****************************************************************************
+--              fsMrpInstance subtree
+-- *****************************************************************************
+
+fsMrpInstanceTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsMrpInstanceEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+     "List of per Virtual Context MRP Module Parameters."
+   ::= { fsMrpInstance 1 }
+
+fsMrpInstanceEntry OBJECT-TYPE
+   SYNTAX       FsMrpInstanceEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+     "Per virtual context MRP module parameters. An entry in this table gets 
+	  created as and when a virtual context is created."
+   INDEX { ieee8021BridgeBaseComponentId }
+   ::= { fsMrpInstanceTable 1 }
+
+FsMrpInstanceEntry ::=
+   SEQUENCE {
+          fsMrpInstanceSystemControl
+            INTEGER,
+          fsMrpInstanceTraceInputString
+            DisplayString,
+          fsMrpInstanceNotifyVlanRegFailure
+            TruthValue,
+          fsMrpInstanceNotifyMacRegFailure
+            TruthValue,
+          fsMrpInstanceBridgeMmrpEnabledStatus
+            TruthValue,
+          fsMrpInstanceBridgeMvrpEnabledStatus
+            TruthValue
+
+        }
+
+fsMrpInstanceSystemControl OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        start(1),
+                        shutdown(2)
+                      }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The administrative system control status requested by management 
+       for MRP. The value shutdown(2) indicates that MRP should be 
+       shutdown in the device on all ports. All memory will be released.
+       The value start(1) indicates that MRP should be active in
+       the device on all ports. This object can be set to 'shutdown'(2)only
+       when none of the MRP applications (MVRP, MMRP) are enabled.
+       When MRP is started, MVRP and MMRP will be enabled by default. 
+       By default, this value is shutdown(2) for all context including 
+       default context."
+   DEFVAL  { shutdown }
+   ::= { fsMrpInstanceEntry 1 }
+
+fsMrpInstanceTraceInputString OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE(1..255))
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object stores the trace option string input given by the user.
+       To enable particular trace, the user has to enter the corresponding 
+       string(given below) assigned for that. For enabling more than one 
+       traces, the user has to enter the corresponding strings with SPACE 
+       (delimiter) between each string.
+             For example, to enable the below traces for MVRP module:
+                 - Init and Shutdown traces
+                 - Management traces
+                 - Data path traces
+                 - Control plane traces and
+                 - Packet Dump traces 
+
+             The input should be fed as follows:
+             enable MVRP init-shut mgmt data-path ctrl pkt-dump
+
+             For MMRP module the input should be:
+             enable MMRP init-shut mgmt data-path ctrl pkt-dump
+  
+             To disable the below traces for MVRP module: 
+                 - Init and Shutdown traces
+                 - Data path traces
+                 - Control plane traces and
+
+             The input should be,
+             disable MVRP init-shut data-path ctrl
+
+             The entered input string is parsed to get the trace options.
+
+             enable          - Enables the corresponding option.
+             disable         - Disables the corresponding option.
+             init-shut       - Init and Shutdown traces.
+             mgmt            - Management traces.
+             data-path       - Data Path traces.
+             ctrl            - Control Plane traces.
+             pkt-dump        - Packet Dump traces.
+             resource        - Traces related to all
+                               resources except buffers.
+             all-fail        - All Failure traces.
+             buffer          - Buffer allocation/
+                               release traces.
+             protocol        - mrp related traces.
+             mvrp            - mvrp related traces.
+             mmrp            - mmrp related traces.
+             critical        - MRP Critical traces.
+             applicant-sem   - Applicant state machine related traces.
+             registrar-sem   - Registrar state machine related traces.
+             leaveall-sem    - LeaveAll state machine related traces.
+             periodic-sem    - Periodic Transmission state machine related 
+                               traces.
+             mrpdu           - MRPDU encoding and decoding related trace.
+             all             - specifies all traces."
+             
+-- DEFVAL  { "critical" }
+-- MIDGEN is crashing if we uncomment the above
+   ::= { fsMrpInstanceEntry 2 }
+
+fsMrpInstanceNotifyVlanRegFailure  OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The administrative trap control status requested by management 
+       for notifying MVRP registration failures. The value true(1) indicates 
+       that trap notification is enabled on the device. The value 
+       false(2) indicates that trap notification is disabled on the 
+       device."
+   DEFVAL      { false } 
+    ::= { fsMrpInstanceEntry 3 }
+
+fsMrpInstanceNotifyMacRegFailure OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The administrative trap control status requested by management
+       for notifying MMRP registration failures. The value true(1) indicates 
+       that trap notification is enabled on the device. The value
+       false(2) indicates that trap notification is disabled on the 
+       device."
+   DEFVAL      { false } 
+    ::= { fsMrpInstanceEntry 4 }
+
+fsMrpInstanceBridgeMmrpEnabledStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The administrative status requested by management for
+        MMRP. The value true(1) indicates that MMRP should
+        be enabled on this device, in all VLANs, on all ports
+        for which it has not been specifically disabled.  When
+        false(2), MMRP is disabled, in all VLANs and on all
+        ports, and all MMRP packets will be forwarded
+        transparently. This object affects both applicant and
+        registrar state machines.  A transition from false(2)
+        to true(1) will cause a reset of all MMRP state
+        machines on all ports.
+
+        The value of this object must be retained across
+        reinitializations of the management system."
+    DEFVAL      { true }
+    ::= { fsMrpInstanceEntry 5 }
+
+fsMrpInstanceBridgeMvrpEnabledStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The state of MVRP operation on this port. The value
+        true(1) indicates that MVRP is enabled on this port,
+        as long as ieee8021QBridgeMvrpEnabledStatus is also enabled
+        for this device.  When false(2) but
+        ieee8021QBridgeMvrpEnabledStatus is still
+        enabled for the device, MVRP is disabled on this port:
+        any MVRP packets received will be silently discarded, and
+        no MVRP registrations will be propagated from other
+        ports. This object affects all MVRP applicant and
+        registrar state machines on this port.  A transition
+        from false(2) to true(1) will cause a reset of all
+        MVRP state machines on this port.
+
+        The value of this object must be retained across
+        reinitializations of the management system."
+    DEFVAL      { true }
+    ::= { fsMrpInstanceEntry 6 }
+
+-- **************************************************************************
+--              fsMrpPortConfig subtree                
+-- **************************************************************************
+
+fsMrpPortTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF FsMrpPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "A table of MRP control information about each bridge port."
+   ::= { fsMrpPortConfig 1 }
+
+fsMrpPortEntry OBJECT-TYPE
+   SYNTAX      FsMrpPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "Per bridge port MRP module parameters. An entry in this table gets 
+	  created as and when a port is created/mapped."
+   INDEX { ieee8021BridgeBasePortComponentId,
+           ieee8021BridgeBasePort }
+   ::= { fsMrpPortTable 1 }
+
+FsMrpPortEntry ::=
+   SEQUENCE {
+          fsMrpPortPeriodicSEMStatus
+            EnabledStatus,
+          fsMrpPortParticipantType
+            INTEGER,
+          fsMrpPortRegAdminControl
+              RegAdminControlType,
+          fsMrpPortRestrictedGroupRegistration
+              TruthValue,
+          fsMrpPortRestrictedVlanRegistration
+              TruthValue
+       }
+
+fsMrpPortPeriodicSEMStatus  OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The administrative periodic state machine status requested 
+        by management for MRP. The value 'enabled(1)' generates 
+        transmission events on a periodic basis, against all applicant 
+        state machines that are associated with the port.
+        The value disabled(2) indicates that MRP periodic state machine 
+        does not generate any periodic events on this port. 
+        A transition from disabled(2) to enabled(1) will start periodic 
+        timer on the port."
+     DEFVAL      { disabled } 
+     ::= { fsMrpPortEntry 1 }    
+
+fsMrpPortParticipantType   OBJECT-TYPE
+   SYNTAX      INTEGER  {
+                   fullParticipant(1),
+                   applicantOnly(2)
+                 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+      "The value 'fullParticipant'(1) indicates that it implements the 
+       complete applicant state machine and the registrar state
+       machine for each attribute declared, registered or tracked, together 
+       with a single instance of the LeaveAll state machine and the Periodic 
+       state machine.
+       The value 'applicantOnly'(2) indicates that it implements the
+       applicant state machine with omission of certain states and actions 
+       (as specified by Table 10-3 in IEEE Standard 802.1ak-2007), for each 
+       attribute declared or tracked together with a single instance of the 
+       periodic state machine. That is LeaveAll state machine and rgistrar 
+	   state machine are not applicable for this type."
+	DEFVAL { fullParticipant }
+    ::= {fsMrpPortEntry 2}
+
+fsMrpPortRegAdminControl   OBJECT-TYPE
+   SYNTAX      RegAdminControlType
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+      "This object is used to configure the registrar admin control for
+       the port. The values can be normal(0), fixed(1), forbidden(2).
+       Currently this configuration is applied only for MVRP."
+	DEFVAL { normal }
+    ::= {fsMrpPortEntry 3}
+
+fsMrpPortRestrictedGroupRegistration OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The state of Restricted Group Registration on this port.
+         If the value of this control is true(1), then creation
+         of a new dynamic entry is permitted only if there is a
+         Static Filtering Entry for the VLAN concerned, in which
+         the Registrar Administrative Control value is normal
+         registration.
+
+        The value of this object must be retained across
+        reinitializations of the management system."
+    DEFVAL      { false }
+    ::= {fsMrpPortEntry 4 }
+
+fsMrpPortRestrictedVlanRegistration OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The state of restricted VLAN registration on this port.
+         If the value of this control is true(1), then creation
+         of a new dynamic VLAN entry is permitted only if there
+         is a static VLAN registration entry for the VLAN concerned,
+         in which the registrar administrative Control value for
+         this port is normal registration.
+
+        The value of this object must be retained across
+        reinitializations of the management system."
+    DEFVAL      { false }
+    ::= { fsMrpPortEntry 5 }
+
+fsMvrpPortTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF FsMvrpPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "A table of MVRP control and status information about
+        every bridge port. Augments the ieee8021BridgeBasePortTable."
+   ::= { fsMrpPortConfig 2 }
+
+fsMvrpPortEntry OBJECT-TYPE
+   SYNTAX      FsMvrpPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "MMRP control and status information for a bridge port."
+   INDEX { ieee8021BridgeBasePortComponentId,
+           ieee8021BridgeBasePort }
+   ::= { fsMvrpPortTable 1 }
+
+FsMvrpPortEntry ::=
+   SEQUENCE {
+        fsMvrpPortMvrpEnabledStatus
+            TruthValue,
+        fsMvrpPortMvrpFailedRegistrations
+            Counter64,
+        fsMvrpPortMvrpLastPduOrigin
+            MacAddress
+       }
+fsMvrpPortMvrpEnabledStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The state of MVRP operation on this port. The value
+        true(1) indicates that MVRP is enabled on this port,
+        as long as ieee8021QBridgeMvrpEnabledStatus is also enabled
+        for this device.  When false(2) but
+        ieee8021QBridgeMvrpEnabledStatus is still
+        enabled for the device, MVRP is disabled on this port:
+        any MVRP packets received will be silently discarded, and
+        no MVRP registrations will be propagated from other
+        ports. This object affects all MVRP applicant and
+        registrar state machines on this port. A transition
+        from false(2) to true(1) will cause a reset of all
+        MVRP state machines on this port.
+
+        The value of this object must be retained across
+        reinitializations of the management system."
+    DEFVAL      { true }
+    ::= { fsMvrpPortEntry 1 }
+
+fsMvrpPortMvrpFailedRegistrations OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS      "failed MVRP registrations"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The total number of failed MVRP registrations, for any
+        reason, on this port.
+
+        Discontinuities in the value of the counter can occur
+        at re-initialization of the management system, and at
+        other times as indicated by the value of
+        ifCounterDiscontinuityTime object of the associated
+        interface (if any)."
+    ::= { fsMvrpPortEntry 2 }
+
+fsMvrpPortMvrpLastPduOrigin OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The source MAC sddress of the last MVRP message
+        received on this port."
+    ::= { fsMvrpPortEntry 3 }
+
+-- *************************************************************************
+--        fsMrpApplicantInfo subtree
+-- *************************************************************************
+
+fsMrpApplicantControlTable   OBJECT-TYPE
+   SYNTAX      SEQUENCE OF FsMrpApplicantControlEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Table containing the information about applicant admin control
+       on a port and application basis."
+   ::= {fsMrpApplicantInfo  1}
+
+fsMrpApplicantControlEntry   OBJECT-TYPE
+   SYNTAX      FsMrpApplicantControlEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Entry indicating the applicant admin control on a per port and 
+       application basis.
+       The entry in this table will be created whenever the MRP module 
+       receives the port operational status UP indication from lower layer.
+       The entry will be deleted in the following scenarios:
+		 1. On receiving port operational status DOWN indication from 
+            lower layer. 
+		 2. On receiving port delete/unmap indication from interface management 
+            module."
+   INDEX { ieee8021BridgeBasePortComponentId, 
+           ieee8021BridgeBasePort, 
+           fsMrpApplicationAddress, 
+           fsMrpAttributeType }
+   ::= { fsMrpApplicantControlTable 1}
+
+FsMrpApplicantControlEntry ::=
+   SEQUENCE {
+          fsMrpApplicationAddress
+            MacAddress,
+          fsMrpAttributeType
+            Integer32,
+          fsMrpApplicantControlAdminStatus
+            INTEGER
+     }
+
+fsMrpApplicationAddress OBJECT-TYPE
+    SYNTAX   MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This object is used to differentiate the MRP applications."
+    ::= {fsMrpApplicantControlEntry 1}
+
+fsMrpAttributeType OBJECT-TYPE
+    SYNTAX   Integer32 (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION 
+      "This object identifies the attribute types. 
+       If the fsMrpApplicationAddress corresponds to that of MVRP then the 
+       value(1) indicates that the attribute type is VID and the remaining 
+       values are unused.
+       If the fsMrpApplicationAddress corresponds to that of MMRP, then the 
+            - value(1) indicates that the attribute type is service requirement 
+            - value(2) indicates that the attribute type is MAC registration.
+       and the remaining values are unused."
+    ::= {fsMrpApplicantControlEntry 2}
+
+fsMrpApplicantControlAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER  {
+                   normal(1),
+                   nonParticipant(2),
+                   active(3)
+                 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+      "The applicant admin control denotes the behavior of the applicant 
+       on a given port and application. 
+       The value normal(1) indicates that the applicant participates 
+       normally in MRPDU exchanges.
+       The value nonParticipant(2) indicates that the MRP participant does 
+       not transmit any MRPDUs.
+       The value active(3) allows to send VLAN declarations when the port is
+       in the blocking state. Use the value normal(1) to return to the default
+       state (active mode disabled). This value is applicable only for MVRP."
+    DEFVAL    { normal }
+    ::= {fsMrpApplicantControlEntry 3}
+
+-- *****************************************************************************
+--    fsMrpStatistics subtree    
+-- *****************************************************************************
+
+fsMrpPortStatsTable   OBJECT-TYPE
+   SYNTAX      SEQUENCE OF FsMrpPortStatsEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "A table containing per-port statistics for MRPDUs."
+   ::= {fsMrpStatistics  1}
+
+fsMrpPortStatsEntry  OBJECT-TYPE
+   SYNTAX      FsMrpPortStatsEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "MRPDUs Tx/Rx statistics for an interface."
+   INDEX { ieee8021BridgeBasePortComponentId, 
+           ieee8021BridgeBasePort, 
+           fsMrpApplicationAddress }
+   ::= { fsMrpPortStatsTable 1}
+
+FsMrpPortStatsEntry ::=
+    SEQUENCE {
+	   fsMrpPortStatsClearStatistics
+            TruthValue, 
+       fsMrpPortStatsNumberOfRegistrations
+            Counter64,
+       fsMrpPortStatsRxValidPduCount 
+            Counter64,
+       fsMrpPortStatsRxInvalidPduCount      
+            Counter64,
+        fsMrpPortStatsRxNewMsgCount           
+            Counter64,
+        fsMrpPortStatsRxJoinInMsgCount           
+            Counter64,
+        fsMrpPortStatsRxJoinMtMsgCount          
+            Counter64,
+        fsMrpPortStatsRxLeaveMsgCount         
+            Counter64,
+        fsMrpPortStatsRxEmptyMsgCount              
+            Counter64,
+        fsMrpPortStatsRxInMsgCount                   
+            Counter64,
+        fsMrpPortStatsRxLeaveAllMsgCount        
+            Counter64,
+        fsMrpPortStatsTxPduCount 
+            Counter64,
+        fsMrpPortStatsTxNewMsgCount                
+            Counter64,
+        fsMrpPortStatsTxJoinInMsgCount            
+            Counter64,
+        fsMrpPortStatsTxJoinMtMsgCount            
+            Counter64,
+        fsMrpPortStatsTxLeaveMsgCount           
+            Counter64,
+        fsMrpPortStatsTxEmptyMsgCount                 
+            Counter64,
+        fsMrpPortStatsTxInMsgCount                        
+            Counter64,
+        fsMrpPortStatsTxLeaveAllMsgCount               
+            Counter64
+    }
+
+fsMrpPortStatsClearStatistics  OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "Setting a value of 'true' in this object, resets all MVRP/MMRP 
+           statistics counter values to zero. After resetting the statistics 
+           counter values, the value of this object automatically switches back 
+           to 'false'.
+           
+		   Setting a value of 'false' to this object has no effect.
+           This object always returns 'false' on a read."
+     DEFVAL  { false }
+     ::= { fsMrpPortStatsEntry 1}
+
+fsMrpPortStatsNumberOfRegistrations OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of registration present in this port. This counter is 
+		   incremented while registering an attribute on a port."
+      ::= { fsMrpPortStatsEntry 2}
+
+fsMrpPortStatsRxValidPduCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of valid MRPDUs received on this port. This counter is 
+		   incremented on receiving valid MRPDUs on a port."
+      ::= { fsMrpPortStatsEntry 3}
+
+fsMrpPortStatsRxInvalidPduCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of invalid MRPDUs received on this port. This counter is
+		   incremented on receiving invalid MRPDUs on a port."
+      ::= { fsMrpPortStatsEntry 4}
+
+fsMrpPortStatsRxNewMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of MRP NEW messages received on this port. This counter is 
+           incremented on receiving NEW event for attributes on a port."
+      ::= { fsMrpPortStatsEntry 5}
+
+fsMrpPortStatsRxJoinInMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of JOININ messages received on this port. This counter 
+		   is incremented on receiving JOININ event for attributes on a port."
+      ::= { fsMrpPortStatsEntry  6}
+
+fsMrpPortStatsRxJoinMtMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of JOINMT messages received on this port. This counter 
+           is incremented on receiving JOINMT event for attributes on a port."
+      ::= { fsMrpPortStatsEntry 7}
+
+fsMrpPortStatsRxLeaveMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of LEAVE messages received on this port. This counter 
+           is incremented on receiving LEAVE event for attributes on a port."
+      ::= { fsMrpPortStatsEntry  8}
+
+fsMrpPortStatsRxEmptyMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of EMPTY messages received on this port. This counter 
+           is incremented on receiving MT event for attributes on a port."
+      ::= { fsMrpPortStatsEntry 9}
+
+fsMrpPortStatsRxInMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of IN messages received on this port. This counter 
+           is incremented on receiving IN event for attributes on a port."
+      ::= { fsMrpPortStatsEntry 10}
+
+fsMrpPortStatsRxLeaveAllMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of LEAVEALL messages received on this port. This counter 
+           is incremented on receiving LEAVEALL event for attributes on a port."
+      ::= { fsMrpPortStatsEntry 11}
+
+fsMrpPortStatsTxPduCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of MRPDUs transmitted on this port. This counter is 
+           incremented whenever a port transmits MRPDU."
+      ::= { fsMrpPortStatsEntry 12}
+
+fsMrpPortStatsTxNewMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of NEW messages transmitted on this port. This counter is
+           incremented whenever a port transmits the NEW event for an 
+           attribute."
+      ::= { fsMrpPortStatsEntry 13}
+
+fsMrpPortStatsTxJoinInMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of JOININ messages transmitted on this port. This counter is
+           incremented whenever a port transmits the JOININ event for an 
+           attribute."
+      ::= { fsMrpPortStatsEntry 14}
+
+fsMrpPortStatsTxJoinMtMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of JOINMT messages transmitted on this port. This counter is
+           incremented whenever a port transmits the JOINMT event for an
+           attribute."
+      ::= { fsMrpPortStatsEntry 15}
+
+fsMrpPortStatsTxLeaveMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of LEAVE messages transmitted on this port. This counter is
+           incremented whenever a port transmits the LEAVE event for an
+           attribute."
+      ::= { fsMrpPortStatsEntry 16}
+
+fsMrpPortStatsTxEmptyMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of EMPTY messages transmitted on this port. This counter is
+           incremented whenever a port transmits the EMPTY event for an
+           attribute."
+      ::= { fsMrpPortStatsEntry 17}
+
+fsMrpPortStatsTxInMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of IN messages transmitted on this port. This counter is
+           incremented whenever a port transmits the IN event for an 
+           attribute."
+      ::= { fsMrpPortStatsEntry 18}
+
+fsMrpPortStatsTxLeaveAllMsgCount OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Number of LEAVEALL messages transmitted on this port. This counter 
+           is incremented whenever a port transmits the LEAVEALL event for an 
+           attribute."
+      ::= { fsMrpPortStatsEntry 19}
+
+-- ************************************************************************
+--       fsMrpStateMachine subtree 
+-- ************************************************************************
+
+fsMrpSEMTable   OBJECT-TYPE
+   SYNTAX      SEQUENCE OF FsMrpSEMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Table containing the information about the attributes states 
+      (both Applicant and Registrar) on a port."
+   ::= {fsMrpStateMachine  1}
+
+fsMrpSEMEntry   OBJECT-TYPE
+   SYNTAX      FsMrpSEMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Entry indicating the SEM state of each and every attributes present 
+       in a port (Registered as well as declared). 
+       An entry in this table is populated whenever the port receives a JOIN 
+       indication/request for an attribute."
+   INDEX { ieee8021BridgeBasePortComponentId, 
+           ieee8021BridgeBasePort, 
+           fsMrpApplicationAddress,
+           fsMrpSEMMapContext,
+           fsMrpAttributeType,
+           fsMrpSEMAttributeValue }
+   ::= { fsMrpSEMTable 1}
+
+FsMrpSEMEntry ::=
+   SEQUENCE {
+          fsMrpSEMMapContext
+            Integer32,
+          fsMrpSEMAttributeValue
+            OCTET STRING,
+          fsMrpSEMApplicantState
+            INTEGER,
+          fsMrpSEMRegistrarState
+            INTEGER,
+          fsMrpSEMOriginatorAddress
+            MacAddress
+       }
+fsMrpSEMMapContext   OBJECT-TYPE
+    SYNTAX       Integer32(0..4094)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This object indicates the MAP context on which the 
+         participant belongs.
+         For MVRP, it will be between 0 to maximum number of MST instances. 
+         For MMRP, it will be between 1 to maximum number of VLAN Id 
+         supported. The remaining values are unused."
+    ::= {fsMrpSEMEntry 1}
+
+fsMrpSEMAttributeValue  OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1..6))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the attribute value learnt on this port.
+         For MVRP, the length of the attribute value is two octets.
+         For MMRP, the length of the attribute value is six octets if the
+         attribute type is MAC. Otherwise, the length of the attribute value is 
+         two octets for service requirement attribute type."
+    ::= {fsMrpSEMEntry 2}
+
+fsMrpSEMApplicantState  OBJECT-TYPE
+    SYNTAX   INTEGER { 
+                vo(0),
+                vp(1),
+                vn(2),
+                an(3),
+                aa(4),
+                qa(5),
+                la(6),
+                ao(7),
+                qo(8),
+                ap(9),
+                qp(10),
+                lo(11)
+            }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object specifies applicant state machine state for each port 
+         and each attribute value.
+         The description of each state is given below.
+           - vo. Very anxious Observer. The applicant is not declaring the 
+             attribute, and has not received a JoinIn message since the state 
+             machine was initialized, or since last receiving a Leave or 
+             LeaveAll.
+           - vp. Very anxious Passive. The applicant is declaring the 
+             attribute, but has neither sent a Join nor received a JoinIn 
+             since the state machine was initialized, or since last receiving 
+             a LeaveAll or Leave.
+           - vn. Very anxious New. The applicant is declaring the attribute, 
+             but has not sent a message since receiving a MAD Join request for 
+             a new declaration.
+           - an. Anxious New. The applicant is declaring the attribute, and has 
+             sent a single New message since receiving the MAD Join request 
+             for the new declaration.
+           - aa. Anxious Active. The applicant is declaring the attribute, and 
+             has sent a Join message, since the last Leave or LeaveAll, but 
+             has either not received another JoinIn or In, or has received a 
+             subsequent message specifying an Empty registrar state.
+           - qa. Quiet Active. The applicant is declaring the attribute and has 
+             sent at least one of the required Join or New messages since the 
+             last Leave or LeaveAll, has seen or sent the other, and has 
+             received no subsequent messages specifying an Empty registrar 
+             state.
+           - la. Leaving Active. The applicant has sent a Join or New message 
+             since last receipt of a Leave or LeaveAll, but has subsequently 
+             received a MAD Leave request and has not yet sent a Leave message.
+           - ao. Anxious Observer. The applicant is not declaring the 
+             attribute, but has received a JoinIn since last receiving a Leave 
+             or LeaveAll. 
+           - qo. Quiet Observer. The applicant is not declaring the attribute, 
+             but has received two JoinIns since last receiving a Leave or 
+             LeaveAll, and at least one since last receiving a message 
+             specifying an Empty registrar state.
+           - ap. Anxious Passive. The applicant is declaring the attribute, and 
+             has not sent a Join or a New since last receiving a Leave or a 
+             LeaveAll but has received messages as for the Anxious Observer 
+             state.
+           - qp. Quiet Passive. The applicant is declaring the attribute, and 
+             has not sent a Join or a New since last receiving a Leave or a 
+             LeaveAll but has received messages as for the Quiet Observer 
+             state.
+           - lo. Leaving Observer. The applicant is not declaring the 
+             attribute, and has received a Leave or LeaveAll message."
+    ::= {fsMrpSEMEntry 3} 
+
+fsMrpSEMRegistrarState   OBJECT-TYPE
+    SYNTAX   INTEGER {
+                    mt(0),
+                    in(1),
+                    lv(2)
+                  }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object specifies registrar state machine state for each port 
+         and each attribute value.
+         The registrar for each attribute implements the following three states
+         for the attribute
+             mt - Not registered.
+             in - Registered.
+             lv - Previously registered, but now being timed out."
+    ::= {fsMrpSEMEntry 4}
+
+fsMrpSEMOriginatorAddress OBJECT-TYPE
+    SYNTAX   MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The MAC address of the originator of the most recent MRPDU that was 
+         responsible for causing a state change in the registrar state machine."
+    ::= {fsMrpSEMEntry 5}
+
+-- ************************************************************************
+--       fsMrpTraps subtree 
+-- ************************************************************************
+
+fsMrpTrapNotificationCtrl     OBJECT IDENTIFIER ::= { fsMrpTraps 0 }
+
+fsMrpTrapContextName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The name of the virtual context."
+    ::= {fsMrpTraps 1}
+
+fsMrpTrapBridgeBasePort OBJECT-TYPE
+    SYNTAX      IEEE8021BridgePortNumber
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The port number of the port for which the MVRP / MMRP 
+         registration fails."
+    ::= {fsMrpTraps 2}
+
+fsMrpTrapMvrpAttributeValue OBJECT-TYPE
+    SYNTAX      IEEE8021VlanIndex
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The VLAN ID for which the MVRP registration fails."
+    ::= {fsMrpTraps 3}
+
+fsMrpTrapMmrpAttributeValue OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The MAC address for which the MMRP registration fails."
+    ::= {fsMrpTraps 4}
+
+fsMrpTrapAttrRegFailureReason  OBJECT-TYPE
+    SYNTAX    DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the reason for the failure of the attribute    
+         registration. The value 'lackOfResource' indicates that the 
+         attribute registration failed due to lack of resources. 
+         The value 'restrictedRegistration' indicates that the attribute 
+         registration is restricted by the Restricted_VLAN_Registration 
+         control in MVRP or the Restricted_MAC_Registration control in MMRP. 
+         The value 'unsupportedAttributeValue' indicates that the 
+         attribute registration fails due to unsupported attribute value."
+    ::= {fsMrpTraps 5}
+
+fsMrpVlanRegFailureNotifyTrap   NOTIFICATION-TYPE
+    OBJECTS  {
+        fsMrpTrapContextName,
+        fsMrpTrapBridgeBasePort,
+        fsMrpTrapMvrpAttributeValue,
+        fsMrpTrapAttrRegFailureReason
+    }
+    STATUS   current
+    DESCRIPTION
+        "This trap is generated when the dynamic Vlan registration fails. 
+         The generated trap will carry information about the VID, 
+         virtual context name, port ID and the reason for failure."
+    ::= {fsMrpTrapNotificationCtrl 1}
+
+fsMrpMacRegFailureNotifyTrap   NOTIFICATION-TYPE
+    OBJECTS  {
+        fsMrpTrapContextName,
+        fsMrpTrapBridgeBasePort,
+        fsMrpTrapMmrpAttributeValue,
+        fsMrpTrapAttrRegFailureReason
+    }
+    STATUS   current
+    DESCRIPTION
+        "This trap is generated when the dynamic group registration fails. 
+         The generated trap will carry information about the MAC address, 
+         virtual context name, port ID and the reason for failure."
+    ::= {fsMrpTrapNotificationCtrl 2}
+
+END 

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -359,7 +359,7 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
           'right'    => TRUE,
           'class'    => 'btn-primary',
           'readonly' => $readonly,
-          'value'    => 'update_contact'
+          'value'    => 'contact_edit'
         ];
 
         //print_vars($form);
@@ -401,25 +401,27 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
                   <td>' . escape_html($alert_test['alert_name']) . '</td>
                   <td width="25px">');
 
-            $form                            = ['type'  => 'simple',
-                                                //'userlevel'  => 10,          // Minimum user level for display form
-                                                'id'    => 'delete_alert_checker_' . $assoc['alert_test_id'],
-                                                'style' => 'display:inline;',
+            $form = [
+                'type'  => 'simple',
+                //'userlevel'  => 10,          // Minimum user level for display form
+                'id'    => 'delete_alert_checker_' . $assoc['alert_test_id'],
+                'style' => 'display:inline;',
             ];
             $form['row'][0]['alert_test_id'] = [
               'type'  => 'hidden',
-              'value' => $assoc['alert_test_id']];
+              'value' => $assoc['alert_test_id']
+            ];
             $form['row'][0]['contact_id']    = [
               'type'  => 'hidden',
-              'value' => $contact['contact_id']];
-
+              'value' => $contact['contact_id']
+            ];
             $form['row'][99]['action'] = [
               'type'      => 'submit',
-              'icon_only' => TRUE, // hide button styles
+              //'icon_only' => TRUE, // hide button styles
               'name'      => '',
-              'icon'      => $config['icon']['cancel'],
+              'icon'      => 'icon-trash',
               'readonly'  => $transport === 'syscontact',
-              //'class'       => 'btn-small',
+              'class'     => 'btn-xs btn-danger',
               // confirmation dialog
               'attribs'   => ['data-toggle'            => 'confirm', // Enable confirmation dialog
                               'data-confirm-placement' => 'left',
@@ -427,7 +429,8 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
                               //'data-confirm-content' => '<div class="alert alert-warning"><h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>
                               //                           This association will be deleted!</div>'),
               ],
-              'value'     => 'delete_alert_checker_contact'];
+              'value'     => 'contact_alert_checker_delete'
+            ];
 
             print_form($form);
             unset($form);
@@ -456,15 +459,17 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
             }
         }
 
-        $form                               = ['type'  => 'simple',
-                                               //'userlevel'  => 10,          // Minimum user level for display form
-                                               'id'    => 'associate_alert_check',
-                                               'style' => 'padding: 7px; margin: 0px;',
-                                               'right' => TRUE,
+        $form = [
+            'type'  => 'simple',
+            //'userlevel'  => 10,          // Minimum user level for display form
+            'id'    => 'associate_alert_check',
+            'style' => 'padding: 7px; margin: 0px;',
+            'right' => TRUE,
         ];
-        $form['row'][0]['type']             = [
+        $form['row'][0]['type'] = [
           'type'  => 'hidden',
-          'value' => 'alert'];
+          'value' => 'alert'
+        ];
         $form['row'][0]['alert_checker_id'] = [
           'type'        => 'select',
           'name'        => 'Associate Alert Checker',
@@ -473,15 +478,17 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
           //'right'       => TRUE,
           'readonly'    => $readonly,
           'values'      => $form_items['alert_checker_id'],
-          'value'       => $vars['alert_checker_id']];
-        $form['row'][0]['action']           = [
+          'value'       => $vars['alert_checker_id']
+        ];
+        $form['row'][0]['action'] = [
           'type'     => 'submit',
           'name'     => 'Associate',
-          'icon'     => $config['icon']['plus'],
+          'icon'     => 'icon-plus-sign',
           //'right'       => TRUE,
           'readonly' => $readonly,
           'class'    => 'btn-primary',
-          'value'    => 'associate_alert_check'];
+          'value'    => 'contact_alert_checker_add'
+        ];
 
         $box_close['footer_content']   = generate_form($form);
         $box_close['footer_nopadding'] = TRUE;
@@ -502,7 +509,7 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
         $assocs = dbFetchRows('SELECT * FROM `alert_contacts_assoc` AS A
                          LEFT JOIN `syslog_rules` AS T ON T.`la_id` = A.`alert_checker_id`
                          WHERE `aca_type` = ? AND `contact_id` = ?
-                         ORDER BY `la_severity`, `la_name` DESC', ['syslog', $contact['contact_id']]);
+                         ORDER BY `la_severity`, `la_name` DESC', [ 'syslog', $contact['contact_id'] ]);
     }
     //r($assocs);
     echo generate_box_open(['title' => 'Associated Syslog Rules', 'header-border' => TRUE]);
@@ -517,30 +524,32 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
             $assoc_exists[$assoc['la_id']] = TRUE;
 
             echo('<tr>
-                <td width="150"><i class="' . $config['icon']['syslog-alerts'] . '"></i> ' . escape_html($assoc['la_name']) . '</td>
+                <td width="150">' . get_icon('syslog-alerts') . ' ' . escape_html($assoc['la_name']) . '</td>
                 <td>' . escape_html($assoc['la_rule']) . '</td>
                 <td width="25">');
 
-            $form                            = ['type'  => 'simple',
-                                                //'userlevel'  => 10,          // Minimum user level for display form
-                                                'id'    => 'delete_syslog_checker_' . $assoc['la_id'],
-                                                'style' => 'display:inline;',
+            $form = [
+                'type'  => 'simple',
+                //'userlevel'  => 10,          // Minimum user level for display form
+                'id'    => 'delete_syslog_checker_' . $assoc['la_id'],
+                'style' => 'display:inline;',
             ];
-            $form['row'][0]['alert_test_id'] = [
+
+            $form['row'][0]['la_id'] = [
               'type'  => 'hidden',
-              'value' => $assoc['la_id']];
+              'value' => $assoc['la_id']
+            ];
             $form['row'][0]['contact_id']    = [
               'type'  => 'hidden',
-              'value' => $contact['contact_id']];
-
+              'value' => $contact['contact_id']
+            ];
             $form['row'][99]['action'] = [
-                //$form['row'][99]['submit'] = array(
                 'type'      => 'submit',
-                'icon_only' => TRUE, // hide button styles
+                //'icon_only' => TRUE, // hide button styles
                 'name'      => '',
-                'icon'      => $config['icon']['cancel'],
+                'icon'      => 'icon-trash',
                 'readonly'  => $transport === 'syscontact',
-                //'class'       => 'btn-small',
+                'class'     => 'btn-xs btn-danger',
                 // confirmation dialog
                 'attribs'   => ['data-toggle'            => 'confirm', // Enable confirmation dialog
                                 'data-confirm-placement' => 'left',
@@ -548,7 +557,8 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
                                 //'data-confirm-content' => '<div class="alert alert-warning"><h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>
                                 //                           This association will be deleted!</div>'),
                 ],
-                'value'     => 'delete_syslog_checker_contact'];
+                'value'     => 'contact_syslog_rule_delete'
+            ];
 
             print_form($form);
             unset($form);
@@ -577,32 +587,36 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
             }
         }
 
-        $form                     = ['type'  => 'simple',
-                                     //'userlevel'  => 10,          // Minimum user level for display form
-                                     'id'    => 'associate_syslog_rule',
-                                     'style' => 'padding: 7px; margin: 0px;',
-                                     'right' => TRUE,
+        $form = [
+            'type'  => 'simple',
+            //'userlevel'  => 10,          // Minimum user level for display form
+            'id'    => 'contact_syslog_rule_add',
+            'style' => 'padding: 7px; margin: 0px;',
+            'right' => TRUE,
         ];
         $form['row'][0]['type']   = [
-          'type'  => 'hidden',
-          'value' => 'syslog'];
+            'type'  => 'hidden',
+            'value' => 'syslog'
+        ];
         $form['row'][0]['la_id']  = [
-          'type'        => 'select',
-          'name'        => 'Associate Syslog Rule',
-          'live-search' => FALSE,
-          'width'       => '250px',
-          //'right'       => TRUE,
-          'readonly'    => $readonly,
-          'values'      => $form_items['la_id'],
-          'value'       => $vars['la_id']];
+            'type'        => 'select',
+            'name'        => 'Associate Syslog Rule',
+            'live-search' => FALSE,
+            'width'       => '250px',
+            //'right'       => TRUE,
+            'readonly'    => $readonly,
+            'values'      => $form_items['la_id'],
+            'value'       => $vars['la_id']
+        ];
         $form['row'][0]['action'] = [
-          'type'     => 'submit',
-          'name'     => 'Associate',
-          'icon'     => $config['icon']['plus'],
-          //'right'       => TRUE,
-          'readonly' => $readonly,
-          'class'    => 'btn-primary',
-          'value'    => 'associate_syslog_rule'];
+            'type'     => 'submit',
+            'name'     => 'Associate',
+            'icon'     => 'icon-plus-sign',
+            //'right'       => TRUE,
+            'readonly' => $readonly,
+            'class'    => 'btn-primary',
+            'value'    => 'contact_syslog_rule_add'
+        ];
 
         $box_close['footer_content']   = generate_form($form);
         $box_close['footer_nopadding'] = TRUE;

@@ -39,10 +39,10 @@ if (count($supplies)) {
         $graph_array           = [];
         $graph_array['height'] = "100";
         $graph_array['width']  = "210";
-        $graph_array['to']     = $config['time']['now'];
+        $graph_array['to']     = get_time();
         $graph_array['id']     = $supply['supply_id'];
         $graph_array['type']   = $graph_type;
-        $graph_array['from']   = $config['time']['day'];
+        $graph_array['from']   = get_time('day');
         $graph_array['legend'] = "no";
 
         $link_array         = $graph_array;

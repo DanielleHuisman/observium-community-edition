@@ -1,5 +1,4 @@
 <?php
-
 /*
 <div class="navbar navbar-narrow" style="">
     <div class="navbar-inner">
@@ -27,24 +26,35 @@
   </div>
 */
 
-if ($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
+if ($_SESSION['userlevel'] >= 5 && $config['weathermap']['enable']) {
 
     $navbar['class'] = 'navbar-narrow';
     $navbar['brand'] = 'Weathermaps';
+
+    if ($_SESSION['userlevel'] > 7 && isset($vars['mapname']) && $vars['mapname'] === 'new') {
+
+        $map_name = 'new_map_'.date('Ymd-His');
+
+        if ($wmap_id = dbInsert(['wmap_name' => $map_name ], 'weathermaps')) {
+            header("Location: /" . generate_url(['page' => "wmap", 'wmap_id' => $wmap_id]));
+        }
+        return;
+    }
+
 
     // Allow use of wmap_id as well as mapname
     if (isset($vars['wmap_id'])) {
         $vars['mapname'] = dbFetchCell("SELECT `wmap_name` FROM `weathermaps` WHERE `wmap_id` = ?", [$vars['wmap_id']]);
     }
+
+    $editing = FALSE;
     if (isset($vars['mapname']) && dbExist("weathermaps", "`wmap_name` = ?", [$vars['mapname']])) {
-        if ($_SESSION['userlevel'] > 7) {
+        if ($_SESSION['userlevel'] > 7 && $vars['edit']) {
             $editing = TRUE;
         }
     } else {
         unset($vars['mapname']);
     }
-
-    //$editing = TRUE;
 
     if ($editing === TRUE) {
         $navbar['options']['add_node']['text'] = 'Add Node';
@@ -68,15 +78,31 @@ if ($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
 
         $navbar['options_right']['help']['id']        = 'tb_help';
         $navbar['options_right']['help']['text']      = '';
-        $navbar['options_right']['tb_coords']['text'] = 'Return to List';
+
+        //$navbar['options_right']['tb_coords']['text'] = 'Return to List';
+        //$navbar['options_right']['tb_coords']['icon'] = 'sprite-return';
+        //$navbar['options_right']['tb_coords']['url']  = generate_url(['page' => "wmap"]);
+        //$navbar['options_right']['tb_coords']['id']   = 'tb_coords';
+    }
+
+    if (isset($vars['mapname'])) {
+
+        if ($_SESSION['userlevel'] > 7) {
+            $navbar['options_right']['edit']['text'] = 'Edit Map';
+            $navbar['options_right']['edit']['icon'] = 'sprite-cog';
+            if ($editing) {
+                $navbar['options_right']['edit']['text']   = 'Disable Editing';
+                $navbar['options_right']['edit']['active'] = TRUE;
+                $navbar['options_right']['edit']['url']    = generate_url(['page' => "wmap", 'mapname' => $vars['mapname'], 'edit' => NULL]);
+            } else {
+                $navbar['options_right']['edit']['url']    = generate_url(['page' => "wmap", 'mapname' => $vars['mapname'], 'edit' => TRUE]);
+            }
+        }
+
+        $navbar['options_right']['tb_coords']['text'] = 'Map List';
         $navbar['options_right']['tb_coords']['icon'] = 'sprite-return';
         $navbar['options_right']['tb_coords']['url']  = generate_url(['page' => "wmap"]);
         $navbar['options_right']['tb_coords']['id']   = 'tb_coords';
-    } elseif (isset($vars['mapname'])) {
-
-        //  $navbar['options_right']['edit']['text'] = 'Edit Map';
-        //  $navbar['options_right']['edit']['icon'] = 'sprite-cog';
-        //  $navbar['options_right']['edit']['url']  = generate_url(array('page' => "wmap", 'mapname' => $vars['mapname'], 'edit' => TRUE));
 
     }
 
@@ -87,11 +113,35 @@ if ($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
     if (isset($vars['mapname'])) {
 
         if ($editing === TRUE) {
+
+
+//r($vars);
+
+
             include($config['install_dir'] . "/includes/weathermap/editor.php");
         } else {
-            echo '<div class="box box-solid">';
-            echo '<img src="/weathermap.php?mapname=' . htmlentities($vars['mapname']) . '&action=draw&unique=' . time() . '">';
-            echo '</div>';
+            //echo '<div class="box box-solid" align="center">';
+            //echo '<img src="/weathermap.php?mapname=' . htmlentities($vars['mapname']) . '&action=draw&unique=' . time() . '">';
+            //echo '</div>';
+
+            require_once 'Console/Getopt.php';
+            require_once "../includes/weathermap/lib/Weathermap.class.php";
+
+            $map            = new WeatherMap;
+            $mapfile        = $vars['mapname'];
+            $map->context   = 'cli';
+            $map->ReadConfig($mapfile);
+            $map->ReadData();
+            //$map->htmlstyle = "qtip";
+            ob_start();
+            $image = $map->DrawMap('', '', 250, TRUE, FALSE, FALSE);
+            $img = base64_encode(ob_get_contents());
+            $map->imageuri = 'data:image/png;base64,'.$img;
+            $map->imageuri = '/weathermap.php?mapname=' . escape_html($vars['mapname']) . '&action=draw&unique=' . time();
+            ob_end_clean();
+            $map->PreloadMapHTML();
+            echo $map->MakeHTML();
+            //r($map);
         }
 
     } else {
@@ -103,13 +153,13 @@ if ($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
             echo '
     <div class="box box-solid" style="float: left; margin-left: 10px; margin-bottom: 10px;  width:612px; min-width: 612px; max-width:612px; min-height:500px; max-height:500px;">
       <div class="box-header with-border">
-        <a href="' . generate_url(['page' => "wmap", 'mapname' => $wmap['wmap_name']]) . '"><h3 class="box-title">' . htmlentities($wmap['wmap_name']) . '</h3>
+        <a href="' . generate_url(['page' => "wmap", 'mapname' => $wmap['wmap_name']]) . '"><h3 class="box-title">' . escape_html($wmap['wmap_name']) . '</h3>
         </a>
       </div>
       <div class="box-body">
        <div style="position:absolute; width:100%; height:100%">
         <a href="' . generate_url(['page' => "wmap", 'mapname' => $wmap['wmap_name']]) . '">
-          <img src="/weathermap.php?mapname=' . htmlentities($wmap['wmap_name']) . '&action=draw&unique=' . time() . '&width=590&height=490">
+          <img src="/weathermap.php?mapname=' . escape_html($wmap['wmap_name']) . '&action=draw&unique=' . time() . '&width=590&height=490">
         </a>
         </div>
       </div>
@@ -123,9 +173,7 @@ if ($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
     }
 } else {
 
-    print_error("Not Permitted");
-
+    print_error_permission();
 }
 
-
-?>
+// EOF

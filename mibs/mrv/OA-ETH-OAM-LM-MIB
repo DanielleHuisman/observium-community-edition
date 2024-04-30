@@ -1,0 +1,1165 @@
+
+--  =======================================================================
+--  File        : osEthOamLoss.mib
+--  Description : Private MIB for to support the functionality 
+--                of IEEE 802.1ag and ITU-T Y.1731
+
+OA-ETH-OAM-LM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+       MODULE-IDENTITY, OBJECT-TYPE,
+       Integer32, Counter32,
+       Unsigned32                         FROM SNMPv2-SMI
+       MODULE-COMPLIANCE, OBJECT-GROUP    FROM SNMPv2-CONF
+       MepList, oaOptiSwitch              FROM OS-COMMON-TC-MIB
+       TEXTUAL-CONVENTION, DateAndTime,           
+       TruthValue, MacAddress             FROM SNMPv2-TC;
+
+---------------------- Loss Measure -------------------------
+
+osEthOamLs  MODULE-IDENTITY
+                LAST-UPDATED "201109220000Z"
+                ORGANIZATION "MRV Communications, Inc."
+                CONTACT-INFO
+                   "Anna Drabkin
+                    MRV Communication, Inc
+                    http://www.mrv.com
+                    Email:  adrabkin@mrv.com"              
+                DESCRIPTION
+                    "tbd ."
+
+                REVISION     "201109220000Z"
+                DESCRIPTION
+                    "Ranges of *Priority have fixed."
+
+                REVISION     "201008290000Z"
+                DESCRIPTION
+                    "Initial edition."
+                ::= { oaOptiSwitch 18 }
+     
+-- ************************************************************
+-- MIB place Definition
+-- ************************************************************
+
+osEthOamLsCapabilities      OBJECT IDENTIFIER ::= { osEthOamLs 1 }
+osEthOamLsConformance       OBJECT IDENTIFIER ::= { osEthOamLs 100 }
+osEthOamLsCompliances       OBJECT IDENTIFIER ::= { osEthOamLsConformance 1 }
+osEthOamLsGroups            OBJECT IDENTIFIER ::= { osEthOamLsConformance 2 }
+
+
+                
+OsEthOamMepId ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+       "Maintenance association End Point Identifier (MEPID): A small
+        integer, unique over a given Maintenance Association,
+        identifying a specific MEP."
+    REFERENCE
+       "802.1ag clauses 3.19 and 19.2.1"
+    SYNTAX      Unsigned32 (1..8191)
+
+OsEthOamMepIdOrZero ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+       "MEP Identifier (1 - 8191). 0 indicates MEP is identified 
+        by MAC in another object"
+    REFERENCE
+       "."
+    SYNTAX      Unsigned32 (0|1..8191)
+
+osEthOamLsConfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsEthOamLsConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loss Measurement last completed test results Table."
+    REFERENCE
+       "."
+    ::= { osEthOamLs 2 }
+
+
+osEthOamLsConfEntry OBJECT-TYPE
+    SYNTAX      OsEthOamLsConfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains configuration of Ethernet OAM Loss Measurement test."
+    INDEX { osEthOamMdIndex, osEthOamMaIndex, osEthOamMepIdentifier }
+    ::= { osEthOamLsConfTable 1 }
+
+OsEthOamLsConfEntry ::= SEQUENCE {
+      osEthOamMdIndex               Unsigned32,
+      osEthOamMaIndex               Unsigned32,
+      osEthOamMepIdentifier         OsEthOamMepId,
+      
+      osEthOamLsEnabled             TruthValue,
+      osEthOamLsCounterEnable       BITS,
+      osEthOamLsInterval            Unsigned32,
+
+      osEthOamLsPriority            Unsigned32,
+      osEthOamLsFrameSize           Unsigned32,
+      osEthOamLsFramePattern        OCTET STRING,
+      osEthOamLsMeasurementInterval Integer32,
+    
+      osEthOamLsConfDestType        INTEGER,
+      osEthOamLsConfDestMepId       OsEthOamMepIdOrZero,
+      osEthOamLsConfDestMepMac      MacAddress,
+      osEthOamLsConfDestMepList     MepList,   
+      osEthOamLsConfHistorySize     Unsigned32,
+      osEthOamLsConfTimeout         Unsigned32  
+    }
+
+
+osEthOamMdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32(1..8)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Domain level plus 1"
+    REFERENCE
+       "802.1ag clauses 3.19 and 19.2.1"
+    ::= { osEthOamLsConfEntry 1 }
+
+osEthOamMaIndex OBJECT-TYPE
+    SYNTAX      Unsigned32(1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association index."
+    REFERENCE
+       "."
+    ::= { osEthOamLsConfEntry 2 }
+
+
+osEthOamMepIdentifier OBJECT-TYPE
+    SYNTAX      OsEthOamMepId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Source MEP for the Loopback test"
+    REFERENCE
+       "."
+    ::= { osEthOamLsConfEntry 3 }
+
+osEthOamLsEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This attribute specifies whether the Loss Measurement instance
+        is enabled. The value 'true' indicates the Loss Measurement 
+        instance is enabled.  The value 'false' indicates the Loss
+        Measurement instance is disabled.
+
+        For a Loss Measurement instance to be removed the row should be
+        deleted in order to release internal resources.
+
+        This object can written after row creation time.
+
+        If the LM instance is enabled it will resume after shutdown/restart.
+       "
+    REFERENCE
+       "[MEF `-PM] R7, R8, R9"
+    DEFVAL { true }
+    ::= { osEthOamLsConfEntry 4 }
+    
+osEthOamLsCounterEnable OBJECT-TYPE
+    SYNTAX      BITS {
+                     bTimeOfDayTimestamp(0),
+                     bMeasurementIntervalElapsedTime(1),
+                     bInitiatedMeasurementCounter(2),
+                     bCompleteMeasurementCounter(3),
+                     bTransmitFrameCountForward(4),
+                     bReceiveFrameCountForward(6),
+                     bTransmitFrameCountBackward(7),
+                     bReceiveFrameCountBackward(8),
+                     bAvailabilityIndicatorForward(9),
+                     bAvailabilityIndicatorBackward(10),
+                     bUnavailabilityIndicatorForward(11),
+                     bUnavailabilityIndicatorBackward(12),
+                     bFrameLossRatioForwardMin(13),
+                     bFrameLossRatioForwardMax(14),
+                     bFrameLossRatioForwardAve(15),
+                     bFrameLossRatioBackwardMin(16),
+                     bFrameLossRatioBackwardMax(17),
+                     bFrameLossRatioBackwardAve(18)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "A vector of bits that indicates the type of  LM counters that
+        are enabled. A bit set to '1' enables the specific  LM counter.
+        A bit set to '0' disables the  LM counter.
+
+        If a particular  LM counter is not supported the BIT value should be
+        set to '0'.
+
+        This object can only be written at row creation time.
+      "
+    DEFVAL { { } }
+    ::= { osEthOamLsConfEntry 5 }
+
+osEthOamLsInterval OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "ms"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This attribute specifies the Performance Monitoring OAM
+        message transmission period. For
+        Performance monitoring applications the default value is
+        1 sec. 
+
+        This attribute is not applicable for CCM Loss Measurement and is 
+        ignored for that Loss Measurement Type.
+
+        This object can only be written at row creation time.
+       "
+    REFERENCE
+       "[MEF SOAM-PM] R55, R56, D20"
+    DEFVAL { 1000 }
+    ::= { osEthOamLsConfEntry 6 }
+
+
+osEthOamLsPriority OBJECT-TYPE    
+    SYNTAX      Unsigned32 (0..7|8)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This attribute specifies the priority of frames with 
+        the Loss Measurement OAM message information.
+
+        The default value MUST be the value which yields the lowest frame 
+        loss performance for this EVC.
+
+        This attribute is not applicable for CCM Loss Measurement.
+       "
+    REFERENCE
+       "[MEF SOAM-PM] R51, D19"
+    ::= { osEthOamLsConfEntry 7 }
+
+    
+osEthOamLsFrameSize OBJECT-TYPE
+    SYNTAX      Unsigned32 (64..9600)
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This attribute specifies the Loss Measurement frame size between
+        64 bytes and the maximum transmission unit of the EVC. 
+
+        The range of frame sizes from 64 through 2000 octets, in 4 octet 
+        increments, MUST be supported, and the range of frame sizes from 2004
+        through 9600 octets, in 4 octet increments, SHOULD be supported.  
+
+        The adjustment to the frame size of the standard frame size is 
+        accomplished by the addition of a Data TLV.
+
+        This object is only valid for the entity transmitting the Loss
+        Measurement frames and is ignored by the entity receiving frames.
+       "
+    REFERENCE
+       "[MEF SOAM-PM] R58, D21, D22"
+    DEFVAL { 64 }
+    ::= { osEthOamLsConfEntry 8 }
+    
+osEthOamLsFramePattern OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..1436))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Message data fill pattern"
+    REFERENCE
+       "."
+    ::= { osEthOamLsConfEntry 9 }
+
+osEthOamLsMeasurementInterval OBJECT-TYPE
+    SYNTAX      Integer32 (5..60)
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This attribute specifies a measurement interval that is a multiple of
+        5 minutes.
+       "
+    REFERENCE
+       "[MEF SOAM-PM] R10"
+    DEFVAL { 15 }
+    ::= { osEthOamLsConfEntry 10 }
+    
+osEthOamLsConfDestType OBJECT-TYPE
+    SYNTAX          INTEGER {
+                       singleRMepId(1),
+                       macAddress(2),
+                       listOfRMeps (3)
+                    }
+
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+       "Describes type of destination used.
+       Flag indicating if the destination is specified by destination MEP ID, by destination
+       MAC address or by list of destination MEP IDs."
+    DEFVAL { macAddress }
+    ::= { osEthOamLsConfEntry 11 }    
+
+osEthOamLsConfDestMepId OBJECT-TYPE
+    SYNTAX      OsEthOamMepIdOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP Identifier (1 - 8191). 0 if MEP is identified 
+       by destination MAC (OsEthOamLsConfDestMepMac)."
+    REFERENCE
+       "."
+    ::= { osEthOamLsConfEntry 12 }
+
+osEthOamLsConfDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address instead of MEP ID."
+    REFERENCE
+       "."
+    ::= { osEthOamLsConfEntry 13 }
+
+
+osEthOamLsConfDestMepList OBJECT-TYPE
+    SYNTAX      MepList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "List of destination MEP IDs."
+    ::= { osEthOamLsConfEntry 14 }
+
+osEthOamLsConfHistorySize OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..65535)
+    UNITS       "lines"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Number of entries in the History Table that contains records
+        of the Loss Measurement results"
+    REFERENCE
+       "."
+    DEFVAL { 5 }
+    ::= { osEthOamLsConfEntry 15 }
+
+
+osEthOamLsConfTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..60000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Timeout for the arrival of Loss Measurement Reply"
+    REFERENCE
+       "."
+    DEFVAL { 200 }
+    ::= { osEthOamLsConfEntry 16 }
+----------------------------------------------------------------
+
+osEthOamLsHistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsEthOamLsHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loss Measurement results history Table."
+    REFERENCE
+       "."
+    ::= { osEthOamLs 3 }
+
+osEthOamLsHistEntry OBJECT-TYPE
+    SYNTAX      OsEthOamLsHistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains results of Ethernet OAM Loss Measurement test."
+    INDEX { osEthOamMdIndex, osEthOamMaIndex, osEthOamMepIdentifier, osEthOamLsHistSampleIndex }
+    ::= { osEthOamLsHistTable 1 }
+
+OsEthOamLsHistEntry ::= SEQUENCE {
+    osEthOamLsHistSampleIndex            Unsigned32,
+    osEthOamLsHistNeTotTxFrames          Counter32,
+    osEthOamLsHistNeTotLostFrames        Counter32,
+    osEthOamLsHistNeTotFlr               Counter32,
+    osEthOamLsHistNeMinFlr               Counter32,
+    osEthOamLsHistNeMaxFlr               Counter32,
+    osEthOamLsHistNeAvgFlr               Counter32,
+    osEthOamLsHistFeTotTxFrames          Counter32,
+    osEthOamLsHistFeTotLostFrames        Counter32,
+    osEthOamLsHistFeTotFlr               Counter32,
+    osEthOamLsHistFeMinFlr               Counter32,
+    osEthOamLsHistFeMaxFlr               Counter32,
+    osEthOamLsHistFeAvgFlr               Counter32,
+    osEthOamLsHistNumLmmOut              Counter32,
+    osEthOamLsHistNumLmmIn               Counter32,
+    osEthOamLsHistNumLmrIn               Counter32,
+    osEthOamLsHistNumLmrOut              Counter32,
+    osEthOamLsHistTestStarted            DateAndTime,   
+    osEthOamLsHistBurstStarted           DateAndTime,   
+    osEthOamLsHistDestMepId              OsEthOamMepIdOrZero,
+    osEthOamLsHistDestMepMac             MacAddress,
+    osEthOamLsHistNearEndMsgTx           Unsigned32,
+    osEthOamLsHistNearEndMsgReceived     Unsigned32,   
+    osEthOamLsHistFarEndMsgTx            Unsigned32,
+    osEthOamLsHistFarEndMsgReceived      Unsigned32, 
+    osEthOamLsHistNearEndMsgLoss         Unsigned32,
+    osEthOamLsHistFarEndMsgLoss          Unsigned32,
+    osEthOamLsHistNearEndFlr             Counter32,
+    osEthOamLsHistFarEndFlr              Counter32,
+    osEthOamLsHistPriority               Unsigned32
+      
+    }
+    
+osEthOamLsHistSampleIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "An index that uniquely identifies the sample. 
+        This index starts at 1 and increases by one
+        as each new sample is taken."
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 1 }
+    
+osEthOamLsHistNeTotTxFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of near-end, or
+            egress, data frames transmitted by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 2 }
+
+osEthOamLsHistNeTotLostFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of near-end, or 
+            ingress, data frames lost by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 3 }
+
+osEthOamLsHistNeTotFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 4 }
+
+osEthOamLsHistNeMinFlr OBJECT-TYPE
+    SYNTAX      Counter32
+     UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the minimum near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 5 }
+
+osEthOamLsHistNeMaxFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the maximum near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 6 }
+
+osEthOamLsHistNeAvgFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the average near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 7 }
+
+osEthOamLsHistFeTotTxFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of far-end, or
+            ingress, data frames transmitted by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 8 }
+
+osEthOamLsHistFeTotLostFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of far-end, or 
+            egress, data frames lost by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 9 }
+
+osEthOamLsHistFeTotFlr  OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total far-end frame loss ratio
+            calculated by this MEP." 
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 10 }
+
+osEthOamLsHistFeMinFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the minimum far-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 11 }
+
+osEthOamLsHistFeMaxFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the maximum far-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 12 }
+
+osEthOamLsHistFeAvgFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the average far-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 } 
+    ::= { osEthOamLsHistEntry 13 }
+
+osEthOamLsHistNumLmmOut OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMM frames transmitted."
+    DEFVAL { 0 } 
+    ::= { osEthOamLsHistEntry 14 }
+
+osEthOamLsHistNumLmmIn OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMM frames received."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 15 }
+
+osEthOamLsHistNumLmrIn OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMR frames received."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 16 } 
+
+osEthOamLsHistNumLmrOut OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMR frames transmitted."
+    DEFVAL { 0 }
+    ::= { osEthOamLsHistEntry 17 }
+
+
+osEthOamLsHistTestStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Time stamp indicating when the Loss Measurement test started."
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 18 }
+    
+osEthOamLsHistBurstStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Time stamp indicating when the Loss Measurement burst started."
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 19 }    
+
+osEthOamLsHistDestMepId OBJECT-TYPE
+    SYNTAX      OsEthOamMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP ID or 0 if destination is specified by MAC address"
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 20 }
+
+osEthOamLsHistDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address used in the Loss Measurement test"
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 21 }
+
+osEthOamLsHistNearEndMsgTx OBJECT-TYPE
+    SYNTAX      Unsigned32    
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION 
+       "Number of messages transmitted to Near End (Loss Measurement initiator) from test initiation"
+    REFERENCE
+       "."
+::= { osEthOamLsHistEntry 22 }
+
+osEthOamLsHistNearEndMsgReceived OBJECT-TYPE
+    SYNTAX      Unsigned32   
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of messages delivered to Near End (Loss Measurement initiator) from test initiation"
+    REFERENCE
+       "."
+::= { osEthOamLsHistEntry 23 }
+
+osEthOamLsHistFarEndMsgTx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of messages transmitted to Far End (Loss Measurement responder) from test initiation"
+    REFERENCE
+       "."
+::= { osEthOamLsHistEntry 24 }
+
+osEthOamLsHistFarEndMsgReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+     UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of messages delivered to Far End (Loss Measurement responder) from test initiation"
+    REFERENCE
+       "."
+::= { osEthOamLsHistEntry 25 }
+
+osEthOamLsHistNearEndMsgLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of messages not delivered to  Near End (Loss Measurement initiator) during time the burst interval"
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 26 }
+
+osEthOamLsHistFarEndMsgLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "Number of messages not delivered to Far End (Loss Measurement responder) during time the burst interval"
+    REFERENCE
+       "."
+    ::= { osEthOamLsHistEntry 27 }
+
+     
+osEthOamLsHistNearEndFlr    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION 
+     "This attribute contains the near-end frame loss
+            ratio calculated in burst."
+ REFERENCE
+       "."
+   ::= { osEthOamLsHistEntry 28 }
+
+osEthOamLsHistFarEndFlr     OBJECT-TYPE 
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This attribute contains the far-end frame loss
+            ratio calculated in burst."
+    REFERENCE
+       "."
+   ::= { osEthOamLsHistEntry 29 }
+   
+osEthOamLsHistPriority  OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Loss Measurement message."
+    REFERENCE
+       "."
+   ::= { osEthOamLsHistEntry 30 }
+    
+    
+    
+-- Hist Ls results
+
+----------------------------------------------------------------
+-- Last Ls results
+
+
+
+osEthOamLsLastTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF OsEthOamLsLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Ethernet OAM Loss Measurement last completed test results Table."
+    REFERENCE
+       "."
+    ::= { osEthOamLs 4 }
+
+osEthOamLsLastEntry OBJECT-TYPE
+    SYNTAX      OsEthOamLsLastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Contains results of Ethernet OAM Loss Measurement test."
+    INDEX { osEthOamMdIndex, osEthOamMaIndex, osEthOamMepIdentifier }
+    ::= { osEthOamLsLastTable 1 }
+
+
+OsEthOamLsLastEntry ::= SEQUENCE {
+    osEthOamLsLastNeTotTxFrames Counter32,
+    osEthOamLsLastNeTotLostFrames        Counter32,
+    osEthOamLsLastNeTotFlr               Counter32,
+    osEthOamLsLastNeMinFlr               Counter32,
+    osEthOamLsLastNeMaxFlr               Counter32,
+    osEthOamLsLastNeAvgFlr               Counter32,
+    osEthOamLsLastFeTotTxFrames          Counter32,
+    osEthOamLsLastFeTotLostFrames        Counter32,
+    osEthOamLsLastFeTotFlr               Counter32,
+    osEthOamLsLastFeMinFlr               Counter32,
+    osEthOamLsLastFeMaxFlr               Counter32,
+    osEthOamLsLastFeAvgFlr               Counter32,
+    osEthOamLsLastNumLmmOut              Counter32,
+    osEthOamLsLastNumLmmIn               Counter32,
+    osEthOamLsLastNumLmrIn               Counter32,
+    osEthOamLsLastNumLmrOut              Counter32,
+    osEthOamLsLastTestStarted            DateAndTime,   
+    osEthOamLsLastBurstStarted           DateAndTime,   
+    osEthOamLsLastDestMepId              OsEthOamMepIdOrZero,
+    osEthOamLsLastDestMepMac             MacAddress,
+    osEthOamLsLastNearEndMsgLoss         Unsigned32,
+    osEthOamLsLastFarEndMsgLoss          Unsigned32,
+    osEthOamLsLastNearEndFlr             Counter32,
+    osEthOamLsLastFarEndFlr              Counter32,
+    osEthOamLsLastPriority               Unsigned32
+
+}
+
+osEthOamLsLastNeTotTxFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of near-end, or
+            egress, data frames transmitted by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 1 }
+
+osEthOamLsLastNeTotLostFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of near-end, or 
+            ingress, data frames lost by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 2 }
+
+osEthOamLsLastNeTotFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 3 }
+
+osEthOamLsLastNeMinFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the minimum near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 4 }
+
+osEthOamLsLastNeMaxFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the maximum near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 5 }
+
+osEthOamLsLastNeAvgFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the average near-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 6 }
+
+osEthOamLsLastFeTotTxFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of far-end, or
+            ingress, data frames transmitted by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 7 }
+
+osEthOamLsLastFeTotLostFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total number of far-end, or 
+            egress, data frames lost by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 8 }
+
+osEthOamLsLastFeTotFlr  OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the total far-end frame loss ratio
+            calculated by this MEP." 
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 9 }
+
+osEthOamLsLastFeMinFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the minimum far-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 10 }
+
+osEthOamLsLastFeMaxFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the maximum far-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 11 }
+
+osEthOamLsLastFeAvgFlr OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the average far-end frame loss
+            ratio calculated by this MEP."
+    DEFVAL { 0 } 
+    ::= { osEthOamLsLastEntry 12 }
+
+osEthOamLsLastNumLmmOut OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMM frames transmitted."
+    DEFVAL { 0 } 
+    ::= { osEthOamLsLastEntry 13 }
+
+osEthOamLsLastNumLmmIn OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMM frames received."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 14 }
+
+osEthOamLsLastNumLmrIn OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMR frames received."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 15 } 
+
+osEthOamLsLastNumLmrOut OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains the count of the total number of
+            LMR frames transmitted."
+    DEFVAL { 0 }
+    ::= { osEthOamLsLastEntry 16 }
+osEthOamLsLastTestStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Time stamp indicating when the Loss Measurement test started."
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 17 }
+
+osEthOamLsLastBurstStarted OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Time stamp indicating when the Loss Measurement burst started."
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 18 }
+        
+    
+
+osEthOamLsLastDestMepId OBJECT-TYPE
+    SYNTAX      OsEthOamMepIdOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP ID or 0 if destination is specified by MAC address"
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 19 }
+
+osEthOamLsLastDestMepMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Destination MEP MAC address used in the Loss Measurement test"
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 20 }
+
+
+osEthOamLsLastNearEndMsgLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of messages not delivered to  Near End (Loss Measurement initiator) during time the burst interval"
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 21 }
+
+osEthOamLsLastFarEndMsgLoss OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of messages not delivered to Far End (Loss Measurement responder) during time the burst interval"
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 22 }
+
+
+
+osEthOamLsLastNearEndFlr    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION 
+     "This attribute contains the near-end frame loss
+            ratio calculated in burst."
+ REFERENCE
+       "."
+   ::= { osEthOamLsLastEntry 23 }
+
+osEthOamLsLastFarEndFlr     OBJECT-TYPE 
+    SYNTAX      Counter32
+    UNITS       "0.01%"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+      "This attribute contains the far-end frame loss
+            ratio calculated in burst."
+    REFERENCE
+       "."
+   ::= { osEthOamLsLastEntry 24 }
+   
+osEthOamLsLastPriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Diffserv level for the Loss Measurement message."
+    REFERENCE
+       "."
+    ::= { osEthOamLsLastEntry 25 }
+   
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+
+nbEthOamMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The core compliance statement for all the implementations." 
+
+    MODULE -- this module 
+        MANDATORY-GROUPS { 
+                          osEthOamLsMandatoryGroup
+                         }
+
+    ::= { osEthOamLsCompliances 1 }
+
+-- ...................................................................
+-- Conformance Groups 
+-- ................................................................... 
+ 
+osEthOamLsMandatoryGroup  OBJECT-GROUP
+    OBJECTS { 
+    osEthOamLsEnabled,
+    osEthOamLsCounterEnable,
+    osEthOamLsInterval,
+    osEthOamLsPriority,
+    osEthOamLsFrameSize,
+    osEthOamLsFramePattern,
+    osEthOamLsMeasurementInterval,
+    osEthOamLsConfDestType,
+    osEthOamLsConfDestMepId,
+    osEthOamLsConfDestMepMac,
+    osEthOamLsConfDestMepList,
+    osEthOamLsConfHistorySize,
+    osEthOamLsConfTimeout,
+    osEthOamLsHistNeTotTxFrames,
+    osEthOamLsHistNeTotLostFrames,
+    osEthOamLsHistNeTotFlr,
+    osEthOamLsHistNeMinFlr,
+    osEthOamLsHistNeMaxFlr,
+    osEthOamLsHistNeAvgFlr,
+    osEthOamLsHistFeTotTxFrames,
+    osEthOamLsHistFeTotLostFrames,
+    osEthOamLsHistFeTotFlr,
+    osEthOamLsHistFeMinFlr,
+    osEthOamLsHistFeMaxFlr,
+    osEthOamLsHistFeAvgFlr,
+    osEthOamLsHistNumLmmOut,
+    osEthOamLsHistNumLmmIn,
+    osEthOamLsHistNumLmrIn,
+    osEthOamLsHistNumLmrOut,
+    osEthOamLsHistTestStarted,
+    osEthOamLsHistBurstStarted,
+    osEthOamLsHistDestMepId,
+    osEthOamLsHistDestMepMac,
+    osEthOamLsHistNearEndMsgTx,
+    osEthOamLsHistNearEndMsgReceived,
+    osEthOamLsHistFarEndMsgTx,
+    osEthOamLsHistFarEndMsgReceived,
+    osEthOamLsHistNearEndMsgLoss,
+    osEthOamLsHistFarEndMsgLoss,
+    osEthOamLsHistNearEndFlr,
+    osEthOamLsHistFarEndFlr,
+    osEthOamLsHistPriority,
+    osEthOamLsLastNeTotTxFrames,
+    osEthOamLsLastNeTotLostFrames,
+    osEthOamLsLastNeTotFlr,
+    osEthOamLsLastNeMinFlr,
+    osEthOamLsLastNeMaxFlr,
+    osEthOamLsLastNeAvgFlr,
+    osEthOamLsLastFeTotTxFrames,
+    osEthOamLsLastFeTotLostFrames,
+    osEthOamLsLastFeTotFlr,
+    osEthOamLsLastFeMinFlr,
+    osEthOamLsLastFeMaxFlr,
+    osEthOamLsLastFeAvgFlr,
+    osEthOamLsLastNumLmmOut,
+    osEthOamLsLastNumLmmIn,
+    osEthOamLsLastNumLmrIn,
+    osEthOamLsLastNumLmrOut,
+    osEthOamLsLastTestStarted,
+    osEthOamLsLastBurstStarted,
+    osEthOamLsLastDestMepId,
+    osEthOamLsLastDestMepMac,
+    osEthOamLsLastNearEndMsgLoss,
+    osEthOamLsLastFarEndMsgLoss,
+    osEthOamLsLastNearEndFlr,
+    osEthOamLsLastFarEndFlr,
+    osEthOamLsLastPriority
+    }
+    STATUS current 
+    DESCRIPTION 
+        "."
+
+    ::= { osEthOamLsGroups 1 }
+
+----------------------------------------------------------------
+END
+
+

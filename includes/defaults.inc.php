@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage config
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 
@@ -201,7 +201,8 @@ $config['web_device_name']      = 'hostname';  // Default name to display device
 $config['web_pagesize']         = 100;         // Default pagesize for tables (items per page)
 $config['web_theme_default']    = 'light';     // Default theme 'light', 'dark', 'darkblue' or 'system' (based on MacOS/Windows system settings)
 
-$config['web_porttype_legend_limit'] = 10;    //
+$config['web_porttype_legend_limit'] = 10;    // Above this number port type graph legends will not be shown in the UI
+$config['web_group_legend_limit']    = 5;     // Above this number group aggregate graph legends will not be shown in the UI
 
 $config['web_session_lifetime']     = 86400;     // Default user sessions lifetime in seconds (86400 - one day). This lifetime actual for sessions without "remember me" checkbox.
 $config['web_session_ip']           = TRUE;      // Bind user sessions to his IP address
@@ -218,6 +219,7 @@ $config['web_show_bgp_asdot']   = FALSE;   // Display BGP 32bit ASNs in asdot fo
 $config['web_show_overview']      = TRUE;     // FIXME. Not sure, still required?
 $config['overview_show_sysDescr'] = TRUE;     // FIXME. Not sure, still required?
 
+$config['web_show_notifications'] = TRUE;  // Show or not notifications on top of Web UI
 $config['web_show_locations']     = TRUE;  // Enable Locations on menu
 $config['ports_page_default']     = "details"; // eg "details" or "basic"
 
@@ -264,9 +266,9 @@ $config['snmp']['v3'] = [];
 // $config['snmp']['v3'][0]['cryptopass'] = ""; // Privacy (Encryption) Passphrase
 // $config['snmp']['v3'][0]['cryptoalgo'] = "AES"; // DES | AES | AES-192 | AES-192-C | AES-256 | AES-256-C
 
-// SNMP virtual contexts ignore
+// SNMP virtual contexts ignore in snmp_virtual_exist()
 $config['snmp']['virtual_ignore'][] = '/^vpls_\S+$/';        // IOS XR incorrect snmp contexts, ie: cContextMappingVrfName."vpls_XXXX11192" = XXXX11192
-$config['snmp']['virtual_ignore'][] = '/^vlan\-(\d{1,4})$/'; // Common Cisco vlan contexts
+//$config['snmp']['virtual_ignore'][] = '/^vlan\-(\d{1,4})$/'; // Common Cisco vlan contexts (do not ignore by default, this broke vlan discovery)
 
 // Autodiscovery Settings
 
@@ -670,7 +672,6 @@ $config['bad_if'][] = "voip-null";
 $config['bad_if'][] = "virtual-";
 $config['bad_if'][] = "unrouted";
 $config['bad_if'][] = "eobc";
-$config['bad_if'][] = "lp0";
 $config['bad_if'][] = "-atm";
 $config['bad_if'][] = "faith0";
 $config['bad_if'][] = "container";
@@ -692,6 +693,7 @@ $config['bad_if'][] = "BRG-ET"; // Bridged Ethernet on Juniper
 // FIXME. Rename to $config['ports']['ignore_name_regexp']
 $config['bad_if_regexp'][] = "/^ng[0-9]+$/i";
 $config['bad_if_regexp'][] = "/^sl[0-9]/i";
+$config['bad_if_regexp'][] = "/^lp0/";
 $config['bad_if_regexp'][] = "/^<(none|invalid)>$/i"; // calix: <none>, <invalid>
 $config['bad_if_regexp'][] = "/^<(invalid|ethportany):[\d-]+>$/i"; // calix: <INVALID:0-0-0-1-0-0-0-4-91-219>, <EthPortAny:0-0-0-0-0-0-0-0-0-0>
 $config['bad_if_regexp'][] = "/^(ZTPCONFIG|TopoNode|SYSLOG)=/i";   // iqnos: ZTPCONFIG=ZTPCFG, TopoNode=1.1.1.1, SYSLOG=SYSLOG-1
@@ -770,6 +772,7 @@ $config['ignore_mount_regexp'][] = '/on: (\/\.mount)?\/tmp/';       // tmpfs, mo
 $config['ignore_mount_regexp'][] = '/on: \/junos^/';
 $config['ignore_mount_regexp'][] = '/on: \/junos\/dev/';
 $config['ignore_mount_regexp'][] = '/on: \/jail\/dev/';
+$config['ignore_mount_regexp'][] = '/on: \/run\/initramfs\/';       // junos-evo: re0:/dev/loop1, mounted on /run/initramfs/uswitch/data/hashes/3b51e0ac302b9417a94565b6fd8236683347e83e
 $config['ignore_mount_regexp'][] = '/^(dev|proc)fs/'; // devfs: dev file system, mounted on: /.mount/dev
 $config['ignore_mount_regexp'][] = '/^\/dev\/md0/';
 $config['ignore_mount_regexp'][] = '/^\/var\/dhcpd\/dev,/';
@@ -842,8 +845,16 @@ $config['device_traffic_iftype'][] = '/virtual/';
 $config['device_traffic_iftype'][] = '/mpls/';
 $config['device_traffic_iftype'][] = '/ieee8023adLag/';
 $config['device_traffic_iftype'][] = '/l2vlan/';
+$config['device_traffic_iftype'][] = '/l3ipvlan/';
+$config['device_traffic_iftype'][] = '/ipForward/';
 $config['device_traffic_iftype'][] = '/ppp/';
 $config['device_traffic_iftype'][] = '/propMultiplexor/';
+$config['device_traffic_iftype'][] = '/mpeg/';
+$config['device_traffic_iftype'][] = '/docsCableUpstreamChannel/';
+$config['device_traffic_iftype'][] = '/docsCableUpstream/';
+$config['device_traffic_iftype'][] = '/docsCableDownstream/';
+$config['device_traffic_iftype'][] = '/cableDownstreamRfPort/';
+
 
 $config['device_traffic_descr'][] = '/loopback/';
 $config['device_traffic_descr'][] = '/vlan/';
@@ -862,10 +873,10 @@ $config['ip-address']['ignore_type'][] = 'broadcast'; // IPv4 Broadcasts
 $config['ip-address']['ignore_type'][] = 'link-local'; // IPv6 Link Local fe80::200:5aee:feaa:20a2
 
 // IRC Bot configuration
-
+// FIXME. Who still use this bot? It's most likely doesn't work.
 $config['irc_host']    = "irc.oftc.net";
 $config['irc_port']    = 6667;
-$config['irc_nick']    = "Observium" . random_int(1, 99999);
+$config['irc_nick']    = ""; // Default: "Observium" . random_int(1, 99999);
 $config['irc_chan'][]  = "";
 $config['irc_chankey'] = "";
 $config['irc_ssl']     = FALSE;
@@ -874,7 +885,7 @@ $config['irc_ssl']     = FALSE;
 
 $config['allow_unauth_graphs']      = 0;       // Allow graphs to be viewed by anyone
 $config['allow_unauth_graphs_cidr'] = [];      // Allow graphs to be viewed without authorisation from certain IP ranges
-$config['auth_mechanism']           = "mysql"; // Available mechanisms: mysql (default), ldap, radius, http-auth
+$config['auth_mechanism']           = "mysql"; // Available mechanisms: mysql (default), ldap, radius, http-auth, ad
 
 $config['auth']['remote_user'] = FALSE;        // Trust Apache server to authenticate user, READ DOCUMENTATION FIRST!!
 
@@ -886,6 +897,7 @@ $config['auth_ldap_server']    = "ldap.yourserver"; // LDAP server name, or arra
 #$config['auth_ldap_ad_domain'] = "ad.yourcorp";      // AD domain name (fqdn form), used to determine DCs if server list is unset
 $config['auth_ldap_port']               = 389; // LDAP server port
 $config['auth_ldap_starttls']           = 'no'; // Use STARTTLS ('no', 'optional' or 'require')
+//$config['auth_ldap_tls_require_cert']   = 'never'; // Certificate checking strategy ('never', 'allow', 'try' or 'demand')
 $config['auth_ldap_recursive']          = TRUE; // Active Directory recursive lookup for nested groups
 $config['auth_ldap_recursive_maxdepth'] = 3; // Max depth for recursive lookup
 $config['auth_ldap_prefix']             = "uid=";
@@ -913,11 +925,41 @@ $config['auth_ldap_groupmemberattr'] = "memberUid"; // Use your unique attribute
 
 // Assign user levels to certain LDAP groups
 #$config['auth_ldap_groups']['admin']['level']  = 10; // Full administrative access
-#$config['auth_ldap_groups']['cto']['level']     = 7; // Global read access with secured info (ie rancid configs)
-#$config['auth_ldap_groups']['pfy']['level']     = 5; // Global read access
+#$config['auth_ldap_groups']['write']['level']   = 9; // Global Secure Read/Write
+#$config['auth_ldap_groups']['secure']['level']  = 8; // Global Secure Read / Limited Write
+#$config['auth_ldap_groups']['global']['level']  = 7; // Global read access with secured info (ie rancid configs)
+#$config['auth_ldap_groups']['read']['level']    = 5; // Global read access
 #$config['auth_ldap_groups']['support']['level'] = 1; // Only login access, for access to devices/entities require bind entity permissions
+#$config['auth_ldap_groups']['disabled']['level'] = 0; // Just disabled login, default if no assigned to other groups
+
+// Active Directory Authentication
+
+$config['auth_ad_server']    = [ 'dc1.ad.yourcorp' ]; // AD server name, or array of LDAP server names tried in order.
+#$config['auth_ad_domain'] = 'ad.yourcorp';      // AD domain name (fqdn form), used to determine DCs if server list is unset, and basedn if unset
+#$config['auth_ad_basedn'] = 'DC=ad,DC=yourcorp'; // AD base DN, optional if you set ad_domain
+$config['auth_ad_port']               = 389; // AD server port
+$config['auth_ad_tls']           = FALSE; // Use TLS connection (normally when using port 636)
+$config['auth_ad_starttls']           = 'no'; // Use STARTTLS ('no', 'optional' or 'require')
+$config['auth_ad_validatecert']           = TRUE; // Validate server's SSL certificate
+
+#$config['auth_ad_group']  = [ 'cn=observium,ou=groups,dc=ad,dc=yourcorp', 'IT Engineers' ]; // Require membership of any of these groups to allow login.
+// Accepts either full DNs or just group names as they are named in AD.
+// If auth_ad_group is not specified, group level groups from auth_ad_groups below will be used. If no level groups, every valid user has access.
+
+$config['auth_ad_binddn']        = 'observium@ad.yourcorp'; // Initial LDAP bind dn and password, required (can be DN or user@domain.tld)
+$config['auth_ad_bindpw']        = '';
+
+// Assign user levels to certain LDAP groups
+#$config['auth_ad_groups']['admin']['level']  = 10; // Full administrative access
+#$config['auth_ad_groups']['write']['level']   = 9; // Global Secure Read/Write
+#$config['auth_ad_groups']['secure']['level']  = 8; // Global Secure Read / Limited Write
+#$config['auth_ad_groups']['global']['level']  = 7; // Global read access with secured info (ie rancid configs)
+#$config['auth_ad_groups']['read']['level']    = 5; // Global read access
+#$config['auth_ad_groups']['support']['level'] = 1; // Only login access, for access to devices/entities require bind entity permissions
+#$config['auth_ad_groups']['disabled']['level'] = 0; // Just disabled login, default if no assigned to other groups
 
 // RADIUS Authentication
+
 $config['auth_radius_server']  = ['127.0.0.1']; // RADIUS server list
 $config['auth_radius_port']    = 1812; // Server port
 $config['auth_radius_timeout'] = 5; // Timeout in seconds
@@ -931,9 +973,12 @@ $config['auth_radius_method']      = 'PAP'; // Authentication method to use: PAP
 // Assign user levels to certain RADIUS groups
 $config['auth_radius_groupmemberattr'] = 'Filter-Id';    // Attribute number or name containing the name of a group. Allowed: Filter-Id (11), Reply-Message (18)
 #$config['auth_radius_groups']['admin']['level']  = 10; // Full administrative access
-#$config['auth_radius_groups']['cto']['level']     = 7; // Global read access with secured info (ie rancid configs)
-#$config['auth_radius_groups']['pfy']['level']     = 5; // Global read access
+#$config['auth_radius_groups']['write']['level']   = 9; // Global Secure Read/Write
+#$config['auth_radius_groups']['secure']['level']  = 8; // Global Secure Read / Limited Write
+#$config['auth_radius_groups']['global']['level']  = 7; // Global read access with secured info (ie rancid configs)
+#$config['auth_radius_groups']['read']['level']    = 5; // Global read access
 #$config['auth_radius_groups']['support']['level'] = 1; // Only login access, for access to devices/entities require bind entity permissions
+#$config['auth_radius_groups']['disabled']['level'] = 0; // Just disabled login, default if no assigned to other groups
 
 // Syslog Settings
 
@@ -1073,9 +1118,10 @@ $config['poller_modules']['fdb-table']                     = 1;
 $config['poller_modules']['graphs']                        = 1;
 $config['poller_modules']['oids']                          = 1;
 $config['poller_modules']['cisco-vpdn']                    = 0;
-$config['poller_modules']['packages']                      = 0; // unix/linux packages, same as in unix-agent
+//$config['poller_modules']['packages']                      = 0; // unix/linux packages, same as in unix-agent
 $config['poller_modules']['processes']                     = 1;
 $config['poller_modules']['probes']                        = 1;
+$config['poller_modules']['syslog']                        = 0;
 
 // List of discovery modules. Need to be in this array to be
 // considered for execution.
