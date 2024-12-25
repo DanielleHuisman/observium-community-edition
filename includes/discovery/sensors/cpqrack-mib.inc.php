@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -21,7 +20,7 @@ $cpqrack = snmpwalk_cache_oid($device, 'cpqRackCommonEnclosureHasFans', $cpqrack
 //print_vars($oids);
 
 // Power Supplies
-$oids = snmp_cache_table($device, 'cpqRackPowerSupplyTable', NULL, 'CPQRACK-MIB');
+$oids = snmp_cache_table($device, 'cpqRackPowerSupplyTable', [], 'CPQRACK-MIB');
 
 foreach ($oids as $index => $entry) {
     $rack = $entry['cpqRackPowerSupplyRack'];
@@ -37,31 +36,28 @@ foreach ($oids as $index => $entry) {
     // Power Output
     $oid_name = 'cpqRackPowerSupplyCurPwrOutput';
     $oid      = '.1.3.6.1.4.1.232.22.2.5.1.1.1.10.' . $index;
-    $type     = 'CPQRACK-MIB' . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
     if ($value > 0) {
-        discover_sensor_ng($device, 'power', 'CPQRACK-MIB', $oid_name, $oid, $index, $type, 'Power Supply Output ' . $descr, 1, $value);
+        discover_sensor_ng($device, 'power', 'CPQRACK-MIB', $oid_name, $oid, $index, 'Power Supply Output ' . $descr, 1, $value);
     }
 
     // Intake Temperature
     $oid_name = 'cpqRackPowerSupplyIntakeTemp';
     $oid      = '.1.3.6.1.4.1.232.22.2.5.1.1.1.12.' . $index;
-    $type     = 'CPQRACK-MIB' . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
     if ($value > 0) {
-        discover_sensor_ng($device, 'temperature', 'CPQRACK-MIB', $oid_name, $oid, $index, $type, 'Power Supply Intake ' . $descr, 1, $value);
+        discover_sensor_ng($device, 'temperature', 'CPQRACK-MIB', $oid_name, $oid, $index, 'Power Supply Intake ' . $descr, 1, $value);
     }
 
     // Exhaust Temperature
     $oid_name = 'cpqRackPowerSupplyExhaustTemp';
     $oid      = '.1.3.6.1.4.1.232.22.2.5.1.1.1.13.' . $index;
-    $type     = 'CPQRACK-MIB' . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
     if ($value > 0) {
-        discover_sensor_ng($device, 'temperature', 'CPQRACK-MIB', $oid_name, $oid, $index, $type, 'Power Supply Exhaust ' . $descr, 1, $value);
+        discover_sensor_ng($device, 'temperature', 'CPQRACK-MIB', $oid_name, $oid, $index, 'Power Supply Exhaust ' . $descr, 1, $value);
     }
 
     // Status
@@ -114,11 +110,10 @@ foreach ($oids as $index => $entry) {
 
     $oid_name = 'cpqRackCommonEnclosureTempCurrent';
     $oid      = '.1.3.6.1.4.1.232.22.2.3.1.2.1.6.' . $index;
-    $type     = 'CPQRACK-MIB' . '-' . $oid_name;
     $value    = $entry[$oid_name];
     $limits   = ['limit_high' => $entry['cpqRackCommonEnclosureTempThreshold']];
 
-    discover_sensor_ng($device, 'temperature', 'CPQRACK-MIB', $oid_name, $oid, $index, $type, $descr, 1, $value, $limits);
+    discover_sensor_ng($device, 'temperature', 'CPQRACK-MIB', $oid_name, $oid, $index, $descr, 1, $value, $limits);
 
     // State
     $oid   = '.1.3.6.1.4.1.232.22.2.3.1.2.1.8.' . $index;

@@ -1,0 +1,4970 @@
+ADTRAN-ERPS-MIB 
+
+DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN ETHERNET RING PROTECTION MIB
+    -- PRODUCT:   ADTRAN CND Products
+    -- VERSION:   1.0
+    -- DATE:      August 04, 2008
+
+    -- This MIB contains tables that support the ERPS feature
+
+    -- HISTORY:
+    --     08/04/08 rs:    First revision
+    --     07/01/09 jz:    Updated alarms OID
+
+IMPORTS
+
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, Counter32,
+    Counter64, Unsigned32, IpAddress, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, OBJECT-GROUP
+        FROM SNMPv2-CONF
+    MacAddress, TimeStamp,TEXTUAL-CONVENTION, TruthValue, DateAndTime, DisplayString, RowStatus
+        FROM SNMPv2-TC
+    InterfaceIndex, InterfaceIndexOrZero, ifDescr
+        FROM IF-MIB
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB
+    InetAddressType, InetAddress
+        FROM INET-ADDRESS-MIB
+    HCPerfTotalCount, HCPerfIntervalCount, HCPerfCurrentCount
+        FROM HC-PerfHist-TC-MIB
+    adShared
+        FROM ADTRAN-MIB
+
+    adTrapInformSeqNum
+        FROM ADTRAN-GENTRAPINFORM-MIB
+    sysName
+        FROM SNMPv2-MIB
+    adGenSlotInfoIndex
+        FROM ADTRAN-GENSLOT-MIB
+
+    adGenErps,adGenErpsID
+        FROM ADTRAN-ERPS-CONTAINER-MIB
+    ;
+
+    adErpsMIB MODULE-IDENTITY
+    LAST-UPDATED "201701230000Z"
+    ORGANIZATION "ADTRAN, Inc."
+    CONTACT-INFO 
+        "CND Tech Support
+           Postal: ADTRAN, Inc.
+                   901 Explorer Blvd.
+                   Huntsville, AL  35806
+                   Tel: +1 800 726-8663
+                   Fax: +1 256 963 6217
+                   E-mail: support@adtran.com"
+    DESCRIPTION
+        "The Adtran Ethernet Protection Ring MIB."
+
+       REVISION "201701230000Z"
+       DESCRIPTION  "Added new trap for notification of Inconsistent Topology Rate across the ERPS ring. 
+                     Added erpsIfRateMiscnfEnable to the erpsIfTable."
+
+       REVISION "201412160000Z"
+       DESCRIPTION  "Added new OID erpsIfTopologyRate."
+
+       REVISION "201407010000Z"
+       DESCRIPTION  "Updated erpsIfRplLink, erpsIfControlStag OIDs for write operation.
+                     Updated erpsIfWestIfIndex, erpsIfEastIfIndex OIDs for write operation.
+                     Added OID erpsIfRapsVirtualChannel to support ERPS Ladder configuration. 
+                     Added erpsIfLastError, erpsIfRowStatus for dynamic configuration of rings.
+                     Adeded erpsIfLastCreateErrorTable to report ring creation errors."
+
+       REVISION "201305160000Z"
+       DESCRIPTION  "Added erpsIfTopologyEnable."
+
+       REVISION "201206170000Z"
+       DESCRIPTION  "Added erpsIfUuid and erpsIfConfigTrapEnable to the erpsIfTable.
+                     Added erpsIfUuid and erpsIfIndex to all alarm varbinds.
+                     Added new trap for notification of configuration changes.
+                     Added UUID to Ring IfIndex lookup table."
+
+       REVISION "201112010000Z"
+       DESCRIPTION  "Increased the range of allowable Node Ids to 1024
+
+                     Update the range for remaining WTR time.
+
+                     Updated OID descriptions for DNF Counters.
+
+                     Updated the erpsIfTable to include:
+                         erpsIfTransportStag OCTET STRING
+                         erpsIfVlanMisconfig DisplayString
+                         erpsIfStationIp
+
+                     Added erpsCounters24HrCurrentTable and
+                         erpsCounters24HrIntervalTable
+                         erpsSpanCounters24HrCurrentTable
+                         erpsSpanCounters24HrIntervalTable
+
+                     Updated the erpsRingTopoTable to include:
+                         erpsRingTopoStationIp
+                         erpsRingTopoWestStationIp
+                         erpsRingTopoEastStationIp
+                         
+                     Added the erpsRingTopoMacTable"
+
+       REVISION "201107140000Z"
+       DESCRIPTION  "Added erpsIfControlStag to the erpsIfTable."
+
+    ::= { adGenErpsID 1}
+
+--
+--   Textual Conventions used in this MIB
+--
+
+ErpsSpan ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Indicates the span interface of the ERPS ring."
+    SYNTAX INTEGER {
+        east    (1),
+        west    (2)
+    }
+
+ErpsProtectionStatus ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Indicates the current protection status of the ERPS span.
+         The status values are (in ascending priority order) :
+
+         noRequest
+         No protection request on the span, the protection
+         status is idle.
+
+         waitToRestore
+         The condition for an automatic protection was cleared and
+         the span is engaged in a wait to restore period.
+
+         remoteManualSwitch
+         A user initiated manual switch on a remote span.
+
+         manualSwitch
+         A user initiated manual switch (via the
+         erpsSpanProtectionCommand) on a local span.
+
+         remoteSignalDegraded
+         A detected state on a remote span indicating the signal
+         is degraded due to excessive BER.
+
+         signalDegraded
+         A detected state on a local span indicating the signal
+         is degraded due to excessive BER.
+
+         remoteSignalFailed
+         A detected state on a local span indicating the signal
+         has failed.
+
+         signalFailed
+         A detected state on a local span indicating the signal
+         has failed.
+
+         remoteForcedSwitch
+         A user initiated forced switch (via the
+         erpsSpanProtectionCommand) on a local span.
+
+         forcedSwitch
+         A user initiated forced switch (via the
+         erpsSpanProtectionCommand) on a local span."
+
+    SYNTAX INTEGER {
+        noRequest            (0),
+        waitToRestore        (1),
+        remoteManualSwitch   (2),
+        manualSwitch         (3),
+        remoteSignalDegraded (4),
+        signalDegraded       (5),
+        remoteSignalFailed   (6),
+        signalFailed         (7),
+        remoteForcedSwitch   (8),
+        forcedSwitch         (9)
+    }
+
+
+ErpsRingTopoProtectionStatus ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Indicates the current protection status of the ERPS span."
+    SYNTAX        INTEGER {
+                    noRequest          (0),
+                    ringSpanBlocked    (1),  
+                    manualSwitch       (2),
+                    signalFail         (3),
+                    forcedSwitch       (4)
+    }
+
+
+
+--
+-- Object groups
+--
+erpsGeneral            OBJECT IDENTIFIER ::= { adGenErps 1 }
+erpsProtocol           OBJECT IDENTIFIER ::= { adGenErps 2 }
+erpsCounters           OBJECT IDENTIFIER ::= { adGenErps 3 }
+erpsSpanCounters       OBJECT IDENTIFIER ::= { adGenErps 4 }
+erpsAllTraps           OBJECT IDENTIFIER ::= { adGenErps 5 }
+erpsTraps              OBJECT IDENTIFIER ::= { erpsAllTraps 0 }
+
+--
+-- ERPS interface table
+--
+
+erpsIfTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsIfEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface table, extension to the ifTable.
+
+         All read-write attributes in this table are non-volatile,
+         i.e. will be retained across system reset."
+    ::= { erpsGeneral 1 }
+
+erpsIfEntry OBJECT-TYPE
+    SYNTAX        ErpsIfEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "One such entry for every interface in the ifTable which
+         is an ERPS interface. ERPS interfaces should have
+         ifType of propVirtual(53)."
+    INDEX { erpsIfIndex }
+    ::= { erpsIfTable 1 }
+
+ErpsIfEntry ::= SEQUENCE {
+    erpsIfIndex                  InterfaceIndex,
+    erpsIfStationId              Unsigned32,
+    erpsIfStationName            OCTET STRING,
+    erpsIfProtectionWTR          Unsigned32,
+    erpsIfGuardTimer             Unsigned32,
+    erpsIfMessageTimer           Unsigned32,
+    erpsIfMessageTimerRunning    TruthValue,
+    erpsIfRplOwner               TruthValue,
+    erpsIfRplLink                INTEGER,
+    erpsIfEnabled                TruthValue,
+    erpsIfWtrRunning             TruthValue,
+    erpsIfWtrRemaining           Unsigned32,
+    erpsIfWestIfIndex            InterfaceIndex,
+    erpsIfEastIfIndex            InterfaceIndex,
+    erpsIfProtectState           ErpsProtectionStatus,
+    erpsIfLastChange             TimeStamp,
+    erpsIfChanges                Counter32,
+    erpsIfStationsOnRing         Unsigned32,
+    erpsIfIsRingClosed           TruthValue, 
+    erpsTopoIfCurrentStatus      BITS,
+    erpsTopoIfLastChange         TimeStamp,
+    erpsTopoIfChanges            Counter32, 
+    erpsIfControlStag            Integer32,
+    erpsIfTransportStag          OCTET STRING,
+    erpsIfVlanMisconfig          DisplayString,
+    erpsIfStationIp              IpAddress,
+    erpsIfUuid                   OCTET STRING,
+    erpsIfConfigTrapEnable       TruthValue,
+    erpsIfTopologyEnable         TruthValue,
+    erpsIfRapsVirtualChannel     TruthValue,
+    erpsIfLastError              DisplayString,
+    erpsIfRowStatus              RowStatus,
+    erpsIfTopologyRate           INTEGER,
+    erpsIfRateMiscnfEnable       TruthValue
+    }
+
+erpsIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsIfEntry 1 }
+
+
+erpsIfStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..1024)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The node id of the current station."
+    ::= { erpsIfEntry 2 }
+
+erpsIfStationName OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(0..128))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The sysName of the current station."
+    ::= { erpsIfEntry 3 }
+
+erpsIfProtectionWTR OBJECT-TYPE
+    SYNTAX        Unsigned32 (5..720)
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Indicates the length of time in seconds, to remain in the
+         protection state, after the cause of an automatic
+         protection is removed. This mechanism prevents protection
+         switch oscillations.
+         Default value for WTR is 60 seconds."
+    DEFVAL { 60 }
+    ::= { erpsIfEntry 4 }
+
+erpsIfGuardTimer OBJECT-TYPE
+    SYNTAX        Unsigned32 (10..2000)
+    UNITS         "Milliseconds" 
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Indicates the length of time in milliseconds, during which
+         the node ignores incoming R-APS messages.
+         Default value for Guard timer is 500 milliseconds."
+    DEFVAL { 500 }
+    ::= { erpsIfEntry 5 }
+
+erpsIfMessageTimer OBJECT-TYPE
+    SYNTAX        Unsigned32 (500..2000)
+    UNITS         "Milliseconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the length of time in milliseconds, after which
+         the NR or NR,RB messages can be sent repeatedly when required.
+         Default value is 1000 milliseconds."
+    DEFVAL { 1000 }
+    ::= { erpsIfEntry 6 }
+
+erpsIfMessageTimerRunning OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the Message Timer is currently running."
+    ::= { erpsIfEntry 7 }
+
+erpsIfRplOwner OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the current node is the RPL Owner."
+    ::= { erpsIfEntry 8 }
+
+erpsIfRplLink OBJECT-TYPE
+    SYNTAX  INTEGER {
+        east    (1),
+        west    (2),
+        none    (3)
+    }
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Indicates which span is the RPL link. Setting an RPL span
+         makes this ERPS node an RPL owner. Setting this value
+         to 'none' makes this ERPS node a non-RPL owner."
+    DEFVAL { none }
+    ::= { erpsIfEntry 9 }
+
+erpsIfEnabled OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether ERPS on the current node is enabled."
+    ::= { erpsIfEntry 10 }
+
+erpsIfWtrRunning OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the WTR time is running. This is 
+         applicable to an RPL Owner only."
+    ::= { erpsIfEntry 11 }
+
+erpsIfWtrRemaining OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..720)
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the length of time in seconds, remaining
+         before the WTR timer expires. This is applicable to 
+         an RPL Owner only. A WTR of 0 indicates the WTR
+         timer is not running."
+    ::= { erpsIfEntry 12 }
+
+erpsIfWestIfIndex OBJECT-TYPE
+    SYNTAX       InterfaceIndex 
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This is the ifIndex of the west span.  This may be a faceplate
+         port or, in the case of a sub-ring interconnection, a different
+         ERPS instance on the same module."
+    ::= { erpsIfEntry 13 }
+
+erpsIfEastIfIndex OBJECT-TYPE
+    SYNTAX       InterfaceIndex 
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This is the ifIndex of the east span.  This may be a faceplate
+         port or, in the case of a sub-ring interconnection, a different
+         ERPS instance on the same module."
+    ::= { erpsIfEntry 14 }
+
+erpsIfProtectState OBJECT-TYPE
+    SYNTAX       ErpsProtectionStatus 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the current protection status of the ERPS span."
+    ::= { erpsIfEntry 15 }
+
+erpsIfLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The value of sysUpTime at the time when any of the following
+         attributes change:
+         erpsIfStationId,        erpsIfStationName,
+         erpsIfProtectionWTR,    erpsIfGuardTimer,
+         erpsIfMessageTimer,     erpsIfMessageTimerRunning,
+         erpsIfRplOwner,         erpsIfRplLink,
+         erpsIfEnabled,          erpsIfWtrRunning,
+         erpsIfWtrRemaining,     erpsIfWestIfIndex,
+         erpsIfEastIfIndex,      erpsIfProtectState"
+    ::= { erpsIfEntry 16 }
+
+erpsIfChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates number of times erpsIfLastChange changed."
+    ::= { erpsIfEntry 17 }
+
+erpsIfStationsOnRing OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..255)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of stations on the ERPS ring."
+    ::= { erpsIfEntry 18 }
+
+erpsIfIsRingClosed OBJECT-TYPE
+    SYNTAX        TruthValue 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the ERPS ring is open or closed. Returns SNMP true if open, false otherwise."
+    ::= { erpsIfEntry 19 }
+
+erpsTopoIfCurrentStatus OBJECT-TYPE
+     SYNTAX       BITS {
+                    duplicateRplOwner     (0),
+                    duplicateMac          (1),
+                    duplicateNode         (2),
+                    exceedMaxStations     (3),
+                    topologyInconsistent  (4)
+                  }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the current status of the ERPS Ring.
+         this attribute is used to generate alarm to the management system."
+    ::= { erpsIfEntry 20 }
+
+erpsTopoIfLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The value of sysUpTime at the time when any of the following
+         attributes change:
+         erpsTopoIfStationsOnRing, erpsTopoIfCurrentStatus."
+    ::= { erpsIfEntry 21 }
+
+erpsTopoIfChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates number of times erpsTopoIfLastChange changed."
+    ::= { erpsIfEntry 22 }
+
+erpsIfControlStag OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "The control-plane S-tag (VLAN ID) is used for the ERPS protocol (R-APS) 
+         messages. The valid range for the control-plane S-tag is 2 to 4094. 
+         If the value of the control-plane S-tag is default (4096), the 
+         internal management VLAN ID is used for protocol messages."
+    DEFVAL { 4096 }
+    ::= { erpsIfEntry 23 }
+
+erpsIfTransportStag OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(512))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "A set of bits that indicate whether the S-Tags represented by the 
+         bit positions are being transported between the East and West spans
+         of this ERPS interface. The bit positions in this string identify
+         the S-Tag, so that the most significant bit is S-Tag 4095, the least
+         significant bit is S-Tag 0 (unused), with the entire range in between.
+         If the bit position is set, the S-Tag is being transported on this
+         ERPS interface, and otherwise, it is not being transported."
+    ::= { erpsIfEntry 24 }
+
+erpsIfVlanMisconfig OBJECT-TYPE
+    SYNTAX        DisplayString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Displays a string describing the vlan misconfiguration information.
+         This is an empty string unless the erpsAlarmVlanMisconfig alarm is
+         raised, in which case this string shows the information of which node
+         id and which vlan are misconfigured. For example: Vlan 111, Nodes 2 3."
+    ::= { erpsIfEntry 25 }
+
+erpsIfStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The IP address of the current station."
+    ::= { erpsIfEntry 26 }
+
+erpsIfUuid OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(16))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "A Universally Unique Identifier (UUID) for this ring.
+         The UUID is generated at the RPL Owner using an MD5 algorithm.
+         The UUID is then sent to all nodes on the ring and reported in
+         this OID. This field can be used to identify the network nodes
+         belonging to a single ring ."
+    ::= { erpsIfEntry 27 }
+
+erpsIfConfigTrapEnable OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Enables the erpsAlarmConfigurationChange trap to be sent whenever provisioning
+         for this ERPS instance is changed. The default is False (disabled)."
+    DEFVAL { false }     
+    ::= { erpsIfEntry 28 }
+
+erpsIfTopologyEnable OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Enables the proprietary Adtran Ring Topology Protocol for this ERPS instance.
+         The default is True (enabled).
+
+         This proprietary protocol is as an adjunct to the ERPS protocol; it provides a 
+         topology view of the ring (who is connected to whom on the ring). By default this 
+         protocol is enabled for each enabled ERPS instance. On some products the protocol 
+         may be disabled. Reasons to disable the protocol include interfacing to non-Adtran 
+         equipment or when multiple virtual rings are overlaid on a common physical ring and 
+         the bandwidth and processing power to discover the same topology via multiple ERPS 
+         instances is excessive and unnecessary."
+    DEFVAL { true }     
+    ::= { erpsIfEntry 29 }
+
+erpsIfRapsVirtualChannel OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Enable or disable R-APS virtual channel operation if this is a sub-ring interconnection node.
+         This is not applicable to major rings or non-interconnection nodes of sub-rings.
+         See section 9.7.1 of G.8032 (02/2012) for information on R-APS virtual channel operation for sub-rings.
+         The default value is False (disabled)."
+    DEFVAL { false }     
+    ::= { erpsIfEntry 30 }
+
+erpsIfLastError OBJECT-TYPE
+    SYNTAX        DisplayString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The string describing the last provisioning error experienced."
+    ::= { erpsIfEntry 31 }
+
+erpsIfRowStatus OBJECT-TYPE
+    SYNTAX        RowStatus
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This object is used to create a new row or modify or delete an
+         existing row in the ERPS interface table."
+    ::= { erpsIfEntry 32}
+
+erpsIfTopologyRate OBJECT-TYPE
+    SYNTAX  INTEGER {
+        slow  (1),
+        fast  (2)
+    }
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Sets the message exchange rate for the proprietary Adtran Ring Topology 
+         Protocol (when enabled). Setting the rate to 'slow' selects a protocol 
+         message period of 10 seconds. Setting the rate to 'fast' selects a 500 ms 
+         period. The default value is product dependent.
+
+         In order to allow interoperation between the different products, the topology protocol 
+         rate may be adjusted using this OID. All products on a common ring using the topology 
+         protocol must be set for either 'fast-rate' or 'slow-rate' operation."
+    ::= { erpsIfEntry 33 }
+
+erpsIfRateMiscnfEnable OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "Enables the erpsAlarmTopoRateInconsistentSet trap to be sent, if there is a 
+	 single node or more than one nodes are configured topology rate incorrectly in the ERPS ring.
+         The default is True (enabled)."
+    DEFVAL { true }     
+    ::= { erpsIfEntry 34 }
+
+
+
+--
+-- ERPS statistics management table
+--
+
+erpsIfStatsControlTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsIfStatsControlEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS statistics management table,
+         controls the collection, duration, clearance, and status
+         of the MAC statistics.
+
+         The usage of this table is as follows:
+         1. In order to clear period of counters (or all periods) of 
+            specific counting point (or all counting points) of the 
+            ERPS MAC, the user should first set the 
+            erpsIfStatsControlPeriodClear item to specify the period 
+            that he would like to clear, and the 
+            erpsIfStatsControlCountPointClear item to specify the 
+            counting point on which he would like to perform the 
+            statistics clearance.
+            In case that the user specified 'clearSpecificInterval'
+            in the erpsIfStatsControlPeriodClear item, the user should 
+            also set the specific interval to clear by setting 
+            erpsIfStatsControlIntervalClear.
+            After setting these items, the user can activate the 
+            clear operation by setting erpsIfStatsControlCommitClear 
+            item to 'commit'.
+            The status of the clear operation (done of failed) is 
+            indicated by the returned value of erpsIfStatsControlCommitClear
+            item.
+         2. Setting erpsIfStatsControlPeriodClear to 'clearAllIntervals' and
+            erpsIfStatsControlCountPointClear to 'clearWest' (for example)
+            will clear all current and previous intervals, and day
+            counters of the west side of the ERPS MAC.
+         3. The IntervalValidData of cleared interval should be set to false.
+
+         All read-write attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsGeneral 2 }
+
+erpsIfStatsControlEntry OBJECT-TYPE
+    SYNTAX        ErpsIfStatsControlEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "One such entry for every interface in the ifTable which 
+         has an ifType of ERPS interface."
+    INDEX { erpsIfStatsControlIfIndex }
+    ::= { erpsIfStatsControlTable 1 }
+
+ErpsIfStatsControlEntry ::= SEQUENCE {
+    erpsIfStatsControlIfIndex            InterfaceIndex,
+    erpsIfStatsControlPeriodClear        INTEGER,
+    erpsIfStatsControlCountPointClear    INTEGER,
+    erpsIfStatsControlIntervalClear      Unsigned32,
+    erpsIfStatsControlCommitClear        INTEGER,
+    erpsIfStatsControlTimeElapsed        Unsigned32,
+    erpsIfStatsControlValidIntervals     Unsigned32
+    }
+
+erpsIfStatsControlIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsIfStatsControlEntry 1 }
+
+erpsIfStatsControlPeriodClear OBJECT-TYPE
+    SYNTAX        INTEGER {
+                    idle                  (1),
+                    clearAllIntervals     (2),
+                    clearCurrent          (3),
+                    clearIntervals        (4),
+                    clearSpecificInterval (5),
+                    clearCumulative       (6),
+                    clearAll              (7)
+                  }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This attribute allows for some or all of the 
+         interval statistics for this ERPS MAC to be cleared. 
+         It does not affect the values of the running counters 
+         or the counter values reported through the interface MIB.
+
+         clearSpecificInterval clears the interval indicated by
+         erpsIfStatsControlIntervalClear.
+
+         Default value for period clear is idle."
+    DEFVAL { idle }
+    ::= { erpsIfStatsControlEntry 2 }
+
+erpsIfStatsControlCountPointClear OBJECT-TYPE
+    SYNTAX        INTEGER {
+                    clearAll           (1),
+                    clearWest          (2),
+                    clearEast          (3),
+                    clearRing          (4)
+                  }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This attribute allows for a specific counting point of the 
+         ERPS MAC or all of the ERPS MAC counting points to be cleared
+         on erpsIfStatsControlPeriodClear request.
+
+         Default value for Interface to clear is clearAll, i.e.
+         clear statistics of all interfaces."
+    DEFVAL { clearAll }
+    ::= { erpsIfStatsControlEntry 3 }
+
+erpsIfStatsControlIntervalClear OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..96)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The statistics interval number to clear.
+         The interval identified by 1 is the most recently completed
+         15 minute interval, and interval identified by N is the
+         interval immediately preceding the one identified by N-1.
+
+         Setting erpsIfStatsControlPeriodClear to clearSpecificInterval will
+         clear the interval that is indicated by this object."
+    ::= { erpsIfStatsControlEntry 4 }
+
+erpsIfStatsControlCommitClear OBJECT-TYPE
+    SYNTAX  INTEGER {
+                      commit        (1),  -- write only
+                      commitDone    (2),  -- read only
+                      commitFailed  (3)   -- read only
+                    }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "Sends a commit with input parameters to specify the 
+         Period (erpsIfStatsControlPeriodClear),
+         count point (erpsIfStatsControlCountPointClear) and
+         specific interval (erpsIfStatsControlIntervalClear) to clear.
+
+         If the clear operation succeeds this attribute will have 
+         the value commitDone(2) when read.
+         If the clear operation fails this attribute will have 
+         the value commitFailed(3) when read."
+    ::= { erpsIfStatsControlEntry 5 }
+
+erpsIfStatsControlTimeElapsed OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..910)
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of seconds, including partial seconds, that
+         have elapsed since the beginning of the current
+         measurement interval. If, for some reason, such as an
+         adjustment in the system's time-of-day clock, the current
+         interval exceeds the maximum value, the agent will return
+         the maximum value."
+    ::= { erpsIfStatsControlEntry 6 }
+
+erpsIfStatsControlValidIntervals OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..96)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of previous 15-minute intervals for
+         which data was collected.
+         An ERPS interface must be capable of supporting at least n
+         intervals.
+         The minimum value of n is 4. The default of n is 32.
+         The maximum value of n is 96.
+         The value will be <n> unless the measurement was
+         (re-)started within the last (<n>*15) minutes, in which
+         case the value will be the number of complete 15
+         minute intervals for which the agent has at least
+         some data. In certain cases (e.g., in the case
+         where the agent is a proxy) it is possible that some
+         intervals are unavailable.  In this case, this
+         interval is the maximum interval number for
+         which data is available. "
+    ::= { erpsIfStatsControlEntry 7 }
+
+--
+-- ERPS span table
+--
+
+erpsSpanTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface Span table.
+
+         All read-write attributes in this table are non-volatile,
+         i.e. will be retained across system reset."
+    ::= { erpsGeneral 3 }
+
+erpsSpanEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "One such entry for every span of an ERPS interface."
+    INDEX { erpsSpanIfIndex,
+            erpsSpanId   }
+    ::= { erpsSpanTable 1 }
+
+ErpsSpanEntry ::= SEQUENCE {
+    erpsSpanIfIndex                        InterfaceIndex,
+    erpsSpanId                             ErpsSpan,
+    erpsSpanProtectionCommand              INTEGER,
+    erpsSpanStatus                         INTEGER,
+    erpsSpanForwardingStatus               INTEGER,
+    erpsSpanCurrentStatus                  BITS,
+    erpsSpanLastChange                     TimeStamp,
+    erpsSpanChanges                        Counter32
+    }
+
+erpsSpanIfIndex  OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsSpanEntry 1 }
+
+erpsSpanId OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Indicates the span interface of the ERPS Ring. Each ERPS 
+         span is connected to both east and west.
+         The east span receives from ringlet1 and transmits through 
+         ringlet0.
+         The west span receives from ringlet0 and transmits through
+         ringlet1."
+    ::= { erpsSpanEntry 2 }
+
+erpsSpanProtectionCommand OBJECT-TYPE
+    SYNTAX        INTEGER {
+                    idle            (1),
+                    manualSwitch    (2),
+                    forcedSwitch    (3)
+                  }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The protection mode requested by management for the local 
+         station that can affect the protection status of the ERPS
+         station, according to the set of rules describing the ERPS 
+         protection.
+
+         When read, this object returns the last command written 
+         unless it has been preempted, or idle if no command has been 
+         written to this interface span since initialization.
+
+
+         There is no pending of commands, that is if a command has 
+         been preempted by a failure, when the failure clears the 
+         command is not executed.
+
+         If the command cannot be executed because an equal or \
+         higher priority request is in effect, an error is returned.
+
+         writing idle to a span that has no pending protection
+         command, has no affect. An idle clears an active WTR state.
+
+         The protection commands (arranged in ascending priority 
+         order) are:
+    
+         idle
+         This command clears the protection for the specified 
+         interface span.
+         This value should be returned by a read request when no 
+         protection command has been written to the object.
+
+         manualSwitch
+         A protection command on each end of a specified span. This 
+         command doesn't have precedence over automatic protection, 
+         and therefore it can't preempt
+         an existing automatic protection request.
+
+         forcedSwitch
+         A command on each end of a specified span. This command has
+         precedence over automatic protection, and therefore it can 
+         preempt an existing automatic protection request.
+
+         Default value of protection command is idle."
+    DEFVAL { idle }
+    ::= { erpsSpanEntry 3 }
+
+erpsSpanStatus OBJECT-TYPE
+    SYNTAX        INTEGER {
+                  up    (1),
+                  down  (2)
+    }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the span status."
+    ::= { erpsSpanEntry 4 }
+
+erpsSpanForwardingStatus OBJECT-TYPE
+    SYNTAX        INTEGER {
+                  forwarding  (1),
+                  blocked     (2)
+    }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the span forwarding status."
+    ::= { erpsSpanEntry 5 }
+
+erpsSpanCurrentStatus OBJECT-TYPE
+    SYNTAX        BITS {
+                     keepAliveTimeout (0),
+                     miswired         (1),
+                     phyLinkDegrade   (2),
+                     phyLinkFail      (3),
+                     ccmLinkFail      (4)
+                  }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the current status of the ERPS span.
+         this attribute is used to generate alarm to the management system."
+    ::= { erpsSpanEntry 6 }
+
+erpsSpanLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The value of sysUpTime at the time when any of the following
+         attributes changes:
+         erpsSpanProtectionCommand, erpsSpanStatus          
+         erpsSpanForwardingStatus,  erpsSpanCurrentStatus"
+    ::= { erpsSpanEntry 7 }
+
+erpsSpanChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates number of times erpsSpanLastChange changed.
+
+         The discontinued counter value is indicated 
+         by the ifCounterDiscontinuityTime value."
+    ::= { erpsSpanEntry 8 }
+
+
+
+--
+-- ERPS changes summary group  
+--
+
+erpsIfChangeSummaryObject OBJECT IDENTIFIER ::= { erpsGeneral 5 }
+
+erpsIfChangeSummaryNumInterfaces OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Number of ERPS interfaces on this device."
+    ::= {  erpsIfChangeSummaryObject 1 }
+
+erpsIfChangeSummaryIfLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Latest timestamp when any instance of erpsIfLastChange changed."
+    ::= { erpsIfChangeSummaryObject 2 }
+
+erpsIfChangeSummaryIfChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Number of times any instance of erpsIfChanges changed.
+        
+         The discontinued counter value is indicated 
+         by the ifCounterDiscontinuityTime value."
+    ::= { erpsIfChangeSummaryObject 3 }
+
+erpsIfChangeSummarySpanLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Latest timestamp when any instance of erpsSpanLastChange changed."
+    ::= { erpsIfChangeSummaryObject 4 }
+
+erpsIfChangeSummarySpanChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Number of times any instance of erpsSpanChanges changed.
+
+         The discontinued counter value is indicated 
+         by the ifCounterDiscontinuityTime value."
+    ::= { erpsIfChangeSummaryObject 5 }
+
+
+--
+-- ERPS UUID to RingIf Mapping table
+--
+
+erpsUuidMapTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsUuidMapEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Uuid to RingIF Map table."
+    ::= { erpsGeneral 4 }
+
+erpsUuidMapEntry OBJECT-TYPE
+    SYNTAX        ErpsUuidMapEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Entry representing the mapping between UUID and Ring IfIndex."
+    INDEX { adGenSlotInfoIndex, erpsUuidMapUuid }
+    ::= { erpsUuidMapTable 1 }
+
+ErpsUuidMapEntry ::= SEQUENCE {
+    erpsUuidMapUuid                      OCTET STRING,
+    erpsUuidMapRingIfIndex               InterfaceIndex
+    }
+
+erpsUuidMapUuid OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(16))
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The UUID to be looked up on the slot."
+    ::= { erpsUuidMapEntry 1 }
+
+erpsUuidMapRingIfIndex  OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of the ERPS interface that corresponds to the UUID on the slot."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsUuidMapEntry 2 }
+
+
+--
+-- ERPS interface last create error table
+--
+
+erpsIfLastCreateErrorTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsIfLastCreateErrorEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface last create error table. This table is used to 
+        indicate the last error that occurred during creation of an ERPS ring."
+    ::= { erpsGeneral 6 }
+
+erpsIfLastCreateErrorEntry OBJECT-TYPE
+    SYNTAX        ErpsIfLastCreateErrorEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the ERPS interface last create error table."
+    INDEX  { adGenSlotInfoIndex }
+    ::= { erpsIfLastCreateErrorTable 1 }
+
+ErpsIfLastCreateErrorEntry ::= SEQUENCE {
+    erpsIfLastCreateError       DisplayString
+    }
+
+erpsIfLastCreateError OBJECT-TYPE
+    SYNTAX        DisplayString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The last error that occurred during the creation of an ERPS ring."
+    ::= { erpsIfLastCreateErrorEntry 1 }
+
+
+
+--
+-- ERPS ring interface current counters table
+--
+
+erpsCountersCurrentTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsCountersCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface current counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsCounters 1 }
+
+erpsCountersCurrentEntry OBJECT-TYPE
+    SYNTAX        ErpsCountersCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics for 
+         the current interval for the ERPS interface.
+         The corresponding instance of erpsIfStatsControlTimeElapsed
+         indicates the number of seconds which have elapsed 
+         so far in the current interval."
+    INDEX { erpsCurrentIfIndex }
+    ::= { erpsCountersCurrentTable 1 }
+
+ErpsCountersCurrentEntry ::= SEQUENCE {
+    erpsCurrentIfIndex                 InterfaceIndex,
+
+    erpsCurrentInRapsNrRb              Counter32,
+    erpsCurrentInRapsNrRbDnf           Counter32,
+    erpsCurrentInRapsNr                Counter32,
+    erpsCurrentInRapsFs                Counter32,
+    erpsCurrentInRapsSf                Counter32,
+    erpsCurrentInRapsMs                Counter32,
+    erpsCurrentInRapsIgnored           Counter32,
+    erpsCurrentInRapsTotal             Counter32,
+    erpsCurrentOutRapsNrRb             Counter32,
+    erpsCurrentOutRapsNrRbDnf          Counter32,
+    erpsCurrentOutRapsNr               Counter32,
+    erpsCurrentOutRapsFs               Counter32,
+    erpsCurrentOutRapsSf               Counter32,
+    erpsCurrentOutRapsMs               Counter32,
+    erpsCurrentOutRapsTotal            Counter32,
+    erpsCurrentProtectionSwitches      Counter32
+    }
+
+erpsCurrentIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsCountersCurrentEntry 1 }
+
+erpsCurrentInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 2 }
+
+erpsCurrentInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in the current interval. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsCountersCurrentEntry 3 }
+
+erpsCurrentInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 4 }
+
+erpsCurrentInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 5 }
+
+erpsCurrentInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 6 }
+
+erpsCurrentInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 7 }
+
+erpsCurrentInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in the 
+         current interval. This happens during the Guard timer."
+    ::= { erpsCountersCurrentEntry 8 }
+
+erpsCurrentInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in the 
+         current interval. "
+    ::= { erpsCountersCurrentEntry 9 }
+
+erpsCurrentOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 10 }
+
+erpsCurrentOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in the current interval. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsCountersCurrentEntry 11 }
+
+erpsCurrentOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 12 }
+
+erpsCurrentOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 13 }
+
+erpsCurrentOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 14 }
+
+erpsCurrentOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in the 
+         current interval."
+    ::= { erpsCountersCurrentEntry 15 }
+
+erpsCurrentOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in the 
+         current interval. "
+    ::= { erpsCountersCurrentEntry 16 }
+
+erpsCurrentProtectionSwitches OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of switches to protection state in the 
+         current interval. "
+    ::= { erpsCountersCurrentEntry 17 }
+
+
+
+--
+-- ERPS ring interface interval counters
+--
+
+erpsCountersIntervalTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsCountersIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface interval counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsCounters 2 }
+
+erpsCountersIntervalEntry OBJECT-TYPE
+    SYNTAX        ErpsCountersIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics collected for a particular 
+         interval of an ERPS interface.
+         The corresponding instance of erpsIfValidIntervals indicates the number of 
+         intervals for which the set of statistics is available."
+    INDEX { erpsIntervalIfIndex,
+         erpsIntervalNumber }
+    ::= { erpsCountersIntervalTable 1 }
+
+ErpsCountersIntervalEntry ::= SEQUENCE {
+    erpsIntervalIfIndex                 InterfaceIndex,
+    erpsIntervalNumber                  Unsigned32,
+    erpsIntervalValidData               TruthValue,
+    erpsIntervalTimeElapsed             Unsigned32,
+    erpsIntervalStartTime               DateAndTime,
+
+    erpsIntervalInRapsNrRb              Counter32,
+    erpsIntervalInRapsNrRbDnf           Counter32,
+    erpsIntervalInRapsNr                Counter32,
+    erpsIntervalInRapsFs                Counter32,
+    erpsIntervalInRapsSf                Counter32,
+    erpsIntervalInRapsMs                Counter32,
+    erpsIntervalInRapsIgnored           Counter32,
+    erpsIntervalInRapsTotal             Counter32,
+    erpsIntervalOutRapsNrRb             Counter32,
+    erpsIntervalOutRapsNrRbDnf          Counter32,
+    erpsIntervalOutRapsNr               Counter32,
+    erpsIntervalOutRapsFs               Counter32,
+    erpsIntervalOutRapsSf               Counter32,
+    erpsIntervalOutRapsMs               Counter32,
+    erpsIntervalOutRapsTotal            Counter32,
+    erpsIntervalProtectionSwitches      Counter32
+    }
+
+erpsIntervalIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsCountersIntervalEntry 1 }
+
+erpsIntervalNumber OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..96)
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "A number between 1 and 96, which identifies the intervals 
+         for which the set of statistics is available. The interval
+         identified by 1 is the most recently completed 15 minute
+         interval, and interval identified by N is the interval 
+         immediately preceding the one identified by N-1."
+    ::= { erpsCountersIntervalEntry 2 }
+
+erpsIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This variable indicates if the data for this interval 
+         is valid.
+         It will be valid if it contains data for 900 seconds 
+         plus or minus 10 seconds."
+    ::= { erpsCountersIntervalEntry 3 }
+
+erpsIntervalTimeElapsed OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..910)
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The duration of a particular interval in seconds.
+        If, for some reason, such as an adjustment in the system's
+        time-of-day clock, the current interval exceeds the maximum
+        value, the agent will return the maximum value."
+    ::= { erpsCountersIntervalEntry 4 }
+
+erpsIntervalStartTime OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the wall clock time that this interval started."
+    ::= { erpsCountersIntervalEntry 5 }
+
+erpsIntervalInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 6 }
+
+erpsIntervalInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in a particular interval in the
+         past 24 hours. Note that the 'NrRb' was mistakenly
+         added to this OID name."
+    ::= { erpsCountersIntervalEntry 7 }
+
+erpsIntervalInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 8 }
+
+erpsIntervalInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 9 }
+
+erpsIntervalInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 10 }
+
+erpsIntervalInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 11 }
+
+erpsIntervalInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in a
+         particular interval in the past 24 hours.
+         The messages get ignored during the Guard timer."
+    ::= { erpsCountersIntervalEntry 12 }
+
+erpsIntervalInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 13 }
+
+erpsIntervalOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 14 }
+
+erpsIntervalOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in a particular interval in the 
+         past 24 hours. Note that the 'NrRb' was mistakenly
+         added to this OID name."
+    ::= { erpsCountersIntervalEntry 15 }
+
+erpsIntervalOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 16 }
+
+erpsIntervalOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 17 }
+
+erpsIntervalOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in a 
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 18 }
+
+erpsIntervalOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 19 }
+
+erpsIntervalOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 20 }
+
+erpsIntervalProtectionSwitches OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of switches to protection state in a
+         Particular interval in the past 24 hours."
+    ::= { erpsCountersIntervalEntry 21 }
+
+
+
+--
+-- ERPS ring interface day (24 hour summaries) counters
+--
+
+erpsCountersDayTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsCountersDayEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Day Table contains the cumulative sum
+         of the various statistics for the 24 hour period
+         preceding the current interval.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsCounters 3 }
+
+erpsCountersDayEntry OBJECT-TYPE
+    SYNTAX        ErpsCountersDayEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the ERPS Day table."
+    INDEX { erpsDayIfIndex }
+    ::= { erpsCountersDayTable 1 }
+
+ErpsCountersDayEntry ::= SEQUENCE {
+    erpsDayIfIndex                 InterfaceIndex,
+
+    erpsDayInRapsNrRb              Counter32,
+    erpsDayInRapsNrRbDnf           Counter32,
+    erpsDayInRapsNr                Counter32,
+    erpsDayInRapsFs                Counter32,
+    erpsDayInRapsSf                Counter32,
+    erpsDayInRapsMs                Counter32,
+    erpsDayInRapsIgnored           Counter32,
+    erpsDayInRapsTotal             Counter32,
+    erpsDayOutRapsNrRb             Counter32,
+    erpsDayOutRapsNrRbDnf          Counter32,
+    erpsDayOutRapsNr               Counter32,
+    erpsDayOutRapsFs               Counter32,
+    erpsDayOutRapsSf               Counter32,
+    erpsDayOutRapsMs               Counter32,
+    erpsDayOutRapsTotal            Counter32,
+    erpsDayProtectionSwitches      Counter32
+    }
+
+erpsDayIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsCountersDayEntry 1 }
+
+
+erpsDayInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 2 }
+
+erpsDayInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in the past 24 hours. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsCountersDayEntry 3 }
+
+erpsDayInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 4 }
+
+erpsDayInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 5 }
+
+erpsDayInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 6 }
+
+erpsDayInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 7 }
+
+erpsDayInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in the 
+         past 24 hours. The messages get ignored during the 
+         Guard timer."
+    ::= { erpsCountersDayEntry 8 }
+
+erpsDayInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 9 }
+
+erpsDayOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 10 }
+
+erpsDayOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in the past 24 hours. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsCountersDayEntry 11 }
+
+erpsDayOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 12 }
+
+erpsDayOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsCountersDayEntry 13 }
+
+erpsDayOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 14 }
+
+erpsDayOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 15 }
+
+erpsDayOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in the 
+         past 24 hours."
+    ::= { erpsCountersDayEntry 16 }
+
+erpsDayProtectionSwitches OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of switches to protection state in the 
+         Past 24 hours."
+    ::= { erpsCountersDayEntry 17 }
+
+
+--
+-- ERPS ring interface 24 hour current counters table
+--
+
+erpsCounters24HrCurrentTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsCounters24HrCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface 24 hour current counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsCounters 5 }
+
+erpsCounters24HrCurrentEntry OBJECT-TYPE
+    SYNTAX        ErpsCounters24HrCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics for 
+         the 24 hour current interval for the ERPS interface."
+    INDEX { erps24HrCurrentIfIndex }
+    ::= { erpsCounters24HrCurrentTable 1 }
+
+ErpsCounters24HrCurrentEntry ::= SEQUENCE {
+    erps24HrCurrentIfIndex             InterfaceIndex,
+
+    erps24HrCurrentInRapsNrRb          Counter32,
+    erps24HrCurrentInRapsDnf           Counter32,
+    erps24HrCurrentInRapsNr            Counter32,
+    erps24HrCurrentInRapsFs            Counter32,
+    erps24HrCurrentInRapsSf            Counter32,
+    erps24HrCurrentInRapsMs            Counter32,
+    erps24HrCurrentInRapsIgnored       Counter32,
+    erps24HrCurrentInRapsTotal         Counter32,
+    erps24HrCurrentOutRapsNrRb         Counter32,
+    erps24HrCurrentOutRapsDnf          Counter32,
+    erps24HrCurrentOutRapsNr           Counter32,
+    erps24HrCurrentOutRapsFs           Counter32,
+    erps24HrCurrentOutRapsSf           Counter32,
+    erps24HrCurrentOutRapsMs           Counter32,
+    erps24HrCurrentOutRapsTotal        Counter32,
+    erps24HrCurrentProtectionSwitches  Counter32
+    }
+
+erps24HrCurrentIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsCounters24HrCurrentEntry 1 }
+
+erps24HrCurrentInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 2 }
+
+erps24HrCurrentInRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in the current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 3 }
+
+erps24HrCurrentInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 4 }
+
+erps24HrCurrentInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 5 }
+
+erps24HrCurrentInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 6 }
+
+erps24HrCurrentInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 7 }
+
+erps24HrCurrentInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in the 
+         current 24 hour interval. This happens during the Guard timer."
+    ::= { erpsCounters24HrCurrentEntry 8 }
+
+erps24HrCurrentInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in the 
+         current 24 hour interval. "
+    ::= { erpsCounters24HrCurrentEntry 9 }
+
+erps24HrCurrentOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 10 }
+
+erps24HrCurrentOutRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in the current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 11 }
+
+erps24HrCurrentOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 12 }
+
+erps24HrCurrentOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 13 }
+
+erps24HrCurrentOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 14 }
+
+erps24HrCurrentOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsCounters24HrCurrentEntry 15 }
+
+erps24HrCurrentOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in the 
+         current 24 hour interval. "
+    ::= { erpsCounters24HrCurrentEntry 16 }
+
+erps24HrCurrentProtectionSwitches OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of switches to protection state in the 
+         current 24 hour interval. "
+    ::= { erpsCounters24HrCurrentEntry 17 }
+
+
+
+--
+-- ERPS ring interface 24 hour interval counters
+--
+
+erpsCounters24HrIntervalTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsCounters24HrIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface 24 hour interval counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsCounters 6 }
+
+erpsCounters24HrIntervalEntry OBJECT-TYPE
+    SYNTAX        ErpsCounters24HrIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics collected for a particular 
+         24 hour interval of an ERPS interface."
+    INDEX { erps24HrIntervalIfIndex,
+         erps24HrIntervalNumber }
+    ::= { erpsCounters24HrIntervalTable 1 }
+
+ErpsCounters24HrIntervalEntry ::= SEQUENCE {
+    erps24HrIntervalIfIndex             InterfaceIndex,
+    erps24HrIntervalNumber              Unsigned32,
+    erps24HrIntervalValidData           TruthValue,
+    erps24HrIntervalTimeElapsed         Unsigned32,
+    erps24HrIntervalStartTime           DateAndTime,
+
+    erps24HrIntervalInRapsNrRb          Counter32,
+    erps24HrIntervalInRapsDnf           Counter32,
+    erps24HrIntervalInRapsNr            Counter32,
+    erps24HrIntervalInRapsFs            Counter32,
+    erps24HrIntervalInRapsSf            Counter32,
+    erps24HrIntervalInRapsMs            Counter32,
+    erps24HrIntervalInRapsIgnored       Counter32,
+    erps24HrIntervalInRapsTotal         Counter32,
+    erps24HrIntervalOutRapsNrRb         Counter32,
+    erps24HrIntervalOutRapsDnf          Counter32,
+    erps24HrIntervalOutRapsNr           Counter32,
+    erps24HrIntervalOutRapsFs           Counter32,
+    erps24HrIntervalOutRapsSf           Counter32,
+    erps24HrIntervalOutRapsMs           Counter32,
+    erps24HrIntervalOutRapsTotal        Counter32,
+    erps24HrIntervalProtectionSwitches  Counter32
+    }
+
+erps24HrIntervalIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsCounters24HrIntervalEntry 1 }
+
+erps24HrIntervalNumber OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..7)
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "A number between 1 and 7, which identifies the interval
+         for which the set of statistics is available. The interval
+         identified by 1 is the most recently completed 24 hour
+         interval, and interval identified by N is the interval 
+         immediately preceding the one identified by N-1."
+    ::= { erpsCounters24HrIntervalEntry 2 }
+
+erps24HrIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This variable indicates if the data for this interval 
+         is valid.
+         It will be valid if it contains data for 86400 seconds 
+         plus or minus 10 seconds."
+    ::= { erpsCounters24HrIntervalEntry 3 }
+
+erps24HrIntervalTimeElapsed OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The duration of a particular interval in seconds.
+        If, for some reason, such as an adjustment in the system's
+        time-of-day clock, the current interval exceeds the maximum
+        value, the agent will return the maximum value."
+    ::= { erpsCounters24HrIntervalEntry 4 }
+
+erps24HrIntervalStartTime OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the wall clock time that this interval started."
+    ::= { erpsCounters24HrIntervalEntry 5 }
+
+erps24HrIntervalInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 6 }
+
+erps24HrIntervalInRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in a particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 7 }
+
+erps24HrIntervalInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 8 }
+
+erps24HrIntervalInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 9 }
+
+erps24HrIntervalInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 10 }
+
+erps24HrIntervalInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 11 }
+
+erps24HrIntervalInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in a
+         particular 24 hour interval.
+         The messages get ignored during the Guard timer."
+    ::= { erpsCounters24HrIntervalEntry 12 }
+
+erps24HrIntervalInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 13 }
+
+erps24HrIntervalOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 14 }
+
+erps24HrIntervalOutRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in a particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 15 }
+
+erps24HrIntervalOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 16 }
+
+erps24HrIntervalOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 17 }
+
+erps24HrIntervalOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in a 
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 18 }
+
+erps24HrIntervalOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 19 }
+
+erps24HrIntervalOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 20 }
+
+erps24HrIntervalProtectionSwitches OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of switches to protection state in a
+         Particular 24 hour interval."
+    ::= { erpsCounters24HrIntervalEntry 21 }
+
+
+--
+-- ERPS ring interface continuously running counters
+--
+
+erpsCountersStatsTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsCountersStatsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS interface total counters table.
+
+         The DiscontinuityTime for this table is indicated by 
+         ifCounterDiscontinuityTime defined in ifXTable.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsCounters 4 }
+
+erpsCountersStatsEntry OBJECT-TYPE
+    SYNTAX        ErpsCountersStatsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the  stats table."
+    INDEX { erpsStatsIfIndex }
+    ::= { erpsCountersStatsTable 1 }
+
+ErpsCountersStatsEntry ::= SEQUENCE {
+    erpsStatsIfIndex                 InterfaceIndex,
+
+    erpsStatsInRapsNrRb              Counter32,
+    erpsStatsInRapsNrRbDnf           Counter32,
+    erpsStatsInRapsNr                Counter32,
+    erpsStatsInRapsFs                Counter32,
+    erpsStatsInRapsSf                Counter32,
+    erpsStatsInRapsMs                Counter32,
+    erpsStatsInRapsIgnored           Counter32,
+    erpsStatsInRapsTotal             Counter32,
+    erpsStatsOutRapsNrRb             Counter32,
+    erpsStatsOutRapsNrRbDnf          Counter32,
+    erpsStatsOutRapsNr               Counter32,
+    erpsStatsOutRapsFs               Counter32,
+    erpsStatsOutRapsSf               Counter32,
+    erpsStatsOutRapsMs               Counter32,
+    erpsStatsOutRapsTotal            Counter32,
+    erpsStatsProtectionSwitches      Counter32
+    }
+
+erpsStatsIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsCountersStatsEntry 1 }
+
+erpsStatsInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received."
+    ::= { erpsCountersStatsEntry 2 }
+
+erpsStatsInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set. Note that the 'NrRb' was
+         mistakenly added to this OID name."
+    ::= { erpsCountersStatsEntry 3 }
+
+erpsStatsInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received."
+    ::= { erpsCountersStatsEntry 4 }
+
+erpsStatsInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received."
+    ::= { erpsCountersStatsEntry 5 }
+
+erpsStatsInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received."
+    ::= { erpsCountersStatsEntry 6 }
+
+erpsStatsInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received."
+    ::= { erpsCountersStatsEntry 7 }
+
+erpsStatsInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages.
+         The messages get ignored during the Guard timer."
+    ::= { erpsCountersStatsEntry 8 }
+
+erpsStatsInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received."
+    ::= { erpsCountersStatsEntry 9 }
+
+erpsStatsOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted."
+    ::= { erpsCountersStatsEntry 10 }
+
+erpsStatsOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with DNF
+         bit set. Note that the 'NrRb' was mistakenly added
+         to this OID name."
+    ::= { erpsCountersStatsEntry 11 }
+
+erpsStatsOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted."
+    ::= { erpsCountersStatsEntry 12 }
+
+erpsStatsOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted."
+    ::= { erpsCountersStatsEntry 13 }
+
+erpsStatsOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted."
+    ::= { erpsCountersStatsEntry 14 }
+
+erpsStatsOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted."
+    ::= { erpsCountersStatsEntry 15 }
+
+erpsStatsOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted."
+    ::= { erpsCountersStatsEntry 16 }
+
+erpsStatsProtectionSwitches OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of switches to protection state"
+    ::= { erpsCountersStatsEntry 17 }
+
+
+
+
+
+--
+-- ERPS ring interface span current counters table
+--
+
+erpsSpanCountersCurrentTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanCountersCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Span interface current counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsSpanCounters 1 }
+
+erpsSpanCountersCurrentEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanCountersCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics for 
+         the current interval forthe ERPS Span interface.
+         The corresponding instance of erpsIfStatsControlTimeElapsed
+         indicates the number of seconds which have elapsed 
+         so far in the current interval."
+    INDEX { erpsSpanCurrentIfIndex,
+            erpsSpanCurrentSpan }
+    ::= { erpsSpanCountersCurrentTable 1 }
+
+ErpsSpanCountersCurrentEntry ::= SEQUENCE {
+    erpsSpanCurrentIfIndex                 InterfaceIndex,
+    erpsSpanCurrentSpan                    ErpsSpan,
+
+    erpsSpanCurrentInRapsNrRb              Counter32,
+    erpsSpanCurrentInRapsNrRbDnf           Counter32,
+    erpsSpanCurrentInRapsNr                Counter32,
+    erpsSpanCurrentInRapsFs                Counter32,
+    erpsSpanCurrentInRapsSf                Counter32,
+    erpsSpanCurrentInRapsMs                Counter32,
+    erpsSpanCurrentInRapsIgnored           Counter32,
+    erpsSpanCurrentInRapsTotal             Counter32,
+    erpsSpanCurrentOutRapsNrRb             Counter32,
+    erpsSpanCurrentOutRapsNrRbDnf          Counter32,
+    erpsSpanCurrentOutRapsNr               Counter32,
+    erpsSpanCurrentOutRapsFs               Counter32,
+    erpsSpanCurrentOutRapsSf               Counter32,
+    erpsSpanCurrentOutRapsMs               Counter32,
+    erpsSpanCurrentOutRapsTotal            Counter32
+    }
+
+erpsSpanCurrentIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsSpanCountersCurrentEntry 1 }
+
+erpsSpanCurrentSpan OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An indication of the span of the interface for which this
+         row contains information."
+    ::= { erpsSpanCountersCurrentEntry 2 }
+
+erpsSpanCurrentInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 3 }
+
+erpsSpanCurrentInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in the current interval. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsSpanCountersCurrentEntry 4 }
+
+erpsSpanCurrentInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 5 }
+
+erpsSpanCurrentInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 6 }
+
+erpsSpanCurrentInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 7 }
+
+erpsSpanCurrentInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 8 }
+
+erpsSpanCurrentInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in the 
+         current interval. This happens during the Guard timer."
+    ::= { erpsSpanCountersCurrentEntry 9 }
+
+erpsSpanCurrentInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in the 
+         current interval. "
+    ::= { erpsSpanCountersCurrentEntry 10 }
+
+erpsSpanCurrentOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 11 }
+
+erpsSpanCurrentOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in the current interval. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsSpanCountersCurrentEntry 12 }
+
+erpsSpanCurrentOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 13 }
+
+erpsSpanCurrentOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 14 }
+
+erpsSpanCurrentOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 15 }
+
+erpsSpanCurrentOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in the 
+         current interval."
+    ::= { erpsSpanCountersCurrentEntry 16 }
+
+erpsSpanCurrentOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in the 
+         current interval. "
+    ::= { erpsSpanCountersCurrentEntry 17 }
+
+
+
+--
+-- ERPS ring span interface interval counters
+--
+
+erpsSpanCountersIntervalTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanCountersIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Span interface interval counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsSpanCounters 2 }
+
+erpsSpanCountersIntervalEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanCountersIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        " R-APS message and local command/event statistics collected for a particular 
+         interval for the ERPS Span interface of a particular ERPS interface.
+         The corresponding instance of erpsIfValidIntervals indicates the number of 
+         intervals for which the set of statistics is available."
+    INDEX { erpsSpanIntervalIfIndex,
+            erpsSpanIntervalSpan,
+            erpsSpanIntervalNumber }
+    ::= { erpsSpanCountersIntervalTable 1 }
+
+ErpsSpanCountersIntervalEntry ::= SEQUENCE {
+    erpsSpanIntervalIfIndex                 InterfaceIndex,
+    erpsSpanIntervalSpan                    ErpsSpan,
+    erpsSpanIntervalNumber                  Unsigned32,
+    erpsSpanIntervalValidData               TruthValue,
+    erpsSpanIntervalTimeElapsed             Unsigned32,
+    erpsSpanIntervalStartTime               DateAndTime,
+
+    erpsSpanIntervalInRapsNrRb              Counter32,
+    erpsSpanIntervalInRapsNrRbDnf           Counter32,
+    erpsSpanIntervalInRapsNr                Counter32,
+    erpsSpanIntervalInRapsFs                Counter32,
+    erpsSpanIntervalInRapsSf                Counter32,
+    erpsSpanIntervalInRapsMs                Counter32,
+    erpsSpanIntervalInRapsIgnored           Counter32,
+    erpsSpanIntervalInRapsTotal             Counter32,
+    erpsSpanIntervalOutRapsNrRb             Counter32,
+    erpsSpanIntervalOutRapsNrRbDnf          Counter32,
+    erpsSpanIntervalOutRapsNr               Counter32,
+    erpsSpanIntervalOutRapsFs               Counter32,
+    erpsSpanIntervalOutRapsSf               Counter32,
+    erpsSpanIntervalOutRapsMs               Counter32,
+    erpsSpanIntervalOutRapsTotal            Counter32
+    }
+
+erpsSpanIntervalIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsSpanCountersIntervalEntry 1 }
+
+erpsSpanIntervalSpan OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An indication of the span of the interface for which this 
+         row contains information."
+    ::= { erpsSpanCountersIntervalEntry 2 }
+
+erpsSpanIntervalNumber OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..96)
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "A number between 1 and 96, which identifies the intervals 
+         for which the set of statistics is available. The interval
+         identified by 1 is the most recently completed 15 minute
+         interval, and interval identified by N is the interval 
+         immediately preceding the one identified by N-1."
+    ::= { erpsSpanCountersIntervalEntry 3 }
+
+erpsSpanIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This variable indicates if the data for this interval 
+         is valid.
+         It will be valid if it contains data for 900 seconds 
+         plus or minus 10 seconds."
+    ::= { erpsSpanCountersIntervalEntry 4 }
+
+erpsSpanIntervalTimeElapsed OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..910)
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The duration of a particular interval in seconds.
+         If, for some reason, such as an adjustment in the system's
+         time-of-day clock, the current interval exceeds the maximum
+         value, the agent will return the maximum value."
+    ::= { erpsSpanCountersIntervalEntry 5 }
+
+erpsSpanIntervalStartTime OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the wall clock time that this interval started."
+    ::= { erpsSpanCountersIntervalEntry 6 }
+
+erpsSpanIntervalInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 7 }
+
+erpsSpanIntervalInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in a particular interval in the
+         past 24 hours. Note that the 'NrRb' was mistakenly
+         added to this OID name."
+    ::= { erpsSpanCountersIntervalEntry 8 }
+
+erpsSpanIntervalInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 9 }
+
+erpsSpanIntervalInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 10 }
+
+erpsSpanIntervalInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 11 }
+
+erpsSpanIntervalInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 12 }
+
+erpsSpanIntervalInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in a
+         particular interval in the past 24 hours.
+         The messages get ignored during the Guard timer."
+    ::= { erpsSpanCountersIntervalEntry 13 }
+
+erpsSpanIntervalInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 14 }
+
+erpsSpanIntervalOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 15 }
+
+erpsSpanIntervalOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in a particular interval in the 
+         past 24 hours. Note that the 'NrRb' was mistakenly
+         added to this OID name."
+    ::= { erpsSpanCountersIntervalEntry 16 }
+
+erpsSpanIntervalOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 17 }
+
+erpsSpanIntervalOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 18 }
+
+erpsSpanIntervalOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in a 
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 19 }
+
+erpsSpanIntervalOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 20 }
+
+erpsSpanIntervalOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersIntervalEntry 21 }
+
+
+
+--
+-- ERPS ring span interface day (24 hour summaries) counters
+--
+
+erpsSpanCountersDayTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanCountersDayEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Mac Span Day Table contains the cumulative sum
+         of the various statistics for the 24 hour period
+         preceding the current interval.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsSpanCounters 3 }
+
+erpsSpanCountersDayEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanCountersDayEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the ERPS Span Day table."
+    INDEX { erpsSpanDayIfIndex,
+            erpsSpanDaySpan }
+    ::= { erpsSpanCountersDayTable 1 }
+
+ErpsSpanCountersDayEntry ::= SEQUENCE {
+    erpsSpanDayIfIndex                 InterfaceIndex,
+    erpsSpanDaySpan                    ErpsSpan,
+
+    erpsSpanDayInRapsNrRb              Counter32,
+    erpsSpanDayInRapsNrRbDnf           Counter32,
+    erpsSpanDayInRapsNr                Counter32,
+    erpsSpanDayInRapsFs                Counter32,
+    erpsSpanDayInRapsSf                Counter32,
+    erpsSpanDayInRapsMs                Counter32,
+    erpsSpanDayInRapsIgnored           Counter32,
+    erpsSpanDayInRapsTotal             Counter32,
+    erpsSpanDayOutRapsNrRb             Counter32,
+    erpsSpanDayOutRapsNrRbDnf          Counter32,
+    erpsSpanDayOutRapsNr               Counter32,
+    erpsSpanDayOutRapsFs               Counter32,
+    erpsSpanDayOutRapsSf               Counter32,
+    erpsSpanDayOutRapsMs               Counter32,
+    erpsSpanDayOutRapsTotal            Counter32
+    }
+
+erpsSpanDayIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsSpanCountersDayEntry 1 }
+
+erpsSpanDaySpan OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An indication of the span of the interface for which this 
+         row contains information."
+    ::= { erpsSpanCountersDayEntry 2 }
+
+erpsSpanDayInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 3 }
+
+erpsSpanDayInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in the past 24 hours. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsSpanCountersDayEntry 4 }
+
+erpsSpanDayInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 5 }
+
+erpsSpanDayInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 6 }
+
+erpsSpanDayInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 7 }
+
+erpsSpanDayInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 8 }
+
+erpsSpanDayInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in the 
+         past 24 hours. The messages get ignored during the 
+         Guard timer."
+    ::= { erpsSpanCountersDayEntry 9 }
+
+erpsSpanDayInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 10 }
+
+erpsSpanDayOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 11 }
+
+erpsSpanDayOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in the past 24 hours. Note that
+         the 'NrRb' was mistakenly added to this OID name."
+    ::= { erpsSpanCountersDayEntry 12 }
+
+erpsSpanDayOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 13 }
+
+erpsSpanDayOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in a
+         particular interval in the past 24 hours."
+    ::= { erpsSpanCountersDayEntry 14 }
+
+erpsSpanDayOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 15 }
+
+erpsSpanDayOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 16 }
+
+erpsSpanDayOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in the 
+         past 24 hours."
+    ::= { erpsSpanCountersDayEntry 17 }
+
+
+--
+-- ERPS ring span interface 24 hour current counters table
+--
+
+erpsSpanCounters24HrCurrentTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanCounters24HrCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS span 24 hour current counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsSpanCounters 5 }
+
+erpsSpanCounters24HrCurrentEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanCounters24HrCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics for 
+         the 24 hour current interval for the ERPS span."
+    INDEX { erpsSpan24HrCurrentIfIndex,
+            erpsSpan24HrCurrentSpan }
+    ::= { erpsSpanCounters24HrCurrentTable 1 }
+
+ErpsSpanCounters24HrCurrentEntry ::= SEQUENCE {
+    erpsSpan24HrCurrentIfIndex         InterfaceIndex,
+    erpsSpan24HrCurrentSpan            ErpsSpan,
+
+    erpsSpan24HrCurrentInRapsNrRb      Counter32,
+    erpsSpan24HrCurrentInRapsDnf       Counter32,
+    erpsSpan24HrCurrentInRapsNr        Counter32,
+    erpsSpan24HrCurrentInRapsFs        Counter32,
+    erpsSpan24HrCurrentInRapsSf        Counter32,
+    erpsSpan24HrCurrentInRapsMs        Counter32,
+    erpsSpan24HrCurrentInRapsIgnored   Counter32,
+    erpsSpan24HrCurrentInRapsTotal     Counter32,
+    erpsSpan24HrCurrentOutRapsNrRb     Counter32,
+    erpsSpan24HrCurrentOutRapsDnf      Counter32,
+    erpsSpan24HrCurrentOutRapsNr       Counter32,
+    erpsSpan24HrCurrentOutRapsFs       Counter32,
+    erpsSpan24HrCurrentOutRapsSf       Counter32,
+    erpsSpan24HrCurrentOutRapsMs       Counter32,
+    erpsSpan24HrCurrentOutRapsTotal    Counter32
+    }
+
+erpsSpan24HrCurrentIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsSpanCounters24HrCurrentEntry 1 }
+
+erpsSpan24HrCurrentSpan OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An indication of the span of the interface for which this 
+         row contains information."
+    ::= { erpsSpanCounters24HrCurrentEntry 2 }
+
+erpsSpan24HrCurrentInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 3 }
+
+erpsSpan24HrCurrentInRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in the current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 4 }
+
+erpsSpan24HrCurrentInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 5 }
+
+erpsSpan24HrCurrentInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 6 }
+
+erpsSpan24HrCurrentInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 7 }
+
+erpsSpan24HrCurrentInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 8 }
+
+erpsSpan24HrCurrentInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in the 
+         current 24 hour interval. This happens during the Guard timer."
+    ::= { erpsSpanCounters24HrCurrentEntry 9 }
+
+erpsSpan24HrCurrentInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in the 
+         current 24 hour interval. "
+    ::= { erpsSpanCounters24HrCurrentEntry 10 }
+
+erpsSpan24HrCurrentOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 11 }
+
+erpsSpan24HrCurrentOutRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in the current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 12 }
+
+erpsSpan24HrCurrentOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 13 }
+
+erpsSpan24HrCurrentOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 14 }
+
+erpsSpan24HrCurrentOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 15 }
+
+erpsSpan24HrCurrentOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in the 
+         current 24 hour interval."
+    ::= { erpsSpanCounters24HrCurrentEntry 16 }
+
+erpsSpan24HrCurrentOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in the 
+         current 24 hour interval. "
+    ::= { erpsSpanCounters24HrCurrentEntry 17 }
+
+
+
+--
+-- ERPS ring interface 24 hour interval counters
+--
+
+erpsSpanCounters24HrIntervalTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanCounters24HrIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS span 24 hour interval counters table.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsSpanCounters 6 }
+
+erpsSpanCounters24HrIntervalEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanCounters24HrIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "R-APS message and local command/event statistics collected for a particular 
+         24 hour interval of an ERPS span."
+    INDEX { erpsSpan24HrIntervalIfIndex,
+            erpsSpan24HrIntervalSpan, 
+            erpsSpan24HrIntervalNumber }
+    ::= { erpsSpanCounters24HrIntervalTable 1 }
+
+ErpsSpanCounters24HrIntervalEntry ::= SEQUENCE {
+    erpsSpan24HrIntervalIfIndex         InterfaceIndex,
+    erpsSpan24HrIntervalSpan            ErpsSpan,
+    erpsSpan24HrIntervalNumber          Unsigned32,
+    erpsSpan24HrIntervalValidData       TruthValue,
+    erpsSpan24HrIntervalTimeElapsed     Unsigned32,
+    erpsSpan24HrIntervalStartTime       DateAndTime,
+
+    erpsSpan24HrIntervalInRapsNrRb      Counter32,
+    erpsSpan24HrIntervalInRapsDnf       Counter32,
+    erpsSpan24HrIntervalInRapsNr        Counter32,
+    erpsSpan24HrIntervalInRapsFs        Counter32,
+    erpsSpan24HrIntervalInRapsSf        Counter32,
+    erpsSpan24HrIntervalInRapsMs        Counter32,
+    erpsSpan24HrIntervalInRapsIgnored   Counter32,
+    erpsSpan24HrIntervalInRapsTotal     Counter32,
+    erpsSpan24HrIntervalOutRapsNrRb     Counter32,
+    erpsSpan24HrIntervalOutRapsDnf      Counter32,
+    erpsSpan24HrIntervalOutRapsNr       Counter32,
+    erpsSpan24HrIntervalOutRapsFs       Counter32,
+    erpsSpan24HrIntervalOutRapsSf       Counter32,
+    erpsSpan24HrIntervalOutRapsMs       Counter32,
+    erpsSpan24HrIntervalOutRapsTotal    Counter32
+    }
+
+erpsSpan24HrIntervalIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsSpanCounters24HrIntervalEntry 1 }
+
+erpsSpan24HrIntervalSpan OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An indication of the span of the interface for which this 
+         row contains information."
+    ::= { erpsSpanCounters24HrIntervalEntry 2 }
+
+erpsSpan24HrIntervalNumber OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..7)
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "A number between 1 and 7, which identifies the interval
+         for which the set of statistics is available. The interval
+         identified by 1 is the most recently completed 24 hour
+         interval, and interval identified by N is the interval 
+         immediately preceding the one identified by N-1."
+    ::= { erpsSpanCounters24HrIntervalEntry 3 }
+
+erpsSpan24HrIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This variable indicates if the data for this interval 
+         is valid.
+         It will be valid if it contains data for 86400 seconds 
+         plus or minus 10 seconds."
+    ::= { erpsSpanCounters24HrIntervalEntry 4 }
+
+erpsSpan24HrIntervalTimeElapsed OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "Seconds" 
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The duration of a particular interval in seconds.
+        If, for some reason, such as an adjustment in the system's
+        time-of-day clock, the current interval exceeds the maximum
+        value, the agent will return the maximum value."
+    ::= { erpsSpanCounters24HrIntervalEntry 5 }
+
+erpsSpan24HrIntervalStartTime OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the wall clock time that this interval started."
+    ::= { erpsSpanCounters24HrIntervalEntry 6 }
+
+erpsSpan24HrIntervalInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 7 }
+
+erpsSpan24HrIntervalInRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set in a particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 8 }
+
+erpsSpan24HrIntervalInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 9 }
+
+erpsSpan24HrIntervalInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 10 }
+
+erpsSpan24HrIntervalInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 11 }
+
+erpsSpan24HrIntervalInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 12 }
+
+erpsSpan24HrIntervalInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages in a
+         particular 24 hour interval.
+         The messages get ignored during the Guard timer."
+    ::= { erpsSpanCounters24HrIntervalEntry 13 }
+
+erpsSpan24HrIntervalInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 14 }
+
+erpsSpan24HrIntervalOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 15 }
+
+erpsSpan24HrIntervalOutRapsDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         the DNF bit set in a particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 16 }
+
+erpsSpan24HrIntervalOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 17 }
+
+erpsSpan24HrIntervalOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 18 }
+
+erpsSpan24HrIntervalOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted in a 
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 19 }
+
+erpsSpan24HrIntervalOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 20 }
+
+erpsSpan24HrIntervalOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted in a
+         particular 24 hour interval."
+    ::= { erpsSpanCounters24HrIntervalEntry 21 }
+
+
+
+--
+-- ERPS ring span interface continuously running counters
+--
+
+erpsSpanCountersStatsTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsSpanCountersStatsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Span interface total counters table.
+
+         The DiscontinuityTime for this table is indicated by 
+         ifCounterDiscontinuityTime defined in ifXTable.
+
+         All attributes in this table are volatile,
+         i.e. will be cleared on system reset."
+    ::= { erpsSpanCounters 4 }
+
+erpsSpanCountersStatsEntry OBJECT-TYPE
+    SYNTAX        ErpsSpanCountersStatsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the span stats table."
+    INDEX { erpsSpanStatsIfIndex,
+            erpsSpanStatsSpan }
+    ::= { erpsSpanCountersStatsTable 1 }
+
+ErpsSpanCountersStatsEntry ::= SEQUENCE {
+    erpsSpanStatsIfIndex                 InterfaceIndex,
+    erpsSpanStatsSpan                    ErpsSpan,
+
+    erpsSpanStatsInRapsNrRb              Counter32,
+    erpsSpanStatsInRapsNrRbDnf           Counter32,
+    erpsSpanStatsInRapsNr                Counter32,
+    erpsSpanStatsInRapsFs                Counter32,
+    erpsSpanStatsInRapsSf                Counter32,
+    erpsSpanStatsInRapsMs                Counter32,
+    erpsSpanStatsInRapsIgnored           Counter32,
+    erpsSpanStatsInRapsTotal             Counter32,
+    erpsSpanStatsOutRapsNrRb             Counter32,
+    erpsSpanStatsOutRapsNrRbDnf          Counter32,
+    erpsSpanStatsOutRapsNr               Counter32,
+    erpsSpanStatsOutRapsFs               Counter32,
+    erpsSpanStatsOutRapsSf               Counter32,
+    erpsSpanStatsOutRapsMs               Counter32,
+    erpsSpanStatsOutRapsTotal            Counter32
+
+    }
+
+erpsSpanStatsIfIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS interface."
+    ::= { erpsSpanCountersStatsEntry 1 }
+
+erpsSpanStatsSpan OBJECT-TYPE
+    SYNTAX        ErpsSpan
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An indication of the span of the interface for which this 
+         row contains information."
+    ::= { erpsSpanCountersStatsEntry 2 }
+
+erpsSpanStatsInRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages received."
+    ::= { erpsSpanCountersStatsEntry 3 }
+
+erpsSpanStatsInRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages received with
+         the DNF bit set. Note that the 'NrRb' was
+         mistakenly added to this OID name."
+    ::= { erpsSpanCountersStatsEntry 4 }
+
+erpsSpanStatsInRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages received."
+    ::= { erpsSpanCountersStatsEntry 5 }
+
+erpsSpanStatsInRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages received."
+    ::= { erpsSpanCountersStatsEntry 6 }
+
+erpsSpanStatsInRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages received."
+    ::= { erpsSpanCountersStatsEntry 7 }
+
+erpsSpanStatsInRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages received."
+    ::= { erpsSpanCountersStatsEntry 8 }
+
+erpsSpanStatsInRapsIgnored OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of ignored incoming R-APS messages.
+         The messages get ignored during the Guard timer."
+    ::= { erpsSpanCountersStatsEntry 9 }
+
+erpsSpanStatsInRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages received."
+    ::= { erpsSpanCountersStatsEntry 10 }
+
+erpsSpanStatsOutRapsNrRb OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR, RB) messages transmitted."
+    ::= { erpsSpanCountersStatsEntry 11 }
+
+erpsSpanStatsOutRapsNrRbDnf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS messages transmitted with
+         DNF bit set. Note that the 'NrRb' was mistakenly
+         added to this OID name."
+    ::= { erpsSpanCountersStatsEntry 12 }
+
+erpsSpanStatsOutRapsNr OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(NR) messages transmitted."
+    ::= { erpsSpanCountersStatsEntry 13 }
+
+erpsSpanStatsOutRapsFs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(FS) messages transmitted."
+    ::= { erpsSpanCountersStatsEntry 14 }
+
+erpsSpanStatsOutRapsSf OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(SF) messages transmitted."
+    ::= { erpsSpanCountersStatsEntry 15 }
+
+erpsSpanStatsOutRapsMs OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of R-APS(MS) messages transmitted."
+    ::= { erpsSpanCountersStatsEntry 16 }
+
+erpsSpanStatsOutRapsTotal OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The total number of R-APS messages transmitted."
+    ::= { erpsSpanCountersStatsEntry 17 }
+
+
+ 
+
+
+
+
+--
+-- ERPS Ring Topology table
+--
+
+erpsRingTopoTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsRingTopoEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Ring Topology table."
+
+    ::= { erpsProtocol 2 }
+
+erpsRingTopoEntry OBJECT-TYPE
+    SYNTAX        ErpsRingTopoEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Entry representing the topology indexed by erps index and station id."
+    INDEX { erpsRingTopoIndex, erpsRingTopoStationId }
+    ::= { erpsRingTopoTable 1 }
+
+ErpsRingTopoEntry ::= SEQUENCE {
+    erpsRingTopoIndex                    InterfaceIndex,
+    erpsRingTopoStationId                Unsigned32,
+
+    erpsRingTopoStationName              OCTET STRING,
+    erpsRingTopoStationFlags             BITS,
+    erpsRingTopoMacAddress               MacAddress,
+    erpsRingTopoWestStationId            Unsigned32,
+    erpsRingTopoEastStationId            Unsigned32,
+    erpsRingTopoWestNeighborMacAddress   MacAddress,
+    erpsRingTopoEastNeighborMacAddress   MacAddress,
+    erpsRingTopoWestProtectionStatus     ErpsRingTopoProtectionStatus,
+    erpsRingTopoEastProtectionStatus     ErpsRingTopoProtectionStatus,
+    erpsRingTopoLastChange               TimeStamp,
+    erpsRingTopoChanges                  Counter32,
+    erpsRingTopoStationIp                IpAddress,
+    erpsRingTopoWestStationIp            IpAddress,
+    erpsRingTopoEastStationIp            IpAddress
+    }
+
+erpsRingTopoIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible 
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS Ring Topology interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsRingTopoEntry 1 }
+
+erpsRingTopoStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..1024)
+    MAX-ACCESS    not-accessible 
+    STATUS        current
+    DESCRIPTION
+        "The Node Id of the ERPS ring node."
+    ::= { erpsRingTopoEntry 2 }
+
+erpsRingTopoStationName OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(0..128))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The sysName of the current station."
+    ::= { erpsRingTopoEntry 3 }
+
+erpsRingTopoStationFlags OBJECT-TYPE
+    SYNTAX        BITS {
+                    isRplOwner (0),
+                    isHub      (1),
+                    isTopoInconsistentWithNeighbor(2)
+                  }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Conveys more information about the current station."
+    ::= { erpsRingTopoEntry 4 }
+
+erpsRingTopoMacAddress OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Mac Address of the current station."
+    ::= { erpsRingTopoEntry 5 }
+
+erpsRingTopoWestStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..1024)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Node Id of the west neighbor of the current station."
+    ::= { erpsRingTopoEntry 6 }
+
+erpsRingTopoEastStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..1024)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Node Id of the east neighbor of the current station."
+    ::= { erpsRingTopoEntry 7 }
+
+erpsRingTopoWestNeighborMacAddress OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Mac Address of the west neighbor of the current station."
+    ::= { erpsRingTopoEntry 8 }
+
+erpsRingTopoEastNeighborMacAddress OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Mac Address of the east neighbor of the current station."
+    ::= { erpsRingTopoEntry 9 }
+
+erpsRingTopoWestProtectionStatus OBJECT-TYPE
+    SYNTAX        ErpsRingTopoProtectionStatus
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "West protection status of the current station."
+    ::= { erpsRingTopoEntry 10 }
+
+erpsRingTopoEastProtectionStatus OBJECT-TYPE
+    SYNTAX        ErpsRingTopoProtectionStatus
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "East protection status of the current station."
+    ::= { erpsRingTopoEntry 11 }
+
+erpsRingTopoLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The value of sysUpTime at the time when any topology element
+         gets updated."
+    ::= { erpsRingTopoEntry 12 }
+
+erpsRingTopoChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates number of times erpsRingTopoLastChange changed."
+    ::= { erpsRingTopoEntry 13 }
+
+erpsRingTopoStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Station IP of the current station."
+    ::= { erpsRingTopoEntry 14 }
+
+erpsRingTopoWestStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Station IP of the west neighbor of the current station."
+    ::= { erpsRingTopoEntry 15 }
+
+erpsRingTopoEastStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Station IP of the east neighbor of the current station."
+    ::= { erpsRingTopoEntry 16 }
+
+
+--
+-- ERPS Ring MAC Topology table
+--
+
+erpsRingTopoMacTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF ErpsRingTopoMacEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The ERPS Ring Topology table, indexed by MAC address."
+
+    ::= { erpsProtocol 3 }
+
+erpsRingTopoMacEntry OBJECT-TYPE
+    SYNTAX        ErpsRingTopoMacEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Entry representing the topology indexed by erps index and MAC address."
+    INDEX { erpsRingTopoMacIndex, erpsRingTopoMacMacAddress }
+    ::= { erpsRingTopoMacTable 1 }
+
+ErpsRingTopoMacEntry ::= SEQUENCE {
+    erpsRingTopoMacIndex                  InterfaceIndex,
+    erpsRingTopoMacMacAddress             MacAddress,
+
+    erpsRingTopoMacStationId              Unsigned32,
+    erpsRingTopoMacStationName            OCTET STRING,
+    erpsRingTopoMacStationFlags           BITS,
+    erpsRingTopoMacWestStationId          Unsigned32,
+    erpsRingTopoMacEastStationId          Unsigned32,
+    erpsRingTopoMacWestNeighborMacAddress MacAddress,
+    erpsRingTopoMacEastNeighborMacAddress MacAddress,
+    erpsRingTopoMacWestProtectionStatus   ErpsRingTopoProtectionStatus,
+    erpsRingTopoMacEastProtectionStatus   ErpsRingTopoProtectionStatus,
+    erpsRingTopoMacLastChange             TimeStamp,
+    erpsRingTopoMacChanges                Counter32,
+    erpsRingTopoMacStationIp              IpAddress,
+    erpsRingTopoMacWestStationIp          IpAddress,
+    erpsRingTopoMacEastStationIp          IpAddress
+    }
+
+erpsRingTopoMacIndex OBJECT-TYPE
+    SYNTAX        InterfaceIndex
+    MAX-ACCESS    not-accessible 
+    STATUS        current
+    DESCRIPTION
+        "The ifIndex of this ERPS Ring Topology interface."
+    REFERENCE   "RFC 2863, ifIndex"
+    ::= { erpsRingTopoMacEntry 1 }
+
+erpsRingTopoMacMacAddress OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The Mac Address of the current station."
+    ::= { erpsRingTopoMacEntry 2 }
+
+erpsRingTopoMacStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..1024)
+    MAX-ACCESS    read-only 
+    STATUS        current
+    DESCRIPTION
+        "The Node Id of the ERPS ring node. 
+         Reports value 0 if the node has no Node Id."
+    ::= { erpsRingTopoMacEntry 3 }
+
+erpsRingTopoMacStationName OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(0..128))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The sysName of the current station."
+    ::= { erpsRingTopoMacEntry 4 }
+
+erpsRingTopoMacStationFlags OBJECT-TYPE
+    SYNTAX        BITS {
+                    isRplOwner (0),
+                    isHub      (1),
+                    isTopoInconsistentWithNeighbor(2)
+                  }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Conveys more information about the current station.
+         Note that many ERPS implementations do not have any
+         station on the ring that is a hub."
+    ::= { erpsRingTopoMacEntry 5 }
+
+erpsRingTopoMacWestStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..1024)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Node Id of the west neighbor of the current station. 
+         Reports value 0 if the node has no Node Id."
+    ::= { erpsRingTopoMacEntry 6 }
+
+erpsRingTopoMacEastStationId OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..1024)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Node Id of the east neighbor of the current station. 
+         Reports value 0 if the node has no Node Id."
+    ::= { erpsRingTopoMacEntry 7 }
+
+erpsRingTopoMacWestNeighborMacAddress OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Mac Address of the west neighbor of the current station."
+    ::= { erpsRingTopoMacEntry 8 }
+
+erpsRingTopoMacEastNeighborMacAddress OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Mac Address of the east neighbor of the current station."
+    ::= { erpsRingTopoMacEntry 9 }
+
+erpsRingTopoMacWestProtectionStatus OBJECT-TYPE
+    SYNTAX        ErpsRingTopoProtectionStatus
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "West protection status of the current station."
+    ::= { erpsRingTopoMacEntry 10 }
+
+erpsRingTopoMacEastProtectionStatus OBJECT-TYPE
+    SYNTAX        ErpsRingTopoProtectionStatus
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "East protection status of the current station."
+    ::= { erpsRingTopoMacEntry 11 }
+
+erpsRingTopoMacLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The value of sysUpTime at the time when any topology element
+         gets updated."
+    ::= { erpsRingTopoMacEntry 12 }
+
+erpsRingTopoMacChanges OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates number of times erpsRingTopoMacLastChange changed."
+    ::= { erpsRingTopoMacEntry 13 }
+
+erpsRingTopoMacStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Station IP of the current station."
+    ::= { erpsRingTopoMacEntry 14 }
+
+erpsRingTopoMacWestStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Station IP of the west neighbor of the current station."
+    ::= { erpsRingTopoMacEntry 15 }
+
+erpsRingTopoMacEastStationIp OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The Station IP of the east neighbor of the current station."
+    ::= { erpsRingTopoMacEntry 16 }
+
+
+--
+-- ERPS ALARMS
+--
+
+-- List of all ERPS Alarms
+-- ERPS Duplicate RPL Owner
+-- ERPS No RPL Owner
+-- ERPS Dup Hub
+-- ERPS No Hub
+-- ERPS Max Nodes Exceeded
+-- ERPS West Miswired
+-- ERPS East Miswired
+-- VLAN misconfig 
+-- Topology Inconsistent 
+-- East Edge
+-- West Edge
+-- No ErpsNeighborWest
+-- No ErpsneighborEast
+-- Ring Incomplete - Raised by Rplowner only
+
+erpsAlarmDupRPLOwnerSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates whether there is more than one RPL Owner in the ring."
+
+        --#TYPE         "Status - Duplicate RPL Owner Set"
+        --#SUMMARY      "ERPS Duplicate RPL Owner Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 1 }
+
+erpsAlarmDupRPLOwnerClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the Duplicate RPL Owner status has been cleared."
+
+        --#TYPE         "Status - Duplicate RPL Owner Clear"
+        --#SUMMARY      "ERPS Duplicate RPL Owner Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 2 }
+
+
+erpsAlarmNoRPLOwnerSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that there is no RPL Owner in the ring."
+
+        --#TYPE         "Status - No RPL Owner Set"
+        --#SUMMARY      "ERPS No RPL Owner Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 3 }
+
+
+erpsAlarmNoRPLOwnerClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the no RPL Owner status has been cleared."
+
+        --#TYPE         "Status - No RPL Owner Clear"
+        --#SUMMARY      "ERPS No RPL Owner Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 4 }
+
+
+
+erpsAlarmDupHubSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates whether there is more than one Hub in the ring."
+
+        --#TYPE         "Status - Duplicate Hub Set"
+        --#SUMMARY      "ERPS Duplicate Hub Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 5 }
+
+
+
+erpsAlarmDupHubClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the Duplicate Hub status has been cleared."
+
+        --#TYPE         "Status - Duplicate Hub Clear"
+        --#SUMMARY      "ERPS Duplicate Hub Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 6 }
+
+erpsAlarmNoHubSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+   }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that there is no Hub in the ring."
+
+        --#TYPE         "Status - No Hub Node Set"
+        --#SUMMARY      "ERPS No Hub Node Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 7 }
+
+
+erpsAlarmNoHubClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+   }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the No Hub Node status has been cleared."
+
+        --#TYPE         "Status - No Hub Node Clear"
+        --#SUMMARY      "ERPS No Hub Node Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 8 }
+
+
+erpsAlarmMaxNodesExceededSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the number of nodes in the ring has exceeded the maximum supported."
+
+        --#TYPE         "Status - Max nodes exceeded Set"
+        --#SUMMARY      "ERPS Max nodes exceeded Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 9 }
+
+
+erpsAlarmMaxNodesExceededClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that max nodes exceeded status has been cleared."
+
+        --#TYPE         "Status - Max nodes exceeded Clear"
+        --#SUMMARY      "ERPS Max nodes exceeded Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MAJOR 
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 10 }
+
+
+erpsAlarmWestMiswiredSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the West Span is miswired."
+
+        --#TYPE         "Status - Miswired West Span Set"
+        --#SUMMARY      "ERPS Miswired West Span Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 11 }
+
+
+erpsAlarmWestMiswiredClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the West Span Miswired status has been cleared."
+
+        --#TYPE         "Status - Miswired West Span Clear"
+        --#SUMMARY      "ERPS Miswired West Span Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 12 }
+
+
+erpsAlarmEastMiswiredSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the East Span is miswired."
+
+        --#TYPE         "Status - East Span Miswired Set"
+        --#SUMMARY      "ERPS East Span Miswired Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 13 }
+
+erpsAlarmEastMiswiredClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the East Span Miswired status has been cleared."
+
+        --#TYPE         "Status - East Span Miswired Clear"
+        --#SUMMARY      "ERPS East Span Miswired Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 14 }
+
+
+erpsAlarmTopoInconsistentSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates Inconsistent Topology with Neighbor."
+
+        --#TYPE         "Status - Inconsistent Topology with Neighbor Set"
+        --#SUMMARY      "ERPS Inconsistent Topology with Neighbor Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 15 }
+
+
+erpsAlarmTopoInconsistentClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that Inconsistent Topology with Neighbor status has been cleared."
+
+        --#TYPE         "Status - Inconsistent Topology with Neighbor Clear"
+        --#SUMMARY      "ERPS Inconsistent Topology with Neighbor Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 16 }
+
+
+erpsAlarmWestEdgeSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the West Span is down."
+
+        --#TYPE         "Status - West Edge Set"
+        --#SUMMARY      "ERPS West Edge Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 17 }
+
+
+erpsAlarmWestEdgeClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the West Span Edge status is cleared."
+
+        --#TYPE         "Status - West Edge Clear"
+        --#SUMMARY      "ERPS West Edge Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 18 }
+
+
+erpsAlarmEastEdgeSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the East Span is down."
+
+        --#TYPE         "Status - East Edge Set"
+        --#SUMMARY      "ERPS East Edge Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 19 }
+
+
+erpsAlarmEastEdgeClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the East Span Edge status is cleared."
+
+        --#TYPE         "Status - East Edge Clear"
+        --#SUMMARY      "ERPS East Edge Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 20 }
+
+
+erpsAlarmNoNeighborWestSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that there is no Erps neighbor on the West span."
+
+        --#TYPE         "Status - No Erps Neighbor West Set"
+        --#SUMMARY      "No Erps Neighbor West Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 21 }
+
+
+erpsAlarmNoNeighborWestClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the No Erps neighbor West status has been cleared."
+
+        --#TYPE         "Status - No Erps Neighbor West Clear"
+        --#SUMMARY      "No Erps Neighbor West Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 22 }
+
+erpsAlarmNoNeighborEastSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that there is no Erps neighbor on the East span."
+
+        --#TYPE         "Status - No Erps Neighbor East Set"
+        --#SUMMARY      "No Erps Neighbor East Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 23 }
+
+
+erpsAlarmNoNeighborEastClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the No Erps neighbor East status has been cleared."
+
+        --#TYPE         "Status - No Erps Neighbor East Clear"
+        --#SUMMARY      "No Erps Neighbor Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 24 }
+
+erpsAlarmRingIncompleteSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that Erps is not configured on one node in the ring."
+
+        --#TYPE         "Status - Ring Incomplete"
+        --#SUMMARY      "ERPS Ring Incomplete Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 25 }
+
+
+erpsAlarmRingIncompleteClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the ring incomplete alarm has been cleared."
+
+        --#TYPE         "Status - Ring Incomplete"
+        --#SUMMARY      "ERPS Ring Incomplete Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 26 }
+
+erpsAlarmVlanMisconfigSet NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the same VLAN is configured on multiple ERPS Nodes"
+
+        --#TYPE         "Status - Vlan Misconfig"
+        --#SUMMARY      "ERPS Vlan Misconfig Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 27 }
+
+
+erpsAlarmVlanMisconfigClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the VLAN misconfig alarm has been cleared."
+
+        --#TYPE         "Status - Vlan Misconfig"
+        --#SUMMARY      "ERPS Vlan Misconfig Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     CRITICAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 28 }
+
+
+erpsAlarmConfigurationChange   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that some type of ERPS configuation element has changed.
+         Will be set if the following OIDs have changed:
+          erpsIfEnabled,          erpsIfProtectionWTR,    erpsIfGuardTimer,
+          erpsIfRplOwner,         erpsIfRplLink,          erpsIfControlStag,
+          erpsIfWestIfIndex,      erpsIfEastIfIndex,      erpsSpanProtectionCommand,
+          erpsIfTransportStag,    erpsIfUuid"
+
+        --#TYPE         "Status - Erps Configuration Change"
+        --#SUMMARY      "ERPS Configuration Has Changed"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     INFORMATIONAL
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 29 }  
+   
+   erpsAlarmTopoRateInconsistentSet   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates Inconsistent Topology Rate across the ERPS ring."
+
+        --#TYPE         "Status - Inconsistent Topology Rate across the ring Set"
+        --#SUMMARY      "ERPS Inconsistent Topology Rate across the ring Set"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 30 }
+
+erpsAlarmTopoRateInconsistentClear   NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        ifDescr,
+        erpsIfStationName,
+        erpsIfUuid,
+        erpsIfIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that Inconsistent Topology Rate across the ring status has been cleared."
+
+        --#TYPE         "Status - Inconsistent Topology Rate across the ring Clear"
+        --#SUMMARY      "ERPS Inconsistent Topology Rate across the ring Clear"
+        --#SUMMARY      "Shelf: %s, Slot: %d, Port: %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+
+   ::= { erpsTraps 31 }
+
+END

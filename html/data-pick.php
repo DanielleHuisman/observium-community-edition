@@ -18,24 +18,21 @@ if (!$config['weathermap']['enable'] || $_SESSION['userlevel'] < 7) {
 }
 
 
-$config['base_url'] = (isset($config['url_path']) ? $config['url_path'] : $observium_url);
+$config['base_url'] = $config['url_path'] ?? $observium_url;
 $observium_found    = TRUE;
 
 
 // ******************************************
 
-function js_escape($str)
-{
-    $str = str_replace('\\', '\\\\', $str);
-    $str = str_replace("'", "\\\'", $str);
+function js_escape($str) {
 
-    $str = "'" . $str . "'";
+    $str = str_replace([ '\\', "'" ], [ '\\\\', "\\\'" ], $str);
 
-    return ($str);
+    return ("'" . $str . "'");
 }
 
 if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'link_step2') {
-    $dataid = intval($_REQUEST['dataid']);
+    $dataid = (int)$_REQUEST['dataid'];
     ?>
 
     <html>
@@ -243,7 +240,7 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'link_step1') {
     }
 
     if (isset($_REQUEST['host_id'])) {
-        $host_id = intval($_REQUEST['host_id']);
+        $host_id = (int)$_REQUEST['host_id'];
     }
 
     $hosts = dbFetchRows("SELECT `device_id`,`hostname` FROM `devices` ORDER BY `hostname`");
@@ -254,7 +251,7 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'link_step1') {
 
     <form name="mini">
         <?php
-        if (count($hosts) > 0) {
+        if (!safe_empty($hosts)) {
             print 'Host: <select name="host_id"  onChange="applyDSFilterChange(document.mini)">';
 
             print '<option ' . ($host_id == -1 ? 'SELECTED' : '') . ' value="-1">Any</option>';
@@ -326,7 +323,7 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'node_step1') {
     }
 
     if (isset($_REQUEST['host_id'])) {
-        $host_id = intval($_REQUEST['host_id']);
+        $host_id = (int)$_REQUEST['host_id'];
     }
 
     $hosts = dbFetchRows("SELECT `device_id` AS `id`,`hostname` as `name` FROM `devices` ORDER BY `hostname`");
@@ -380,7 +377,7 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'node_step1') {
                 // This is the section that sets the Node Properties
                 var graph_url, hover_url;
 
-                var base_url = '<?php echo(isset($config['base_url']) ? $config['base_url'] : ''); ?>';
+                var base_url = '<?php echo($config['base_url'] ?? ''); ?>';
 
                 if (typeof window.opener == "object") {
 
@@ -442,7 +439,7 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'node_step1') {
 
     <form name="mini">
         <?php
-        if (count($hosts) > 0) {
+        if (!safe_empty($hosts)) {
             print 'Host: <select name="host_id"  onChange="applyDSFilterChange(document.mini)">';
 
             print '<option ' . ($host_id == -1 ? 'SELECTED' : '') . ' value="-1">Any</option>';
@@ -462,16 +459,15 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'node_step1') {
 
         print '</form><div class="listcontainer"><ul id="dslist">';
 
-
-
-
-        foreach(dbFetchRows($SQL_picklist) AS $queryrows) {
+        if (!empty($SQL_picklist)) {
+            foreach (dbFetchRows($SQL_picklist) as $queryrows) {
                 echo "<li>";
                 $key  = $queryrows['id'];
                 $name = $queryrows['name'];
                 echo "<a href=\"#\" onclick=\"update_source_step1('$key','$name')\">" . $queryrows['name'] . "</a>";
                 echo "</li>\n";
                 $i++;
+            }
         }
 
         //..} else {
@@ -484,5 +480,5 @@ if (isset($_REQUEST['command']) && $_REQUEST["command"] == 'node_step1') {
     </html>
     <?php
 } // end of node step 1
-// vim:ts=4:sw=4:
-?>
+
+// EOF

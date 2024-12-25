@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -87,7 +87,7 @@ if ($vars['editing']) {
             $updated++;
         }
 
-        foreach (['purpose', 'ignore', 'disabled', 'poller_id'] as $param) {
+        foreach (['purpose', 'ignore', 'disabled', 'poller_id', 'force_discovery'] as $param) {
             if (!in_array($param, ['purpose', 'poller_id'])) {
                 // Boolean params
                 $vars[$param] = get_var_true($vars[$param]) ? '1' : '0';
@@ -112,7 +112,10 @@ if ($vars['editing']) {
             if ((bool)$vars['disabled'] != (bool)$device['disabled']) {
                 log_event('Device ' . ((bool)$vars['disabled'] ? 'disabled' : 'enabled') . ': ' . $device['hostname'], $device['device_id'], 'device', $device['device_id'], 5);
             }
-            $update_message = "Device record updated.";
+            if ((bool)$vars['force_discovery'] != (bool)$device['force_discovery']) {
+                log_event('Device forced discovery ' . ((bool)$vars['force_discovery'] ? 'enabled' : 'disabled') . ': ' . $device['hostname'], $device['device_id'], 'device', $device['device_id'], 5);
+            }
+           $update_message = "Device record updated.";
             if ($override_sysLocation_bool) {
                 $update_message .= " Please note that the updated sysLocation string will only be visible after the next poll.";
             }
@@ -140,34 +143,38 @@ if ($updated && $update_message) {
     print_error($update_message);
 }
 
-$form = ['type'     => 'horizontal',
-         'id'       => 'edit',
-         //'space'     => '20px',
-         'title'    => 'General Device Settings',
-         'icon'     => $config['icon']['tools'],
-         //'class'     => 'box box-solid',
-         'fieldset' => ['edit' => ''],
+$form = [
+    'type'     => 'horizontal',
+    'id'       => 'edit',
+    //'space'     => '20px',
+    'title'    => 'General Device Settings',
+    'icon'     => $config['icon']['tools'],
+    //'class'     => 'box box-solid',
+    'fieldset' => [ 'edit' => '' ],
 ];
 
 $form['row'][0]['editing'] = [
-  'type'  => 'hidden',
-  'value' => 'yes'];
+    'type'  => 'hidden',
+    'value' => 'yes'
+];
 $form['row'][1]['purpose'] = [
-  'type'     => 'text',
-  //'fieldset'    => 'edit',
-  'name'     => 'Description',
-  //'class'       => 'input-xlarge',
-  'width'    => '500px',
-  'readonly' => $readonly,
-  'value'    => $device['purpose']];
-$form['row'][2]['type']    = [
-  'type'     => 'select',
-  //'fieldset'    => 'edit',
-  'name'     => 'Type',
-  'width'    => '250px',
-  'readonly' => $readonly,
-  'values'   => $device_types,
-  'value'    => $device['type']];
+    'type'     => 'text',
+    //'fieldset'    => 'edit',
+    'name'     => 'Description',
+    //'class'       => 'input-xlarge',
+    'width'    => '500px',
+    'readonly' => $readonly,
+    'value'    => $device['purpose']
+];
+$form['row'][2]['type'] = [
+    'type'     => 'select',
+    //'fieldset'    => 'edit',
+    'name'     => 'Type',
+    'width'    => '250px',
+    'readonly' => $readonly,
+    'values'   => $device_types,
+    'value'    => $device['type']
+];
 /*
 $form['row'][2]['reset_type'] = array(
                                 'type'        => 'switch',
@@ -180,71 +187,90 @@ $form['row'][2]['reset_type'] = array(
                                 'off-text'    => 'Keep',
                                 'value'       => 0);
 */
-$form['row'][3]['sysLocation']          = [
-  'type'        => 'text',
-  //'fieldset'    => 'edit',
-  'name'        => 'Custom location',
-  'placeholder' => '',
-  'width'       => '250px',
-  'readonly'    => $readonly,
-  'disabled'    => !$override_sysLocation_bool,
-  'value'       => $override_sysLocation_string];
+$form['row'][3]['sysLocation'] = [
+    'type'        => 'text',
+    //'fieldset'    => 'edit',
+    'name'        => 'Custom location',
+    'placeholder' => '',
+    'width'       => '250px',
+    'readonly'    => $readonly,
+    'disabled'    => !$override_sysLocation_bool,
+    'value'       => $override_sysLocation_string
+];
 $form['row'][3]['override_sysLocation'] = [
-  'type'     => 'toggle',
-  'size'     => 'large',
-  //'fieldset'    => 'edit',
-  //'placeholder' => 'Use custom location below.',
-  'onchange' => "toggleAttrib('disabled', 'sysLocation')",
-  'readonly' => $readonly,
-  'value'    => $override_sysLocation_bool];
+    'type'     => 'toggle',
+    'size'     => 'large',
+    //'fieldset'    => 'edit',
+    //'placeholder' => 'Use custom location below.',
+    'onchange' => "toggleAttrib('disabled', 'sysLocation')",
+    'readonly' => $readonly,
+    'value'    => $override_sysLocation_bool
+];
 
-$poller_list                 = get_pollers();
+$poller_list = get_pollers();
+
 $form['row'][4]['poller_id'] = [
-  'type'      => 'select',
-  'community' => FALSE, // not available on community edition
-  'name'      => 'Poller',
-  'width'     => '250px',
-  'readonly'  => $readonly,
-  'disabled'  => !(count($poller_list) > 1),
-  'values'    => $poller_list,
-  'value'     => $device['poller_id']];
+    'type'      => 'select',
+    'community' => FALSE, // not available on community edition
+    'name'      => 'Poller',
+    'width'     => '250px',
+    'readonly'  => $readonly,
+    'disabled'  => !(count($poller_list) > 1),
+    'values'    => $poller_list,
+    'value'     => $device['poller_id']
+];
 
 $form['row'][5]['ping_skip'] = [
-  'type'        => 'toggle',
-  'view'        => 'toggle',
-  'palette'     => 'yellow',
-  'name'        => 'Skip ping',
-  //'fieldset'    => 'edit',
-  'placeholder' => 'Skip ICMP echo checks, only SNMP availability.',
-  'readonly'    => $readonly,
-  'value'       => $ping_skip];
+    'type'        => 'toggle',
+    'view'        => 'toggle',
+    'palette'     => 'yellow',
+    'name'        => 'Skip ping',
+    //'fieldset'    => 'edit',
+    'placeholder' => 'Skip ICMP echo checks, only SNMP availability.',
+    'readonly'    => $readonly,
+    'value'       => $ping_skip
+];
+$form['row'][6]['force_discovery'] = [
+    'type'        => 'toggle',
+    'view'        => 'toggle',
+    'palette'     => 'blue',
+    'name'        => 'Force Discovery',
+    //'fieldset'    => 'edit',
+    'placeholder' => 'Force the device to be rediscovered in the next 5 mins.',
+    'readonly'    => $readonly,
+    'value'       => $device['force_discovery']
+];
 // FIXME (Mike): $device['ignore'] and get_dev_attrib($device,'disable_notify') it is same/redundant options?
-$form['row'][6]['ignore']   = [
-  'type'        => 'toggle',
-  'view'        => 'toggle',
-  'palette'     => 'yellow',
-  'name'        => 'Device ignore',
-  //'fieldset'    => 'edit',
-  'placeholder' => 'Suppress alerts and notifications and hide in some UI elements.',
-  'readonly'    => $readonly,
-  'value'       => $device['ignore']];
-$form['row'][7]['disabled'] = [
-  'type'        => 'toggle',
-  'view'        => 'toggle',
-  'palette'     => 'red',
-  'name'        => 'Disable',
-  //'fieldset'    => 'edit',
-  'placeholder' => 'Disables polling and discovery.',
-  'readonly'    => $readonly,
-  'value'       => $device['disabled']];
-$form['row'][8]['submit']   = [
-  'type'     => 'submit',
-  'name'     => 'Save Changes',
-  'icon'     => 'icon-ok icon-white',
-  //'right'       => TRUE,
-  'class'    => 'btn-primary',
-  'readonly' => $readonly,
-  'value'    => 'save'];
+$form['row'][7]['ignore'] = [
+    'type'        => 'toggle',
+    'view'        => 'toggle',
+    'palette'     => 'yellow',
+    'name'        => 'Device ignore',
+    //'fieldset'    => 'edit',
+    'placeholder' => 'Suppress alerts and notifications and hide in some UI elements.',
+    'readonly'    => $readonly,
+    'value'       => $device['ignore']
+];
+$form['row'][8]['disabled'] = [
+    'type'        => 'toggle',
+    'view'        => 'toggle',
+    'palette'     => 'red',
+    'name'        => 'Disable',
+    //'fieldset'    => 'edit',
+    'placeholder' => 'Disables polling and discovery.',
+    'readonly'    => $readonly,
+    'value'       => $device['disabled']
+];
+
+$form['row'][9]['submit'] = [
+    'type'     => 'submit',
+    'name'     => 'Save Changes',
+    'icon'     => 'icon-ok icon-white',
+    //'right'       => TRUE,
+    'class'    => 'btn-primary',
+    'readonly' => $readonly,
+    'value'    => 'save'
+];
 
 print_form($form);
 unset($form);

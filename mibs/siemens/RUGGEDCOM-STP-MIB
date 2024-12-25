@@ -1,0 +1,201 @@
+RUGGEDCOM-STP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE, 
+    NOTIFICATION-TYPE,
+    Integer32	        				FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION		        	FROM SNMPv2-TC
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP		       	    FROM SNMPv2-CONF 
+    PortList   							FROM Q-BRIDGE-MIB
+    ruggedcomMgmt, ruggedcomTraps       FROM RUGGEDCOM-MIB;
+
+rcRstp MODULE-IDENTITY
+    LAST-UPDATED "201208030700Z"      -- Aug 30, 17:00 EST 2012
+    ORGANIZATION "RuggedCom"
+    CONTACT-INFO
+       "Postal: RuggedCom Inc.
+                300 Applewood Crescent
+                Concord, Ontario, 
+                L4K 5C7 Canada
+        Tel:    1-905-856-5288
+        E-Mail: support@ruggedcom.com"
+    
+    DESCRIPTION
+        "RuggedCom prorietary MIB for managing STP protocols."
+        
+	REVISION    "201206011700Z"      -- Jun 01, 17:00 EST 2012
+    DESCRIPTION                
+        "Fixed IMPORTS -  added NOTIFICATION-TYPE and NOTIFICATION-GROUP."
+
+	REVISION    "201206011700Z"      -- Jun 01, 17:00 EST 2012
+    DESCRIPTION                
+        "Fixed typing errors and errors in IMPORTS."
+
+    REVISION	"201010101000Z"      -- Oct 10, 10:00 EST 2010
+    DESCRIPTION
+        "RuggedCom prorietary MIB for managing STP protocols.
+        Initial version deals only with RSTP (MSTP is not 
+        supported)."
+
+    ::= { ruggedcomMgmt 5 }
+
+-- ---------------------------------------------------------- --
+-- rcRstp subtrees
+-- ---------------------------------------------------------- --
+rcRstpBase				OBJECT IDENTIFIER ::= { rcRstp 1 }
+--rcRstpTables			OBJECT IDENTIFIER ::= { rcRstp 2 }
+rcRstpConformance 		OBJECT IDENTIFIER ::= { rcRstp 3 }
+-- rcRstpCompliances  	OBJECT IDENTIFIER ::= { rcRstpConformance 1 }
+rcRstpGroups 			OBJECT IDENTIFIER ::= { rcRstpConformance 2 }
+-- Notification/trap branch
+ruggedcomRstpTraps		OBJECT IDENTIFIER ::= { ruggedcomTraps 11 }
+
+-- ---------------------------------------------------------- --
+-- Base objects
+-- ---------------------------------------------------------- --
+rcRstpDot1dStpTxHoldCount OBJECT-TYPE
+	SYNTAX      Integer32(0|3..100 )
+	MAX-ACCESS  read-write
+	STATUS      current
+	DESCRIPTION
+	    "The value used by the Port Transmit state machine to limit
+		the maximum transmission rate.
+
+		Larger values allow the network to recover from failed 
+		links/bridges more quickly.
+	    
+		The value of '0' means unlimitted transmission rate.
+		
+		If the value of dot1dStpTxHoldCount object is 3..10, this object
+		must match the value of the object dot1dStpTxHoldCount (RSTP-MIB).
+		If the value the object dot1dStpTxHoldCount is 10, the value of this 
+		object represents real configured transmission rate limit."
+	REFERENCE
+		"RSTP-MIB"
+	DEFVAL      { 0 }
+	::= { rcRstpBase 1 }
+
+rcRstpDot1dStpForwardingPorts OBJECT-TYPE
+	SYNTAX      PortList
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION
+        "The subset of ports in dot1dStpPortTable that are in
+        'forwarding' state (the vlaue of the object dot1dStpPortState
+        is 'forwarding')."
+	REFERENCE
+		"BRIDGE-MIB"
+	::= { rcRstpBase 2 }
+
+rcRstpDot1dStpBlockedPorts OBJECT-TYPE
+	SYNTAX      PortList
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION
+        "The subset of ports in dot1dStpPortTable that are in
+        'blocking' state (the vlaue of the object dot1dStpPortState 
+        is 'blocking')."
+	REFERENCE
+		"BRIDGE-MIB"
+	::= { rcRstpBase 3 }
+
+rcRstpDot1dStpBrokenPorts OBJECT-TYPE
+	SYNTAX      PortList
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION
+        "The subset of ports in dot1dStpPortTable that are in
+        'broken' state (the vlaue of the object dot1dStpPortState
+        is 'broken')."
+	REFERENCE
+		"BRIDGE-MIB"
+	::= { rcRstpBase 4 }
+
+rcRstpDot1dRstpAlternatePorts OBJECT-TYPE	
+	SYNTAX      PortList
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION
+        "The subset of ports with Alternate role."
+       REFERENCE
+           "IEEE 802.1D-2004: clause 17.7"
+	::= { rcRstpBase 5 }
+
+rcRstpDot1dRstpBackupPorts OBJECT-TYPE
+	SYNTAX      PortList
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION
+        "The subset of ports with Backup role."
+	REFERENCE
+           "IEEE 802.1D-2004: clause 17.7"
+	::= { rcRstpBase 6 }
+-- ---------------------------------------------------------------------- --
+-- Traps
+-- ---------------------------------------------------------------------- --
+rcRstpNewTopology 	NOTIFICATION-TYPE
+	OBJECTS    		{ 
+					  	rcRstpDot1dStpForwardingPorts,
+						rcRstpDot1dStpBlockedPorts,
+					  	rcRstpDot1dStpBrokenPorts,
+					  	rcRstpDot1dRstpAlternatePorts,
+					  	rcRstpDot1dRstpBackupPorts,
+					  	dot1dStpRootPort,
+					  	dot1dStpDesignatedRoot
+					}
+	STATUS     current
+	DESCRIPTION
+	"A rcRstpNewTopology trap is sent by a bridge after topoogy change trap
+	occures on one or more ports ( topologyChange traps are sent), and 
+	topology becomes stable. 
+
+	Topology is stable when the tcWhile timer for all ports on this Bridge 
+	is zero.
+	
+	This traps is disabled if topologyChange trap is disabled by device
+	configuration."		       
+	REFERENCE
+		"BRIDGE-MIB"
+	::= { ruggedcomRstpTraps 1 }
+	
+	
+-- ---------------------------------------------------------------------- --
+--  Object Groups
+-- ---------------------------------------------------------------------- --
+rcRstpBaseStpTxHoldCountGroup OBJECT-GROUP
+	OBJECTS		{
+					rcRstpDot1dStpTxHoldCount
+				}
+	STATUS     current
+    DESCRIPTION 
+        "A group of object providing information about configured
+        Transmit Count."
+    ::= { rcRstpGroups 1 }    
+
+rcRstpBaseGroup OBJECT-GROUP
+    OBJECTS     {
+					rcRstpDot1dStpForwardingPorts,
+					rcRstpDot1dStpBlockedPorts,
+					rcRstpDot1dStpBrokenPorts,					
+				  	rcRstpDot1dRstpAlternatePorts,
+				  	rcRstpDot1dRstpBackupPorts
+                }
+    STATUS      current
+    DESCRIPTION 
+        "A group of object providing information about port states and roles."
+    ::= { rcRstpGroups 2 }    
+
+
+
+rcRstpNotifyGroup OBJECT-GROUP
+    OBJECTS     {
+					rcRstpNewTopology
+				}
+    STATUS      current
+    DESCRIPTION 
+        "A group of objects that define New Topology trap."
+    ::= { rcRstpGroups 3 }    
+
+END

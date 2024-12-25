@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -49,9 +48,8 @@ if ($GLOBALS['snmp_status']) {
         $options              = ['limit_high' => (is_numeric($limits['limit_high']) ? $limits['limit_high'] : NULL),
                                  'limit_low'  => (is_numeric($limits['limit_low']) ? $limits['limit_low'] : NULL)];
 
-        //discover_sensor('temperature', $device, $oid, 'wtWebGraphThermHygroBinaryTempValue.1', 'wut', $descr, 0.1, $value, $options);
         $options['rename_rrd'] = "wut-wtWebGraphThermHygroBinaryTempValue.1";
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, $descr, $scale, $value, $options);
     }
 
     // Humidity/Volts
@@ -82,15 +80,13 @@ if ($GLOBALS['snmp_status']) {
             $options              = ['limit_high' => (is_numeric($limits['limit_high']) ? $limits['limit_high'] : NULL),
                                      'limit_low'  => (is_numeric($limits['limit_low']) ? $limits['limit_low'] : NULL)];
 
-            //discover_sensor('humidity', $device, $oid, 'wtWebGraphThermHygroBinaryTempValue.2', 'wut', $descr, 0.1, $value, $options);
             $options['rename_rrd'] = "wut-wtWebGraphThermHygroBinaryTempValue.2";
-            discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid, $index, $descr, $scale, $value, $options);
         } elseif ($octet == "02") {
             // Voltage? Not tested
             $options = [];
-            //discover_sensor('voltage', $device, $oid, 'wtWebGraphThermHygroBinaryTempValue.2', 'wut', $descr, 0.1, $value);
             $options['rename_rrd'] = "wtWebGraphThermHygroBinaryTempValue.2";
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, $scale, $value, $options);
         }
     }
 }

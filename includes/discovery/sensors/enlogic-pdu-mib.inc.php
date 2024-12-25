@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -88,7 +88,7 @@ foreach ($oids as $index => $entry) {
     $value                 = $entry[$oid_name];
     $options['rename_rrd'] = 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index;
 
-    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // pduUnitStatusApparentPower
     $descr    = "$name Apparent Power";
@@ -97,7 +97,7 @@ foreach ($oids as $index => $entry) {
     $value    = $entry[$oid_name];
     $options  = ['rename_rrd' => 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index];
 
-    discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // pduUnitStatusEnergy (tenths of kilowatt-hours)
     $descr    = "$name Energy";
@@ -202,7 +202,7 @@ foreach ($oids as $unit => $entry1) {
         $value                 = $entry[$oid_name];
         $options['rename_rrd'] = 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index;
 
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale_current, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale_current, $value, $options);
 
         // pduInputPhaseStatusVoltage
 
@@ -234,7 +234,7 @@ foreach ($oids as $unit => $entry1) {
         $value                 = $entry[$oid_name];
         $options['rename_rrd'] = 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index;
 
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         // pduInputPhaseStatusActivePower
         $descr    = "$name Active Power";
@@ -243,7 +243,7 @@ foreach ($oids as $unit => $entry1) {
         $value    = $entry[$oid_name];
         $options  = ['rename_rrd' => 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index];
 
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         // pduInputPhaseStatusApparentPower
         $descr    = "$name Apparent Power";
@@ -252,7 +252,7 @@ foreach ($oids as $unit => $entry1) {
         $value    = $entry[$oid_name];
         $options  = ['rename_rrd' => 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index];
 
-        discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         // pduInputPhaseStatusPowerFactor
         $descr    = "$name Power Factor";
@@ -261,7 +261,7 @@ foreach ($oids as $unit => $entry1) {
         $value    = $entry[$oid_name];
         $options  = ['rename_rrd' => 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index];
 
-        discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
     }
 }
 
@@ -323,7 +323,7 @@ foreach ($oids as $unit => $entry1) {
 
         $options['rename_rrd'] = 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index;
 
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale_current, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale_current, $value, $options);
     }
 }
 
@@ -432,7 +432,7 @@ foreach ($oids as $unit => $entry1) {
         $value                 = $entry[$oid_name];
         $options['rename_rrd'] = 'ENLOGIC-PDU-MIB-' . $oid_name . '-' . $index;
 
-        discover_sensor_ng($device, $sensor_class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $sensor_class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
     }
 }
 

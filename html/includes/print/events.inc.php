@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -150,7 +150,7 @@ function print_events($vars)
                 $string .= '    <td>';
             }
             // Use markdown parsed for Debug events, for allow links to docs (use Markdown Extra).
-            $message_escape = $entry['severity'] >= 7 ? get_markdown($entry['message'], TRUE, TRUE) : escape_html($entry['message']);
+            $message_escape = $entry['severity'] >= 7 ? get_markdown_extra($entry['message']) : escape_html($entry['message']);
             $string         .= $message_escape . '</td>' . PHP_EOL;
             //$string .= $entry['message'] . '</td>' . PHP_EOL;
             $string .= '  </tr>' . PHP_EOL;
@@ -182,20 +182,23 @@ function print_events($vars)
  * @return none
  *
  */
-function print_events_short($var)
-{
+function print_events_short($var) {
     $var['short'] = TRUE;
     print_events($var);
 }
 
 /**
+ * Generate array of eventlogs.
+ *
  * Params:
- * short
- * pagination, pageno, pagesize
+ * short, pagination, pageno, pagesize
  * device_id, entity_id, entity_type, message, timestamp_from, timestamp_to
+ *
+ * @param array $vars
+ *
+ * @return array Array of events
  */
-function get_events_array($vars)
-{
+function get_events_array($vars) {
     $array = [];
 
     // Short events? (no pagination, small out)
@@ -209,53 +212,62 @@ function get_events_array($vars)
     $pagesize          = $array['pagesize'];
 
     // Begin query generate
-    $param = [];
-    $where = ' WHERE 1 ';
+    $where_array = [];
     foreach ($vars as $var => $value) {
         if ($value != '') {
             switch ($var) {
                 case 'device':
                 case 'device_id':
-                    $where .= generate_query_values_and($value, 'device_id');
+                    $where_array[] = generate_query_values($value, 'device_id');
                     break;
+
                 case 'port':
                 case 'entity':
                 case 'entity_id':
-                    $where .= generate_query_values_and($value, 'entity_id');
+                    $where_array[] = generate_query_values($value, 'entity_id');
                     break;
+
                 case 'severity':
-                    $where .= generate_query_values_and($value, 'severity');
+                    $where_array[] = generate_query_values($value, 'severity');
                     break;
+
                 case 'type':
                 case 'entity_type':
-                    $where .= generate_query_values_and($value, 'entity_type');
+                    $where_array[] = generate_query_values($value, 'entity_type');
                     break;
+
                 case 'message':
-                    $where .= generate_query_values_and($value, 'message', '%LIKE%');
+                    $where_array[] = generate_query_values($value, 'message', '%LIKE%');
                     break;
+
                 case 'timestamp_from':
-                    $where   .= ' AND `timestamp` >= ?';
-                    $param[] = $value;
+                    $where_array[] = generate_query_values($value, 'timestamp', '>=');
                     break;
+
                 case 'timestamp_to':
-                    $where   .= ' AND `timestamp` <= ?';
-                    $param[] = $value;
+                    $where_array[] = generate_query_values($value, 'timestamp', '<=');
                     break;
+
                 case "group":
                 case "group_id":
                     $values = get_group_entities($value);
-                    $where  .= generate_query_values_and($values, 'entity_id');
-                    $where  .= generate_query_values_and(get_group_entity_type($value), 'entity_type');
+                    $where_array[] = generate_query_values($values, 'entity_type');
+                    $where_array[] = generate_query_values(get_group_entity_type($value), 'entity_type');
                     break;
             }
         }
     }
 
     // Show events only for permitted devices
-    $query_permitted = generate_query_permitted();
+    if ($_SESSION['userlevel'] >= 5) {
+        // Common only by device entity
+        $query_permitted = generate_query_permitted_ng();
+    } else {
+        // For limited users, use entity table and entity type
+        $query_permitted = generate_query_permitted_ng([ 'device', 'port', 'sensor', 'status', 'counter', 'bill' ], [ 'entity' => TRUE ]);
+    }
 
-    $query         = 'FROM `eventlog` ';
-    $query         .= $where . $query_permitted;
+    $query         = 'FROM `eventlog` ' . generate_where_clause($where_array, $query_permitted);
     $query_count   = 'SELECT COUNT(*) ' . $query;
     $query_updated = 'SELECT MAX(`timestamp`) ' . $query;
 
@@ -264,11 +276,11 @@ function get_events_array($vars)
     $query .= "LIMIT $start,$pagesize";
 
     // Query events
-    $array['entries'] = dbFetchRows($query, $param);
+    $array['entries'] = dbFetchRows($query);
 
     // Query events count
     if ($array['pagination'] && !$array['short']) {
-        $array['count']           = dbFetchCell($query_count, $param);
+        $array['count']           = dbFetchCell($query_count);
         $array['pagination_html'] = pagination($vars, $array['count']);
     } else {
         $array['count'] = safe_count($array['entries']);

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -55,7 +55,7 @@ for ($i = 1; $i <= 8; $i++) {
         if ($temp_unit === 'fahrenheit') {
             $options['sensor_unit'] = 'F';
         }
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, 0, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, 0, $descr, $scale, $value, $options);
     }
     if (!in_array($data[0]["s{$i}2Int"], $invalid)) {
         $descr = '#2 ' . $data[0]["s{$i}description"] . ' (' . $data[0]["s{$i}ID"] . ')';
@@ -71,7 +71,7 @@ for ($i = 1; $i <= 8; $i++) {
         if ($temp_unit === 'fahrenheit') {
             $options['sensor_unit'] = 'F';
         }
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, 0, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, 0, $descr, $scale, $value, $options);
     }
 }
 
@@ -109,7 +109,7 @@ for ($i = 1; $i <= 4; $i++) {
           'limit_low'  => $data[0]["voltage{$i}min"] * $scale,
           'limit_high' => $data[0]["voltage{$i}max"] * $scale
         ];
-        discover_sensor_ng($device, $type, $mib, $oid_name, $oid_num, 0, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $type, $mib, $oid_name, $oid_num, 0, $descr, $scale, $value, $options);
     }
 }
 

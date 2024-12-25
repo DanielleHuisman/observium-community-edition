@@ -4,11 +4,19 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
+
+// FIXME. Migrate to definitions (already exist, need status migration)
+
+if (isset($valid['status']['Dell-Vendor-MIB']['dell-vendor-state']) &&
+    dbExist('status', '`device_id` = ? AND (`status_object` = ? OR `status_object` = ?)', [ $device['device_id'], 'envMonFanState', 'envMonSupplyState' ])) {
+    // Skip statuses when already by Dell-Vendor-MIB
+    return;
+}
 
 // RADLAN-HWENVIROMENT::rlEnvMonFanStatusDescr.67109249 = STRING: "fan1"
 // RADLAN-HWENVIROMENT::rlEnvMonFanStatusDescr.67109250 = STRING: "fan2"
@@ -24,13 +32,7 @@ foreach ($oids as $index => $entry) {
     $oid   = ".1.3.6.1.4.1.89.83.1.1.1.3.$index";
     $value = $entry['rlEnvMonFanState'];
 
-    if (isset($valid['status']['Dell-Vendor-MIB']['dell-vendor-state']) &&
-        dbExist('status', '`device_id` = ? AND `status_object` = ?', [$device['device_id'], 'envMonFanState'])) {
-        // Skip statuses when already by Dell-Vendor-MIB
-        continue;
-    }
     if ($entry['rlEnvMonFanState'] !== 'notPresent') {
-        //discover_status($device, $oid, "rlEnvMonFanState.$index", 'radlan-hwenvironment-state', $descr, $value, array('entPhysicalClass' => 'fan'));
         discover_status_ng($device, $mib, 'rlEnvMonFanState', $oid, $index, 'radlan-hwenvironment-state', $descr, $value, ['entPhysicalClass' => 'fan']);
     }
 }
@@ -54,13 +56,7 @@ foreach ($oids as $index => $entry) {
     $oid   = ".1.3.6.1.4.1.89.83.1.2.1.3.$index";
     $value = $entry['rlEnvMonSupplyState'];
 
-    if (isset($valid['status']['Dell-Vendor-MIB']['dell-vendor-state']) &&
-        dbExist('status', '`device_id` = ? AND `status_object` = ?', [$device['device_id'], 'envMonSupplyState'])) {
-        // Skip statuses when already by Dell-Vendor-MIB
-        continue;
-    }
     if ($entry['rlEnvMonSupplyState'] !== 'notPresent') {
-        //discover_status($device, $oid, "rlEnvMonSupplyState.$index", 'radlan-hwenvironment-state', $descr, $value, array('entPhysicalClass' => 'powerSupply'));
         discover_status_ng($device, $mib, 'rlEnvMonSupplyState', $oid, $index, 'radlan-hwenvironment-state', $descr, $value, ['entPhysicalClass' => 'powerSupply']);
     }
 }

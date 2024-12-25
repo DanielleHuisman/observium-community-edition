@@ -7,13 +7,13 @@
  *
  * @package    observium
  * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 chdir(dirname($argv[0]));
 
-$options = getopt("A:VyaselurpdbiT");
+$options = getopt("A:VyaselurpdbitxT");
 
 include("includes/observium.inc.php");
 
@@ -33,7 +33,7 @@ if (!isset($options['f']) && $config['poller_id'] !== 0) {
     exit;
 }
 
-print_message("%g" . OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION . "\n%WHouseKeeping%n\n", 'color');
+print_message("%g" . OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION . "\n%WHousekeeping%n\n", 'color');
 if (OBS_DEBUG) {
     print_versions();
 }
@@ -73,6 +73,10 @@ if (isset($options['a']) || isset($options['i'])) {
 if (isset($options['a']) || isset($options['r'])) {
     $modules[] = 'rrd';
 }
+if (isset($options['x'])) {
+    $modules[] = 'billing_data';
+}
+
 
 // Get age from command line
 if (isset($options['A'])) {
@@ -103,7 +107,7 @@ NOTE, by default $scriptname asks 'Are you sure want to delete (y/N)?'.
 OPTIONS:
  -V                                          Show version and exit.
  -y                                          Automatically answer 'yes' to prompts
- -a                                          Maintain all modules as specified below.
+ -a                                          Maintain all modules except billing as specified below.
  -s                                          Clean up syslog
  -e                                          Clean up event log
  -l                                          Clean up alert log
@@ -114,6 +118,8 @@ OPTIONS:
  -b                                          Clean up stale database entries
  -A <age>                                    Specifies maximum age for all modules (overrides configuration)
  -f                                          Force run Housekeeping on Poller ID other than 0 (main)
+
+ -x                                          Clean up billing data
 
 DEBUGGING OPTIONS:
  -T                                          Testing, not do any actions, only show counts.

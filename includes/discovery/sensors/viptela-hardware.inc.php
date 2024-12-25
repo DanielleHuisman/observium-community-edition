@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  *
  */
@@ -107,7 +107,7 @@ foreach ($oids as $named_index => $entry) {
                 }
             }
 
-            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $limits);
+            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $limits);
             break;
 
         case 'fans':
@@ -119,7 +119,7 @@ foreach ($oids as $named_index => $entry) {
             $scale    = 1;
             $value    = $entry[$oid_name];
 
-            discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
             break;
 
         case 'pEM':

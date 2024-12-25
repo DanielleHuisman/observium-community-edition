@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -168,7 +168,7 @@ if (OBS_DEBUG) {
                                 $netmap_menu[] = ['title' => $netmap['name'], 'url' => generate_url(['page' => 'netmap', 'netmap_id' => $netmap['netmap_id']]), 'icon' => $config['icon']['map']];
                             }
 
-                          $navbar['observium']['entries'][] = ['title' => 'Advanced Weathermap', 'url' => generate_url(['page' => 'netmap']), 'icon' => $config['icon']['map'], 'entries' => $netmap_menu];
+                          $navbar['observium']['entries'][] = ['title' => 'Advanced Weathermap', 'url' => generate_url(['page' => 'netmap']), 'icon' => $config['icon']['map'], 'entries' => $netmap_menu, 'userlevel' => 9];
 
                         }
 
@@ -191,10 +191,10 @@ if (OBS_DEBUG) {
                         // End PHP Weathermaps
 
 
-                        $navbar['observium']['entries'][] = ['title' => 'Network Map', 'url' => generate_url(['page' => 'map']), 'icon' => $config['icon']['netmap']];
-                        $navbar['observium']['entries'][] = ['title' => 'Network Traffic Map', 'url' => generate_url(['page' => 'map_traffic']), 'icon' => $config['icon']['ospf']];
+                        $navbar['observium']['entries'][] = ['title' => 'Network Map', 'url' => generate_url(['page' => 'map']), 'icon' => $config['icon']['netmap'], 'userlevel' => 9];
+                        $navbar['observium']['entries'][] = ['title' => 'Network Traffic Map', 'url' => generate_url(['page' => 'map_traffic']), 'icon' => $config['icon']['ospf'], 'userlevel' => 9];
 
-                        $navbar['observium']['entries'][] = ['divider' => TRUE];
+                        $navbar['observium']['entries'][] = ['divider' => TRUE, 'userlevel' => 9];
 
                         if ($_SESSION['userlevel'] >= 7) {
                             // Print Contacts
@@ -207,21 +207,24 @@ if (OBS_DEBUG) {
                         if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5) {
                             // Custom OIDs
 
-                            $oids = dbFetchRows("SELECT `oids`.*, COUNT(*) AS `count` FROM `oids` JOIN `oids_entries` ON `oids`.`oid_id` = `oids_entries`.`oid_id` WHERE 1 GROUP BY `oids`.`oid_id`");
+                            $oids_count = dbFetchKeyValue("SELECT `oid_id`, COUNT(*) AS `count` FROM `oids_entries`" .
+                                                          generate_where_clause($cache['where']['devices_permitted']) . " GROUP BY `oid_id`");
+                            //r($oids_count);
 
-                            $oid_count = safe_count($oids);
-
+                            $oid_count = 0;
                             $oids_menu = [];
-                            foreach ($oids as $oid) {
-                                $oids_menu[] = ['title' => $oid['oid_descr'], 'url' => generate_url(['page' => 'customoid', 'oid_id' => $oid['oid_id']]), 'count' => $oid['count'], 'icon' => $config['icon']['customoid']];
+                            foreach (dbFetchRows("SELECT * FROM `oids`") as $oid) {
+                                $oid['count'] = $oids_count[$oid['oid_id']] ?? 0;
+                                $oids_menu[]  = [ 'title' => $oid['oid_descr'], 'url' => generate_url([ 'page' => 'customoid', 'oid_id' => $oid['oid_id']]), 'count' => $oid['count'], 'icon' => $config['icon']['customoid'] ];
+                                $oid_count++;
                             }
 
-                            $navbar['observium']['entries'][] = ['title' => 'Custom OIDs', 'url' => generate_url(['page' => 'customoids']), 'count' => $oid_count, 'icon' => $config['icon']['customoid'], 'entries' => $oids_menu];
-                            //$navbar['observium']['entries'][] = array('divider' => TRUE);
+                            $navbar['observium']['entries'][] = [ 'title' => 'Custom OIDs', 'url' => generate_url(['page' => 'customoids']), 'count' => $oid_count, 'icon' => $config['icon']['customoid'], 'entries' => $oids_menu ];
 
                             // Probes
-                            $navbar['observium']['entries'][] = ['title' => 'Probes', 'url' => generate_url(['page' => 'probes']), 'icon' => $config['icon']['status']];
-                            $navbar['observium']['entries'][] = ['divider' => TRUE];
+                            $probe_count = dbFetchCell("SELECT COUNT(*) FROM `probes` " . generate_where_clause($cache['where']['devices_permitted']));
+                            $navbar['observium']['entries'][] = [ 'title' => 'Probes', 'url' => generate_url(['page' => 'probes']), 'count' => $probe_count, 'icon' => $config['icon']['status'] ];
+                            $navbar['observium']['entries'][] = [ 'divider' => TRUE ];
 
                         }
 
@@ -385,7 +388,7 @@ if (OBS_DEBUG) {
                         if ($cache['devices']['stat']['down'] + $cache['devices']['stat']['ignored'] + $cache['devices']['stat']['disabled']) {
                             $navbar['devices']['entries'][] = ['divider' => TRUE];
                             if ($cache['devices']['stat']['down']) {
-                                $navbar['devices']['entries'][] = ['url' => generate_url(['page' => 'devices', 'status' => '0']), 'icon' => $config['icon']['exclamation'], 'title' => 'Down', 'count_array' => ['down' => $cache['devices']['stat']['down']]];
+                                $navbar['devices']['entries'][] = ['url' => generate_url(['page' => 'devices', 'status' => '0', 'ignore' => '0']), 'icon' => $config['icon']['exclamation'], 'title' => 'Down', 'count_array' => ['down' => $cache['devices']['stat']['down']]];
                             }
                             if ($cache['devices']['stat']['ignored']) {
                                 $navbar['devices']['entries'][] = ['url' => generate_url(['page' => 'devices', 'ignore' => '1']), 'icon' => $config['icon']['ignore'], 'title' => 'Ignored', 'count_array' => ['ignored' => $cache['devices']['stat']['ignored']]];
@@ -476,41 +479,64 @@ if (OBS_DEBUG) {
                         }
 
                         if ($_SESSION['userlevel'] >= '5') {
-                            // FIXME new icons
-                            if ($config['int_customers']) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'customers']), 'icon' => $config['icon']['port-customer'], 'title' => 'Customers'];
+                            // Base interface groups
+                            $int_groups = $config['ports']['descr_groups'];
+                            if ($int_groups['cust']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('cust', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'customers' ]), 'icon' => $int_groups['cust']['icon'], 'title' => $int_groups['cust']['name'] ];
                                 $ifbreak                      = 1;
                             }
-                            if ($config['int_l2tp']) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'iftype', 'type' => 'l2tp']), 'icon' => $config['icon']['users'], 'title' => 'L2TP'];
+                            if ($int_groups['l2tp']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('l2tp', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => 'l2tp' ]), 'icon' => $int_groups['l2tp']['icon'], 'title' => $int_groups['l2tp']['name'] ];
                                 $ifbreak                      = 1;
                             }
-                            if ($config['int_transit']) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'iftype', 'type' => 'transit']), 'icon' => $config['icon']['port-transit'], 'title' => 'Transit'];
+                            $int_t_p = TRUE;
+                            if ($int_groups['transit']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('transit', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => 'transit' ]), 'icon' => $int_groups['transit']['icon'], 'title' => $int_groups['transit']['name'] ];
+                                $ifbreak                      = 1;
+                            } else {
+                                $int_t_p = FALSE; // disable p&t group menu
+                            }
+                            if ($int_groups['peering']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('peering', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => 'peering' ]), 'icon' => $int_groups['peering']['icon'], 'title' => $int_groups['peering']['name'] ];
+                                $ifbreak                      = 1;
+                            } else {
+                                $int_t_p = FALSE; // disable p&t group menu
+                            }
+                            if ($int_t_p) {
+                                $navbar['ports']['entries'][] = [ 'url'   => generate_url(['page' => 'iftype', 'type' => 'peering,transit']),
+                                                                  'icon'  => $config['icon']['port-peering-transit'],
+                                                                  'title' => $int_groups['peering']['name'].' & '.$int_groups['transit']['name'] ];
                                 $ifbreak                      = 1;
                             }
-                            if ($config['int_peering']) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'iftype', 'type' => 'peering']), 'icon' => $config['icon']['port-peering'], 'title' => 'Peering'];
+                            if ($int_groups['core']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('core', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => 'core' ]), 'icon' => $int_groups['core']['icon'], 'title' => $int_groups['core']['name'] ];
                                 $ifbreak                      = 1;
                             }
-                            if ($config['int_peering'] && $config['int_transit']) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'iftype', 'type' => 'peering,transit']), 'icon' => $config['icon']['port-peering-transit'], 'title' => 'Peering & Transit'];
+                            if ($int_groups['server']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('server', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => 'server' ]), 'icon' => $int_groups['server']['icon'], 'title' => $int_groups['server']['name'] ];
                                 $ifbreak                      = 1;
                             }
-                            if ($config['int_core']) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'iftype', 'type' => 'core']), 'icon' => $config['icon']['port-core'], 'title' => 'Core'];
+                            if ($int_groups['service']['enable'] &&
+                                dbExist('ports', generate_where_clause(generate_query_values('service', 'port_descr_type'), $cache['where']['ports_permitted']))) {
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => 'service' ]), 'icon' => $int_groups['service']['icon'], 'title' => $int_groups['service']['name'] ];
                                 $ifbreak                      = 1;
                             }
 
                             // Custom interface groups can be set - see Interface Description Parsing
                             foreach ($config['int_groups'] as $int_type) {
-                                $navbar['ports']['entries'][] = ['url' => generate_url(['page' => 'iftype', 'type' => $int_type]), 'icon' => $config['icon']['port'], 'title' => str_replace(',', ' & ', $int_type)];
+                                $navbar['ports']['entries'][] = [ 'url' => generate_url([ 'page' => 'iftype', 'type' => $int_type]), 'icon' => $config['icon']['port'], 'title' => str_replace(',', ' & ', $int_type) ];
                                 $ifbreak                      = 1;
                             }
                         }
 
                         if ($ifbreak) {
-                            $navbar['ports']['entries'][] = ['divider' => TRUE];
+                            $navbar['ports']['entries'][] = [ 'divider' => TRUE ];
                         }
 
                         $navbar['ports']['entries']['statuses'] = ['title' => 'Status Breakdown', 'url' => generate_url(['page' => '#']), 'icon' => $config['entities']['port']['icon'], 'entries' => []];
@@ -540,11 +566,12 @@ if (OBS_DEBUG) {
                         }
 
                         //////////// Build health menu
-                        $navbar['health'] = ['url' => '#', 'icon' => $config['icon']['health'], 'title' => 'Health'];
+                        $navbar['health'] = [ 'url' => '#', 'icon' => $config['icon']['health'], 'title' => 'Health' ];
 
-                        $health_items = ['processor' => ['text' => 'Processors', 'icon' => $config['icon']['processor']],
-                                         'mempool'   => ['text' => 'Memory', 'icon' => $config['icon']['mempool']],
-                                         'storage'   => ['text' => 'Storage', 'icon' => $config['icon']['storage']]
+                        $health_items = [
+                            'processor' => [ 'text' => 'Processors', 'icon' => $config['icon']['processor'] ],
+                            'mempool'   => [ 'text' => 'Memory',     'icon' => $config['icon']['mempool'] ],
+                            'storage'   => [ 'text' => 'Storage',    'icon' => $config['icon']['storage'] ]
                         ];
 
                         if ($cache['printersupplies']['count']) {
@@ -567,8 +594,8 @@ if (OBS_DEBUG) {
 
                         //r($cache['sensor_types']);
 
-                        $menu_items[0] = ['temperature', 'humidity', 'fanspeed', 'airflow'];
-                        $menu_items[1] = ['current', 'voltage', 'power', 'apower', 'rpower', 'frequency'];
+                        $menu_items[0] = [ 'temperature', 'humidity', 'dewpoint', 'fanspeed', 'airflow', 'waterflow' ];
+                        $menu_items[1] = [ 'current', 'voltage', 'power', 'apower', 'rpower', 'powerfactor', 'crestfactor', 'impedance', 'resistance', 'frequency' ];
                         $menu_items[2] = array_diff(array_keys((array)$cache['sensors']['types']), $menu_items[0], $menu_items[1]);
 
                         foreach ($menu_items as $key => $items) {

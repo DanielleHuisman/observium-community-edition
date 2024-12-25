@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -52,7 +52,8 @@ foreach ($cache['readydataos-mib']['diskTable'] as $index => $entry) {
     $object = 'diskTemperature';
 
     if ($value != '') {
-        discover_sensor_ng($device, 'temperature', $mib, $object, $oid, 'diskTemperature.' . $index, 'readydataos-mib_diskTemperature', $descr, 1, $value, ['entPhysicalClass' => 'storage']);
+        $options = [ 'rename_rrd' => 'readydataos-mib_diskTemperature-diskTemperature.' . $index ];
+        discover_sensor_ng($device, 'temperature', $mib, $object, $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.4526.22.3.1.9.$index";
@@ -64,7 +65,6 @@ foreach ($cache['readydataos-mib']['diskTable'] as $index => $entry) {
 }
 
 /*
-
  READYDATAOS-MIB::fanNumber.1 = INTEGER: 1
  READYDATAOS-MIB::fanRPM.1 = INTEGER: 819
  READYDATAOS-MIB::fanStatus.1 = STRING: "ok"
@@ -74,7 +74,6 @@ foreach ($cache['readydataos-mib']['diskTable'] as $index => $entry) {
  READYDATAOS-MIB::temperatureTyoe.1 = STRING: "cpu"
  READYDATAOS-MIB::temperatureMin.1 = INTEGER: 1
  READYDATAOS-MIB::temperatureMax.1 = INTEGER: 85
-
 */
 
 $cache['readydataos-mib']['fanTable'] = snmpwalk_cache_oid($device, 'fanTable', [], 'READYDATAOS-MIB');
@@ -86,7 +85,8 @@ foreach ($cache['readydataos-mib']['fanTable'] as $index => $entry) {
     $object = 'fanRPM';
 
     if ($value != '') {
-        discover_sensor_ng($device, 'fanspeed', $mib, $object, $oid, 'fanRPM.' . $index, 'readydataos-mib_fanRPM', $descr, 1, $value, ['entPhysicalClass' => 'device']);
+        $options = [ 'rename_rrd' => 'readydataos-mib_fanRPM-fanRPM.' . $index ];
+        discover_sensor_ng($device, 'fanspeed', $mib, $object, $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.4526.22.4.1.3.$index";
@@ -107,7 +107,8 @@ foreach ($cache['readydataos-mib']['temperatureTable'] as $index => $entry) {
     $object = 'temperatureValue';
 
     if ($value != '') {
-        discover_sensor_ng($device, 'temperature', $mib, $object, $oid, 'temperatureValue.' . $index, 'readydataos-mib_temperatureValue', $descr, 1, $value, ['entPhysicalClass' => 'device']);
+        $options = [ 'rename_rrd' => 'readydataos-mib_temperatureValue-temperatureValue.' . $index ];
+        discover_sensor_ng($device, 'temperature', $mib, $object, $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.4526.22.5.1.3.$index";

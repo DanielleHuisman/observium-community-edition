@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -32,7 +31,7 @@ foreach ($stackports as $index => $port) {
     $port_stats[$index]['ifName']        = 'Te' . $port['agentInventoryStackPortUnit'] . '/' . $port['agentInventoryStackPortTag'];
     $port_stats[$index]['ifDescr']       = 'Stack Port';
     $port_stats[$index]['ifType']        = 'propVirtual';
-    $port_stats[$index]['ifSpeed']       = intval($port['agentInventoryStackPortLinkSpeed']) * 1000000000;
+    $port_stats[$index]['ifSpeed']       = (int)$port['agentInventoryStackPortLinkSpeed'] * 1000000000;
     $port_stats[$index]['ifOperStatus']  = $port['agentInventoryStackPortLinkStatus'];
     $port_stats[$index]['ifAdminStatus'] = 'up';
     $port_stats[$index]['ifInErrors']    = $port['agentInventoryStackPortTotalErrors'];

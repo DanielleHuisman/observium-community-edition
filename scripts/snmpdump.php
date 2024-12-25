@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -23,7 +23,7 @@ $cli = TRUE;
 // get_versions();
 
 if (isset($options['V'])) {
-    // Print current version and exit
+    // Print a current version and exit
     print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION);
     if (is_array($options['V'])) {
         print_versions();

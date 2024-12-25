@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage definitions
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -36,14 +36,14 @@ while ($i < 6) {
     unset($class);
 
     // Guess units from $val
-    if (str_contains_array($val, "Amps")) {
+    if (str_contains($val, "Amps")) {
         $class = "voltage";
-    } elseif (str_contains_array($val, "Volts")) {
+    } elseif (str_contains($val, "Volts")) {
         $class = "current";
     }
 
     if (isset($class) && $name !== "00 ") {
-        discover_sensor_ng($device, $class, 'RMCU', $oid, $oid_num, $index, NULL, $name, 0.0001, $val);
+        discover_sensor_ng($device, $class, 'RMCU', $oid, $oid_num, $index, $name, 0.0001, $val);
     }
     $i++;
 }

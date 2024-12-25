@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -144,8 +144,7 @@ function graph_from_definition($vars, $type, $subtype, $device)
 }
 
 // DOCME needs phpdoc block
-function graph_error($string)
-{
+function graph_error($string) {
     global $vars, $config, $graphfile;
 
     $vars['bg'] = "FFBBBB";
@@ -158,18 +157,23 @@ function graph_error($string)
 
     if (FALSE && $height > 99) {
         rrdtool_graph($graphfile, $rrd_options);
-        //$woo = shell_exec($rrd_cmd);
-        //if (OBS_DEBUG) { echo("<pre>".$rrd_cmd."</pre>"); }
+
         if (is_file($graphfile)) {
+            $mimetype = 'image/png';
+            if ($vars['image_data_uri'] == TRUE) {
+                $image_data_uri = data_uri($graphfile, $mimetype);
+                unlink($graphfile);
+                return $image_data_uri;
+            }
             if (!OBS_DEBUG) {
-                header('Content-type: image/png');
+                header('Content-type: ' . $mimetype);
                 header('Content-Length: ' . filesize($graphfile));
                 header('Content-Disposition: inline; filename="' . basename($graphfile) . '"');
                 $fd = fopen($graphfile, 'r');
                 fpassthru($fd);
                 fclose($fd);
             } else {
-                echo('<img src="' . data_uri($graphfile, 'image/png') . '" alt="graph" />');
+                echo('<img src="' . data_uri($graphfile, $mimetype) . '" alt="graph" />');
             }
             unlink($graphfile);
 #      exit();
@@ -200,7 +204,7 @@ function graph_error($string)
 
             if (str_contains($string, "OK")) {
 
-                if(isset($GLOBALS['graph_error'])) {
+                if (isset($GLOBALS['graph_error'])) {
                     $string = $GLOBALS['graph_error'];
                 } else {
                     $string = "RRDTool seems to have generated an empty graph. \nPlease ensure that RRDs are being populated for this device.";
@@ -217,6 +221,15 @@ function graph_error($string)
                 imagestring($im, $font, $px, $py, $lines[$i], imagecolorallocate($im, 254, 0, 0));
             }
 
+            if ($vars['image_data_uri'] == TRUE) {
+                ob_start();
+                imagepng($im);
+                $imagedata = ob_get_clean();
+                $image_data_uri = 'data:image/png;base64,' . base64_encode($imagedata);
+
+                imagedestroy($im);
+                return $image_data_uri;
+            }
             header('Content-type: image/png');
             imagepng($im);
             imagedestroy($im);

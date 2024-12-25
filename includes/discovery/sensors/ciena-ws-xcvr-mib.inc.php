@@ -1,18 +1,17 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 
-// RIP falz 2017-05
+// falz 2017-05
 
 $cienaWsXcvrObjects_oids = [
   'cwsXcvrTemperatureActual',
@@ -43,7 +42,7 @@ foreach ($oids as $index => $entry) {
 
     // array index looks like [4.0] if theres only one lane, or [24.1.0] if there are >1 lanes such as LR4. it will then be 24.1.0 ... 24.4.0.
     // the first number is is ifIndex, grab it.
-    [$ifIndex, $lane,] = explode(".", $index, 3);
+    [ $ifIndex, $lane, ] = explode(".", $index, 3);
 
     // if 2nd element is greater than 0, it's the lane number (1-4 for LR4)
     if ($lane > 0) {
@@ -75,7 +74,6 @@ foreach ($oids as $index => $entry) {
     $descr    = $entry['ifDescr'] . ' Temp';
     $oid_name = 'cwsXcvrTemperatureActual';
     $oid_num  = '.1.3.6.1.4.1.1271.3.4.15.13.1.2.' . $index;
-    $type     = 'cwsXcvrTemperatureActual'; // $mib . '-' . $oid_name;
     if (version_compare($device['version'], '1.6', '>=')) {
         // See: http://jira.observium.org/browse/OBS-2753
         $scale = 0.001;
@@ -91,7 +89,7 @@ foreach ($oids as $index => $entry) {
 
     if ($value != 0) {
         $limits['rename_rrd'] = 'cwsXcvrTemperatureActual-' . $index;
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 
     if ($entry['cwsXcvrChannelTxPowerActual'] == 0 && $entry['cwsXcvrChannelRxPowerActual'] == 0) {
@@ -109,8 +107,7 @@ foreach ($oids as $index => $entry) {
     $descr    = $entry['ifDescr'] . $laneDescr . " RX Power";
     $oid_name = 'cwsXcvrChannelRxPowerActual';
     $oid_num  = '.1.3.6.1.4.1.1271.3.4.15.17.1.2.' . $index;
-    $type     = 'cwsXcvrChannelRxPowerActual'; // $mib . '-' . $oid_name;
-    $scale    = .1;
+    $scale    = 0.1;
     $value    = $entry[$oid_name];
 
     $limits = ['limit_high'      => $entry['cwsXcvrRxPowerThresholdHighAlarmThreshold'],
@@ -120,12 +117,11 @@ foreach ($oids as $index => $entry) {
 
     # some interfaces always return .0 for warnings, unset them if this is the case.
     if ($entry['cwsXcvrRxPowerThresholdHighWarningThreshold'] == .0 || $entry['cwsXcvrRxPowerThresholdLowWarningThreshold'] == .0) {
-        unset($limits['limit_low_warn']);
-        unset($limits['limit_high_warn']);
+        unset($limits['limit_low_warn'], $limits['limit_high_warn']);
     }
 
     $limits['rename_rrd'] = 'cwsXcvrChannelRxPowerActual-' . $index;
-    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
 
     // CIENA-WS-XCVR-MIB::cwsXcvrChannelTxPowerActual.4.1.0 = INTEGER: 1.5
@@ -137,24 +133,22 @@ foreach ($oids as $index => $entry) {
     $descr    = $entry['ifDescr'] . $laneDescr . " TX Power";
     $oid_name = 'cwsXcvrChannelTxPowerActual';
     $oid_num  = '.1.3.6.1.4.1.1271.3.4.15.20.1.2.' . $index;
-    $type     = 'cwsXcvrChannelTxPowerActual'; // $mib . '-' . $oid_name;
-    $scale    = .1;
+    $scale    = 0.1;
     $value    = $entry[$oid_name];
 
-    $limits = ['limit_high'      => $entry['cwsXcvrTxPowerThresholdHighAlarmThreshold'],
-               'limit_low'       => $entry['cwsXcvrTxPowerThresholdLowAlarmThreshold'],
-               'limit_high_warn' => $entry['cwsXcvrTxPowerThresholdHighWarningThreshold'],
-               'limit_low_warn'  => $entry['cwsXcvrTxPowerThresholdLowWarningThreshold']];
+    $limits = [ 'limit_high'      => $entry['cwsXcvrTxPowerThresholdHighAlarmThreshold'],
+                'limit_low'       => $entry['cwsXcvrTxPowerThresholdLowAlarmThreshold'],
+                'limit_high_warn' => $entry['cwsXcvrTxPowerThresholdHighWarningThreshold'],
+                'limit_low_warn'  => $entry['cwsXcvrTxPowerThresholdLowWarningThreshold'] ];
 
 
     # some interfaces always return .0 for warnings, unset them if this is the case.
     if ($entry['cwsXcvrTxPowerThresholdHighWarningThreshold'] == .0 || $entry['cwsXcvrTxPowerThresholdLowWarningThreshold'] == .0) {
-        unset($limits['limit_low_warn']);
-        unset($limits['limit_high_warn']);
+        unset($limits['limit_low_warn'], $limits['limit_high_warn']);
     }
 
-    $limits['rename_rrd'] = 'cwsXcvrChannelTxPowerActual-' . $index;
-    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $type, $descr, $scale, $value, array_merge($options, $limits));
+    $limits['rename_rrd']  = 'cwsXcvrChannelTxPowerActual-' . $index;
+    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 }
 
 // EOF

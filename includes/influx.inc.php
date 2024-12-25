@@ -8,7 +8,7 @@
  * @package        observium
  * @subpackage     influx
  * @author         Bill Fenner <fenner@gmail.com>
- * @copyright  (C) 2017 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 

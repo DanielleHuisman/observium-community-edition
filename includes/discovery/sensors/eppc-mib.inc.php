@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -58,7 +58,7 @@ if ($input_phases > 0) {
 
         $options               = $voltage_limits;
         $options['rename_rrd'] = "eppc-mib-upsESystemInputVoltage.%index%";
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $phase, $descr, $scale, $value, $options);
 
         if ($entry['upsESystemInputFrequency'] > 0) {
             $oid_name = 'upsESystemInputFrequency';
@@ -67,8 +67,8 @@ if ($input_phases > 0) {
 
             $options               = $frequency_limits;
             $options['rename_rrd'] = "eppc-mib-upsESystemInputFrequency.%index%";
-            //discover_sensor('frequency', $device, $oid, "upsESystemInputFrequency.$index", 'eppc-mib', $descr, 0.1, $value, $limits);
-            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+
+            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $phase, $descr, $scale, $value, $options);
         }
 
         if ($entry['upsESystemInputCurrent'] > 0) {
@@ -76,7 +76,7 @@ if ($input_phases > 0) {
             $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.16.1.4.' . $phase;
             $value    = $entry[$oid_name];
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $phase, $descr, $scale, $value);
         }
 
         if ($entry['upsESystemInputWatts'] > 0) {
@@ -84,7 +84,7 @@ if ($input_phases > 0) {
             $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.16.1.5.' . $phase;
             $value    = $entry[$oid_name];
 
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $phase, $descr, 1, $value);
         }
     }
 }
@@ -144,7 +144,7 @@ if ($output_phases > 0) {
 
         $options               = $voltage_limits;
         $options['rename_rrd'] = "eppc-mib-upsESystemOutputVoltage.%index%";
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $phase, $descr, $scale, $value, $options);
 
         $oid_name = 'upsESystemOutputFrequency';
         $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.2.' . $phase;
@@ -152,7 +152,7 @@ if ($output_phases > 0) {
 
         $options               = $frequency_limits;
         $options['rename_rrd'] = "eppc-mib-upsESystemOutputFrequency.%index%";
-        discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $phase, $descr, $scale, $value, $options);
 
         $oid_name = 'upsESystemOutputLoad';
         $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.7.' . $phase;
@@ -160,14 +160,14 @@ if ($output_phases > 0) {
 
         $options               = ['limit_high' => 90, 'limit_high_warn' => 75];
         $options['rename_rrd'] = "eppc-mib-upsESystemOutputLoad.%index%";
-        discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $phase, $descr, 1, $value, $options);
 
         if ($entry['upsESystemOutputCurrent'] > 0) {
             $oid_name = 'upsESystemOutputCurrent';
             $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.4.' . $phase;
             $value    = $entry[$oid_name];
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $phase, $descr, $scale, $value);
         }
 
         if ($entry['upsESystemOutputWatts'] > 0) {
@@ -175,7 +175,7 @@ if ($output_phases > 0) {
             $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.5.' . $phase;
             $value    = $entry[$oid_name];
 
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $phase, $descr, 1, $value);
         }
 
         if ($entry['upsESystemOutputVA'] > 0) {
@@ -183,7 +183,7 @@ if ($output_phases > 0) {
             $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.6.' . $phase;
             $value    = $entry[$oid_name];
 
-            discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value);
+            discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $phase, $descr, 1, $value);
         }
     }
 }

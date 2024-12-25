@@ -101,6 +101,12 @@ class Options
 
     /**
      *
+     * @var string
+     */
+    protected $sid;
+
+    /**
+     *
      * @var boolean
      */
     protected $authenticated = false;
@@ -109,7 +115,7 @@ class Options
      *
      * @var array
      */
-    protected $users = array();
+    protected $users = [];
 
     /**
      * Timeout for connection.
@@ -123,10 +129,20 @@ class Options
      *
      * @var array
      */
-    protected $authenticationClasses = array(
+    protected $authenticationClasses = [
         'digest-md5' => '\\Fabiang\\Xmpp\\EventListener\\Stream\\Authentication\\DigestMd5',
-        'plain'      => '\\Fabiang\\Xmpp\\EventListener\\Stream\\Authentication\\Plain'
-    );
+        'plain'      => '\\Fabiang\\Xmpp\\EventListener\\Stream\\Authentication\\Plain',
+        'anonymous'  => '\\Fabiang\\Xmpp\\EventListener\\Stream\\Authentication\\Anonymous'
+    ];
+
+
+    /**
+     * Options used to create a stream context
+     *
+     * @var array
+     */
+    protected $contextOptions = [];
+
 
     /**
      * Constructor.
@@ -284,6 +300,18 @@ class Options
     }
 
     /**
+     * Get resource.
+     *
+     * @return string
+     */
+    public function getResource()
+    {
+        $username = $this->getUsername();
+        $username = explode('/', $username);
+        return isset($username[1]) ? $username[1] : '';
+    }
+
+    /**
      * Get password.
      *
      * @return string
@@ -324,6 +352,28 @@ class Options
     public function setJid($jid)
     {
         $this->jid = (string) $jid;
+        return $this;
+    }
+
+    /**
+     * Get users jid.
+     *
+     * @return string
+     */
+    public function getSid()
+    {
+        return $this->sid;
+    }
+
+    /**
+     * Set users jid.
+     *
+     * @param string $jid
+     * @return $this
+     */
+    public function setSid($sid)
+    {
+        $this->sid = (string) $sid;
         return $this;
     }
 
@@ -411,6 +461,28 @@ class Options
     public function setTimeout($timeout)
     {
         $this->timeout = (int) $timeout;
+        return $this;
+    }
+
+    /**
+     * Get context options for connection
+     *
+     * @return array
+     */
+    public function getContextOptions()
+    {
+        return $this->contextOptions;
+    }
+
+    /**
+     *  Set context options for connection
+     *
+     * @param array $contextOptions
+     * @return \Fabiang\Xmpp\Options
+     */
+    public function setContextOptions($contextOptions)
+    {
+        $this->contextOptions = (array) $contextOptions;
         return $this;
     }
 }

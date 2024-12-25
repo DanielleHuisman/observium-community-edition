@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -25,10 +25,9 @@ function get_contact_by_id($contact_id)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function get_alert_test_by_id($alert_test_id)
-{
+function get_alert_test_by_id($alert_test_id) {
     if (is_numeric($alert_test_id) &&
-        $alert_test = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', [$alert_test_id])) {
+        $alert_test = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', [ $alert_test_id ])) {
 
         return $alert_test;
     }
@@ -43,6 +42,33 @@ function get_alert_entry_by_id($id)
     return dbFetchRow("SELECT * FROM `alert_table`" .
                       //" LEFT JOIN `alert_table-state` ON  `alert_table`.`alert_table_id` =  `alert_table-state`.`alert_table_id`".
                       " WHERE  `alert_table`.`alert_table_id` = ?", [$id]);
+}
+
+function alert_test_duplicate(&$vars) {
+    if (isset($vars['duplicate_id']) && $dupe = get_alert_test_by_id($vars['duplicate_id'])) {
+        //humanize_alert_check($dupe); // FIXME. Not need for duplication
+        //r($dupe);
+
+        $vars['entity_type']         = $dupe['entity_type'];
+        $vars['alert_name']          = $dupe['alert_name'];
+        $vars['alert_message']       = $dupe['alert_message'];
+
+        // FIXME. Need sync var names and test fields
+        $vars['alert_delay']         = $dupe['delay'];
+        $vars['alert_send_recovery'] = $dupe['suppress_recovery'] ? 0 : 1; // invert
+        $vars['alert_severity']      = $dupe['severity'];
+        $vars['alert_and']           = $dupe['and'];
+
+        $condition_text_block = [];
+        foreach (safe_json_decode($dupe['conditions']) as $condition) {
+            $condition_text_block[] = $condition['metric'] . ' ' . $condition['condition'] . ' ' .
+                                      str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
+        }
+        $vars['alert_conditions'] = implode(PHP_EOL, $condition_text_block);
+
+        unset($vars['duplicate_id']);
+    }
+    //r($vars);
 }
 
 /**
@@ -479,13 +505,10 @@ function cache_device_conditions($device)
  * @return array
  */
 // TESTME needs unit testing
-function cache_device_alert_table($device_id)
-{
+function cache_device_alert_table($device_id) {
     $alert_table = [];
 
-    $sql = "SELECT * FROM  `alert_table`";
-    //$sql .= " LEFT JOIN `alert_table-state` USING(`alert_table_id`)";
-    $sql .= " WHERE `device_id` = ?";
+    $sql = "SELECT * FROM `alert_table` WHERE `device_id` = ?";
 
     foreach (dbFetchRows($sql, [$device_id]) as $entry) {
         $alert_table[$entry['entity_type']][$entry['entity_id']][$entry['alert_test_id']] = $entry;
@@ -515,11 +538,11 @@ function update_alert_tables($silent = TRUE)
 }
 
 // Regenerate Alert Table
-function update_alert_table($alert, $silent = TRUE)
-{
+function update_alert_table($alert, $silent = TRUE) {
 
-    if (is_numeric($alert)) { // We got an alert_test_id, fetch the array.
-        $alert = dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", [$alert]);
+    if (is_numeric($alert)) {
+        // We got an alert_test_id, fetch the array.
+        $alert = get_alert_test_by_id($alert);
     }
 
     if (!safe_empty($alert['alert_assoc'])) {
@@ -611,19 +634,16 @@ function update_alert_table($alert, $silent = TRUE)
  * @return array
  */
 // TESTME needs unit testing
-function cache_alert_rules($vars = [])
-{
+function cache_alert_rules($vars = []) {
     $alert_rules = [];
     $rules_count = 0;
-    $where       = 'WHERE 1';
-    $args        = [];
 
+    $where = [];
     if (isset($vars['entity_type']) && $vars['entity_type'] !== "all") {
-        $where  .= ' AND `entity_type` = ?';
-        $args[] = $vars['entity_type'];
+        $where[] = generate_query_values($vars['entity_type'], 'entity_type');
     }
 
-    foreach (dbFetchRows("SELECT * FROM `alert_tests` " . $where, $args) as $entry) {
+    foreach (dbFetchRows("SELECT * FROM `alert_tests` " . generate_where_clause($where)) as $entry) {
         if ($entry['alerter'] == '') {
             $entry['alerter'] = "default";
         }
@@ -635,7 +655,6 @@ function cache_alert_rules($vars = [])
     print_debug("Cached $rules_count alert rules.");
 
     return $alert_rules;
-
 }
 
 // FIXME. Never used, deprecated?
@@ -1478,24 +1497,21 @@ function update_device_alert_table($device)
  * @return NULL
  */
 // TESTME needs unit testing
-function process_alerts($device)
-{
-    global $config, $alert_rules, $alert_assoc;
+function process_alerts($device) {
+    global $alert_rules, $alert_assoc;
 
     $pid_info = check_process_run($device); // This just clear stalled DB entries
     add_process_info($device);              // Store process info
 
     print_cli_heading($device['hostname'] . " [" . $device['device_id'] . "]", 1);
 
-    $alert_table = cache_device_alert_table($device['device_id']);
+    //$alert_table = cache_device_alert_table($device['device_id']);
 
-    $sql = "SELECT * FROM `alert_table`";
-    //$sql .= " LEFT JOIN `alert_table-state` ON `alert_table`.`alert_table_id` = `alert_table-state`.`alert_table_id`";
-    $sql .= " WHERE `device_id` = ? AND `alert_status` IS NOT NULL;";
+    $sql = "SELECT * FROM `alert_table` WHERE `device_id` = ? AND `alert_status` != -1";
 
     $db_multi_update = [];
 
-    foreach (dbFetchRows($sql, [$device['device_id']]) as $entry) {
+    foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry) {
         print_cli_data_field('Alert: ' . $entry['alert_table_id']);
         print_cli('Status: [' . $entry['alert_status'] . '] ', 'color');
 
@@ -1524,30 +1540,45 @@ function process_alerts($device)
         } elseif ($entry['alert_status'] == '0') {
             echo('Alert tripped. ');
 
+            // FIXME. In db we store crit, warn, need to rename
+            if ($alert_rules[$entry['alert_test_id']]['severity'] === 'warn') {
+                $severity = 'warning';
+            } else {
+                $severity = 'critical'; // crit, default
+            }
+            $interval = age_to_seconds($GLOBALS['config']['alerts'][$severity]['interval']);
+            $alerted_time = time() - $entry['last_alerted']; // seconds ago when last alerted
+
             // Has this been alerted more frequently than the alert interval in the config?
+            //$GLOBALS['spam'] = TRUE; /// DEVEL
             /// FIXME -- this should be configurable per-entity or per-checker
-            if ((time() - $entry['last_alerted']) < $config['alerts']['interval'] && !isset($GLOBALS['spam'])) {
+            if (!isset($GLOBALS['spam']) && $alerted_time < $interval) {
+                echo("Notify suppressed by minimum reminder interval");
                 $entry['suppress_alert'] = TRUE;
             }
 
-            // Don't re-alert if interval set to 0
-            if ($config['alerts']['interval'] == 0 && $entry['last_alerted'] != 0) {
+            // Don't re-alert if an interval set to 0
+            if ($interval == 0 && $entry['last_alerted'] != 0) {
+                echo("Notify reminder globally disabled");
                 $entry['suppress_alert'] = TRUE;
             }
 
             // Check if alert has ignore_until set.
             if (is_numeric($entry['ignore_until']) && $entry['ignore_until'] > time()) {
+                echo("Notify ignored until " . format_unixtime($entry['ignore_until']));
                 $entry['suppress_alert'] = TRUE;
             }
             // Check if alert has ignore_until_ok set.
             if (is_numeric($entry['ignore_until_ok']) && $entry['ignore_until_ok'] == '1') {
+                echo("Notify ignored until OK");
                 $entry['suppress_alert'] = TRUE;
             }
 
             if ($entry['suppress_alert'] != TRUE) {
                 echo('Requires notification. ');
 
-                $log_id = log_alert('Alert notification sent', $device, $entry, 'ALERT_NOTIFY');
+                $notify_tag = $entry['has_alerted'] ? 'REMINDER_NOTIFY' : 'ALERT_NOTIFY'; // reminder if previously alerted
+                $log_id = log_alert('Alert notification sent', $device, $entry, $notify_tag);
                 alert_notifier($entry, "alert", $log_id);
 
                 $db_multi_update[] = [
@@ -1561,7 +1592,7 @@ function process_alerts($device)
                 // dbUpdate($update_array, 'alert_table', '`alert_table_id` = ?', array($entry['alert_table_id']));
 
             } else {
-                echo("No notification required. " . (time() - $entry['last_alerted']));
+                echo(". Last alerted " . format_uptime($alerted_time) . ' ago.');
             }
         } elseif ($entry['alert_status'] == '1') {
             echo("Status: OK. ");
@@ -1594,8 +1625,7 @@ function process_alerts($device)
  *
  * @return array          List of processed notification ids.
  */
-function alert_notifier($entry, $type = "alert", $log_id = NULL)
-{
+function alert_notifier($entry, $type = "alert", $log_id = NULL) {
 
     $device = device_by_id_cache($entry['device_id']);
 
@@ -1659,9 +1689,9 @@ function alert_generate_subject($device, $prefix, $message_tags)
     return $subject;
 }
 
-function alert_generate_tags($entry, $type = "alert")
-{
-    global $config, $alert_rules;
+function alert_generate_tags($entry, $type = "alert") {
+
+    global $alert_rules;
 
     $alert_unixtime = time(); // Store time when alert processed
 
@@ -1709,46 +1739,36 @@ function alert_generate_tags($entry, $type = "alert")
         $metric_array[] = $metric . ' = ' . $value;
     }
 
+    // FIXME. Need move this function outside of generate tags,
+    // because this is transport specific function.
+    // Now do not generate graphs if $config['email']['graphs'] set to false for ANY transport!
     $graphs = alert_generate_graphs($entry, $entity);
 
+    // Severity
     if (empty($alert['severity'])) {
         $alert['severity'] = 'crit';
     }
+    $severity_name = $GLOBALS['config']['alerts']['severity'][$alert['severity']]['name'] ?? 'Critical';
 
     // FIXME. This is how was previously, seems as need something change here?
     $alert_duration = $entry['last_ok'] > 0 ? format_uptime($alert_unixtime - $entry['last_ok']) . " (" . format_unixtime($entry['last_ok']) . ")" : "Unknown";
-    if ($entry['alert_status'] == '1') {
-        // RECOVER
-        $alert_state = 'RECOVER';
-        $alert_emoji = 'white_check_mark';
-        $alert_color = '';
-    } elseif ($entry['has_alerted']) {
-        // ALERT REMINDER by $config['alerts']['interval']
-        $alert_state = 'ALERT REMINDER';
-        $alert_emoji = 'repeat';
-        $alert_color = '';
-    } else {
-        // ALERT (first time)
-        $alert_state = 'ALERT';
-        $alert_emoji = $config['alerts']['severity'][$alert['severity']]['emoji'];
-        $alert_color = $config['alerts']['severity'][$alert['severity']]['color'];
-    }
-    // Custom alert statuses
-    $alert_status_custom = $config['alerts']['status'][$entry['alert_status']] ?? $entry['alert_status'];
+
+    $alert_status = alert_status_array($entry, $alert['severity']);
 
     $message_tags = [
-      'ALERT_STATE'             => $alert_state,
-      'ALERT_EMOJI'             => get_icon_emoji($alert_emoji),               // https://unicodey.com/emoji-data/table.htm
-      'ALERT_EMOJI_NAME'        => $alert_emoji,
-      'ALERT_STATUS'            => $entry['alert_status'],                     // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED)
-      'ALERT_STATUS_CUSTOM'     => $alert_status_custom,                       // Tag for templates (as defined in $config['alerts']['status'] array)
-      //'ALERT_SEVERITY'          => $alert['severity'],                                       // Only: crit(2), warn(4), info(6)
-      'ALERT_SEVERITY'          => $config['alerts']['severity'][$alert['severity']]['name'], // Critical, Warning, Informational
-      'ALERT_COLOR'             => ltrim($alert_color, '#'),
-      'ALERT_URL'               => generate_url(['page'        => 'device',
-                                                 'device'      => $device['device_id'],
-                                                 'tab'         => 'alert',
-                                                 'alert_entry' => $entry['alert_table_id']]),
+      'ALERT_STATE'             => $alert_status['status_name'],
+      'ALERT_STATE_NAME'        => $alert_status['status_name_custom'],
+      'ALERT_EMOJI'             => get_icon_emoji($alert_status['status_emoji']), // https://unicodey.com/emoji-data/table.htm
+      'ALERT_EMOJI_NAME'        => $alert_status['status_emoji'],
+      'ALERT_STATUS'            => $alert_status['status'],                       // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED, 9 - SYSLOG)
+      'ALERT_STATUS_CUSTOM'     => $alert_status['status_custom'],                // Tag for templates (as defined in $config['alerts']['status'] array)
+      //'ALERT_SEVERITY'          => $alert['severity'],                          // Only: crit(2), warn(4), info(6)
+      'ALERT_SEVERITY'          => $severity_name,                                // Critical, Warning, Informational
+      'ALERT_COLOR'             => $alert_status['status_color'],
+      'ALERT_URL'               => generate_url([ 'page'        => 'device',
+                                                  'device'      => $device['device_id'],
+                                                  'tab'         => 'alert',
+                                                  'alert_entry' => $entry['alert_table_id'] ]),
       'ALERT_UNIXTIME'          => $alert_unixtime,                        // Standard unixtime
       'ALERT_TIMESTAMP'         => date('Y-m-d H:i:s P', $alert_unixtime), //           ie: 2000-12-21 16:01:07 +02:00
       'ALERT_TIMESTAMP_RFC2822' => date('r', $alert_unixtime),             // RFC 2822, ie: Thu, 21 Dec 2000 16:01:07 +0200
@@ -1786,22 +1806,99 @@ function alert_generate_tags($entry, $type = "alert")
       'DEVICE_REBOOTED'     => format_unixtime($device['last_rebooted']),
     ];
 
-    $message_tags['TITLE'] = alert_generate_subject($device, $alert_state, $message_tags);
+    $message_tags['TITLE'] = alert_generate_subject($device, $alert_status['status_name_custom'], $message_tags);
 
     return $message_tags;
 }
 
+/**
+ * Returns array of alert status params:
+ *   - status        (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED, 9 - SYSLOG)
+ *   - status_custom (as defined in $config['alerts']['status'] array)
+ *   - status_name   (ALERT, RECOVERY, DELAYED, SUPPRESSED)
+ *   - status_name_custom (as defined in $config['alerts']['status_name'] array)
+ *   - status_emoji
+ *   - status_color
+ * @param array $entry
+ * @param string $severity
+ *
+ * @return array
+ */
+function alert_status_array($entry, $severity = 'crit') {
+
+    $cfg = $GLOBALS['config']['alerts'] ?? [];
+
+    // print_debug("ALERT_STATUS DEBUG\n");
+    // print_debug_vars($entry);
+
+    $array = [
+        'status'        => $entry['alert_status'],
+        'status_custom' => $cfg['status'][$entry['alert_status']] ?? $entry['alert_status'] // Custom alert statuses
+    ];
+
+    if (isset($cfg['status_name'][$entry['alert_status']]) &&
+        is_alpha($cfg['status_name'][$entry['alert_status']])) {
+        // Ability for set custom alert status name (override default)
+        $array['status_name_custom'] = strtoupper($cfg['status_name'][$entry['alert_status']]);
+    }
+
+    if ($entry['alert_status'] == '1') {
+        // RECOVER
+        $array['status_name'] = 'RECOVER';
+        if (empty($array['status_name_custom'])) {
+            $array['status_name_custom'] = $array['status_name'];
+        }
+        $array['status_emoji'] = 'white_check_mark';
+        $array['status_color'] = '';
+
+        //print_debug_vars($array);
+        return $array;
+    }
+
+    $array['status_name'] = 'ALERT';
+
+    if ($entry['has_alerted']) {
+        // ALERT REMINDER by $config['alerts']['interval']
+        if (empty($array['status_name_custom'])) {
+            $array['status_name_custom'] = $array['status_name'];
+        }
+        $array['status_name'] .= ' REMINDER';
+        $array['status_name_custom'] .= ' REMINDER';
+        $array['status_emoji'] = 'repeat';
+        $array['status_color'] = '';
+
+        //print_debug_vars($array);
+        return $array;
+    }
+
+    // ALERT (first time)
+    if (empty($array['status_name_custom'])) {
+        $array['status_name_custom'] = $array['status_name'];
+    }
+    $array['status_emoji'] = $cfg['severity'][$severity]['emoji'];
+    $array['status_color'] = ltrim($cfg['severity'][$severity]['color'], '#');
+
+    //print_debug_vars($array);
+    return $array;
+}
+
 function alert_generate_graphs($entry, $entity) {
-    global $config;
+
+    // FIXME. Who this function depends on email config??
+    if (isset($GLOBALS['config']['email']['graphs']) && !$GLOBALS['config']['email']['graphs']) {
+        return [];
+    }
+
+    // entity definitions
+    $def        = $GLOBALS['config']['entities'][$entry['entity_type']] ?? [];
 
     $graphs     = [];
     $graph_done = [];
     foreach ($entry['metrics'] as $metric => $value) {
-        if ($config['email']['graphs'] !== FALSE
-            && is_array($config['entities'][$entry['entity_type']]['metric_graphs'][$metric])
-            && !in_array($config['entities'][$entry['entity_type']]['metric_graphs'][$metric]['type'], $graph_done)
-        ) {
-            $graph_array = $config['entities'][$entry['entity_type']]['metric_graphs'][$metric];
+        if (is_array($def['metric_graphs'][$metric]) &&
+            !in_array($def['metric_graphs'][$metric]['type'], $graph_done)) {
+
+            $graph_array = $def['metric_graphs'][$metric];
             foreach ($graph_array as $key => $val) {
                 // Check to see if we need to do any substitution
                 if (str_starts($val, '@')) {
@@ -1822,10 +1919,10 @@ function alert_generate_graphs($entry, $entity) {
         unset($graph_array);
     }
 
-    if ($config['email']['graphs'] !== FALSE && empty($graph_done) && is_array($config['entities'][$entry['entity_type']]['graph'])) {
+    if (empty($graph_done) && is_array($def['graph'])) {
         // We can draw a graph for this type/metric pair!
 
-        $graph_array = $config['entities'][$entry['entity_type']]['graph'];
+        $graph_array = $def['graph'];
         foreach ($graph_array as $key => $val) {
             // Check to see if we need to do any substitution
             if (str_starts($val, '@')) {
@@ -1859,8 +1956,8 @@ function alert_generate_graphs($entry, $entity) {
  *
  * @return array Array with transport -> endpoints lists
  */
-function get_alert_contacts($device, $alert_id, $notification_type)
-{
+function get_alert_contacts($device, $alert_id, $notification_type) {
+
     if (!is_array($device)) {
         $device = device_by_id_cache($device);
     }
@@ -1880,12 +1977,14 @@ function get_alert_contacts($device, $alert_id, $notification_type)
         return $contacts;
     }
 
+    $cfg = $GLOBALS['config']['email'];
+
     // figure out which transport methods apply to an alert
     $sql = "SELECT * FROM `alert_contacts`";
     $sql .= " WHERE `contact_disabled` = 0 AND `contact_id` IN";
     $sql .= " (SELECT `contact_id` FROM `alert_contacts_assoc` WHERE `aca_type` = ? AND `alert_checker_id` = ?);";
 
-    $syscontact_exist = $GLOBALS['config']['email']['default_syscontact'];
+    $syscontact_exist = $cfg['default_syscontact'];
     $syscontact_id    = 0;
     foreach (dbFetchRows($sql, [$notification_type, $alert_id]) as $contact) {
         if ($contact['contact_method'] === 'syscontact') {
@@ -1901,12 +2000,10 @@ function get_alert_contacts($device, $alert_id, $notification_type)
         // default device contact
         if (get_dev_attrib($device, 'override_sysContact_bool')) {
             $email = get_dev_attrib($device, 'override_sysContact_string');
+        } elseif (parse_email($device['sysContact'])) {
+            $email = $device['sysContact'];
         } else {
-            if (parse_email($device['sysContact'])) {
-                $email = $device['sysContact'];
-            } else {
-                $email = $GLOBALS['config']['email']['default'];
-            }
+            $email = $cfg['default'];
         }
 
         foreach (parse_email($email) as $email => $descr) {
@@ -1916,12 +2013,12 @@ function get_alert_contacts($device, $alert_id, $notification_type)
 
     }
 
-    if (empty($contacts) && $GLOBALS['config']['email']['default_only'] &&
-        !safe_empty($GLOBALS['config']['email']['default'])) {
+    if (empty($contacts) && $cfg['default_only'] &&
+        !safe_empty($cfg['default'])) {
         // if alert_contacts table is not in use, fall back to default
         // hardcoded defaults for when there is no contact configured.
 
-        foreach (parse_email($GLOBALS['config']['email']['default']) as $email => $descr) {
+        foreach (parse_email($cfg['default']) as $email => $descr) {
             $contacts[] = ['contact_endpoint' => '{"email":"' . $email . '"}', 'contact_id' => '0', 'contact_descr' => $descr, 'contact_method' => 'email'];
             print_debug("Added contact by default email config ($email, $descr).");
         }
@@ -2955,20 +3052,20 @@ function generate_querybuilder_form($entity_type, $type = "attribs", $form_id = 
 
       //operators: $.fn.queryBuilder.constructor.DEFAULTS.operators.concat([
       operators: ([
-      { type: 'le',		      nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'ge',		      nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'lt',		      nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'gt',		      nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'equals',		  nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'le',		    nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'ge',		    nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'lt',		    nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'gt',		    nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'equals',		nb_inputs: 1, multiple: false, apply_to: ['string'] },
       { type: 'notequals',	nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'match',		  nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'notmatch',	  nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'regexp',  	  nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'match',		nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'notmatch',	nb_inputs: 1, multiple: false, apply_to: ['string'] },
+      { type: 'regexp',  	nb_inputs: 1, multiple: false, apply_to: ['string'] },
       { type: 'notregexp',	nb_inputs: 1, multiple: false, apply_to: ['string'] },
-      { type: 'in',		      nb_inputs: 1, multiple: true,  apply_to: ['string'] },
-      { type: 'notin',		  nb_inputs: 1, multiple: true,  apply_to: ['string'] },
-      { type: 'isnull',		      nb_inputs: 0,  apply_to: ['string'] },
-      { type: 'isnotnull',		  nb_inputs: 0,  apply_to: ['string'] }
+      { type: 'in',		    nb_inputs: 1, multiple: true,  apply_to: ['string'] },
+      { type: 'notin',		nb_inputs: 1, multiple: true,  apply_to: ['string'] },
+      { type: 'isnull',		nb_inputs: 0,  apply_to: ['string'] },
+      { type: 'isnotnull',	nb_inputs: 0,  apply_to: ['string'] }
     ]),
     lang: {
       operators: {

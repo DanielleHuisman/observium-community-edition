@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -22,10 +22,9 @@
  *
  * @return array
  */
-function build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port = 161, $snmp_transport = 'udp', $options = [])
-{
+function build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port = 161, $snmp_transport = 'udp', $options = []) {
     $device                   = [];
-    $device['hostname']       = $hostname;
+    $device['hostname']       = strtolower(trim($hostname, ". \n\r\t\v\x00")); // remove trailing dot from hostname
     $device['snmp_port']      = $snmp_port;
     $device['snmp_transport'] = $snmp_transport;
     $device['snmp_version']   = $snmp_version;
@@ -65,7 +64,7 @@ function build_initial_device_array($hostname, $snmp_community, $snmp_version, $
 function get_device_snmp_argv($add, &$snmp_options) {
     global $config;
 
-    if (!$add) {
+    if (!is_array($add) || empty($add)) {
         return [];
     }
 
@@ -75,11 +74,9 @@ function get_device_snmp_argv($add, &$snmp_options) {
     //               Auth, No Priv : add_device.php <hostname> anp v3 <user> <password> [md5|sha|sha-224|sha-256|sha-384|sha-512] [port] [udp|udp6|tcp|tcp6] [context]
     //               Auth,    Priv : add_device.php <hostname> ap v3 <user> <password> <enckey> [md5|sha|sha-224|sha-256|sha-384|sha-512] [des|aes|aes-192|aes-192-c|aes-256|aes-256-c] [port] [udp|udp6|tcp|tcp6] [context]
 
-    $hostname       = strtolower($add[0]);
-    $snmp_community = $add[1];
-    $snmp_version   = strtolower($add[2]);
-
-    $snmp_port = 161;
+    $hostname     = strtolower(trim($add[0], ". \n\r\t\v\x00")); // remove trailing dot from hostname
+    $snmp_version = strtolower($add[2]);
+    $snmp_port    = 161;
     if (str_contains($hostname, ':') && get_ip_version($hostname) !== 6) {
         // Allow pass common hostname:port
         [ $host_tmp, $port_tmp ] = explode(':', $hostname, 2);
@@ -94,9 +91,10 @@ function get_device_snmp_argv($add, &$snmp_options) {
 
     $snmp_transport = 'udp';
 
-    if ($snmp_version === "v3") {
-        //$config['snmp']['v3'] = $snmp_config_v3; // Restore base SNMP v3 credentials
-        $snmp_v3_seclevel     = $snmp_community;
+    if ($snmp_version === 'v3') {
+        $return['snmp_v3_auth'] = [];
+        $snmp_v3_seclevel       = $add[1];
+        $snmp_v3_args           = array_slice($add, 3);
 
         // These values are the same as in defaults.inc.php
         $snmp_v3_auth = [
@@ -108,90 +106,60 @@ function get_device_snmp_argv($add, &$snmp_options) {
             'cryptoalgo' => "AES"
         ];
 
-        $add_context = FALSE; // Derp, last arg after transport is context
-        if ($snmp_v3_seclevel === "nanp" || $snmp_v3_seclevel === "any" || $snmp_v3_seclevel === "noAuthNoPriv") {
-            $snmp_v3_auth['authlevel'] = "noAuthNoPriv";
-            $snmp_v3_args              = array_slice($add, 3);
+        if ($snmp_v3_seclevel === "nanp" || $snmp_v3_seclevel === "noAuthNoPriv") {
+            $snmp_v3_auth['authlevel']  = 'noAuthNoPriv';
+            unset($snmp_v3_auth['authpass'], $snmp_v3_auth['authalgo'], $snmp_v3_auth['cryptopass'], $snmp_v3_auth['cryptoalgo']);
 
-            while ($arg = array_shift($snmp_v3_args)) {
-                // parse all remaining args
-                if (is_valid_param($arg, 'port')) {
-                    $snmp_port = $arg;
-                } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/', $arg)) {
-                    $snmp_transport = $arg;
-                    $add_context    = TRUE; // Derp, last arg after transport is context
-                } elseif ($add_context && strlen($arg)) {
-                    $snmp_context = $arg;
-                    break;
-                } else {
-                    // FIXME: should add a sanity check of chars allowed in user
-                    $user = $arg;
-                }
-            }
-
-            if ($snmp_v3_seclevel !== "any") {
-                //$config['snmp']['v3'] = [$snmp_v3_auth];
-                $return['snmp_v3_auth'] = [ $snmp_v3_auth ];
-            }
         } elseif ($snmp_v3_seclevel === "anp" || $snmp_v3_seclevel === "authNoPriv") {
+            $snmp_v3_auth['authlevel']  = 'authNoPriv';
+            $snmp_v3_auth['authname']   = array_shift($snmp_v3_args);
+            $snmp_v3_auth['authpass']   = array_shift($snmp_v3_args);
+            unset($snmp_v3_auth['cryptopass'], $snmp_v3_auth['cryptoalgo']);
 
-            $snmp_v3_auth['authlevel'] = "authNoPriv";
-            $snmp_v3_args              = array_slice($add, 4);
-            $snmp_v3_auth['authname']  = array_shift($snmp_v3_args);
-            $snmp_v3_auth['authpass']  = array_shift($snmp_v3_args);
-
-            while ($arg = array_shift($snmp_v3_args)) {
-                // parse all remaining args
-                if (is_valid_param($arg, 'port')) {
-                    $snmp_port = $arg;
-                } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
-                    $snmp_transport = $arg;
-                    $add_context    = TRUE; // Derp, last arg after transport is context
-                } elseif (is_valid_param($arg, 'snmp_authalgo')) {
-                    $snmp_v3_auth['authalgo'] = $arg;
-                } elseif ($add_context && !safe_empty($arg)) {
-                    $snmp_context = $arg;
-                    break;
-                }
-            }
-
-            //$config['snmp']['v3'] = [$snmp_v3_auth];
-            $return['snmp_v3_auth'] = [ $snmp_v3_auth ];
-        } elseif ($snmp_v3_seclevel === "ap" || $snmp_v3_seclevel === "authPriv") {
-            $snmp_v3_auth['authlevel']  = "authPriv";
-            $snmp_v3_args               = array_slice($add, 4);
+        } elseif ($snmp_v3_seclevel === "ap" || $snmp_v3_seclevel === 'authPriv') {
+            $snmp_v3_auth['authlevel']  = 'authPriv';
             $snmp_v3_auth['authname']   = array_shift($snmp_v3_args);
             $snmp_v3_auth['authpass']   = array_shift($snmp_v3_args);
             $snmp_v3_auth['cryptopass'] = array_shift($snmp_v3_args);
 
-            while ($arg = array_shift($snmp_v3_args)) {
-                // parse all remaining args
-                if (is_valid_param($arg, 'port')) {
-                    $snmp_port = $arg;
-                } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
-                    $snmp_transport = $arg;
-                    $add_context    = TRUE; // Derp, last arg after transport is context
-                } elseif (is_valid_param($arg, 'snmp_authalgo')) {
-                    $snmp_v3_auth['authalgo'] = $arg;
-                } elseif (is_valid_param($arg, 'snmp_cryptoalgo')) {
-                    $snmp_v3_auth['cryptoalgo'] = $arg;
-                } elseif ($add_context && !safe_empty($arg)) {
-                    $snmp_context = $arg;
-                    break;
-                }
-            }
+        } else {
+            $snmp_v3_seclevel = 'any';
+            $return['snmp_v3_auth'] = $config['snmp']['v3'];
+        }
 
-            //$config['snmp']['v3'] = [ $snmp_v3_auth ];
+        // parse all remaining snmp v3 args
+        // FIXME. This loop was used for random order of args
+        $add_context = FALSE; // Derp, last arg after transport is context
+        foreach ($snmp_v3_args as $arg) {
+            if (is_valid_param($arg, 'port')) {
+                $snmp_port = $arg;
+            } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
+                $snmp_transport = $arg;
+                $add_context    = TRUE; // Derp, last arg after transport is context
+            } elseif (isset($snmp_v3_auth['authpass']) && is_valid_param($arg, 'snmp_authalgo')) {
+                $snmp_v3_auth['authalgo'] = $arg;
+            } elseif (isset($snmp_v3_auth['cryptopass']) && is_valid_param($arg, 'snmp_cryptoalgo')) {
+                $snmp_v3_auth['cryptoalgo'] = $arg;
+            } elseif ($add_context && !safe_empty($arg)) {
+                $snmp_context = $arg;
+                break;
+            } elseif ($snmp_v3_auth['authlevel'] === 'noAuthNoPriv') {
+                // FIXME: should add a sanity check of chars allowed in user
+                $snmp_v3_auth['authname']  = $arg;
+            }
+        }
+        if ($snmp_v3_seclevel !== 'any') {
             $return['snmp_v3_auth'] = [ $snmp_v3_auth ];
         }
-        //print_debug_vars($snmp_v3_auth);
-        //print_debug_vars($config['snmp']['v3']);
-    } else {
+        print_debug_vars($snmp_v3_args);
+        print_debug_vars($snmp_v3_auth);
+    } elseif (!empty($add[1])) {
         // v1 or v2c
-        $snmp_v2_args = array_slice($add, 2);
+        $snmp_community = $add[1];
+        $snmp_v2_args   = array_slice($add, 2);
 
         $add_context = FALSE; // Derp, last arg after transport is context
-        while ($arg = array_shift($snmp_v2_args)) {
+        foreach ($snmp_v2_args as $arg) {
             // parse all remaining args
             if (is_valid_param($arg, 'port')) {
                 $snmp_port = $arg;
@@ -206,15 +174,18 @@ function get_device_snmp_argv($add, &$snmp_options) {
             }
         }
         if (!preg_match('/^(v1|v2c)$/i', $snmp_version)) {
-            $snmp_version = $config['snmp']['version'] !== 'v3' ? $config['snmp']['version'] : 'v2c';
+            $snmp_version = $config['snmp']['version'] === 'v1' ? 'v1' : 'v2c';
         }
 
-        //$config['snmp']['community'] = ($snmp_community ? [$snmp_community] : $snmp_config_community);
         $return['snmp_community'] = $snmp_community ? [ $snmp_community ] : $config['snmp']['community'];
+        print_debug_vars($snmp_v2_args);
+    } else {
+        // reset snmp version to NULL
+        $snmp_version = NULL;
     }
     $return['snmp_version']   = $snmp_version;
     $return['snmp_transport'] = $snmp_transport;
-    $return['snmp_port']      = $snmp_port;
+    $return['snmp_port']      = (int)$snmp_port;
 
     // Add snmp context to params
     if (isset($snmp_context)) {
@@ -237,39 +208,49 @@ function get_device_snmp_argv($add, &$snmp_options) {
 function add_device_vars($vars) {
     global $config;
 
-    $hostname = strip_tags($vars['hostname']);
+    $hostname  = trim(strip_tags($vars['hostname']), ". \n\r\t\v\x00"); // remove trailing dot from hostname
     $printname = escape_html($hostname);
 
     // Add a device to remote poller,
     // only validate vars and add to pollers_actions
     if (is_intnum($vars['poller_id']) && $vars['poller_id'] != $config['poller_id']) {
         print_message("Requested add device with hostname '$printname' to remote Poller [{$vars['poller_id']}].");
+
         if (!(is_valid_hostname($hostname) || get_ip_version($hostname))) {
             // Failed DNS lookup
             print_error("Hostname '$printname' is not valid.");
             return FALSE;
         }
-        if (!dbExist('pollers', '`poller_id` = ?', [$vars['poller_id']])) {
+
+        if (OBS_DISTRIBUTED && $vars['poller_id'] == 0) {
+            // Distributed install, allow adding action for default poller too
+            print_debug("Requested adding device to Default Poller from Remote Poller [{$config['poller_id']}].");
+        } elseif (!dbExist('pollers', '`poller_id` = ?', [ $vars['poller_id'] ])) {
             // Incorrect Poller ID
             print_error("Device with hostname '$printname' not added. Unknown target Poller requested.");
             return FALSE;
         }
-        if ($tmp_id = dbFetchCell('SELECT `poller_id` FROM `observium_actions` WHERE `action` = ? AND `identifier` = ?', ['device_add', $hostname])) {
+
+        if ($tmp_id = dbFetchCell('SELECT `poller_id` FROM `observium_actions` WHERE `action` = ? AND `identifier` = ?', [ 'device_add', $hostname ])) {
             // Incorrect Poller ID
             print_error("Already queued addition device with hostname '$printname' on remote Poller [$tmp_id].");
             return FALSE;
         }
-        if (dbExist('devices', '`hostname` = ?', [$hostname])) {
-            // found in database
+
+        if (dbExist('devices', '`hostname` = ?', [ $hostname ])) {
+            // found in a database
             print_error("Already got device with hostname '$printname'.");
             return FALSE;
         }
+
         if (function_exists('add_action_queue') &&
             $action_id = add_action_queue('device_add', $hostname, $vars)) {
-            print_message("Device with hostname '$printname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].");
-            log_event("Device with hostname '$printname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].", NULL, 'info', NULL, 7);
+            $poller_msg = $vars['poller_id'] == 0 ? 'Default Poller' : 'Remote Poller';
+            print_message("Device with hostname '$printname' added to queue [$action_id] for addition on $poller_msg [{$vars['poller_id']}].");
+            log_event("Device with hostname '$printname' added to queue [$action_id] for addition on $poller_msg [{$vars['poller_id']}].", NULL, 'info', NULL, 7);
             return TRUE;
         }
+
         print_error("Device with hostname '$printname' not added. Incorrect addition to actions queue.");
         return FALSE;
     }
@@ -395,7 +376,7 @@ function add_device_vars($vars) {
 /**
  * Adds the new device to the database.
  *
- * Before adding the device, checks duplicates in the database and the availability of device over a network.
+ * Before adding the device, check duplicates in the database and the availability of device over a network.
  *
  * @param string       $hostname                           Device hostname
  * @param string|array $snmp_version                       SNMP version(s) (default: $config['snmp']['version'])
@@ -405,14 +386,12 @@ function add_device_vars($vars) {
  *                                                         pings later
  *                                                         'break' - for break recursion,
  *                                                         'test'  - for skip adding, only test device availability)
- * @param int          $flags
  *
  * @return mixed Returns $device_id number if added, 0 (zero) if device not accessible with current auth and FALSE if device complete not accessible by
  *               network. When testing, returns -1 if the device is available.
  */
 // TESTME needs unit testing
-function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_transport = 'udp', $options = [], $flags = OBS_DNS_ALL)
-{
+function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_transport = 'udp', $options = []) {
     global $config;
 
     // If $options['break'] set as TRUE, break recursive function execute
@@ -421,233 +400,241 @@ function add_device($hostname, $snmp_version = [], $snmp_port = 161, $snmp_trans
     }
     $return = FALSE; // By default return FALSE
 
-    // Reset snmp timeout and retries options for speedup device adding
+    // Reset snmp timeout and retries options for a speedup device adding
     unset($config['snmp']['timeout'], $config['snmp']['retries']);
 
     $snmp_transport = strtolower($snmp_transport);
 
-    $hostname = strtolower(trim($hostname));
+    $hostname = strtolower(trim($hostname, ". \n\r\t\v\x00")); // remove trailing dot from hostname
 
-    // Try detect if hostname is IP
-    switch (get_ip_version($hostname)) {
+    // Try to detect if hostname is IP
+    switch ($ip_version = get_ip_version($hostname)) {
         case 6:
         case 4:
             if ($config['require_hostname']) {
                 print_error("Hostname should be a valid resolvable FQDN name. Or set config option \$config['require_hostname'] as FALSE.");
-                return $return;
+                return FALSE;
             }
             $hostname = ip_compress($hostname); // Always use compressed IPv6 name
             $ip       = $hostname;
             break;
+
         default:
-            if ($snmp_transport === 'udp6' || $snmp_transport === 'tcp6') { // IPv6 used only if transport 'udp6' or 'tcp6'
-                $flags ^= OBS_DNS_A;                                        // exclude A
-            }
             // Test DNS lookup.
-            $ip = gethostbyname6($hostname, $flags);
+            if ($snmp_transport === 'udp6' || $snmp_transport === 'tcp6') {
+                // IPv6 used only if transport 'udp6' or 'tcp6'
+                $ip = gethostbyname6($hostname, 'ipv6');
+            } else {
+                $ip = gethostbyname6($hostname);
+            }
+            $ip_version = get_ip_version($ip);
     }
 
-    // Test if host exists in database
-    if (!dbExist('devices', '`hostname` = ?', [$hostname])) {
-        if ($ip) {
-            $ip_version = get_ip_version($ip);
-
-            // Test reachability
-            $options['ping_skip'] = isset($options['ping_skip']) && $options['ping_skip'];
-            if ($options['ping_skip']) {
-                $flags |= OBS_PING_SKIP;
-            }
-
-            if (is_pingable($hostname, $flags)) {
-                // Test directory exists in /rrd/
-                if (!$config['rrd_override'] && file_exists($config['rrd_dir'] . '/' . $hostname)) {
-                    print_error("Directory <observium>/rrd/$hostname already exists.");
-                    return FALSE;
-                }
-
-                // Detect snmp transport
-                if (str_istarts($snmp_transport, 'tcp')) {
-                    $snmp_transport = ($ip_version == 4 ? 'tcp' : 'tcp6');
-                } else {
-                    $snmp_transport = ($ip_version == 4 ? 'udp' : 'udp6');
-                }
-
-                // Detect snmp port
-                if (!is_valid_param($snmp_port, 'port')) {
-                    $snmp_port = 161;
-                } else {
-                    $snmp_port = (int)$snmp_port;
-                }
-
-                // Detect snmp version
-                if (empty($snmp_version)) {
-                    // Here set default snmp version order
-                    $i                  = 1;
-                    $snmp_version_order = [];
-                    foreach (['v2c', 'v3', 'v1'] as $tmp_version) {
-                        if ($config['snmp']['version'] == $tmp_version) {
-                            $snmp_version_order[0] = $tmp_version;
-                        } else {
-                            $snmp_version_order[$i] = $tmp_version;
-                        }
-                        $i++;
-                    }
-                    ksort($snmp_version_order);
-
-                    foreach ($snmp_version_order as $tmp_version) {
-                        $ret = add_device($hostname, $tmp_version, $snmp_port, $snmp_transport, $options);
-                        if ($ret === FALSE) {
-                            // Set $options['break'] for break recursive
-                            $options['break'] = TRUE;
-                        } elseif (is_intnum($ret) && $ret != 0) {
-                            return $ret;
-                        }
-                    }
-                } elseif ($snmp_version === "v3") {
-                    // Try each set of parameters from config
-                    foreach ($config['snmp']['v3'] as $auth_iter => $snmp) {
-                        $snmp['version']   = $snmp_version;
-                        $snmp['port']      = $snmp_port;
-                        $snmp['transport'] = $snmp_transport;
-
-                        foreach (['snmp_maxrep', 'snmp_timeout', 'snmp_retries'] as $param) {
-                            if (isset($options[$param]) && is_numeric($options[$param])) {
-                                $snmp[$param] = (int)$options[$param];
-                            }
-                        }
-
-                        // Append SNMPable oids if passed
-                        if (isset($options['snmpable']) && strlen($options['snmpable'])) {
-                            $snmp['snmpable'] = $options['snmpable'];
-                        }
-
-                        // Append SNMP context if passed
-                        if (isset($options['snmp_context']) && strlen($options['snmp_context'])) {
-                            $snmp['snmp_context'] = $options['snmp_context'];
-                        }
-
-                        $device = build_initial_device_array($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp);
-
-                        if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
-                            // Hide snmp auth
-                            print_message("Trying v3 parameters *** / ### [$auth_iter] ... ");
-                        } else {
-                            print_message("Trying v3 parameters " . escape_html($device['snmp_authname'] . "/" . $device['snmp_authlevel']) . " ... ");
-                        }
-
-                        if (is_snmpable($device)) {
-                            if (!check_device_duplicated($device)) {
-                                if (isset($options['test']) && $options['test']) {
-                                    print_message('%WDevice "' . $hostname . '" has successfully been tested and available by ' . strtoupper($snmp_transport) . ' transport with SNMP ' . $snmp_version . ' credentials.%n', 'color');
-                                    $device_id = -1;
-                                } else {
-                                    //$device_id = createHost($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp);
-                                    $device_id = create_device($hostname, $snmp);
-                                    if ($options['ping_skip']) {
-                                        set_entity_attrib('device', $device_id, 'ping_skip', 1);
-                                        // Force pingable check
-                                        if (is_pingable($hostname, $flags ^ OBS_PING_SKIP)) {
-                                            //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
-                                            print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
-                                        }
-                                    }
-                                }
-                                return $device_id;
-                            }
-                            // When detected a duplicate device, this mean it already SNMPable and not need to check next auth!
-                            return FALSE;
-                        } else {
-                            print_warning("No reply on credentials " . escape_html($device['snmp_authname'] . "/" . $device['snmp_authlevel']) . " using $snmp_version.");
-                        }
-                    }
-                } elseif ($snmp_version === "v2c" || $snmp_version === "v1") {
-                    // Try each community from config
-                    foreach ($config['snmp']['community'] as $auth_iter => $snmp_community) {
-                        $snmp = [
-                          'community' => $snmp_community,
-                          'version'   => $snmp_version,
-                          'port'      => $snmp_port,
-                          'transport' => $snmp_transport,
-                        ];
-
-                        foreach (['snmp_maxrep', 'snmp_timeout', 'snmp_retries'] as $param) {
-                            if (isset($options[$param]) && is_numeric($options[$param])) {
-                                $snmp[$param] = (int)$options[$param];
-                            }
-                        }
-
-                        // Append SNMPable oids if passed
-                        if (isset($options['snmpable']) && strlen($options['snmpable'])) {
-                            $snmp['snmpable'] = $options['snmpable'];
-                        }
-
-                        // Append SNMP context if passed
-                        if (isset($options['snmp_context']) && strlen($options['snmp_context'])) {
-                            $snmp['snmp_context'] = $options['snmp_context'];
-                        }
-                        $device = build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport, $snmp);
-
-                        if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
-                            // Hide snmp auth
-                            print_message("Trying $snmp_version community *** [$auth_iter] ...");
-                        } else {
-                            print_message("Trying $snmp_version community " . escape_html($snmp_community) . " ...");
-                        }
-
-                        //r($options);
-                        //r($snmp);
-                        //r($device);
-                        if (is_snmpable($device)) {
-                            if (!check_device_duplicated($device)) {
-                                if (isset($options['test']) && $options['test']) {
-                                    print_message('%WDevice "' . $hostname . '" has successfully been tested and available by ' . strtoupper($snmp_transport) . ' transport with SNMP ' . $snmp_version . ' credentials.%n', 'color');
-                                    $device_id = -1;
-                                } else {
-                                    //$device_id = createHost($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport, $snmp);
-                                    $device_id = create_device($hostname, $snmp);
-                                    if ($options['ping_skip']) {
-                                        set_entity_attrib('device', $device_id, 'ping_skip', 1);
-                                        // Force pingable check
-                                        if (is_pingable($hostname, $flags ^ OBS_PING_SKIP)) {
-                                            //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
-                                            print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
-                                        }
-                                    }
-                                }
-                                return $device_id;
-                            }
-                            // When detected a duplicate device, this mean it already SNMPable and not need to check next auth!
-                            return FALSE;
-                        } else {
-                            if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
-                                print_warning("No reply on given community *** using $snmp_version.");
-                            } else {
-                                print_warning("No reply on community " . escape_html($snmp_community) . " using $snmp_version.");
-                            }
-                            $return = 0; // Return zero for continue trying next auth
-                        }
-                    }
-                } else {
-                    print_error("Unsupported SNMP Version \"$snmp_version\".");
-                    $return = 0; // Return zero for continue trying next auth
-                }
-
-                if (!$device_id) {
-                    // Failed SNMP
-                    print_error("Could not reach $hostname with given SNMP parameters using $snmp_version.");
-                    $return = 0; // Return zero for continue trying next auth
-                }
-            } else {
-                // failed Reachability
-                print_error("Could not ping $hostname.");
-            }
-        } else {
-            // Failed DNS lookup
-            print_error("Could not resolve $hostname.");
-        }
-    } else {
-        // found in database
+    // Test if host exists in a database
+    if (dbExist('devices', '`hostname` = ?', [ $hostname ])) {
+        // found in a database
         print_error("Already got device $hostname.");
+        return FALSE;
+    }
+
+    if (!$ip_version) {
+        // Failed DNS lookup
+        print_error("Could not resolve $hostname.");
+        return FALSE;
+    }
+
+    // Test reachability
+    $options['ping_skip'] = isset($options['ping_skip']) && $options['ping_skip'];
+    if (!is_pingable($ip, 'all', $options['ping_skip'])) {
+        // failed Reachability
+        print_error("Could not ping $hostname.");
+        return FALSE;
+    }
+
+    // Test directory exists in /rrd/
+    if (!$config['rrd_override'] && file_exists($config['rrd_dir'] . '/' . $hostname)) {
+        print_error("Directory <observium>/rrd/$hostname already exists.");
+        return FALSE;
+    }
+
+    // Detect snmp transport
+    if (str_istarts($snmp_transport, 'tcp')) {
+        $snmp_transport = $ip_version === 4 ? 'tcp' : 'tcp6';
+    } else {
+        $snmp_transport = $ip_version === 4 ? 'udp' : 'udp6';
+    }
+
+    // Detect snmp port
+    if (!is_valid_param($snmp_port, 'port')) {
+        $snmp_port = 161;
+    } else {
+        $snmp_port = (int)$snmp_port;
+    }
+
+    // Detect snmp version
+    if (empty($snmp_version)) {
+        // FIXME. Loop by all snmp versions
+        $i                  = 1;
+        $snmp_version_order = [];
+        foreach ([ 'v2c', 'v3', 'v1' ] as $tmp_version) {
+            if ($config['snmp']['version'] == $tmp_version) {
+                $snmp_version_order[0] = $tmp_version;
+            } else {
+                $snmp_version_order[$i] = $tmp_version;
+            }
+            $i++;
+        }
+        ksort($snmp_version_order);
+
+        foreach ($snmp_version_order as $tmp_version) {
+            $ret = add_device($hostname, $tmp_version, $snmp_port, $snmp_transport, $options);
+            if ($ret === FALSE) {
+                // Set $options['break'] for break recursive
+                $options['break'] = TRUE;
+            } elseif (is_intnum($ret) && $ret != 0) {
+                // Device was added in loop
+                return $ret;
+            }
+        }
+
+        return FALSE;
+    }
+
+    if ($snmp_version === "v3") {
+        // Try each set of parameters from config
+        foreach ($config['snmp']['v3'] as $auth_iter => $snmp) {
+            $snmp['version']   = $snmp_version;
+            $snmp['port']      = $snmp_port;
+            $snmp['transport'] = $snmp_transport;
+
+            foreach (['snmp_maxrep', 'snmp_timeout', 'snmp_retries'] as $param) {
+                if (isset($options[$param]) && is_numeric($options[$param])) {
+                    $snmp[$param] = (int)$options[$param];
+                }
+            }
+
+            // Append SNMPable oids if passed
+            if (isset($options['snmpable']) && strlen($options['snmpable'])) {
+                $snmp['snmpable'] = $options['snmpable'];
+            }
+
+            // Append SNMP context if passed
+            if (isset($options['snmp_context']) && strlen($options['snmp_context'])) {
+                $snmp['snmp_context'] = $options['snmp_context'];
+            }
+
+            $device = build_initial_device_array($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp);
+
+            if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
+                // Hide snmp auth
+                print_message("Trying v3 parameters *** / ### [$auth_iter] ... ");
+            } else {
+                print_message("Trying v3 parameters " . escape_html($device['snmp_authname'] . "/" . $device['snmp_authlevel']) . " ... ");
+            }
+
+            if (is_snmpable($device)) {
+                if (!check_device_duplicated($device)) {
+                    if (isset($options['test']) && $options['test']) {
+                        print_message('%WDevice "' . $hostname . '" has successfully been tested and available by ' . strtoupper($snmp_transport) . ' transport with SNMP ' . $snmp_version . ' credentials.%n', 'color');
+                        $device_id = -1;
+                    } else {
+                        //$device_id = createHost($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp);
+                        $device_id = create_device($hostname, $snmp);
+                        if ($options['ping_skip']) {
+                            set_entity_attrib('device', $device_id, 'ping_skip', 1);
+
+                            // Force pingable check, for warning only
+                            if (is_pingable($hostname)) {
+                                //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
+                                print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
+                            }
+                        }
+                    }
+                    return $device_id;
+                }
+                // When detected a duplicate device, this mean it already SNMPable and not need to check next auth!
+                return FALSE;
+            } else {
+                print_warning("No reply on credentials " . escape_html($device['snmp_authname'] . "/" . $device['snmp_authlevel']) . " using $snmp_version.");
+            }
+        }
+    } elseif ($snmp_version === "v2c" || $snmp_version === "v1") {
+        // Try each community from config
+        foreach ($config['snmp']['community'] as $auth_iter => $snmp_community) {
+            $snmp = [
+                'community' => $snmp_community,
+                'version'   => $snmp_version,
+                'port'      => $snmp_port,
+                'transport' => $snmp_transport,
+            ];
+
+            foreach (['snmp_maxrep', 'snmp_timeout', 'snmp_retries'] as $param) {
+                if (isset($options[$param]) && is_numeric($options[$param])) {
+                    $snmp[$param] = (int)$options[$param];
+                }
+            }
+
+            // Append SNMPable oids if passed
+            if (isset($options['snmpable']) && strlen($options['snmpable'])) {
+                $snmp['snmpable'] = $options['snmpable'];
+            }
+
+            // Append SNMP context if passed
+            if (isset($options['snmp_context']) && strlen($options['snmp_context'])) {
+                $snmp['snmp_context'] = $options['snmp_context'];
+            }
+            $device = build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport, $snmp);
+
+            if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
+                // Hide snmp auth
+                print_message("Trying $snmp_version community *** [$auth_iter] ...");
+            } else {
+                print_message("Trying $snmp_version community " . escape_html($snmp_community) . " ...");
+            }
+
+            //r($options);
+            //r($snmp);
+            //r($device);
+            if (is_snmpable($device)) {
+                if (!check_device_duplicated($device)) {
+                    if (isset($options['test']) && $options['test']) {
+                        print_message('%WDevice "' . $hostname . '" has successfully been tested and available by ' . strtoupper($snmp_transport) . ' transport with SNMP ' . $snmp_version . ' credentials.%n', 'color');
+                        $device_id = -1;
+                    } else {
+                        //$device_id = createHost($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport, $snmp);
+                        $device_id = create_device($hostname, $snmp);
+                        if ($options['ping_skip']) {
+                            set_entity_attrib('device', $device_id, 'ping_skip', 1);
+                            // Force pingable check
+                            if (is_pingable($hostname)) {
+                                //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
+                                print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
+                            }
+                        }
+                    }
+                    return $device_id;
+                }
+                // When detected a duplicate device, this mean it already SNMPable and not need to check next auth!
+                return FALSE;
+            }
+
+            if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2) {
+                print_warning("No reply on given community *** using $snmp_version.");
+            } else {
+                print_warning("No reply on community " . escape_html($snmp_community) . " using $snmp_version.");
+            }
+            $return = 0; // Return zero for continuing trying next auth
+        }
+
+    } else {
+        print_error("Unsupported SNMP Version \"$snmp_version\".");
+        $return = 0; // Return zero for continuing trying next auth
+    }
+
+    if (!$device_id) {
+        // Failed SNMP
+        print_error("Could not reach $hostname with given SNMP parameters using $snmp_version.");
+        $return = 0; // Return zero for continuing trying next auth
     }
 
     return $return;
@@ -688,26 +675,30 @@ function get_device_os($device)
     $cache_os     = [];
 
     $table_rows    = [];
-    $table_opts    = ['max-table-width' => TRUE]; // Set maximum table width as available columns in terminal
-    $table_headers = ['%WOID%n', ''];
-    $table_rows[]  = ['sysDescr', $sysDescr];
-    $table_rows[]  = ['sysObjectID', $sysObjectID];
+    $table_opts    = [ 'max-table-width' => TRUE ]; // Set maximum table width as available columns in terminal
+    $table_headers = [ '%WOID%n', '' ];
+    $table_rows[]  = [ 'sysDescr', $sysDescr ];
+    $table_rows[]  = [ 'sysObjectID', $sysObjectID ];
     print_cli_table($table_rows, $table_headers, NULL, $table_opts);
     //print_debug("Detect OS. sysDescr: '$sysDescr', sysObjectID: '$sysObjectID'");
 
     $table_rows = []; // Reinit
     //$table_opts    = array('max-table-width' => 200);
-    $table_headers = ['%WOID%n', '%WMatched definition%n', ''];
+    $table_headers = [ '%WOID%n', '%WMatched definition%n', '' ];
     // By first check all sysObjectID
-    foreach ($discovery_os['sysObjectID'] as $def => $cos) {
-        if (match_oid_num($sysObjectID, $def)) {
-            // Store matched OS, but by first need check by complex discovery arrays!
-            $sysObjectID_def = $def;
-            $sysObjectID_os  = $cos;
-            //print_debug_vars($sysObjectID_def);
-            //print_debug_vars($sysObjectID_os);
-            break;
+    if (!safe_empty($sysObjectID)) {
+        foreach ($discovery_os['sysObjectID'] as $def => $cos) {
+            if (match_oid_num($sysObjectID, $def)) {
+                // Store matched OS, but by first need check by complex discovery arrays!
+                $sysObjectID_def = $def;
+                $sysObjectID_os  = $cos;
+                //print_debug_vars($sysObjectID_def);
+                //print_debug_vars($sysObjectID_os);
+                break;
+            }
         }
+    } else {
+        print_debug("Skip sysObjectID os match, because it is empty.");
     }
 
     if ($recheck) {
@@ -908,8 +899,7 @@ function check_device_os_changed(&$device) {
  * @return bool TRUE if duplicates found
  */
 // TESTME needs unit testing
-function check_device_duplicated($device)
-{
+function check_device_duplicated($device) {
 
     switch (get_device_duplicated($device)) {
         case 'hostname':
@@ -922,20 +912,20 @@ function check_device_duplicated($device)
         case 'ip_snmp_v2c':
             if (get_ip_version($device['hostname'])) {
                 $dns_ip = $device['hostname'];
-            } elseif (in_array($device['snmp_transport'], ['udp6', 'tcp6'])) {
-                $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_AAAA); // IPv6
+            } elseif (in_array($device['snmp_transport'], [ 'udp6', 'tcp6' ])) {
+                $dns_ip = gethostbyname6($device['hostname'], 'ipv6'); // IPv6
             } else {
-                $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_A); // IPv4
+                $dns_ip = gethostbyname6($device['hostname'], 'ipv4'); // IPv4
             }
             print_error("Already got device with resolved IP ($dns_ip) and SNMP v1/v2c community.");
             return TRUE;
         case 'ip_snmp_v3':
             if (get_ip_version($device['hostname'])) {
                 $dns_ip = $device['hostname'];
-            } elseif (in_array($device['snmp_transport'], ['udp6', 'tcp6'])) {
-                $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_AAAA); // IPv6
+            } elseif (in_array($device['snmp_transport'], [ 'udp6', 'tcp6' ])) {
+                $dns_ip = gethostbyname6($device['hostname'], 'ipv6'); // IPv6
             } else {
-                $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_A); // IPv4
+                $dns_ip = gethostbyname6($device['hostname'], 'ipv4'); // IPv4
             }
             print_error("Already got device with resolved IP ($dns_ip) and SNMP v3 auth.");
             return TRUE;
@@ -1050,23 +1040,22 @@ function check_device_duplicated($device)
  *
  * @return string
  */
-function get_device_duplicated($device, &$return = [])
-{
+function get_device_duplicated($device, &$return = []) {
     if (empty($device['hostname'])) {
         return NULL;
     }
-    // Check if we need return device
+    // Check if we need a return device
     $return_devices = func_num_args() > 1;
     $duplicate      = NULL;
 
-    // Check by same hostname in DB
+    // Check the same hostname in DB
     if ($device['device_id'] && $device['device_id'] > 0) {
         // Exclude self device
         $where  = '`hostname` = ? AND `device_id` != ?';
-        $params = [$device['hostname'], $device['device_id']];
+        $params = [ $device['hostname'], $device['device_id'] ];
     } else {
         $where  = '`hostname` = ?';
-        $params = [$device['hostname']];
+        $params = [ $device['hostname'] ];
     }
     if (dbExist('devices', $where, $params)) {
         $duplicate = 'hostname';
@@ -1079,19 +1068,19 @@ function get_device_duplicated($device, &$return = [])
     // Check by network access and SNMP
     if (get_ip_version($device['hostname'])) {
         $dns_ip = $device['hostname'];
-    } elseif (in_array($device['snmp_transport'], ['udp6', 'tcp6'])) {
-        $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_AAAA); // IPv6
+    } elseif (in_array($device['snmp_transport'], [ 'udp6', 'tcp6' ])) {
+        $dns_ip = gethostbyname6($device['hostname'], 'ipv6'); // IPv6
     } else {
-        $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_A); // IPv4
+        $dns_ip = gethostbyname6($device['hostname'], 'ipv4'); // IPv4
     }
     $snmp_port = is_intnum($device['snmp_port']) ? $device['snmp_port'] : 161;
     if ($device['snmp_context']) {
         // Also check snmp context
         $where  = '`ip` = ? AND `snmp_port` = ? AND `snmp_context` = ?';
-        $params = [ip_compress($dns_ip), $snmp_port, $device['snmp_context']];
+        $params = [ ip_compress($dns_ip), $snmp_port, $device['snmp_context'] ];
     } else {
         $where  = '`ip` = ? AND `snmp_port` = ? AND `snmp_context` IS NULL';
-        $params = [ip_compress($dns_ip), $snmp_port];
+        $params = [ ip_compress($dns_ip), $snmp_port ];
     }
     if ($device['device_id'] && $device['device_id'] > 0) {
         // Exclude self device
@@ -1106,7 +1095,7 @@ function get_device_duplicated($device, &$return = [])
                 $device['snmp_authlevel'] = strtolower($device['snmp_authlevel']);
                 //$entry['snmp_authlevel']  = strtolower($entry['snmp_authlevel']);
                 if ($device['snmp_authlevel'] === 'noauthnopriv' && $device['snmp_authname'] === $entry['snmp_authname']) {
-                    // Exactly same host, v3 noAuthNoPriv
+                    // Exactly the same host, v3 noAuthNoPriv
                     $duplicate = 'ip_snmp_' . $entry['snmp_transport'];
                     if ($return_devices) {
                         $return[$duplicate][] = $entry;
@@ -1526,21 +1515,19 @@ function delete_device($id, $delete_rrd = FALSE)
     return $ret;
 }
 
-function device_status_array(&$device)
-{
-    global $attribs;
+function device_status_array(&$device) {
+    global $attribs, $cache;
 
-    $flags = OBS_DNS_ALL;
-    if ($device['snmp_transport'] === 'udp6' || $device['snmp_transport'] === 'tcp6') { // Exclude IPv4 if used transport 'udp6' or 'tcp6'
-        $flags ^= OBS_DNS_A;
+    $dns_options = 'all';
+    if ($device['snmp_transport'] === 'udp6' || $device['snmp_transport'] === 'tcp6') {
+        // Exclude IPv4 if used transport 'udp6' or 'tcp6'
+        $dns_options = 'ipv6';
     }
 
+    // Add skip ping
     $attribs['ping_skip'] = isset($attribs['ping_skip']) && $attribs['ping_skip'];
-    if ($attribs['ping_skip']) {
-        $flags |= OBS_PING_SKIP; // Add skip ping flag
-    }
 
-    $device['status_pingable'] = is_pingable($device['hostname'], $flags);
+    $device['status_pingable'] = is_pingable($device['hostname'], $dns_options, $attribs['ping_skip']);
     $device['pingable']        = $device['status_pingable']; // Compat
     if ($device['status_pingable']) {
         $device['status_snmpable'] = is_snmpable($device);
@@ -1561,8 +1548,12 @@ function device_status_array(&$device)
         //print_cli_data("Device status", "Device is not responding to PINGs", 1);
         $status_message = "Device is not responding to PINGs";
         $status         = "0";
-        //print_vars(get_status_var('ping_dns'));
-        if (isset_status_var('ping_dns') && get_status_var('ping_dns') !== 'ok') {
+
+        // Set in is_pingable_cache_dns()
+        //print_vars($cache['is_pingable'][$host]['dns_status']);
+        if (isset($cache['is_pingable'][$device['hostname']]) &&
+            $cache['is_pingable'][$device['hostname']]['dns_status'] !== 'ok') {
+
             $status_message = "Device hostname is not resolved";
             $status_type    = 'dns';
         } else {
@@ -1570,7 +1561,7 @@ function device_status_array(&$device)
         }
     }
 
-    return ['status' => $status, 'status_type' => $status_type, 'message' => $status_message];
+    return [ 'status' => $status, 'status_type' => $status_type, 'message' => $status_message ];
 }
 
 /**
@@ -1896,9 +1887,9 @@ function get_device_id_by_syslog_host($host) {
         } elseif ($config['syslog']['use_ip'] && is_valid_hostname($host)) {
             // Try associate hosts by DNS IP query
             $dns_found = FALSE;
-            $dns_ip = gethostbyname6($host, OBS_DNS_A); // IPv4
+            $dns_ip = gethostbyname6($host, 'ipv4'); // IPv4
             if (!$dns_ip) {
-                $dns_ip = gethostbyname6($host, OBS_DNS_AAAA); // IPv6
+                $dns_ip = gethostbyname6($host, 'ipv6'); // IPv6
             }
             if ($dns_ip) {
                 $query = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
@@ -2008,7 +1999,7 @@ function get_device_hostname_by_id($id) {
         }
         $id = $id['device_id'];
     }
-    if (is_intnum($id)) {
+    if (!is_intnum($id)) {
         return FALSE;
     }
 

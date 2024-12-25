@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage ajax
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -21,23 +21,21 @@ if (!$_SESSION['authenticated']) {
 
 include_dir($config['html_dir'] . "/includes/widgets/");
 
-$widget = dbFetchRow("SELECT * FROM `dash_widgets` WHERE widget_id = ?", [$_POST['id']]);
+$widget = dbFetchRow("SELECT * FROM `dash_widgets` WHERE `widget_id` = ?", [ $_POST['id'] ]);
 
-$widget['height'] = (is_numeric($_POST['height']) ? $_POST['height'] : '3');
-$widget['width']  = (is_numeric($_POST['width']) ? $_POST['width'] : '4');
+$widget['height'] = is_numeric($_POST['height']) ? $_POST['height'] : 3;
+$widget['width']  = is_numeric($_POST['width']) ? $_POST['width'] : 4;
 
 print_dash_mod($widget);
 
-function print_dash_mod($mod)
-{
+function print_dash_mod($mod) {
 
-    global $config;
-    global $cache;
+    global $config, $cache;
 
-    $mod['vars'] = json_decode($mod['widget_config'], TRUE);
+    $mod['vars'] = safe_json_decode($mod['widget_config']);
 
-    $width  = (is_numeric($mod['width']) ? $mod['width'] : 1240);
-    $height = (is_numeric($mod['height']) ? $mod['height'] : 80);
+    $width  = is_numeric($mod['width']) ? $mod['width'] : 1240;
+    $height = is_numeric($mod['height']) ? $mod['height'] : 80;
 
     switch ($mod['widget_type']) {
 
@@ -57,16 +55,15 @@ function print_dash_mod($mod)
 
             echo '<div class="box box-solid do-not-update">';
 
-            $wmap = dbFetchRow("SELECT * FROM `weathermaps` WHERE `wmap_name` = ?", [$mod['vars']['mapname']]);
+            $wmap = dbFetchRow("SELECT * FROM `weathermaps` WHERE `wmap_name` = ?", [ $mod['vars']['mapname'] ]);
 
             echo '  <div class="hover-hide widget-title" style="z-index: 900; position: absolute; overflow: hidden;" class="widget-title"><h4 style="wwriting-mode: vertical-lr; ttext-orientation: mixed;" class="box-title">' .
-                 '' . htmlentities($wmap['wmap_name']) . '</h4>' .
-                 '</div>' . PHP_EOL;
+                 escape_html($wmap['wmap_name']) . '</h4></div>' . PHP_EOL;
 
             echo '  <div class="box-content" style="overflow: hidden">';
             echo '<div style="height:100%; overflow:hidden; width: 110%;">';
-            echo '<a href="' . generate_url(['page' => 'wmap', 'mapname' => $wmap['map_name']]) . '">';
-            echo '<img src="/weathermap.php?mapname=' . htmlentities($wmap['wmap_name']) . '&action=draw&unique=' . time() . '&width=' . $width . '&height=' . $height . '">';
+            echo '<a href="' . generate_url([ 'page' => 'wmap', 'mapname' => $wmap['map_name'] ]) . '">';
+            echo '<img src="/weathermap.php?mapname=' . escape_html($wmap['wmap_name']) . '&action=draw&unique=' . time() . '&width=' . $width . '&height=' . $height . '">';
             echo '</a>';
 
             echo '</div>';
@@ -79,6 +76,7 @@ function print_dash_mod($mod)
             echo '<div class="box box-solid do-not-update">';
             print_dash_map($mod, $width, $height);
             echo '</div>';
+
             break;
 
         case "port_percent":
@@ -103,13 +101,14 @@ function print_dash_mod($mod)
             echo '    <div class="box-content" style="height: ' . ($height - 40) . 'px; overflow: auto;">';
             //echo '    <div class="box-content" style="overflow: scroll; overflow-x:scroll;">';
             //echo '    <div class="box-content" style="overflow:auto;">';
-            print_alert_table(['status'     => 'failed',
-                               'pagination' => FALSE,
-                               'short'      => TRUE]
-            );
+
+            $short = !($width > 1000);
+
+            print_alert_table([ 'status' => 'failed', 'pagination' => FALSE, 'short' => $short ]);
             echo '    </div>';
             echo '  </div>';
             echo '</div>';
+
             break;
 
         case "status_summary":
@@ -164,8 +163,10 @@ function print_dash_mod($mod)
             echo '    <div class="box-header" style="cursor: hand;"><h3 class="box-title"><a href="/syslog/">Syslog</a></h3></div>';
             echo '    <div class="box-content" style="overflow: hidden; overflow-x:scroll;">';
 
-            $syslog_vars = array_merge($mod['vars'], ['short'    => TRUE, 'pagesize' => ($height - 36) / 26,
-                                                      'priority' => $config['frontpage']['syslog']['priority']]);
+            $short = !($width > 1000);
+
+            $syslog_vars = array_merge($mod['vars'], [ 'short'    => $short, 'pagesize' => ($height - 36) / 26,
+                                                       'priority' => $config['frontpage']['syslog']['priority'] ]);
 
             print_syslogs($syslog_vars);
 
@@ -178,7 +179,9 @@ function print_dash_mod($mod)
             echo '    <div class="box-header" style="cursor: hand;"><h3 class="box-title"><a href="/syslog_alerts/">Syslog Alerts</a></h3></div>';
             echo '    <div class="box-content" style="overflow: hidden; overflow-x:scroll;">';
 
-            $alertlog_vars = array_merge($mod['vars'], ['short' => TRUE, 'pagesize' => ($height - 36) / 26]);
+            $short = !($width > 1000);
+
+            $alertlog_vars = array_merge($mod['vars'], [ 'short' => $short, 'pagesize' => ($height - 36) / 26 ]);
 
             print_logalert_log($alertlog_vars);
 
@@ -191,7 +194,10 @@ function print_dash_mod($mod)
             echo '    <div class="box-header" style="cursor: hand;"><h3 class="box-title"><a href="/alert_log/">Alert Log</a></h3></div>';
             echo '    <div class="box-content" style="overflow: hidden; overflow-x:scroll;">';
 
-            $alertlog_vars = array_merge($mod['vars'], ['short' => TRUE, 'pagesize' => ($height - 36) / 26]);
+            $short = !($width > 1000);
+
+            $alertlog_vars = array_merge($mod['vars'], [ 'short' => $short, 'pagesize' => ($height - 36) / 26 ]);
+
             print_alert_log($alertlog_vars);
 
             echo '  </div>';
@@ -204,11 +210,11 @@ function print_dash_mod($mod)
             echo '    <div class="box-content" style="overflow: hidden; overflow-x:scroll;">';
 
             $pagesize = floor(($height - 36) / 26);
-            //if($width > 1000) { $pagesize -= 3; $short = FALSE; } else { $short = TRUE; }
 
+            $short = !($width > 1000);
 
-            $eventlog_vars = array_merge($mod['vars'], ['short'    => TRUE, 'pagesize' => $pagesize, 'pageno' => 1,
-                                                        'severity' => $config['frontpage']['eventlog']['severity']]);
+            $eventlog_vars = array_merge($mod['vars'], [ 'short'    => $short, 'pagesize' => $pagesize, 'pageno' => 1,
+                                                         'severity' => $config['frontpage']['eventlog']['severity'] ]);
 
             print_events($eventlog_vars);
 

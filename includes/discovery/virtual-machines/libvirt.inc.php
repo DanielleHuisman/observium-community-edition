@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -120,6 +120,6 @@ unset($libvirt_vmlist);
 
 // Clean up removed VMs (our type - libvirt - only, so we don't clean up other modules' VMs)
 check_valid_virtual_machines($device, $valid, 'libvirt');
-echo(PHP_EOL);
+//echo(PHP_EOL);
 
 // EOF

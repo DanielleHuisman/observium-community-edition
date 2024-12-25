@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -71,15 +71,15 @@ if (is_array($config['sensors']['static'])) {
             if (snmp_status()) {
                 $value = snmp_fix_numeric($value);
                 if (is_numeric($value)) {
-                    $options = [];
-                    $fields  = ['limit', 'limit_low', 'limit_warn', 'limit_low_warn'];
+                    $options = [ 'sensor_type' => 'static' ];
+                    $fields  = [ 'limit', 'limit_low', 'limit_warn', 'limit_low_warn' ];
                     foreach ($fields as $field) {
                         if (isset($sensor[$field])) {
                             $options[$field] = $sensor[$field];
                         }
                     }
 
-                    discover_sensor_ng($device, $sensor['class'], 'STATIC', 'static', $sensor['oid'], $sensor['oid'], 'static', $sensor['descr'], $sensor['multiplier'], $value, $options);
+                    discover_sensor_ng($device, $sensor['class'], 'STATIC', 'static', $sensor['oid'], $sensor['oid'], $sensor['descr'], $sensor['multiplier'], $value, $options);
                 }
             }
         }

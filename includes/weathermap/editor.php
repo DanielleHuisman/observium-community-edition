@@ -10,7 +10,9 @@ require_once 'lib/WMLine.class.php';
 if (!isset($config)) {
     require_once '../../includes/observium.inc.php';
     include_once($config['html_dir'] . "/includes/functions.inc.php");
-    $vars = get_vars(); // Parse vars from GET/POST/URI
+
+    // Parse vars from GET/POST/URI
+    $vars = get_vars();
 }
 
 // so that you can't have the editor active, and not know about it.
@@ -58,7 +60,7 @@ if (isset($_COOKIE['wmeditor'])) {
     }
 }
 
-chdir(dirname(__FILE__));
+chdir(__DIR__);
 
 $action   = '';
 $mapname  = '';
@@ -74,7 +76,7 @@ if (!wm_module_checks()) {
     print "If you find that the weathermap tool itself is working, from the command-line or Cacti poller, then it is possible that you have two different PHP installations. The Editor uses the same PHP that webpages on your server use, but the main weathermap tool uses the command-line PHP interpreter.<p>";
     print ">check.php</a> to help make sure that there are no problems.</p><hr/>";
     print "Here is a copy of the phpinfo() from your PHP web module, to help debugging this...<hr>";
-    phpinfo();
+    //phpinfo();
     exit();
 }
 
@@ -83,18 +85,18 @@ if (isset($vars['wmap_id'])) {
 }
 
 if (isset($vars['action'])) {
-    $action = $vars['action'];
+    $action = escape_html($vars['action']);
 }
 if (isset($vars['mapname'])) {
-    $mapname = $vars['mapname'];  /*$mapname = wm_editor_sanitize_conffile($mapname);*/
+    $mapname = escape_html($vars['mapname']);  /*$mapname = wm_editor_sanitize_conffile($mapname);*/
 }
 if (isset($vars['selected'])) {
     $selected = wm_editor_sanitize_selected($vars['selected']);
 }
 
-$weathermap_debugging = TRUE;
+$weathermap_debugging = FALSE;
 
-if ($mapname == '') {
+if (empty($mapname)) {
     // this is the file-picker/welcome page
     show_editor_startpage();
 } else {

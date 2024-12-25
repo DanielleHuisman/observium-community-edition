@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -203,9 +203,11 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     }
 
     if (is_numeric($value)) {
-        $value = scale_value($value, $scale);
-        // $value *= $scale; // Scale before unit conversion
-        $value = value_to_si($value, $options['counter_unit'], $class); // Convert if not SI unit
+        $value = scale_value($value, $scale); // Scale before unit conversion
+        if (isset($options['counter_unit']) &&
+            $unit_to = $GLOBALS['config']['counter_types'][$class]['symbol']) {
+            $value = value_unit_convert($value, $options['counter_unit'], $unit_to); // Convert if not SI unit
+        }
 
         // Extra add value
         if (isset($options['value_add']) && is_numeric($options['value_add'])) {
@@ -219,12 +221,19 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
         return FALSE;
     }
 
-    $param_limits = ['limit_high' => 'counter_limit', 'limit_high_warn' => 'counter_limit_warn',
-                     'limit_low'  => 'counter_limit_low', 'limit_low_warn' => 'counter_limit_low_warn'];
-    foreach ($param_limits as $key => $column) {
-        // Set limits vars and unit convert if required
-        $$key = (is_numeric($options[$key]) ? value_to_si($options[$key], $options['counter_unit'], $class) : NULL);
+    if (isset($options['counter_unit']) &&
+        $limit_unit_to = $GLOBALS['config']['counter_types'][$class]['symbol']) {
+
+        $param_limits = [
+            'limit_high' => 'counter_limit', 'limit_high_warn' => 'counter_limit_warn',
+            'limit_low'  => 'counter_limit_low', 'limit_low_warn' => 'counter_limit_low_warn'
+        ];
+        foreach ($param_limits as $key => $column) {
+            // Set limits vars and unit convert if required
+            $$key = is_numeric($options[$key]) ? value_unit_convert($options[$key], $options['counter_unit'], $limit_unit_to) : NULL;
+        }
     }
+
     // Set by which param use limits
     switch (strtolower($options['limit_by'])) {
         case 's':
@@ -540,7 +549,10 @@ function poll_counter($device, &$oid_cache)
         }
 
         // Unit conversion to SI (if required)
-        $counter_poll['counter_value'] = value_to_si($counter_poll['counter_value'], $counter_db['counter_unit'], $class);
+        if ($counter_db['counter_unit'] &&
+            $unit_to = $GLOBALS['config']['counter_types'][$class]['symbol']) {
+            $counter_poll['counter_value'] = value_unit_convert($counter_poll['counter_value'], $counter_db['counter_unit'], $unit_to);
+        }
 
         // Extra add
         if (isset($counter_attribs['oid_add']) && is_numeric($counter_poll['counter_value_add'])) {

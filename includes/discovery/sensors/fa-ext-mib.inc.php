@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -28,7 +28,7 @@ if (!safe_count($oids)) {
     return;
 }
 $oids = snmpwalk_cache_oid($device, 'connUnitPortIndex', $oids, 'FCMGMT-MIB', NULL, $flags);
-//$oids = snmpwalk_cache_oid($device, 'connUnitPortName',                    $oids, 'FCMGMT-MIB', NULL, $flags);
+//$oids = snmpwalk_cache_oid($device, 'connUnitPortName', $oids, 'FCMGMT-MIB', NULL, $flags);
 
 $port_sw = snmpwalk_cache_oid($device, 'swFCPortSpecifier', [], 'SW-MIB');
 
@@ -58,42 +58,37 @@ foreach ($oids as $index => $entry) {
     $descr    = $name . ' Temperature';
     $oid_name = 'swSfpTemperature';
     $oid_num  = '.1.3.6.1.4.1.1588.2.1.1.1.28.1.1.1.' . $index;
-    $type     = $mib . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], $descr, 1, $value, $options);
 
     $descr    = $name . ' Voltage';
     $oid_name = 'swSfpVoltage';
     $oid_num  = '.1.3.6.1.4.1.1588.2.1.1.1.28.1.1.2.' . $index;
-    $type     = $mib . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], NULL, $descr, 0.001, $value, $options);
+    discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], $descr, 0.001, $value, $options);
 
     $descr    = $name . ' Bias Current';
     $oid_name = 'swSfpCurrent';
     $oid_num  = '.1.3.6.1.4.1.1588.2.1.1.1.28.1.1.3.' . $index;
-    $type     = $mib . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], NULL, $descr, 0.001, $value, $options);
+    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], $descr, 0.001, $value, $options);
 
     $descr    = $name . ' Receive Power';
     $oid_name = 'swSfpRxPower';
     $oid_num  = '.1.3.6.1.4.1.1588.2.1.1.1.28.1.1.4.' . $index;
-    $type     = $mib . '-' . $oid_name;
     $value    = str_replace('-inf', '-40', $entry[$oid_name]);
 
-    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], $descr, 1, $value, $options);
 
     $descr    = $name . ' Transmit Power';
     $oid_name = 'swSfpTxPower';
     $oid_num  = '.1.3.6.1.4.1.1588.2.1.1.1.28.1.1.5.' . $index;
-    $type     = $mib . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $entry['connUnitPortIndex'], $descr, 1, $value, $options);
 
 }
 

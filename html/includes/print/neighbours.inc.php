@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -49,23 +49,24 @@ function print_neighbours($vars)
 
         $string .= '<table class="table table-hover table-striped table-condensed">' . PHP_EOL;
 
-        $cols = [
-            [ NULL, 'class="state-marker"' ],
-            'device_a'    => 'Local Device',
-            'port_a'      => 'Local Port',
-            'NONE'        => NULL,
-            'device_b'    => 'Remote Device',
-            'port_b'      => 'Remote Port',
-            'protocol'    => 'Protocol',
-            'last_change' => 'Last changed',
+        $header = [
+            'state-marker' => '',
+            [ 'device_a'    => 'Local Device' ],
+            [ 'port_a'      => 'Local Port' ],
+            '',
+            [ 'device_b'    => 'Remote Device' ],
+            [ 'port_b'      => 'Remote Port' ],
+            [ 'protocol'    => 'Protocol' ],
+            [ 'last_change' => 'Last changed', 'class' => 'text-nowrap' ],
         ];
         if ($_SESSION['userlevel'] > 7) {
-            $cols[] = ''; // 'Autodiscovery'
+            $header[] = ''; // 'Autodiscovery'
         }
         if (!$list['device']) {
-            unset($cols[0], $cols['device_a']);
+            //r($header);
+            unset($header[0], $header['state-marker']);
         }
-        $string .= get_table_header($cols, $vars);
+        $string .= generate_table_header($header, $vars);
 
         $string .= '  <tbody>' . PHP_EOL;
 
@@ -93,7 +94,7 @@ function print_neighbours($vars)
 
             //r($entry); //r($entry['remote_port']);
 
-            if (is_intnum($entry['remote_device_id']) || is_intnum($entry['remote_port_id'])) {
+            if ((is_intnum($entry['remote_device_id']) && $entry['remote_device_id']) || is_intnum($entry['remote_port_id'])) {
                 $remote_port = $entry['remote_port_id'] ? get_port_by_id_cache($entry['remote_port_id']) : [];
                 if ($entry['remote_device_id']) {
                     $remote_device = device_by_id_cache($entry['remote_device_id']);

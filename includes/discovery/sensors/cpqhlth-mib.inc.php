@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -28,7 +28,7 @@ foreach ($oids as $index => $entry) {
 
     if ($entry['cpqHeFltTolPowerSupplyCapacityMaximum'] != 0) {
         $options['rename_rrd'] = "cpqhlth-cpqHeFltTolPwrSupply.$index";
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.232.6.2.9.3.1.4.$index";
@@ -69,7 +69,7 @@ foreach ($oids as $index => $entry) {
         $options  = ['limit_high' => $entry['cpqHeTemperatureThreshold']];
 
         $options['rename_rrd'] = "cpqhlth-CpqHeTemperatureEntry.$index";
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
     }
 }
 

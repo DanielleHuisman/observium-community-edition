@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -20,7 +20,7 @@ $graph_return['valid_options'][] = "95th";
 $graph_return['valid_options'][] = "trend";
 $graph_return['valid_options'][] = "inverse";
 
-$do_95th = !(isset($vars['95th']) && get_var_false($vars['95th']));
+$do_95th = !(get_var_false($vars['95th'] ?? ''));
 
 switch ($format) {
     case 'octets':

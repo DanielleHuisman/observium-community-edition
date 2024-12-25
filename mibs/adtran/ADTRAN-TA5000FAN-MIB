@@ -1,0 +1,472 @@
+ADTRAN-TA5000FAN-MIB  DEFINITIONS ::= BEGIN
+
+    -- TITLE:       TA5000 Fan Module Product MIB
+    -- FILENAME:    adta5kfan.mi2
+    -- PARTNUMBER:  1187.080L1, 1188.085L1
+    -- AUTHOR:      Andria Dyess
+    -- DATE:        06/20/2011
+    --
+    -- MODIFICATIONS:
+    --   02/16/2006 pnb Initial draft
+    --   02/17/2006 pnb Add LED definitions
+    --   07/27/2007 mmi Added temperature threshold traps
+    --   08/16/2007 mmi removed fan trap fan number from yellow alarm
+    --   12/28/2007 pnb remove shelf # as superfluous from trap descriptions
+    --   12/28/2007 mmi added adTA5kFanProvTempThres OID
+    --   01/02/2008 mmi Updated the description for the fan temperature threshold OID
+    --   06/20/2011 aed Converted to SNMPv2
+    --          **** DO NOT ADD REVISION COMMENTS HERE ****
+    --
+    --    SPECIAL CASE OIDs:
+    --    The TA5000 Fan Module supports the following values for the single LED Fan Status colors
+    --      reported in adGenSlotFaceplate:
+    --         00   Off     Power or Fuse Failure
+    --         01   Green   Power applied - Health Good - No alarms
+    --         10   Red     Major alarm - >1 fan failure or imminent failure detected
+    --         11   Orange  Minor alarm - 1 fan failure or imminent failure detected
+    --
+
+    -- This MIB defines the TA5000 Fan Module product information which is common to both the 19" and 23" modules.
+    --   All OIDs are under the 23" Product ID branch (751) as generically applicable.
+
+    IMPORTS
+           MODULE-IDENTITY,
+           OBJECT-TYPE,
+           NOTIFICATION-TYPE
+                  FROM SNMPv2-SMI
+           sysName
+                  FROM SNMPv2-MIB
+           DisplayString,
+           TruthValue
+                  FROM SNMPv2-TC
+           adIdentity,
+           adProducts,
+           adMgmt
+                  FROM ADTRAN-MIB
+           adGenSlotInfoIndex
+                  FROM ADTRAN-GENSLOT-MIB
+           adTrapInformSeqNum
+                  FROM ADTRAN-GENTRAPINFORM-MIB
+     	   adTAeSCUTrapAlarmLevel
+     	          FROM ADTRAN-TAeSCUEXT1-MIB;
+
+    adTa5kFanModuleIdentity MODULE-IDENTITY
+        LAST-UPDATED "201410222100Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Total Access 5000 Fan Module MIB"
+
+        REVISION        "201410222100Z"
+        DESCRIPTION     "Added alarm severity varbind to Temp Threshold alarm.
+			 Added oid for number of fans in alarm.
+                         Added alarm severity and number of fans alarming varbinds to Multi-Fan alarm."
+
+        REVISION        "201110282100Z"
+        DESCRIPTION     "Added alarm enable/disable provisioning."
+
+        REVISION        "201106201800Z"
+        DESCRIPTION     "Converted from SNMPv1."
+
+        ::= { adIdentity 751 }
+
+
+
+    -- OBJECT IDENTIFIERS
+
+    -- All management information is defined for the 23" module which is shared with the 19" module.
+    adTA5kFanModule        OBJECT IDENTIFIER ::= { adProducts 751 }
+    adTA5kFanModule19      OBJECT IDENTIFIER ::= { adProducts 860 }
+    adTA5kFanmg            OBJECT IDENTIFIER ::= { adMgmt 751 }
+
+    adTa5kFanModuleEvents  OBJECT IDENTIFIER ::= { adTA5kFanModule 0 }
+    adTA5kFanProvisioning  OBJECT IDENTIFIER ::= { adTA5kFanmg 1 }
+    adTA5kFanStatus        OBJECT IDENTIFIER ::= { adTA5kFanmg 2 }
+
+    -- TA 5000 slot numbering
+    -- 251 Fan Module
+
+-- ============================================================================
+
+
+-- ============================================================================
+-- TA5000 Fan Module Provisioning Table
+-- ============================================================================
+
+adTA5kFanProvTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF AdTA5kFanProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Table of Fan Module provisioning info."
+    ::= { adTA5kFanProvisioning 1 }
+
+ adTA5kFanProvEntry OBJECT-TYPE
+    SYNTAX  AdTA5kFanProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Indexed by slot number"
+    INDEX   {  adGenSlotInfoIndex }
+    ::= { adTA5kFanProvTable 1 }
+
+ AdTA5kFanProvEntry ::=
+    SEQUENCE {
+        adTA5kFanProvFanSpeedMode            INTEGER,
+        adTA5kFanProvTempThres               INTEGER,
+        adTA5kFanProvYellowAlarmEnable       TruthValue,
+        adTA5kFanProvRedAlarmEnable          TruthValue,
+ 	adMultiFanAlarmSeverity 	     INTEGER,
+ 	adFanTempThreshAlarmSeverity         INTEGER
+    }
+
+adTA5kFanProvFanSpeedMode  OBJECT-TYPE
+    SYNTAX  INTEGER {
+            auto(1),
+            max(2)
+            }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The speed mode of auto causes the fans to be thermostatically controlled.
+         The speed mode of max causes the fans to run at max speed continuously."
+    ::= { adTA5kFanProvEntry 1 }
+
+adTA5kFanProvTempThres  OBJECT-TYPE
+    SYNTAX  INTEGER (1..999)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Reprsents the temperature threhold for the fan sensor in deg C with a whole number range of 1 - 999."
+    ::= { adTA5kFanProvEntry 2 }
+
+adTA5kFanProvYellowAlarmEnable  OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "True - alarm is enabled"
+
+    DEFVAL {true}
+    ::= { adTA5kFanProvEntry 3 }
+
+adTA5kFanProvRedAlarmEnable  OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "True - alarm is enabled"
+
+    DEFVAL {true}
+    ::= { adTA5kFanProvEntry 4 }
+
+adMultiFanAlarmSeverity OBJECT-TYPE
+    SYNTAX INTEGER {
+			major(5),
+			critical(6)
+	           }
+
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+            "Sets the Severity for the Multi-Fan alarm"
+    DEFVAL    { major }
+    ::= { adTA5kFanProvEntry 5 }
+
+adFanTempThreshAlarmSeverity OBJECT-TYPE
+    SYNTAX INTEGER {
+			major(5),
+			critical(6)
+                   }
+
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+       	"Sets the Severity for the Fan Temperature Threshold alarm"
+    DEFVAL    { major }
+    ::= { adTA5kFanProvEntry 6 }
+
+-- ============================================================================
+-- TA5000 Fan Module Status Table
+-- ============================================================================
+
+adTA5kFanStatusTable OBJECT-TYPE
+   SYNTAX  SEQUENCE OF AdTA5kFanStatusEntry
+   MAX-ACCESS  not-accessible
+   STATUS  current
+   DESCRIPTION
+        "Table of GR-303 Interface group info."
+   ::= { adTA5kFanStatus 1 }
+
+adTA5kFanStatusEntry OBJECT-TYPE
+   SYNTAX  AdTA5kFanStatusEntry
+   MAX-ACCESS  not-accessible
+   STATUS  current
+   DESCRIPTION
+           "Indexed by slot number"
+   INDEX   { adGenSlotInfoIndex }
+   ::= { adTA5kFanStatusTable 1 }
+
+AdTA5kFanStatusEntry ::=
+   SEQUENCE {
+       adTA5kFanStatusFan1Speed
+           DisplayString,
+       adTA5kFanStatusFan2Speed
+           DisplayString,
+       adTA5kFanStatusFan3Speed
+           DisplayString,
+       adTA5kFanStatusFan4Speed
+           DisplayString,
+       adTA5kFanStatusVoltage
+           DisplayString,
+       adTA5kFanStatusTemp
+           DisplayString,
+       adTA5kFanStatusVoltageAux
+           DisplayString,
+        adTA5kFanStatusFan5Speed
+           DisplayString,
+       adTA5kFanStatusFan6Speed
+           DisplayString,
+       adTA5kFanStatusFan7Speed
+           DisplayString,
+       adTA5kFanStatusFan8Speed
+           DisplayString,
+       adTA5kMultiFansInAlarm
+           INTEGER
+   }
+
+adTA5kFanStatusFan1Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan1 including units (RPM)"
+    ::= { adTA5kFanStatusEntry 1 }
+
+adTA5kFanStatusFan2Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan2 including units (RPM)"
+    ::= { adTA5kFanStatusEntry 2 }
+
+adTA5kFanStatusFan3Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan3 including units (RPM)"
+    ::= { adTA5kFanStatusEntry 3 }
+
+adTA5kFanStatusFan4Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan4 including units (RPM)"
+    ::= { adTA5kFanStatusEntry 4 }
+
+adTA5kFanStatusVoltage OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The shelf voltage including units (V)"
+    ::= { adTA5kFanStatusEntry 5 }
+
+adTA5kFanStatusTemp OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The module temperature including units (C)"
+    ::= { adTA5kFanStatusEntry 6 }
+
+adTA5kFanStatusVoltageAux OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The aux shelf voltage for high flow fan including units (V)"
+    ::= { adTA5kFanStatusEntry 7 }
+
+adTA5kFanStatusFan5Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan5 (high flow)  including units (RPM)"
+    ::= { adTA5kFanStatusEntry 8}
+
+adTA5kFanStatusFan6Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan6 (high flow)  including units (RPM)"
+    ::= { adTA5kFanStatusEntry 9 }
+
+adTA5kFanStatusFan7Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan7 (high flow)  including units (RPM)"
+    ::= { adTA5kFanStatusEntry 10 }
+
+adTA5kFanStatusFan8Speed OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The speed of Fan8 (high flow)  including units (RPM)"
+    ::= { adTA5kFanStatusEntry 11 }
+
+adTA5kMultiFansInAlarm OBJECT-TYPE
+    SYNTAX  INTEGER
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The number of fans in alarm"
+    ::= { adTA5kFanStatusEntry 12 }
+
+
+-- ============================================================================
+-- TA5000 Fan Module Traps
+-- ============================================================================
+
+adTA5kFanYellowActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates a yellow alarm meaning 1 fan alarming."
+        --#TYPE       "Error - RX Yellow Alarm Active, 1 fan alarming"
+        --#SUMMARY    "TA5000 Fan: yellow alarm active (1 fan) for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   MINOR
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kFanModuleEvents 1 }
+
+adTA5kFanYellowInActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates a yellow alarm inactive meaning 1 fan no longer alarming."
+        --#TYPE       "Error - RX Yellow Alarm Inactive, 1 fan no longer alarming"
+        --#SUMMARY    "TA5000 Fan: yellow alarm inactive (1 fan) for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   MINOR
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kFanModuleEvents 2 }
+
+adTA5kFanRedActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex,
+		adTAeSCUTrapAlarmLevel,
+	     	adTA5kMultiFansInAlarm
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates a red alarm meaning multiple fans alarming."
+        --#TYPE       "Error - RX Red Alarm Active, multiple fans alarming"
+        --#SUMMARY    "TA5000 Fan: red alarm active (multiple fans) for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   MAJOR
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kFanModuleEvents 3 }
+
+adTA5kFanRedInActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex,
+		adTAeSCUTrapAlarmLevel,
+	     	adTA5kMultiFansInAlarm
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates a red alarm inactive meaning multiple fans no longer alarming."
+        --#TYPE       "Error - RX Red Alarm Inactive, multiple fans no longer alarming"
+        --#SUMMARY    "TA5000 Fan: red alarm inactive (multiple fans) for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   MAJOR
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kFanModuleEvents 4 }
+
+adTA5kFanTempThresExceedActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex,
+                adTAeSCUTrapAlarmLevel
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates a fan temperature threshold alarm."
+        --#TYPE       "Error - RX Fan Temperature Threshold Alarm Active"
+        --#SUMMARY    "TA5000 Fan: temperature threshold alarm active for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   MAJOR
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kFanModuleEvents 5 }
+
+adTA5kFanTempThresExceedInactive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex,
+                adTAeSCUTrapAlarmLevel
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates a fan temperature threshold alarm inactive."
+        --#TYPE       "Error - RX Fan Temperature Threshold Alarm Inactive"
+        --#SUMMARY    "TA5000 Fan: temperature threshold alarm inactive for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   MAJOR
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kFanModuleEvents 6 }
+END

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -288,7 +288,7 @@ if (safe_count($ups_array)) {
                 $limits['limit_low']  = sensor_limit_low('voltage', $limit);
             }
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], array_merge($options, $limits));
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], array_merge($options, $limits));
         }
 
         ## Input frequency
@@ -303,7 +303,7 @@ if (safe_count($ups_array)) {
                 $limits['limit_low']  = sensor_limit_low('frequency', $limit * $scale_frequency);
             }
 
-            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_frequency, $entry[$oid_name], array_merge($options, $limits));
+            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid, $index, $descr, $scale_frequency, $entry[$oid_name], array_merge($options, $limits));
         }
 
         ## Input current
@@ -312,7 +312,7 @@ if (safe_count($ups_array)) {
             !discovery_check_if_type_exist(['current->HUAWEI-UPS-MIB-hwUpsInputCurrentA'], 'sensor')) {
             $oid = ".1.3.6.1.2.1.33.1.3.3.1.4.$index";
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, $descr, $scale_current, $entry[$oid_name], $options);
         }
 
         ## Input power
@@ -321,7 +321,7 @@ if (safe_count($ups_array)) {
             $oid = ".1.3.6.1.2.1.33.1.3.3.1.5.$index";
             //discover_sensor('power', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, $scale, $entry[$oid_name]);
 
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, $descr, $scale, $entry[$oid_name], $options);
         }
 
     }
@@ -389,7 +389,7 @@ if (safe_count($ups_array)) {
                 $limits['limit_low']  = sensor_limit_low('voltage', $limit);
             }
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], array_merge($options, $limits));
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], array_merge($options, $limits));
         }
 
         ## Output current
@@ -399,7 +399,7 @@ if (safe_count($ups_array)) {
                                             'current->CPS-MIB-upsAdvanceOutputCurrent'], 'sensor')) {
             $oid = ".1.3.6.1.2.1.33.1.4.4.1.3.$index";
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, $descr, $scale_current, $entry[$oid_name], $options);
         }
 
         ## Output power
@@ -409,7 +409,7 @@ if (safe_count($ups_array)) {
                                             'power->CPS-MIB-upsAdvanceOutputPower'], 'sensor')) {
             $oid = ".1.3.6.1.2.1.33.1.4.4.1.4.$index";
 
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
         }
 
         $oid_name = 'upsOutputPercentLoad';
@@ -417,7 +417,7 @@ if (safe_count($ups_array)) {
             !discovery_check_if_type_exist('load->HUAWEI-UPS-MIB-hwUpsOutputLoadA', 'sensor')) {
             $oid = ".1.3.6.1.2.1.33.1.4.4.1.5.$index";
 
-            discover_sensor_ng($device, 'load', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'load', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
         }
 
     }
@@ -470,7 +470,7 @@ if (safe_count($ups_array)) {
                                             'voltage->HUAWEI-UPS-MIB-hwUpsBypassInputVoltageA'], 'sensor')) {
             $oid = ".1.3.6.1.2.1.33.1.5.3.1.2.$index";
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
         }
 
         ## Bypass current
@@ -478,7 +478,7 @@ if (safe_count($ups_array)) {
         if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
             $oid = ".1.3.6.1.2.1.33.1.5.3.1.3.$index";
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, $descr, $scale_current, $entry[$oid_name], $options);
         }
 
         ## Bypass power
@@ -486,7 +486,7 @@ if (safe_count($ups_array)) {
         if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
             $oid = ".1.3.6.1.2.1.33.1.5.3.1.4.$index";
 
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
         }
 
     }
@@ -505,9 +505,8 @@ if (isset($ups_array[0])) {
         $entry[$oid_name] != 0 && $entry[$oid_name] < 1000) { // Battery won't be freezing, 0 means no sensor.
         $oid = ".1.3.6.1.2.1.33.1.2.7.0";
 
-        //discover_sensor('temperature', $device, $oid, "upsBatteryTemperature", 'ups-mib', "Battery".$descr_extra, 1, $ups_array[0]['upsBatteryTemperature']);
         $options = ['rename_rrd' => 'ups-mib-upsBatteryTemperature'];
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
     }
 
     $oid_name = 'upsBatteryCurrent';
@@ -515,18 +514,16 @@ if (isset($ups_array[0])) {
         $entry[$oid_name] >= 0 && $entry[$oid_name] < 10000) {
         $oid = ".1.3.6.1.2.1.33.1.2.6.0";
 
-        //discover_sensor('current', $device, $oid, "upsBatteryCurrent", 'ups-mib', "Battery" . $descr_extra, $scale_current, $ups_array[0]['upsBatteryCurrent']);
         $options = ['rename_rrd' => 'ups-mib-upsBatteryCurrent', 'limit_auto' => FALSE];
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, $descr, $scale_current, $entry[$oid_name], $options);
     }
 
     $oid_name = 'upsBatteryVoltage';
     if (isset($entry[$oid_name])) {
         $oid = ".1.3.6.1.2.1.33.1.2.5.0"; # UPS-MIB:upsBatteryVoltage.0
 
-        //discover_sensor('voltage', $device, $oid, "upsBatteryVoltage", 'ups-mib', "Battery" . $descr_extra, $scale, $ups_array[0]['upsBatteryVoltage']);
         $options = ['rename_rrd' => 'ups-mib-upsBatteryVoltage'];
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_battery, $entry[$oid_name], $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, $scale_battery, $entry[$oid_name], $options);
     }
 
     $oid_name = 'upsEstimatedMinutesRemaining';
@@ -540,8 +537,7 @@ if (isset($ups_array[0])) {
         if ($limit = snmp_get_oid($device, "upsConfigLowBattTime.0", "UPS-MIB")) {
             $options['limit_low'] = $limit;
         }
-        //discover_sensor('runtime', $device, $oid, "upsEstimatedMinutesRemaining.0", 'mge', $descr . $descr_extra, 1, $value, $limits);
-        discover_sensor_ng($device, 'runtime', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+        discover_sensor_ng($device, 'runtime', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
     }
 
     $oid_name = 'upsEstimatedChargeRemaining';
@@ -549,9 +545,8 @@ if (isset($ups_array[0])) {
         $descr = "Battery Charge Remaining" . $descr_extra;
         $oid   = ".1.3.6.1.2.1.33.1.2.4.0";
 
-        //discover_sensor('capacity', $device, $oid, "upsEstimatedChargeRemaining.0", 'ups-mib', $descr . $descr_extra, 1, $value);
         $options = ['rename_rrd' => 'ups-mib-upsEstimatedChargeRemaining.0'];
-        discover_sensor_ng($device, 'capacity', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+        discover_sensor_ng($device, 'capacity', $mib, $oid_name, $oid, $index, $descr, 1, $entry[$oid_name], $options);
     }
 
     $oid_name = 'upsBatteryStatus';
@@ -559,7 +554,6 @@ if (isset($ups_array[0])) {
         $descr = "Battery Status" . $descr_extra;
         $oid   = ".1.3.6.1.2.1.33.1.2.1.0";
 
-        //discover_status($device, $oid, "upsBatteryStatus.0", 'ups-mib-battery-state', $descr . $descr_extra, $value, array( 'entPhysicalClass' => 'other' ));
         discover_status_ng($device, $mib, $oid_name, $oid, $index, 'ups-mib-battery-state', $descr, $entry[$oid_name], ['entPhysicalClass' => 'battery']);
     }
 }
@@ -582,13 +576,13 @@ if (is_numeric($value) &&
     $scale_frequency = strlen($value) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
     $descr           = "Output" . $descr_extra;
     $oid             = ".1.3.6.1.2.1.33.1.4.2.0";
-    //discover_sensor('frequency', $device, $oid, "upsOutputFrequency", 'ups-mib', "Output".$descr_extra, $scale, $value);
+
     $options = ['rename_rrd' => 'ups-mib-upsOutputFrequency'];
     if ($limit = snmp_get_oid($device, "upsConfigOutputFreq.0", "UPS-MIB")) {
         $options['limit_high'] = sensor_limit_high('frequency', $limit * $scale_frequency);
         $options['limit_low']  = sensor_limit_low('frequency', $limit * $scale_frequency);
     }
-    discover_sensor_ng($device, 'frequency', $mib, "upsOutputFrequency", $oid, 0, NULL, $descr, $scale_frequency, $value, $options);
+    discover_sensor_ng($device, 'frequency', $mib, "upsOutputFrequency", $oid, 0, $descr, $scale_frequency, $value, $options);
 }
 
 ## Bypass Frequency
@@ -599,9 +593,9 @@ if (is_numeric($value) &&
     $scale_frequency = strlen($value) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
     $descr           = "Bypass" . $descr_extra;
     $oid             = ".1.3.6.1.2.1.33.1.5.1.0";
-    //discover_sensor('frequency', $device, $oid, "upsBypassFrequency", 'ups-mib', "Bypass".$descr_extra, $scale, $value);
+
     $options = ['rename_rrd' => 'ups-mib-upsBypassFrequency'];
-    discover_sensor_ng($device, 'frequency', $mib, "upsBypassFrequency", $oid, 0, NULL, $descr, $scale_frequency, $value, $options);
+    discover_sensor_ng($device, 'frequency', $mib, "upsBypassFrequency", $oid, 0, $descr, $scale_frequency, $value, $options);
 }
 
 //UPS-MIB::upsTestId.0 = OID: UPS-MIB::upsTestNoTestsInitiated

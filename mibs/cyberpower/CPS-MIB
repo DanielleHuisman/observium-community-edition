@@ -2,11 +2,11 @@
 --
 -- PROJECT: SNMP MIB FILE CONSTRUCTED
 --
--- Version : 2.10
+-- Version : 2.11
 --
 -- File Name: CPSMIB2022.mib
 --
--- CREATION DATE : 09/16/2022
+-- CREATION DATE : 11/18/2022
 --
 -- AUTHOR : Ryuk
 --
@@ -49,7 +49,8 @@ environmentSensor              OBJECT IDENTIFIER ::=  { hardware 4 }
 ats                            OBJECT IDENTIFIER ::=  { hardware 5 }
 ePDU2                          OBJECT IDENTIFIER ::=  { hardware 6 }
 battmgr                        OBJECT IDENTIFIER ::=  { hardware 7 }
-currentProbe				   OBJECT IDENTIFIER ::=  { hardware 50 }
+environmentSensor2             OBJECT IDENTIFIER ::=  { hardware 8 }
+currentProbe                   OBJECT IDENTIFIER ::=  { hardware 50 }
 
 mconfigClock                   OBJECT IDENTIFIER ::=  { mconfig 5 }
 
@@ -164,6 +165,11 @@ bmStrings			OBJECT IDENTIFIER ::=  { battmgr 10 }
 bmFuncShutdown	OBJECT IDENTIFIER ::=  { battmgr 20 }
 
 bmFuncResMeasure		  			  OBJECT IDENTIFIER ::=  { bmFuncRes 1 }
+
+envir2Ident                     OBJECT IDENTIFIER ::=  { environmentSensor2 1 }
+envir2Temp                      OBJECT IDENTIFIER ::=  { environmentSensor2 2 }
+envir2Humid                     OBJECT IDENTIFIER ::=  { environmentSensor2 3 }
+envir2Contact                   OBJECT IDENTIFIER ::=  { environmentSensor2 4 }
 
 currIdent                     OBJECT IDENTIFIER ::=  { currentProbe 1 }
 currConfig                    OBJECT IDENTIFIER ::=  { currentProbe 2 }
@@ -1189,6 +1195,16 @@ upsAdvanceConfigEnergyReset OBJECT-TYPE
       "Setting this OID to reset (2) will cause the output energy meter value to be reset to zero. 
        Getting this OID will do nothing and return the noOperation(1) value."
    ::= { upsAdvanceConfig 19 }
+
+upsAdvanceConfigBatteryRuntimeThreshold OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS read-write
+   STATUS mandatory
+   DESCRIPTION
+      "When the UPS supplies battery power and the remaining runtime is lower than this threshold, 
+       the UPS will sound an alarm. 
+       The value expressed in minutes."
+   ::= { upsAdvanceConfig 20 }
 
 -- the upsBaseControl group
 upsBaseControlConserveBattery OBJECT-TYPE
@@ -4249,9 +4265,9 @@ envirContactEntry  OBJECT-TYPE
    ACCESS not-accessible
    STATUS mandatory
    DESCRIPTION
-      "This gives access to contact entries"
+      "This gives access to contact entries."
    INDEX  { envirContactIndex }
-   ::= { envirContactTable 1 }  
+   ::= { envirContactTable 1 }
 
 ContactEntry ::=
    SEQUENCE {
@@ -6888,6 +6904,54 @@ ePDU2PhaseConfigPhasePeakLoadReset OBJECT-TYPE
  
 			Getting this OID will do nothing and return the noOperation(1) value."
 		::= {ePDU2PhaseConfigEntry 8}
+
+ePDU2PhaseInfoTable OBJECT-TYPE
+		SYNTAX SEQUENCE OF EPDU2PhaseInfoEntryStruct
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"A table of Rack PDU phase information."
+		::= {ePDU2Phase 3}
+
+ePDU2PhaseInfoEntry OBJECT-TYPE
+		SYNTAX EPDU2PhaseInfoEntryStruct
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"Information data from currently queried Rack PDU phase." 
+		INDEX {ePDU2PhaseInfoIndex}
+		::= {ePDU2PhaseInfoTable 1}
+
+EPDU2PhaseInfoEntryStruct ::= 
+	SEQUENCE {
+		ePDU2PhaseInfoIndex					INTEGER, 
+		ePDU2PhaseInfoModuleIndex		INTEGER, 
+		ePDU2PhaseInfoNumber					INTEGER
+	}
+
+ePDU2PhaseInfoIndex OBJECT-TYPE
+		SYNTAX INTEGER(1..12)
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+			"The index to the Rack PDU phase properties table entry." 
+		::= {ePDU2PhaseInfoEntry 1}
+		
+ePDU2PhaseInfoModuleIndex OBJECT-TYPE
+		SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+			"The Rack PDU numeric ID." 
+		::= {ePDU2PhaseInfoEntry 2}
+		
+ePDU2PhaseInfoNumber OBJECT-TYPE
+		SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+			"The numeric phase ID."
+		::= {ePDU2PhaseInfoEntry 3}
 
 ePDU2PhaseStatusTable OBJECT-TYPE
 		SYNTAX SEQUENCE OF EPDU2PhaseStatusEntryStruct
@@ -9817,7 +9881,388 @@ bmShutdownDownCount    OBJECT-TYPE
    DESCRIPTION
       "Down count before battery probe shutdown, unit in minute."
    ::= { bmFuncShutdown 3 }
-   
+
+-- environment2 Group
+-- envir2Ident group
+envir2IdentTableSize OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+			"The number of environment sensor."
+    ::= { envir2Ident 1 }
+
+envir2IdentTable OBJECT-TYPE
+		SYNTAX SEQUENCE OF ENVIR2IdentEntryStruct 
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"A table of environment sensor identification information."
+		::= { envir2Ident 2 }
+
+envir2IdentEntry OBJECT-TYPE
+		SYNTAX ENVIR2IdentEntryStruct 
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"Identification data from environment sensor being queried."
+		INDEX  { envir2IdentIndex }
+		::= { envir2IdentTable 1 }
+
+ENVIR2IdentEntryStruct ::=
+  SEQUENCE {
+  	envir2IdentIndex						   			 	INTEGER, 
+  	envir2IdentModulePosition							INTEGER,
+	  envir2IdentName			    							DisplayString,
+	  envir2IdentLocation										DisplayString,
+	  envir2IdentSerialNumber								DisplayString
+  }
+
+envir2IdentIndex OBJECT-TYPE
+    SYNTAX INTEGER(1..8)
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The index to the environment sensor table entry."
+		::= { envir2IdentEntry 1 }
+
+envir2IdentModulePosition OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The position of environment sensor. "
+		::= { envir2IdentEntry 2 }
+
+envir2IdentName OBJECT-TYPE
+		SYNTAX  DisplayString 
+ 		ACCESS  read-write
+		STATUS  mandatory
+		DESCRIPTION
+			"The name of the environment sensor.
+				The maximum string size is device dependent."
+		::= { envir2IdentEntry  3 }
+
+envir2IdentLocation OBJECT-TYPE
+		SYNTAX  DisplayString
+		ACCESS  read-write
+  	STATUS  mandatory
+  	DESCRIPTION
+			"The location of the environment sensor.
+				The maximum string size is device dependent."
+		::= { envir2IdentEntry 4 }
+
+envir2IdentSerialNumber OBJECT-TYPE
+    SYNTAX DisplayString
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The serial number of the environment sensor."
+		::= { envir2IdentEntry 5 }
+
+-- envir2Temp group
+envir2TempTableSize OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+			"The number of environment sensor."
+    ::= { envir2Temp 1 }
+
+envir2TempUnit OBJECT-TYPE
+    SYNTAX INTEGER{
+    	celsius								(1), 
+    	fahrenheit						(2)
+    }
+		ACCESS read-write
+		STATUS mandatory
+		DESCRIPTION
+				"This OID describes the unit of environment sensor. 
+					Setting the OID to Celsius(1) or Fahrenheit(2) to change the temperature unit." 
+		::= { envir2Temp 2 }
+
+envir2TempTable OBJECT-TYPE
+		SYNTAX SEQUENCE OF ENVIR2TempEntryStruct 
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"A table of environment sensor identification information in temperature."
+		::= { envir2Temp 3 }
+
+envir2TempEntry OBJECT-TYPE
+		SYNTAX ENVIR2TempEntryStruct 
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"Identification data from environment sensor being queried."
+		INDEX  { envir2TemperatureIndex }
+		::= { envir2TempTable 1 }
+
+ENVIR2TempEntryStruct ::=
+  SEQUENCE {
+  	envir2TemperatureIndex			   			 	INTEGER,
+  	envir2TempModulePosition							INTEGER, 
+	  envir2Temperature		    							INTEGER,
+	  envir2TempHighThreshold								INTEGER,
+	  envir2TempLowThreshold								INTEGER,
+	  envir2TempRateOfChange								INTEGER,
+	  envir2TempHysteresis									INTEGER
+  }	
+
+envir2TemperatureIndex OBJECT-TYPE
+    SYNTAX INTEGER(1..8)
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The index to the environment sensor table entry."
+		::= { envir2TempEntry 1 }
+
+envir2TempModulePosition OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The position of environment sensor."
+		::= { envir2TempEntry 2 }
+
+envir2Temperature OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-only
+   STATUS  mandatory
+   DESCRIPTION
+      "The environment temperature expressed in 1/100. 
+      The value is  determined by temperature unit which can be changed in envir2TempUnit."
+   ::= { envir2TempEntry 3 }
+
+envir2TempHighThreshold OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The high temperature threshold of the environment sensor. 
+      The value is  determined by temperature unit which can be changed in envir2TempUnit."
+   ::= { envir2TempEntry 4 }
+
+envir2TempLowThreshold OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The low temperature threshold of the environment sensor. 
+      The value is  determined by temperature unit which can be changed in envir2TempUnit."
+   ::= { envir2TempEntry 5 }
+
+envir2TempRateOfChange OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The rate of change of the temperature.
+      	The value expressed in degree per 5 minute. 
+      	The value is  determined by temperature unit which can be changed in envir2TempUnit."
+   ::= { envir2TempEntry 6 }
+
+envir2TempHysteresis OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The number of degrees beyond the temperature thresholds
+       	at which an active temperature alarm will be cleared.
+      	 This configuration setting applies to all temperature thresholds. 
+      	 The value is  determined by temperature unit which can be changed in envir2TempUnit."
+   ::= { envir2TempEntry 7 }
+
+-- envir2Humid group
+envir2HumidTableSize OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+			"The number of environment sensor."
+    ::= { envir2Humid 1 }
+
+envir2HumidTable OBJECT-TYPE
+		SYNTAX SEQUENCE OF ENVIR2HumidEntryStruct 
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"A table of environment sensor identification information in humidity."
+		::= { envir2Humid 2 }
+
+envir2HumidEntry OBJECT-TYPE
+		SYNTAX ENVIR2HumidEntryStruct 
+		ACCESS not-accessible
+		STATUS mandatory
+		DESCRIPTION
+			"Identification data from environment sensor being queried."
+		INDEX  { envir2HumidityIndex }
+		::= { envir2HumidTable 1 }
+
+ENVIR2HumidEntryStruct ::=
+  SEQUENCE {
+  	envir2HumidityIndex					   			 	INTEGER, 
+  	envir2HumidModulePosition							INTEGER,
+	  envir2Humidity			    							INTEGER,
+	  envir2HumidHighThreshold							INTEGER,
+	  envir2HumidLowThreshold								INTEGER,
+	  envir2HumidRateOfChange								INTEGER,
+	  envir2HumidHysteresis									INTEGER
+  }	
+
+envir2HumidityIndex OBJECT-TYPE
+    SYNTAX INTEGER(1..8)
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The index to the environment sensor table entry."
+		::= { envir2HumidEntry 1 }
+
+envir2HumidModulePosition OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The position of environment sensor."
+		::= { envir2HumidEntry 2 }
+
+envir2Humidity OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-only
+   STATUS  mandatory
+   DESCRIPTION
+      "The environment relative humidity expressed in 1/100."
+   ::= { envir2HumidEntry 3 }
+
+envir2HumidHighThreshold OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The high relative humidity threshold of the environment sensor.
+       The value expressed in persentage."
+   ::= { envir2HumidEntry 4 }
+
+envir2HumidLowThreshold OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The low relative humidity threshold of the environment sensor.
+       The value expressed in persentage."
+   ::= { envir2HumidEntry 5 }
+
+envir2HumidRateOfChange OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The rate of change of the relative humidity.
+       The value expressed in persentage per 5 minute."
+   ::= { envir2HumidEntry 6 }
+
+envir2HumidHysteresis OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS  read-write
+   STATUS  mandatory
+   DESCRIPTION
+      "The number of degrees beyond the relative humidity thresholds
+       at which an active relative humidity alarm will be cleared.
+       This configuration setting applies to all relative humidity
+       thresholds.
+       Units are displayed in persentage."
+   ::= { envir2HumidEntry 7 }
+
+-- envir2Contact group
+envir2ContactTableSize OBJECT-TYPE
+   SYNTAX INTEGER
+   ACCESS read-only
+   STATUS mandatory
+   DESCRIPTION
+      "The number of the contact in the environment sensor."
+   ::= { envir2Contact 1 }
+
+envir2ContactTable OBJECT-TYPE
+   SYNTAX SEQUENCE OF ENVIR2ContactEntryStruct
+   ACCESS not-accessible
+   STATUS mandatory
+   DESCRIPTION
+      "Allows for getting of information of each contact of the environment sensor."
+   ::= { envir2Contact 2 } 
+
+envir2ContactEntry  OBJECT-TYPE
+   SYNTAX ENVIR2ContactEntryStruct  
+   ACCESS not-accessible
+   STATUS mandatory
+   DESCRIPTION
+      "This gives access to contact entries"
+   INDEX  { envir2ContactIndex }
+   ::= { envir2ContactTable 1 }  
+
+ENVIR2ContactEntryStruct ::=
+   SEQUENCE {
+      envir2ContactIndex   	  	 			  	INTEGER,
+      envir2ContactModulePosition					INTEGER,
+      envir2ContactModuleNumber						INTEGER,
+      envir2ContactName 	  	  				  DisplayString,
+      envir2ContactStatus 	  					  INTEGER,
+      envir2ContactNormalState 						INTEGER
+   }
+
+envir2ContactIndex OBJECT-TYPE
+   SYNTAX INTEGER(1..32)
+   ACCESS read-only
+   STATUS mandatory
+   DESCRIPTION
+      "The index to the contact of the environment sensor."
+   ::= { envir2ContactEntry 1 }
+
+envir2ContactModulePosition OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The position of environment sensor."
+		::= { envir2ContactEntry 2 }
+
+envir2ContactModuleNumber OBJECT-TYPE
+    SYNTAX INTEGER
+		ACCESS read-only
+		STATUS mandatory
+		DESCRIPTION
+				"The numeric contact ID."
+		::= { envir2ContactEntry 3 }
+
+envir2ContactName OBJECT-TYPE
+   SYNTAX DisplayString
+   ACCESS read-write
+   STATUS mandatory
+   DESCRIPTION
+      "Getting or setting the name of the contact of the environment sensor."
+   ::= { envir2ContactEntry 4 }
+
+envir2ContactStatus OBJECT-TYPE
+   SYNTAX INTEGER {
+      contactNormal         (1),
+      contactAbnormal       (2)
+   } 
+   ACCESS read-only
+   STATUS mandatory
+   DESCRIPTION
+      "Getting this OID will return the Contact Status."
+   ::= { envir2ContactEntry 5 }
+
+envir2ContactNormalState OBJECT-TYPE
+   SYNTAX INTEGER {
+      normalOpen         (1),
+      normalClose        (2)
+   } 
+   ACCESS read-write
+   STATUS mandatory
+   DESCRIPTION
+      "Set the contact normal state."
+   ::= { envir2ContactEntry 6 }
+
 currIdentSystemID OBJECT-TYPE
    SYNTAX INTEGER{
    		batteryManager(1)
@@ -12185,6 +12630,144 @@ envRateOfHumdChangeAbnormal TRAP-TYPE
    --#HELPTAG 0
    --#STATE NONOPERATIONAL
    ::= 213   
+
+accessoryDeviceEvent TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An accessory event has been happened."
+		::= 250
+
+accessoryDeviceAlarm TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { mtrapinfoString }
+		DESCRIPTION
+			"Alarm: An accessory alarm has been detected."
+		::= 251
+
+accessoryDeviceAlarmClear TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An accessory alarm has been cleared."
+		::= 252
+
+envTemperatureEvent TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2TemperatureIndex, envir2Temperature, mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An environment sensor Temperature event has been happened.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the temperture table index.
+				The fifth argument is the temperture."
+		::= 253
+
+envTemperatureAlarm TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2TemperatureIndex, envir2Temperature, mtrapinfoString }
+		DESCRIPTION
+			"Alarm: An environment sensor Temperature alarm has been detected.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the temperture table index.
+				The fifth argument is the temperture."
+		::= 254
+
+envTemperatureAlarmClear TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2TemperatureIndex, envir2Temperature, mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An environment sensor Temperature alarm has been cleared.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the temperture table index.
+				The fifth argument is the temperture."
+		::= 255
+
+envHumidityEvent TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2HumidityIndex, envir2Humidity, mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An environment sensor Humidity event has been happened.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the humidity table index.
+				The fifth argument is the humidity."
+		::= 256
+
+envHumidityAlarm TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2HumidityIndex, envir2Humidity, mtrapinfoString }
+		DESCRIPTION
+			"Alarm: An environment sensor Humidity alarm has been detected.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the humidity table index.
+				The fifth argument is the humidity."
+		::= 257
+
+envHumidityAlarmClear TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2HumidityIndex, envir2Humidity, mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An environment sensor Humidity alarm has been cleared.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the humidity table index.
+				The fifth argument is the humidity."
+		::= 258
+
+envContactEvent TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2ContactIndex, envir2ContactName, mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An environment sensor Contact event has been happened.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the contect table index.
+				The fifth argument is the contact name."
+		::= 259
+
+envContactAlarm TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2ContactIndex, envir2ContactName, mtrapinfoString }
+		DESCRIPTION
+			"Alarm: An environment sensor Contact alarm has been detected.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the contect table index.
+				The fifth argument is the contact name."
+		::= 260
+
+envContactAlarmClear TRAP-TYPE
+		ENTERPRISE cps
+		VARIABLES { envir2IdentSerialNumber, envir2IdentName, envir2IdentLocation,
+								envir2ContactIndex, envir2ContactName, mtrapinfoString }
+		DESCRIPTION
+			"INFORMATIONAL: An environment sensor Contact alarm has been cleared.
+				The first argument is the sensor serial number.
+				The second argument is the sensor name.
+				The third argument is the sensor location.
+				The foutrh argument is the contect table index.
+				The fifth argument is the contact name."
+		::= 261
 
 -- ATS Traps
 atsSwitchSource TRAP-TYPE

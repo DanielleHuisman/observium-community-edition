@@ -7,22 +7,25 @@
  *
  * @package        observium
  * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
-if (!empty($agent_data['app']['exim'])) {
-    $app_id = discover_app($device, 'exim');
+if (!empty($agent_data['app']['exim']) && is_string($agent_data['app']['exim'])) {
 
-    foreach (explode("\n", $agent_data['app']['exim']) as $line) {
-        [$item, $value] = explode(":", $line, 2);
-        $exim_data[trim($item)] = trim($value);
+  $app_id = discover_app($device, 'exim');
+
+  foreach (explode("\n", $agent_data['app']['exim']) as $line) {
+    if (strpos($line, ':') !== false) {
+      [$item, $value] = explode(":", $line, 2);
+      $exim_data[trim($item)] = trim($value);
     }
+  }
 
-    rrdtool_update_ng($device, 'exim', $exim_data, $app_id);
-    update_application($app_id, $exim_data);
+  rrdtool_update_ng($device, 'exim', $exim_data, $app_id);
+  update_application($app_id, $exim_data);
 
-    unset($exim_data, $item, $value, $app_id);
+  unset($exim_data, $item, $value, $app_id);
 }
 
 // EOF

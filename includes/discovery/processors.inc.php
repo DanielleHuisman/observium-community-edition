@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -58,7 +58,7 @@ foreach (get_device_mibs_permitted($device) as $mib) {
 }
 
 // Remove processors which weren't redetected here
-foreach (dbFetchRows('SELECT * FROM `processors` WHERE `device_id` = ?', [$device['device_id']]) as $test_processor) {
+foreach (dbFetchRows('SELECT * FROM `processors` WHERE `device_id` = ?', [ $device['device_id'] ]) as $test_processor) {
     $processor_index = $test_processor['processor_index'];
     $processor_type  = $test_processor['processor_type'];
     $processor_descr = $test_processor['processor_descr'];
@@ -66,7 +66,13 @@ foreach (dbFetchRows('SELECT * FROM `processors` WHERE `device_id` = ?', [$devic
 
     if (!$valid['processor'][$processor_type][$processor_index]) {
         $GLOBALS['module_stats'][$module]['deleted']++; //echo('-');
-        dbDelete('processors', '`processor_id` = ?', [$test_processor['processor_id']]);
+        dbDelete('processors', '`processor_id` = ?', [ $test_processor['processor_id'] ]);
+
+        // Delete attribs, currently only for ucd-raw (very rare case)
+        //if (dbExist('entity_attribs', '`device_id` = ? AND `entity_type` = ? AND `entity_id` = ?`', [ $device['device_id'], 'processor', $test_processor['processor_id'] ])) {
+        if ($processor_type === 'ucd-raw') {
+            dbDelete('entity_attribs', '`device_id` = ? AND `entity_type` = ? AND `entity_id` = ?`', [ $device['device_id'], 'processor', $test_processor['processor_id'] ]);
+        }
         log_event("Processor removed: type " . $processor_type . " index " . $processor_index . " descr " . $processor_descr, $device, 'processor', $test_processor['processor_id']);
     }
     unset($processor_oid, $processor_type);

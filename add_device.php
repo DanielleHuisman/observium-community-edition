@@ -5,20 +5,17 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage cli
+ * @copyright  (C) Adam Armstrong
  *
  */
 
-/// FIXME. This is mostly DERP arguments parsing, new cmd will be soon
+/// FIXME. This is mostly DERP arguments parsing
 
 chdir(dirname($argv[0]));
 
-$options = getopt("dhpt");
-if (isset($options['d'])) {
-    array_shift($argv);
-}
+$options = getopt("dhpt", [], $opt_index);
 
 include("includes/observium.inc.php");
 include("includes/discovery/functions.inc.php");
@@ -35,33 +32,32 @@ if (isset($options['h'])) {
 }
 
 $snmp_options = [];
-// Just test, do not add device
+// Just test, do not add a device
 if (isset($options['t'])) {
     $snmp_options['test'] = TRUE;
-    array_shift($argv);
 }
 // Add skip pingable checks if argument -p passed
 if (isset($options['p'])) {
     $snmp_options['ping_skip'] = 1;
-    array_shift($argv);
 }
+// Remove options and script name from argv
+$argv = array_slice($argv, $opt_index);
 
-$added = 0;
-
-if (!empty($argv[1])) {
-    $add_array = [];
-    if (is_file($argv[1])) {
-        // Parse file into array with devices to add
-        foreach (new SplFileObject($argv[1]) as $line) {
+$added     = 0;
+$add_array = [];
+if (!empty($argv[0])) {
+    if (is_file($argv[0])) {
+        // Parse file into an array with devices to add
+        foreach (new SplFileObject($argv[0]) as $line) {
             $d = preg_split('/\s/', $line, -1, PREG_SPLIT_NO_EMPTY);
-            if (empty($d) || strpos(reset($d), '#') === 0) {
+            if (empty($d) || str_starts_with($d[0], '#')) {
+                // Skip empty lines or commented
                 continue;
             }
             $add_array[] = $d;
         }
     } else {
-        $add_array[0] = $argv;
-        array_shift($add_array[0]);
+        $add_array[] = $argv;
     }
 
     // Save base SNMP v3 credentials and v2c/v1 community
@@ -69,156 +65,40 @@ if (!empty($argv[1])) {
     $snmp_config_community = $config['snmp']['community'];
 
     foreach ($add_array as $add) {
-        $hostname       = strtolower($add[0]);
-        $snmp_community = $add[1];
-        $snmp_version   = strtolower($add[2]);
-
-        $snmp_port = 161;
-        if (str_contains($hostname, ':') && get_ip_version($hostname) !== 6) {
-            // Allow pass common hostname:port
-            [$host_tmp, $port_tmp] = explode(':', $hostname, 2);
-            if (is_valid_param($port_tmp, 'port')) {
-                $hostname  = $host_tmp;
-                $snmp_port = $port_tmp;
-            }
-            unset($host_tmp, $port_tmp);
+        $snmp = get_device_snmp_argv($add, $snmp_options);
+        if (!$snmp) {
+            //print_error("Try to add $hostname:");
+            continue;
         }
-        $snmp_transport = 'udp';
+        $hostname       = $snmp['hostname'];
+        $snmp_version   = $snmp['snmp_version'];
+        $snmp_transport = $snmp['snmp_transport'];
+        $snmp_port      = $snmp['snmp_port'];
 
+        // FIXME. Still used hard set v2c/v3 auth by config
         if ($snmp_version === "v3") {
-            $config['snmp']['v3'] = $snmp_config_v3; // Restore base SNMP v3 credentials
-            $snmp_v3_seclevel     = $snmp_community;
-
-            // These values are the same as in defaults.inc.php
-            $snmp_v3_auth = [
-              'authlevel'  => "noAuthNoPriv",
-              'authname'   => "observium",
-              'authpass'   => "",
-              'authalgo'   => "MD5",
-              'cryptopass' => "",
-              'cryptoalgo' => "AES"
-            ];
-
-            $add_context = FALSE; // Derp, last arg after transport is context
-            if ($snmp_v3_seclevel === "nanp" || $snmp_v3_seclevel === "any" || $snmp_v3_seclevel === "noAuthNoPriv") {
-                $snmp_v3_auth['authlevel'] = "noAuthNoPriv";
-                $snmp_v3_args              = array_slice($add, 3);
-
-                while ($arg = array_shift($snmp_v3_args)) {
-                    // parse all remaining args
-                    if (is_valid_param($arg, 'port')) {
-                        $snmp_port = $arg;
-                    } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/', $arg)) {
-                        $snmp_transport = $arg;
-                        $add_context    = TRUE; // Derp, last arg after transport is context
-                    } elseif ($add_context && strlen($arg)) {
-                        $snmp_context = $arg;
-                        break;
-                    } else {
-                        // FIXME: should add a sanity check of chars allowed in user
-                        $user = $arg;
-                    }
-                }
-
-                if ($snmp_v3_seclevel !== "any") {
-                    $config['snmp']['v3'] = [$snmp_v3_auth];
-                }
-            } elseif ($snmp_v3_seclevel === "anp" || $snmp_v3_seclevel === "authNoPriv") {
-
-                $snmp_v3_auth['authlevel'] = "authNoPriv";
-                $snmp_v3_args              = array_slice($argv, 4);
-                $snmp_v3_auth['authname']  = array_shift($snmp_v3_args);
-                $snmp_v3_auth['authpass']  = array_shift($snmp_v3_args);
-
-                while ($arg = array_shift($snmp_v3_args)) {
-                    // parse all remaining args
-                    if (is_valid_param($arg, 'port')) {
-                        $snmp_port = $arg;
-                    } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
-                        $snmp_transport = $arg;
-                        $add_context    = TRUE; // Derp, last arg after transport is context
-                    } elseif (is_valid_param($arg, 'snmp_authalgo')) {
-                        $snmp_v3_auth['authalgo'] = $arg;
-                    } elseif ($add_context && strlen($arg)) {
-                        $snmp_context = $arg;
-                        break;
-                    }
-                }
-
-                $config['snmp']['v3'] = [$snmp_v3_auth];
-            } elseif ($snmp_v3_seclevel === "ap" || $snmp_v3_seclevel === "authPriv") {
-                $snmp_v3_auth['authlevel']  = "authPriv";
-                $snmp_v3_args               = array_slice($argv, 4);
-                $snmp_v3_auth['authname']   = array_shift($snmp_v3_args);
-                $snmp_v3_auth['authpass']   = array_shift($snmp_v3_args);
-                $snmp_v3_auth['cryptopass'] = array_shift($snmp_v3_args);
-
-                while ($arg = array_shift($snmp_v3_args)) {
-                    // parse all remaining args
-                    if (is_valid_param($arg, 'port')) {
-                        $snmp_port = $arg;
-                    } elseif (preg_match('/^(' . implode("|", $config['snmp']['transports']) . ')$/i', $arg)) {
-                        $snmp_transport = $arg;
-                        $add_context    = TRUE; // Derp, last arg after transport is context
-                    } elseif (is_valid_param($arg, 'snmp_authalgo')) {
-                        $snmp_v3_auth['authalgo'] = $arg;
-                    } elseif (is_valid_param($arg, 'snmp_cryptoalgo')) {
-                        $snmp_v3_auth['cryptoalgo'] = $arg;
-                    } elseif ($add_context && strlen($arg)) {
-                        $snmp_context = $arg;
-                        break;
-                    }
-                }
-
-                $config['snmp']['v3'] = [$snmp_v3_auth];
-            }
-            //print_debug_vars($snmp_v3_auth);
-            //print_debug_vars($config['snmp']['v3']);
-        } else {
+            // v3
+            $config['snmp']['v3'] = $snmp['snmp_v3_auth'];
+        } elseif (!empty($snmp_version)) {
             // v1 or v2c
-            $snmp_v2_args = array_slice($argv, 2);
-
-            $add_context = FALSE; // Derp, last arg after transport is context
-            while ($arg = array_shift($snmp_v2_args)) {
-                // parse all remaining args
-                if (is_valid_param($arg, 'port')) {
-                    $snmp_port = $arg;
-                } elseif (preg_match('/(' . implode("|", $config['snmp']['transports']) . ')/i', $arg)) {
-                    $snmp_transport = $arg;
-                    $add_context    = TRUE; // Derp, last arg after transport is context
-                } elseif (preg_match('/^(v1|v2c)$/i', $arg)) {
-                    $snmp_version = $arg;
-                } elseif ($add_context && strlen($arg)) {
-                    $snmp_context = $arg;
-                    break;
-                }
-            }
-
-            $config['snmp']['community'] = ($snmp_community ? [$snmp_community] : $snmp_config_community);
-        }
-
-        // Add snmp context to params
-        if (isset($snmp_context)) {
-            $snmp_options['snmp_context'] = $snmp_context;
-            unset($snmp_context);
+            $config['snmp']['community'] = $snmp['snmp_community'];
         }
 
         print_message("Try to add $hostname:");
-        if (in_array($snmp_version, ['v1', 'v2c', 'v3'])) {
-            // If snmp version passed in arguments, then use the exact version
-            $device_id = add_device($hostname, $snmp_version, $snmp_port, $snmp_transport, $snmp_options);
-        } else {
-            // If snmp version unknown check all possible snmp versions and auth options
-            $device_id = add_device($hostname, NULL, $snmp_port, $snmp_transport, $snmp_options);
-        }
 
-        if ($device_id) {
-            if (!isset($options['t'])) {
+        // If a known snmp version passed in arguments, then use the exact version (v1, v2c, v3)
+        // otherwise checks all possible snmp versions and auth options
+        if ($device_id = add_device($hostname, $snmp_version, $snmp_port, $snmp_transport, $snmp_options)) {
+            if (!isset($snmp_options['test'])) {
                 $device = device_by_id_cache($device_id);
                 print_success("Added device " . $device['hostname'] . " (" . $device_id . ").");
             } // Else this is device testing, success message already written by add_device()
             $added++;
         }
+
+        // Restore base SNMP v1/2c/3 credentials (need for add multiple devices)
+        $config['snmp']['community'] = $snmp_config_community;
+        $config['snmp']['v3']        = $snmp_config_v3;
     }
 }
 
@@ -236,8 +116,7 @@ if ($added) {
     print_help(OBS_SCRIPT_NAME);
 }
 
-function print_help($scriptname)
-{
+function print_help($scriptname) {
     global $config;
 
     $snmp_version = get_versions('snmp');

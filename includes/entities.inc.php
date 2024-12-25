@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -1623,8 +1623,8 @@ function entity_scale_definition($device, $definition, $entity, $entity_type = N
     return $scale;
 }
 
-function entity_limits_definition($device, $definition, $entity, $scale = 1)
-{
+function entity_limits_definition($device, $definition, $entity, $scale = 1) {
+
     $options = [];
 
     // Scale limit
@@ -1636,7 +1636,7 @@ function entity_limits_definition($device, $definition, $entity, $scale = 1)
             //print_vars($entity);
             if (isset($definition['limit_scale']['scale'])) {
                 // Convert single condition to multi
-                $definition['limit_scale'] = [$definition['limit_scale']];
+                $definition['limit_scale'] = [ $definition['limit_scale'] ];
             }
             foreach ($definition['limit_scale'] as $test) {
                 print_debug("Test Limit Scale by condition: " . $test['scale']);
@@ -1792,11 +1792,7 @@ function entity_limits_definition($device, $definition, $entity, $scale = 1)
 
     // One last step for convert limit unit, when value and limits use different units (ie HP-ICF-TRANSCEIVER-MIB)
     if (isset($definition['limit_unit'])) {
-        foreach (['limit_low', 'limit_low_warn', 'limit_high_warn', 'limit_high'] as $limit) {
-            if (isset($options[$limit])) {
-                $options[$limit] = value_to_si($options[$limit], $definition['limit_unit'], $definition['class']);
-            }
-        }
+        $options['limit_unit'] = $definition['limit_unit'];
     }
 
     // Allow disable auto limits by definitions

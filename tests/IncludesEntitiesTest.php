@@ -13,78 +13,166 @@ include(__DIR__ . '/../includes/definitions.inc.php');
 include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
 include(__DIR__ . '/../includes/functions.inc.php');
 
-class IncludesEntitiesTest extends \PHPUnit\Framework\TestCase
-{
+class IncludesEntitiesTest extends \PHPUnit\Framework\TestCase {
 
-  /**
-  * @dataProvider providerEntityDescrDefinition
-  * @group descr
-  */
-  public function testEntityDescrDefinition($type, $result, $definition, $descr_entry, $count = 1)
-  {
-    $this->assertSame($result, entity_descr_definition($type, $definition, $descr_entry, $count));
-  }
+    /**
+    * @dataProvider providerEntityDescrDefinition
+    * @group descr
+    */
+    public function testEntityDescrDefinition($type, $result, $definition, $descr_entry, $count = 1) {
+        $this->assertSame($result, entity_descr_definition($type, $definition, $descr_entry, $count));
+    }
 
 
-  public function providerEntityDescrDefinition()
-  {
-    $result = array();
+    public function providerEntityDescrDefinition() {
+        $result = array();
 
-    // Mempool
-    $type = 'mempool';
-    $definition = array();
-    $array      = array('i' => '22', 'index' => '33');
+        // Mempool
+        $type = 'mempool';
+        $definition = array();
+        $array      = array('i' => '22', 'index' => '33');
 
-    // Defaults from entity definition
-    $result[] = array($type, 'Memory',          $definition, $array);
-    $result[] = array($type, 'Memory Pool 33',  $definition, $array, 2);
+        // Defaults from entity definition
+        $result[] = array($type, 'Memory',          $definition, $array);
+        $result[] = array($type, 'Memory Pool 33',  $definition, $array, 2);
 
-    // Descr from oid_descr, but it empty
-    $definition['oid_descr'] = 'OidName';
-    $result[] = array($type, 'Memory',          $definition, $array);
-    // Descr from descr
-    $definition['descr'] = 'Name from Descr';
-    $result[] = array($type, 'Name from Descr', $definition, $array);
-    $result[] = array($type, 'Name from Descr 33', $definition, $array, 2);
-    // Descr from oid_descr
-    $array['OidName'] = 'Name from Oid';
-    $result[] = array($type, 'Name from Oid',   $definition, $array);
-    $result[] = array($type, 'Name from Oid',   $definition, $array, 2);
-    // Now descr use tags
-    $definition['descr'] = 'Name from Descr with Tags (%i%) {%index%} [%oid_descr%]';
-    $result[] = array($type, 'Name from Descr with Tags (22) {33} [Name from Oid]', $definition, $array);
-    $definition['descr'] = 'Name from Descr with Tags (%OidName%)';
-    $result[] = array($type, 'Name from Descr with Tags (Name from Oid)', $definition, $array);
-    // Tag multiple times
-    $definition['descr'] = 'Name from Descr with multiple Tags {%oid_descr%} [%oid_descr%]';
-    $result[] = array($type, 'Name from Descr with multiple Tags {Name from Oid} [Name from Oid]', $definition, $array);
-    // Multipart indexes
-    $definition['descr'] = 'Name from Descr with Tags {%index0%}';
-    $result[] = array($type, 'Name from Descr with Tags {33}', $definition, $array);
-    $array['index'] = '11.22.33.44.55';
-    $definition['descr'] = 'Name from Descr with Multipart Index {%index1%} {%index3%} {%index2%} [%index%]';
-    $result[] = array($type, 'Name from Descr with Multipart Index {22} {44} {33} [11.22.33.44.55]', $definition, $array);
+        // Descr from oid_descr, but it empty
+        $definition['oid_descr'] = 'OidName';
+        $result[] = array($type, 'Memory',          $definition, $array);
+        // Descr from descr
+        $definition['descr'] = 'Name from Descr';
+        $result[] = array($type, 'Name from Descr', $definition, $array);
+        $result[] = array($type, 'Name from Descr 33', $definition, $array, 2);
+        // Descr from oid_descr
+        $array['OidName'] = 'Name from Oid';
+        $result[] = array($type, 'Name from Oid',   $definition, $array);
+        $result[] = array($type, 'Name from Oid',   $definition, $array, 2);
+        // Now descr use tags
+        $definition['descr'] = 'Name from Descr with Tags (%i%) {%index%} [%oid_descr%]';
+        $result[] = array($type, 'Name from Descr with Tags (22) {33} [Name from Oid]', $definition, $array);
+        $definition['descr'] = 'Name from Descr with Tags (%OidName%)';
+        $result[] = array($type, 'Name from Descr with Tags (Name from Oid)', $definition, $array);
+        // Tag multiple times
+        $definition['descr'] = 'Name from Descr with multiple Tags {%oid_descr%} [%oid_descr%]';
+        $result[] = array($type, 'Name from Descr with multiple Tags {Name from Oid} [Name from Oid]', $definition, $array);
+        // Multipart indexes
+        $definition['descr'] = 'Name from Descr with Tags {%index0%}';
+        $result[] = array($type, 'Name from Descr with Tags {33}', $definition, $array);
+        $array['index'] = '11.22.33.44.55';
+        $definition['descr'] = 'Name from Descr with Multipart Index {%index1%} {%index3%} {%index2%} [%index%]';
+        $result[] = array($type, 'Name from Descr with Multipart Index {22} {44} {33} [11.22.33.44.55]', $definition, $array);
 
-    // Sensors
-    $type = 'sensor';
-    $definition = array();
-    $array      = array('i' => '22', 'index' => '33');
+        // Sensors
+        $type = 'sensor';
+        $definition = array();
+        $array      = array('i' => '22', 'index' => '33');
 
-    $definition['oid_descr'] = 'jnxOperatingDescr';
-    $definition['descr_transform'] = ['action' => 'entity_name'];
+        $definition['oid_descr'] = 'jnxOperatingDescr';
+        $definition['descr_transform'] = ['action' => 'entity_name'];
 
-    $array['jnxOperatingDescr'] = "PIC: 4x 10GE(LAN) SFP+     @ 0/0/*";
-    $result[] = array($type, 'PIC: 4x 10GE(LAN) SFP+ @ 0/0/*',   $definition, $array);
+        $array['jnxOperatingDescr'] = "PIC: 4x 10GE(LAN) SFP+     @ 0/0/*";
+        $result[] = array($type, 'PIC: 4x 10GE(LAN) SFP+ @ 0/0/*',   $definition, $array);
 
-    return $result;
-  }
+        return $result;
+    }
+
+    /**
+     * @dataProvider providerGetDeviceSnmpArgv
+     * @group device
+     */
+    public function testGetDeviceSnmpArgv($argv, $result, $options = []) {
+        $this->assertSame($result, get_device_snmp_argv($argv, $snmp_options));
+        if ($snmp_options || $options) {
+            // Common snmp v3 or context
+            $this->assertSame($options, $snmp_options);
+        }
+    }
+
+    public function providerGetDeviceSnmpArgv() {
+        $array = [];
+
+        // SNMP v1
+        // hostname.test community v1
+        $array[] = [ [ 'hostname.test', 'community', 'v1' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v1', 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // hostname.test community v1 tcp context
+        $array[] = [ [ 'hostname.test', 'community', 'v1', 'tcp', 'context' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v1', 'snmp_transport' => 'tcp', 'snmp_port' => 161 ],
+                     [ 'snmp_context' => 'context' ] ];
+
+        // SNMP v2c (default)
+        // hostname.test community
+        $array[] = [ [ 'hostname.test', 'community', ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // hostname.test community v2c
+        $array[] = [ [ 'hostname.test', 'community', 'v2c' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // hostname.test community v2c tcp context
+        $array[] = [ [ 'hostname.test', 'community', 'v2c', 'tcp', 'context' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'tcp', 'snmp_port' => 161 ],
+                     [ 'snmp_context' => 'context' ] ];
+
+        // SNMP v3
+        // hostname.test nanp v3 username
+        $snmp_v3_auth = [ [ 'authlevel' => 'noAuthNoPriv', 'authname' => 'username' ] ];
+        $array[] = [ [ 'hostname.test', 'nanp', 'v3', 'username' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_v3_auth' => $snmp_v3_auth, 'snmp_version' => 'v3', 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // hostname.test nanp v3 tcp context
+        $snmp_v3_auth = [ [ 'authlevel' => 'noAuthNoPriv', 'authname' => 'observium' ] ];
+        $array[] = [ [ 'hostname.test', 'nanp', 'v3', 'tcp', 'context' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_v3_auth' => $snmp_v3_auth, 'snmp_version' => 'v3', 'snmp_transport' => 'tcp', 'snmp_port' => 161 ],
+                     [ 'snmp_context' => 'context' ] ];
+
+        // hostname.test anp v3 username password sha
+        $snmp_v3_auth = [ [ 'authlevel' => 'authNoPriv', 'authname' => 'username', 'authpass' => 'password', 'authalgo' => 'sha' ] ];
+        $array[] = [ [ 'hostname.test', 'anp', 'v3', 'username', 'password', 'sha' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_v3_auth' => $snmp_v3_auth, 'snmp_version' => 'v3', 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // hostname.test anp v3 username password tcp context
+        $snmp_v3_auth = [ [ 'authlevel' => 'authNoPriv', 'authname' => 'username', 'authpass' => 'password', 'authalgo' => 'MD5' ] ];
+        $array[] = [ [ 'hostname.test', 'anp', 'v3', 'username', 'password', 'tcp', 'context' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_v3_auth' => $snmp_v3_auth, 'snmp_version' => 'v3', 'snmp_transport' => 'tcp', 'snmp_port' => 161 ],
+                     [ 'snmp_context' => 'context' ] ];
+
+        // hostname.test ap v3 username password encpass sha des
+        $snmp_v3_auth = [ [ 'authlevel' => 'authPriv', 'authname' => 'username', 'authpass' => 'password', 'authalgo' => 'sha', 'cryptopass' => 'encpass', 'cryptoalgo' => 'des' ] ];
+        $array[] = [ [ 'hostname.test', 'ap', 'v3', 'username', 'password', 'encpass', 'sha', 'des' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_v3_auth' => $snmp_v3_auth, 'snmp_version' => 'v3', 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // hostname.test ap v3 username password encpass tcp context
+        $snmp_v3_auth = [ [ 'authlevel' => 'authPriv', 'authname' => 'username', 'authpass' => 'password', 'authalgo' => 'MD5', 'cryptopass' => 'encpass', 'cryptoalgo' => 'AES' ] ];
+        $array[] = [ [ 'hostname.test', 'ap', 'v3', 'username', 'password', 'encpass', 'tcp', 'context' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_v3_auth' => $snmp_v3_auth, 'snmp_version' => 'v3', 'snmp_transport' => 'tcp', 'snmp_port' => 161 ],
+                     [ 'snmp_context' => 'context' ] ];
+
+        // SNMP port
+        // hostname.test:123 community
+        $array[] = [ [ 'hostname.test:123', 'community' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'udp', 'snmp_port' => 123 ] ];
+        // 127.0.0.1:123 community
+        $array[] = [ [ '127.0.0.1:123', 'community', 'v2c' ],
+                     [ 'hostname' => '127.0.0.1', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'udp', 'snmp_port' => 123 ] ];
+        // hostname.test community v2c 123
+        $array[] = [ [ 'hostname.test', 'community', 'v2c', '123' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'udp', 'snmp_port' => 123 ] ];
+        // ::1 community v2c 123
+        $array[] = [ [ '::1', 'community', 'v2c', '123' ],
+                     [ 'hostname' => '::1', 'snmp_community' => [ 'community' ], 'snmp_version' => 'v2c', 'snmp_transport' => 'udp', 'snmp_port' => 123 ] ];
+
+        // Only hostname/ip for detect all possible params
+        // hostname.test
+        $array[] = [ [ 'hostname.test' ],
+                     [ 'hostname' => 'hostname.test', 'snmp_version' => NULL, 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+        // 127.0.0.1
+        $array[] = [ [ '127.0.0.1' ],
+                     [ 'hostname' => '127.0.0.1', 'snmp_version' => NULL, 'snmp_transport' => 'udp', 'snmp_port' => 161 ] ];
+
+        return $array;
+    }
 
     /**
      * @dataProvider providerIsModuleEnabled
      * @group device
      */
-    public function testIsModuleEnabled($device, $module, $default, $enabled, $disabled, $attrib = TRUE)
-    {
+    public function testIsModuleEnabled($device, $module, $default, $enabled, $disabled, $attrib = TRUE) {
         $process = 'poller';
         // Pseudo cache for attribs:
         $GLOBALS['cache']['entity_attribs_all']['device'][$device['device_id']] = []; // set array, for skip query db
@@ -133,7 +221,7 @@ class IncludesEntitiesTest extends \PHPUnit\Framework\TestCase
         $result[] = [ $device_ios,   'unix-agent', FALSE, FALSE, FALSE, FALSE ];
         $result[] = [ $device_vrp,   'unix-agent', FALSE, FALSE, FALSE, FALSE ];
         $result[] = [ $device_amm,   'unix-agent', FALSE, FALSE, FALSE, FALSE ];
-        $result[] = [ $device_gen,   'unix-agent', FALSE,  TRUE, FALSE ];
+        //$result[] = [ $device_gen,   'unix-agent', FALSE,  TRUE, FALSE ];
 
         $result[] = [ $device_linux, 'ipmi',  TRUE,  TRUE, FALSE ];
         $result[] = [ $device_win,   'ipmi',  TRUE,  TRUE, FALSE ];

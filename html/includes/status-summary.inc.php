@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -230,11 +229,11 @@ switch (TRUE) {
 }
 
 $check['status_numbers'] = '
-          <span class="green">' . $cache['alert_entries']['up'] . '</span>/
+          <span class="green">'  . $cache['alert_entries']['up']       . '</span>/
           <span class="purple">' . $cache['alert_entries']['suppress'] . '</span>/
-          <span class="red">' . $cache['alert_entries']['down'] . '</span>/
-          <span class="orange">' . $cache['alert_entries']['delay'] . '</span>/
-          <span class="gray">' . $cache['alert_entries']['unknown'] . '</span>';
+          <span class="red">'    . $cache['alert_entries']['down']     . '</span>/
+          <span class="orange">' . $cache['alert_entries']['delay']    . '</span>/
+          <span class="gray">'   . $cache['alert_entries']['unknown']  . '</span>';
 ?>
 
     <div class="<?php echo($div_class); ?>">
@@ -255,11 +254,11 @@ $check['status_numbers'] = '
                 <tr class="<?php echo($check['html_row_class']); ?>">
                     <td class="state-marker"></td>
                     <td><a href="/alerts/"><strong>Alerts</strong></a></td>
-                    <td><span class="green"><?php echo $cache['alert_entries']['up']; ?></span></td>
-                    <td><span class="red"><?php echo $cache['alert_entries']['down']; ?></span></td>
-                    <td><span class="orange"><?php echo $cache['alert_entries']['delay']; ?></span></td>
-                    <td><span class="purple"><?php echo $cache['alert_entries']['suppress']; ?></span></td>
-                    <td><span class="gray"><?php echo $cache['alert_entries']['unknown']; ?></span></td>
+                    <td><a class="green" href="<?php echo generate_url([ 'page' => 'alerts', 'status' => 'ok' ]); ?>"><?php echo $cache['alert_entries']['up']; ?></a></td>
+                    <td><a class="red" href="<?php echo generate_url([ 'page' => 'alerts', 'status' => 'failed' ]); ?>"><?php echo $cache['alert_entries']['down']; ?></a></td>
+                    <td><a class="orange" href="<?php echo generate_url([ 'page' => 'alerts', 'status' => 'delayed' ]); ?>"><?php echo $cache['alert_entries']['delay']; ?></a></td>
+                    <td><a class="purple" href="<?php echo generate_url([ 'page' => 'alerts', 'status' => 'suppressed' ]); ?>"><?php echo $cache['alert_entries']['suppress']; ?></a></td>
+                    <td><a class="gray" href="<?php echo generate_url([ 'page' => 'alerts', 'status' => 'unknown' ]); ?>"><?php echo $cache['alert_entries']['unknown']; ?></a></td>
                 </tr>
                 </tbody>
             </table>

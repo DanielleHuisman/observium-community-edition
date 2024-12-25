@@ -1,0 +1,2945 @@
+-- MIB version: 1.1.104
+
+-- MIB release note
+--        |    date     | MIB version |   note
+---------------------------------------------------------------------------------------------------
+--        | 2018/02/13  | 1.1.101     |   Initial version
+---------------------------------------------------------------------------------------------------
+--        | 2018/03/01  | 1.1.102     |   Modify descriptions of bankStatusRatedCur, outletStatusRatedCur, and outletStatusSwitchable
+---------------------------------------------------------------------------------------------------
+--        | 2019/09/09  | 1.1.103     |   Add staStatusHasAutoPing, outletStatusAutoPing, outletConfigAutoPing. Modify sensorConfigTable, sensorReadingTable to support port-address indexing
+---------------------------------------------------------------------------------------------------
+--        | 2019/10/08  | 1.1.104     |   Add trapNotification. Add netConfigTable to support port indexing for dual-network
+---------------------------------------------------------------------------------------------------
+--        | 2020/11/23  | 1.1.105     |   Add deviceLock to change password of SNMP for California passes law
+---------------------------------------------------------------------------------------------------
+--        | 2021/05/06  | 1.1.106     |   Add phase layout of outlet and bank
+---------------------------------------------------------------------------------------------------
+--        | 2021/08/24  | 1.1.107     |   Add inlet entry and inlet number
+---------------------------------------------------------------------------------------------------
+--        | 2021/10/01  | 1.1.108     |   Add smoke sensor in dry contact
+---------------------------------------------------------------------------------------------------
+--        | 2021/11/02  | 1.1.109     |   Add InetAddress and InetAddressType for support ipv4/ipv6
+---------------------------------------------------------------------------------------------------
+
+-- ATEN International Co., Ltd.
+-- This file defines the mib struct of Management in PE series
+-- We attach this mib node on enterprises.aten.atenProducts.overip.poweroverip.pe2 subtree
+                                                  
+ATEN-PE2-CFG DEFINITIONS ::= BEGIN
+    IMPORTS
+        enterprises, IpAddress, Gauge, TimeTicks     FROM RFC1155-SMI
+        DisplayString                                FROM RFC1213-MIB
+        OBJECT-TYPE                                  FROM RFC-1212
+        TRAP-TYPE                                    FROM RFC-1215
+        MODULE-IDENTITY, NOTIFICATION-TYPE           FROM SNMPv2-SMI
+        KeyChange                                    FROM SNMP-USER-BASED-SM-MIB
+        MacAddress                                   FROM SNMPv2-TC
+        poweroverip                                  FROM ATEN-PRODUCTS-MIB
+		InetAddressType, InetAddress, InetPortNumber FROM INET-ADDRESS-MIB;
+
+    pe2  MODULE-IDENTITY
+         LAST-UPDATED "201801231200Z"
+         ORGANIZATION "ATEN"
+         CONTACT-INFO "Aten, Inc."
+         DESCRIPTION  "ATEN PE MIB"
+         REVISION     "201801231200Z"
+         DESCRIPTION  "support stations"
+         ::= { poweroverip 3 }
+
+    management            OBJECT IDENTIFIER ::= { pe2 1 }
+    energy                OBJECT IDENTIFIER ::= { pe2 2 }
+        device            OBJECT IDENTIFIER ::= { energy 1 }
+        bank              OBJECT IDENTIFIER ::= { energy 2 }
+        outlet            OBJECT IDENTIFIER ::= { energy 3 }
+        line              OBJECT IDENTIFIER ::= { energy 4 }
+		inlet			  OBJECT IDENTIFIER ::= { energy 5 }
+    environment           OBJECT IDENTIFIER ::= { pe2 3 }
+        sensor            OBJECT IDENTIFIER ::= { environment 1 }
+        dryContact        OBJECT IDENTIFIER ::= { environment 2 }
+    network               OBJECT IDENTIFIER ::= { pe2 4 }
+    event                 OBJECT IDENTIFIER ::= { pe2 5 }
+        trap              OBJECT IDENTIFIER ::= { event 1 }
+    trapNotification      OBJECT IDENTIFIER ::= { pe2 50 }
+	deviceLock      	  OBJECT IDENTIFIER ::= { pe2 150 }
+---------------------------------------------------------------------------------------------------
+-- Management
+---------------------------------------------------------------------------------------------------
+staCount OBJECT-TYPE
+    SYNTAX INTEGER (1..16)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The available station count which includes master and slave stations."
+    ::= { management 1 }
+
+staStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF StaStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Station status table."
+    ::= { management 2 }
+
+staStatusEntry OBJECT-TYPE
+    SYNTAX StaStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing station status info."
+    INDEX { staId }
+    ::= { staStatusTable 1 }
+     
+StaStatusEntry ::=
+    SEQUENCE {
+        staId                   INTEGER,
+        staStatusFWVer          DisplayString,
+        staStatusModelName      DisplayString,
+        staStatusSwitchable     INTEGER,
+        staStatusPerPortReading INTEGER,
+        staStatusBankCount      INTEGER,
+        staStatusOutletCount    INTEGER,
+        staStatusSensorCount    INTEGER,
+        staStatusHasAutoPing    INTEGER,
+		staStatusInletCount		INTEGER
+    }
+
+staId OBJECT-TYPE
+    SYNTAX INTEGER (1..16)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Station ID."
+    ::= { staStatusEntry 1 }
+
+staStatusFWVer OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station FW version.
+        If the station is not available, it returns 'station N/A'."
+    ::= { staStatusEntry 2 }
+
+staStatusModelName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station model name.
+        If the station is not available, it returns 'station N/A'"
+    ::= { staStatusEntry 3 }
+
+staStatusSwitchable OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2), mix(3) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlets of the station are switchable or not.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 4 }
+
+staStatusPerPortReading OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlets of the station are per-port reading or not.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 5 } 
+
+staStatusBankCount OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station bank count.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 6 }
+
+staStatusOutletCount OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station outlet count.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 7 }
+
+staStatusSensorCount OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station sensor count.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 8 }
+
+staStatusHasAutoPing OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The station supports auto-ping or not.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 9 }
+	
+staStatusInletCount OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station inlet count.
+        If the station is not available, it returns value -3000000."
+    ::= { staStatusEntry 10 }
+
+---------------------------------------------------------------------------------------------------
+-- staControlTable
+---------------------------------------------------------------------------------------------------
+staControlTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF StaControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Station control table."
+    ::= { management 3 }
+
+staControlEntry OBJECT-TYPE
+    SYNTAX StaControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing station control info."
+    INDEX { staId }
+    ::= { staControlTable 1 }
+     
+StaControlEntry ::=
+    SEQUENCE {
+        staControlReboot
+       INTEGER
+    }
+
+staControlReboot OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2), not-support(4) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Reboot the station.
+        If the station is not available, it returns value -3000000."
+    ::= { staControlEntry 1 } 
+
+---------------------------------------------------------------------------------------------------
+-- rackConfigTable
+---------------------------------------------------------------------------------------------------
+rackConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF RackConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Rack config table."
+    ::= { management 4 }
+
+rackConfigEntry OBJECT-TYPE
+    SYNTAX RackConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing rack config info."
+    INDEX { staId }
+    ::= { rackConfigTable 1 }
+     
+RackConfigEntry ::=
+    SEQUENCE {
+        rackConfigName   DisplayString,
+        rackConfigRow    INTEGER,
+        rackConfigColumn INTEGER
+    }
+
+rackConfigName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set station's rack name.
+        string length: 1~32
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { rackConfigEntry 1 } 
+
+rackConfigRow OBJECT-TYPE
+    SYNTAX INTEGER (1..26)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set station's rack row number.
+        If the station is not available, it returns value -3000000."
+    ::= { rackConfigEntry 2 }
+
+rackConfigColumn OBJECT-TYPE
+    SYNTAX INTEGER (1..26)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set station's rack column number.
+        If the station is not available, it returns value -3000000."
+    ::= { rackConfigEntry 3 }
+
+staState OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Cascade stations' state. Return string length equals to the MAX support stations.
+        If station N is alive, display 1 at the N's character, else, display 0.
+        The first character is always 1 as it belongs to the Master."
+    ::= { management 5 }
+
+---------------------------------------------------------------------------------------------------
+-- devStatusTable
+---------------------------------------------------------------------------------------------------
+devStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DevStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Device status table."
+    ::= { device 1 }
+
+devStatusEntry OBJECT-TYPE
+    SYNTAX DevStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing device status info."
+    INDEX { staId }
+    ::= { devStatusTable 1 }
+     
+DevStatusEntry ::=
+    SEQUENCE {
+        devStatusRatedCur   INTEGER,
+        devStatusRatedVol   INTEGER,
+        devStatusRatedPower INTEGER,
+		devStatusWiredType	INTEGER
+    }
+
+devStatusRatedCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device input Current value. unit:(0.1mA)
+        If the station does not support this OID, we show value 0.
+        If the station is not available, it returns value -3000000."
+    ::= { devStatusEntry 1 }
+
+devStatusRatedVol OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device input Voltage value. unit:(0.1mV)    
+        If the station does not support this OID, we show value 0.
+        If the station is not available, it returns value -3000000."
+    ::= { devStatusEntry 2 }
+
+devStatusRatedPower OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device power Capacity value. unit:(0.1mVA)
+        If the station does not support this OID, we show value 0.
+        If the station is not available, it returns value -3000000."
+    ::= { devStatusEntry 3 }
+	
+devStatusWiredType OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device circuit wired type
+		Example: 1 for 1 phase, 2 for 3 phase wye, 3 for 3 phase delta
+        If the station does not support this OID, we show value 0.
+        If the station is not available, it returns value -3000000."
+    ::= { devStatusEntry 4 }
+
+---------------------------------------------------------------------------------------------------
+-- devConfigTable
+---------------------------------------------------------------------------------------------------
+devConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DevConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Device config table."
+    ::= { device 2 }
+
+devConfigEntry OBJECT-TYPE
+    SYNTAX DevConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing device config info."
+    INDEX { staId }
+    ::= { devConfigTable 1 }
+     
+DevConfigEntry ::=
+    SEQUENCE {
+        devConfigDevName                   DisplayString,
+        devConfigPowerOnScheduleEn         INTEGER,
+        devConfigOutletsSequentialRebootEn INTEGER,
+        devConfigMinCurThresh              INTEGER,
+        devConfigMaxCurThresh              INTEGER,
+        devConfigMinVolThresh              INTEGER,
+        devConfigMaxVolThresh              INTEGER,
+        devConfigMinPowerThresh            INTEGER,
+        devConfigMaxPowerThresh            INTEGER,
+        devConfigMaxPDThresh               INTEGER
+    }
+
+devConfigDevName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The name of the device.
+        string length: 1~39
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { devConfigEntry 1 } 
+
+devConfigPowerOnScheduleEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no-delaytime(1), delaytime(2), not-support(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether power on schedule or not.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 2 }
+
+devConfigOutletsSequentialRebootEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2), not-support(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This function is used to enable or disable all outlet ports to sequential reboot.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 3 }
+
+devConfigMinCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device minimum electric current measurement threshold.
+        Example: range 0.0~32.0 represents 0~320.
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 4 }
+
+devConfigMaxCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device maximum electric current measurement threshold.  
+        Example: range 0.0~32.0 represents 0~320
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 5 }
+
+devConfigMinVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 900..2600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device minimum voltage measurement threshold. 
+        Example: range 90.0~260.0 represents 900~2600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 6 }
+
+devConfigMaxVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 900..2600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device maximum voltage measurement threshold. 
+        Example: range 90.0~260.0 represents 900~2600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 7 }
+
+devConfigMinPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device minimum power measurement threshold. 
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 8 }
+
+devConfigMaxPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device maximum power measurement threshold. 
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 9 }
+
+devConfigMaxPDThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 0..999990)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set device maximum power dissipation measurement threshold. 
+        Example: range 0.0 ~ 99999.0 represents 0~999990
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devConfigEntry 10 }
+
+---------------------------------------------------------------------------------------------------
+-- devControlTable
+---------------------------------------------------------------------------------------------------
+devControlTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DevControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Device control table."
+    ::= { device 3 }
+
+devControlEntry OBJECT-TYPE
+    SYNTAX DevControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing device control info."
+    INDEX { staId }
+    ::= { devControlTable 1 }
+     
+DevControlEntry ::=
+    SEQUENCE {
+        devControlOperation
+       INTEGER
+    }
+
+devControlOperation OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), off(1), on(2), reboot(3), nostatus(4), not-support(5) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This function is used for outlet control of device.
+         Set off(1) to turn off for outlet control of device.
+         Set on(2) to turn on for all outlet control of device.
+         Set reboot(3) to reboot for outlet control of device.
+         Get this object always return nostatus(3), because there is no device status.
+         If the station is not available, it returns value -3000000."
+    ::= { devControlEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- devReadingTable
+---------------------------------------------------------------------------------------------------
+devReadingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DevReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Device reading table."
+    ::= { device 4 }
+
+devReadingEntry OBJECT-TYPE
+    SYNTAX DevReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing device reading info."
+    INDEX { staId }
+    ::= { devReadingTable 1 }
+     
+DevReadingEntry ::=
+    SEQUENCE {
+        devReadingCur   INTEGER,
+        devReadingVol   INTEGER,
+        devReadingPower INTEGER,
+        devReadingPD    INTEGER,
+        devReadingPF    INTEGER
+    }
+
+devReadingCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device electric current value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devReadingEntry 1 } 
+
+ devReadingVol OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device voltage value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devReadingEntry 2 }    
+
+devReadingPower OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device power value.
+        This value indicates that 10,000 times.  
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devReadingEntry 3 }
+
+devReadingPD OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device power dissipation value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devReadingEntry 4 }
+
+devReadingPF OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Device power factor value.
+        This value indicates that 100 times.  
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { devReadingEntry 5 }
+
+---------------------------------------------------------------------------------------------------
+-- popConfigTable
+---------------------------------------------------------------------------------------------------
+popConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF PopConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "POP config table."
+    ::= { device 5 }
+
+popConfigEntry OBJECT-TYPE
+    SYNTAX PopConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing POP config info."
+    INDEX { staId }
+    ::= { popConfigTable 1 }
+     
+PopConfigEntry ::=
+    SEQUENCE {
+        popConfigOutletModeEn   INTEGER,
+        popConfigLIFOModeEn     INTEGER,
+        popConfigPriorityModeEn INTEGER,
+        popConfigPriorityList   DisplayString
+    }
+
+popConfigOutletModeEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2), not-support(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether outlet POP mode is enabled or not.
+        If the station is not available, it returns value -3000000."
+    ::= { popConfigEntry 1 }
+
+popConfigLIFOModeEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2), not-support(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether LIFO POP mode is enabled or not.
+        If the station is not available, it returns value -3000000."
+    ::= { popConfigEntry 2 }
+
+popConfigPriorityModeEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2), not-support(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether priority POP mode is enabled or not.
+        If the station is not available, it returns value -3000000."
+    ::= { popConfigEntry 3 }
+
+popConfigPriorityList OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Indicate Outlets' power OFF priorities under Priority POP mode.
+        Outlet Separator ','
+        Bank Separator '#'
+        Assign each priority in each bank by Outlet index or zero (indicate N/A) with separators in ascendant order.
+        e.g. for model PE8324 ( Bank1: outlet 1 ~ 16, Bank2: outlet 17 ~ 24 ) 
+        If you want to assign priority 2, 5 of Bank 1 with Outlet 14, 3, 
+        and priority 2, 6, 8 with of Bank 2 with Outlet 17, 23, 24 and left the rest with N/A,
+        please type: 0,14,0,0,3,0,0,0,0,0,0,0,0,0,0,0#0,17,0,0,0,23,0,24.
+        If the station is not available, it returns 'station N/A'."
+    ::= { popConfigEntry 4 } 
+
+---------------------------------------------------------------------------------------------------
+-- capConfigTable
+---------------------------------------------------------------------------------------------------
+capConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CapConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "CAP config table."
+    ::= { device 6 }
+
+capConfigEntry OBJECT-TYPE
+    SYNTAX CapConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing CAP config info."
+    INDEX { staId, outletId }
+    ::= { capConfigTable 1 }
+     
+CapConfigEntry ::=
+    SEQUENCE {
+        capConfigModeEn INTEGER
+    }
+    
+capConfigModeEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether CAP mode is enabled or not.
+        If the station is not available, it returns value -3000000."
+    ::= { capConfigEntry 1 } 
+
+---------------------------------------------------------------------------------------------------
+-- capPriorityConfigTable
+---------------------------------------------------------------------------------------------------
+capPriorityConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CapPriorityConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "CAP priority config table."
+    ::= { device 7 }
+
+capPriorityConfigEntry OBJECT-TYPE
+    SYNTAX CapPriorityConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing CAP priority config info."
+    INDEX { staId, outletId }
+    ::= { capPriorityConfigTable 1 }
+     
+CapPriorityConfigEntry ::=
+    SEQUENCE {
+        capPriorityConfigOutlet INTEGER
+    }
+    
+capPriorityConfigOutlet OBJECT-TYPE
+    SYNTAX INTEGER (0..99)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the CAP Priority of outlet.
+        Priority 0 means this outlet does not support this OID.
+        If the station is not available, it returns value -3000000."
+    ::= { capPriorityConfigEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- bankStatusTable
+---------------------------------------------------------------------------------------------------
+bankStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF BankStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Bank status table."
+    ::= { bank 1 }
+
+bankStatusEntry OBJECT-TYPE
+    SYNTAX BankStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing bank status info."
+    INDEX { staId, bankId }
+    ::= { bankStatusTable 1 }
+     
+BankStatusEntry ::=
+    SEQUENCE {
+        bankId                  INTEGER,
+        bankStatusRatedCur      INTEGER,
+        bankStatusAttachStatus  INTEGER,
+        bankStatusBreakerStatus INTEGER,
+		bankStatusPhaseLayout	INTEGER
+    }
+
+bankId OBJECT-TYPE
+    SYNTAX INTEGER (1..30)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Bank ID."
+    ::= { bankStatusEntry 1 }
+
+bankStatusRatedCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The Bank Max Current value. unit: (0.1mA).
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankStatusEntry 2 }
+
+bankStatusAttachStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), noattached(1), attached(2), error(3), noexisted(4) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The bank attached status.
+        If the station is not available, it returns value -3000000."
+    ::= { bankStatusEntry 3 }
+
+bankStatusBreakerStatus OBJECT-TYPE
+   SYNTAX INTEGER { staNotAvailable(-3000000), off(1), on(2), not-support(3) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The breaker status.
+        If the station is not available, it returns value -3000000."
+    ::= { bankStatusEntry 4 }
+	
+bankStatusPhaseLayout OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), not-support(-2000000), l1-n(1), l2-n(2), l3-n(3), l1-l2(4), l2-l3(5), l3-l1(6) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Display the phase layout of bank.
+        Example: range 1 ~ 3 represents Line1-LineNeutral ~ Line3-lineNeutral.
+					   4 ~ 6 represents Line1-Line2, Line2-Line3, Line3-Line1.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankStatusEntry 5 }
+
+---------------------------------------------------------------------------------------------------
+-- bankConfigTable
+---------------------------------------------------------------------------------------------------
+bankConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF BankConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Bank config table."
+    ::= { bank 2 }
+
+bankConfigEntry OBJECT-TYPE
+    SYNTAX BankConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing bank config info."
+    INDEX { staId, bankId }
+    ::= { bankConfigTable 1 }
+     
+BankConfigEntry ::=
+    SEQUENCE {
+        bankConfigName           DisplayString,
+        bankConfigMinCurThresh   INTEGER,
+        bankConfigMaxCurThresh   INTEGER,
+        bankConfigMinVolThresh   INTEGER,
+        bankConfigMaxVolThresh   INTEGER,
+        bankConfigMinPowerThresh INTEGER,
+        bankConfigMaxPowerThresh INTEGER,
+        bankConfigMaxPDThresh    INTEGER
+    }
+
+bankConfigName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the name of the bank.
+        When this model does not support the OID, we show n/a.
+        string length: 0~15
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { bankConfigEntry 1 }
+
+bankConfigMinCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank minimum electric current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 2 }
+
+bankConfigMaxCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank maximum electric current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 3 }
+
+bankConfigMinVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..2600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank minimum voltage measurement threshold. 
+        Example: range 90.0 ~260.0 represents 900~2600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 4 }
+
+bankConfigMaxVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..2600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank maximum voltage measurement threshold. 
+        Example: range 90.0 ~260.0 represents 900~2600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 5 }
+
+bankConfigMinPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank minimum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 6 }
+
+bankConfigMaxPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank maximum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 7 }
+
+bankConfigMaxPDThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..999990)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the bank maximum power dissipation measurement threshold.
+        Example: range 0.0 ~ 99999.0 represents 0~999990
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankConfigEntry 8 }
+
+---------------------------------------------------------------------------------------------------
+-- bankControlTable
+---------------------------------------------------------------------------------------------------
+bankControlTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF BankControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Bank control table."
+    ::= { bank 3 }
+
+bankControlEntry OBJECT-TYPE
+    SYNTAX BankControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing bank control info."
+    INDEX { staId, bankId }
+    ::= { bankControlTable 1 }
+     
+BankControlEntry ::=
+    SEQUENCE {
+        bankControlOperation
+       INTEGER
+    }
+
+bankControlOperation OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), off(1), on(2), reboot(3), nostatus(4), not-support(5) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This function is used for outlet control of bank.
+        Set off(1) to turn off for outlet control of bank.
+        Set on(2) to turn on for all outlet control of bank.
+        Set reboot(3) to reboot for outlet control of bank.
+        Get this object always return nostatus(3), because there is no bank status.
+        If the station is not available, it returns value -3000000."
+    ::= { bankControlEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- bankReadingTable
+---------------------------------------------------------------------------------------------------
+bankReadingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF BankReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Bank reading table."
+    ::= { bank 4 }
+
+bankReadingEntry OBJECT-TYPE
+    SYNTAX BankReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing bank reading info."
+    INDEX { staId, bankId }
+    ::= { bankReadingTable 1 }
+     
+BankReadingEntry ::=
+    SEQUENCE {
+        bankReadingCur   INTEGER,
+        bankReadingVol   INTEGER,
+        bankReadingPower INTEGER,
+        bankReadingPD    INTEGER,
+        bankReadingPF    INTEGER
+    }
+
+bankReadingCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Bank electric current value.
+        This value indicates that 10,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankReadingEntry 1 }
+
+bankReadingVol OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Bank voltage value.
+        This value indicates that 10,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankReadingEntry 2 }
+
+bankReadingPower OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Bank power value.
+        This value indicates that 10,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankReadingEntry 3 }   
+
+bankReadingPD OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Bank power dissipation value.
+        This value indicates that 10,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankReadingEntry 4 }
+
+bankReadingPF OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Bank power Factor value.
+        This value indicates that 100 times.  
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { bankReadingEntry 5 }
+
+---------------------------------------------------------------------------------------------------
+-- outletStatusTable
+---------------------------------------------------------------------------------------------------
+outletStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF OutletStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Outlet status table."
+    ::= { outlet 1 }
+
+outletStatusEntry OBJECT-TYPE
+    SYNTAX OutletStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing outlet status info."
+    INDEX { staId, outletId }
+    ::= { outletStatusTable 1 }
+     
+OutletStatusEntry ::=
+    SEQUENCE {
+        outletId               INTEGER,
+        outletStatusRatedCur   INTEGER,
+        outletStatusSwitchable INTEGER,
+        outletStatusAutoPing   INTEGER,
+		outletStatusPhaseLayout INTEGER
+    }
+
+outletId OBJECT-TYPE
+    SYNTAX INTEGER (1..42)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Outlet ID."
+    ::= { outletStatusEntry 1 }
+
+outletStatusRatedCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet Max Current value. unit: (0.1mA).
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletStatusEntry 2 }
+
+outletStatusSwitchable OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), not-support(-2000000), no(1), yes(2) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet switchable.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletStatusEntry 3 }
+
+outletStatusAutoPing OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), not-support(-2000000), na(1), online(2), not-reachable(3) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet latest auto-ping result.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletStatusEntry 4 }
+	
+outletStatusPhaseLayout OBJECT-TYPE
+	SYNTAX INTEGER { staNotAvailable(-3000000), not-support(-2000000), l1-n(1), l2-n(2), l3-n(3), l1-l2(4), l2-l3(5), l3-l1(6) }
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Display the phase layout of outlet.
+		Example: range 1 ~ 3 represents Line1-LineNeutral ~ Line3-lineNeutral.
+					   4 ~ 6 represents Line1-Line2, Line2-Line3, Line3-Line1.
+		If the station does not support this OID, it returns value -2000000.
+		If the station is not available, it returns value -3000000."
+	::= { outletStatusEntry 5 }
+
+---------------------------------------------------------------------------------------------------
+-- outletConfigTable
+---------------------------------------------------------------------------------------------------
+outletConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF OutletConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Outlet config table."
+    ::= { outlet 2 }
+
+outletConfigEntry OBJECT-TYPE
+    SYNTAX OutletConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing outlet config info."
+    INDEX { staId, outletId }
+    ::= { outletConfigTable 1 }
+     
+OutletConfigEntry ::=
+    SEQUENCE {
+        outletConfigName               DisplayString,
+        outletConfigConfirmationEn     INTEGER,
+        outletConfigOnDelayTime        INTEGER,
+        outletConfigOffDelayTime       INTEGER,
+        outletConfigShutdownMethod     INTEGER,
+        outletConfigMAC                MacAddress,
+        outletConfigLocalAccessLock    INTEGER,
+        outletConfigMinCurThresh       INTEGER,
+        outletConfigMaxCurThresh       INTEGER,
+        outletConfigMinVolThresh       INTEGER,
+        outletConfigMaxVolThresh       INTEGER,
+        outletConfigMinPowerThresh     INTEGER,
+        outletConfigMaxPowerThresh     INTEGER,
+        outletConfigMaxPDThresh        INTEGER,
+        outletConfigAutoPingContFailTimes INTEGER,
+        outletConfigAutoPingIntervalSec   INTEGER,
+        outletConfigAutoPingRetryTimes    INTEGER,
+        outletConfigAutoPingPowerUpDelaySec INTEGER,
+        outletConfigAutoPingRemoteIPAddr    IpAddress,
+        outletConfigAutoPingEnable     INTEGER,
+        outletConfigAutoPingEnableReboot INTEGER
+    }
+
+outletConfigName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the name of the outlet.   
+        If the station does not support this OID, we show n/a.
+        string length: 0~48
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { outletConfigEntry 1 }
+
+outletConfigConfirmationEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) , noauth(3), not-support(4) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the confirmation of the outlet.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 2 }
+
+outletConfigOnDelayTime OBJECT-TYPE
+    SYNTAX INTEGER (-1 | 0..999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the ON delay time of the outlet.
+        When this model does not support the OID, we show value -1.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 3 }
+
+outletConfigOffDelayTime OBJECT-TYPE
+    SYNTAX INTEGER (-1 | 0..999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the OFF delay time of the outlet.
+        When this model does not support the OID, we show value -1.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 4 }
+
+outletConfigShutdownMethod OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), kill-the-power(1), wake-on-lan(2), after-ac-back(3), not-support(4) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the shutdown method of the outlet.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 5 }
+
+outletConfigMAC OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the MAC address of shutdown method.
+        The value is hex format with length 12.
+        If the station does not support this OID, it return '00-00-00-00-00-00'.
+        If the station is not available, it returns '00-00-00-00-00-00'."
+    ::= { outletConfigEntry 6 }
+
+outletConfigLocalAccessLock OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), unlocked(1), locked(2), not-support(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether the local access of the outlet is locked by remote or not.
+        If the station is not available, it returns value -3000000."
+   ::= { outletConfigEntry 7 }
+
+outletConfigMinCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet minimum electric current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 8 }
+
+outletConfigMaxCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet maximum electric current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 9 }
+
+outletConfigMinVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..2600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet minimum voltage measurement threshold. 
+        Example: range 90.0 ~260.0 represents 900~2600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 10 }
+
+outletConfigMaxVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..2600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet maximum voltage measurement threshold. 
+        Example: range 90.0 ~260.0 represents 900~2600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 11 }
+
+outletConfigMinPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet minimum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 12 }
+
+outletConfigMaxPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet maximum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 13 }
+
+outletConfigMaxPDThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..999990)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet maximum power dissipation measurement threshold.
+        Example: range 0.0 ~ 99999.0 represents 0~999990
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 14 }
+
+outletConfigAutoPingContFailTimes OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..10)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet auto-ping continuously-failed time to reset outlet.
+        Example: range 0 ~ 5
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 15 }
+
+outletConfigAutoPingIntervalSec OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..60)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet auto-ping pinging interval in seconds.
+        Example: range 10 ~ 600
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 16 }
+
+outletConfigAutoPingRetryTimes OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..10)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet auto-ping max retry times.
+        Example: range 0 ~ 5
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 17 }
+
+outletConfigAutoPingPowerUpDelaySec OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..60)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet auto-ping first-ping-delay in seconds after outlet switches on.
+        Example: range 10 ~ 600
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 18 }
+
+outletConfigAutoPingRemoteIPAddr OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "Outlet auto-ping destination IP address.
+        If the station does not support this OID, it returns value '0.0.0.0'.
+        If the station is not available, it returns '0.0.0.0'."
+    ::= { outletConfigEntry 19 }
+
+outletConfigAutoPingEnable OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), not-support(-2000000), disable(1), enable(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet auto-ping enable state.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 20 }
+
+outletConfigAutoPingEnableReboot OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), not-support(-2000000), disable(1), enable(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the outlet auto-ping reboot enable state.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletConfigEntry 21 }
+	
+---------------------------------------------------------------------------------------------------
+-- outletControlTable
+---------------------------------------------------------------------------------------------------
+outletControlTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF OutletControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Outlet control table."
+    ::= { outlet 3 }
+
+outletControlEntry OBJECT-TYPE
+    SYNTAX OutletControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing outlet control info."
+    INDEX { staId, outletId }
+    ::= { outletControlTable 1 }
+     
+OutletControlEntry ::=
+    SEQUENCE {
+        outletControlOperation INTEGER
+    }
+
+outletControlOperation OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), off(1), on(2), pending(3), reboot(4), fault(5), noauth(6), not-support(7), pop(8) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This function is used for the outlet control.
+        Set off(1) to turn off the outlet.
+        Set on(2) to turn on the outlet.
+        Set reboot(3) to reboot the outlet.
+        pending(3), fault(5), noauth(6), not-suport(7), pop(8) can't be set.
+        If the station is not available, it returns value -3000000."
+    ::= { outletControlEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- outletReadingTable
+---------------------------------------------------------------------------------------------------
+outletReadingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF OutletReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Outlet reading table."
+    ::= { outlet 4 }
+
+outletReadingEntry OBJECT-TYPE
+    SYNTAX OutletReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing outlet reading info."
+    INDEX { staId, outletId }
+    ::= { outletReadingTable 1 }
+     
+OutletReadingEntry ::=
+    SEQUENCE {
+        outletReadingCur    INTEGER,
+        outletReadingVol    INTEGER,
+        outletReadingPower  INTEGER,
+        outletReadingPD     INTEGER,
+        outletReadingPF     INTEGER
+    }
+
+outletReadingCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet electric current value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletReadingEntry 1 }
+
+outletReadingVol OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet voltage value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletReadingEntry 2 } 
+
+outletReadingPower OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet power value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletReadingEntry 3 }   
+
+outletReadingPD OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet power dissipation value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletReadingEntry 4 }
+
+outletReadingPF OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Outlet Power Factor value.
+        This value indicates that 100 times.  
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletReadingEntry 5 }
+
+---------------------------------------------------------------------------------------------------
+-- outletAutoPingIpTable
+---------------------------------------------------------------------------------------------------
+outletAutoPingIpTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF OutletAutoPingIpEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Outlet auto-ping table."
+    ::= { outlet 5 }
+	
+outletAutoPingIpEntry OBJECT-TYPE
+    SYNTAX OutletAutoPingIpEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing outlet auto-ping ip info."
+    INDEX { staId, outletId }
+    ::= { outletAutoPingIpTable 1 }
+	
+OutletAutoPingIpEntry ::=
+    SEQUENCE {
+		outletConfigAutoPingRemoteIPType	InetAddressType,
+        outletConfigAutoPingRemoteIP    	InetAddress
+    }
+	
+outletConfigAutoPingRemoteIPType OBJECT-TYPE
+    SYNTAX InetAddressType {ipv4(1), ipv6(2)}
+    MAX-ACCESS  read-only
+    STATUS current
+    DESCRIPTION
+        "Represents the type of the corresponding instance
+            of outletConfigAutoPingRemoteIP object.
+		If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { outletAutoPingIpEntry 1 }
+	
+outletConfigAutoPingRemoteIP OBJECT-TYPE
+    SYNTAX InetAddress
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "Outlet auto-ping destination IP address.
+        If the station does not support this OID, it returns value '0.0.0.0'.
+        If the station is not available, it returns '0.0.0.0'."
+    ::= { outletAutoPingIpEntry 2 }
+	
+---------------------------------------------------------------------------------------------------
+-- lineStatusTable
+---------------------------------------------------------------------------------------------------
+lineStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF LineStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Line status table."
+    ::= { line 1 }
+
+lineStatusEntry OBJECT-TYPE
+    SYNTAX LineStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing line status info."
+    INDEX { staId, lineId }
+    ::= { lineStatusTable 1 }
+     
+LineStatusEntry ::=
+    SEQUENCE {
+        lineId             INTEGER,
+        lineStatusRatedCur INTEGER
+    }
+
+lineId OBJECT-TYPE
+    SYNTAX INTEGER (1..3)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Line ID."
+    ::= { lineStatusEntry 1 }
+
+lineStatusRatedCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The Max Line Current value. unit: (0.1mA)
+        If the station is not available, it returns value -3000000."
+    ::= { lineStatusEntry 2 }
+
+---------------------------------------------------------------------------------------------------
+-- lineConfigTable
+---------------------------------------------------------------------------------------------------
+lineConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF LineConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Line config table."
+    ::= { line 2 }
+
+lineConfigEntry OBJECT-TYPE
+    SYNTAX LineConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing line config info."
+    INDEX { staId, lineId }
+    ::= { lineConfigTable 1 }
+     
+LineConfigEntry ::=
+    SEQUENCE {
+        lineConfigMinCurThresh   INTEGER,
+        lineConfigMaxCurThresh   INTEGER,
+        lineConfigMinVolThresh   INTEGER,
+        lineConfigMaxVolThresh   INTEGER,
+        lineConfigMinPowerThresh INTEGER,
+        lineConfigMaxPowerThresh INTEGER
+    }
+
+lineConfigMinCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the line Minimum current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineConfigEntry 1 }
+
+lineConfigMaxCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the line Maximum electric current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineConfigEntry 2 }
+
+lineConfigMinVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..3800)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the line minimum voltage measurement threshold. 
+        Example: range 90.0 ~380.0 represents 900~3800
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineConfigEntry 3 }
+ 
+lineConfigMaxVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..3800)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the line maximum voltage measurement threshold. 
+        Example: range 90.0 ~380.0 represents 900~3800
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineConfigEntry 4 }
+
+lineConfigMinPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the line minimum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineConfigEntry 5 }
+
+lineConfigMaxPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the line maximum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineConfigEntry 6 }
+ 
+---------------------------------------------------------------------------------------------------
+-- lineReadingTable
+---------------------------------------------------------------------------------------------------
+lineReadingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF LineReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Line reading table."
+    ::= { line 3 }
+
+lineReadingEntry OBJECT-TYPE
+    SYNTAX LineReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing line reading info."
+    INDEX { staId, lineId }
+    ::= { lineReadingTable 1 }
+     
+LineReadingEntry ::=
+    SEQUENCE {
+        lineReadingCur    INTEGER,
+        lineReadingVol    INTEGER,
+        lineReadingPower  INTEGER
+    }
+
+lineReadingCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Line current value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineReadingEntry 1 }
+
+lineReadingVol OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Line voltage value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineReadingEntry 2 } 
+
+lineReadingPower OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Line power value.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { lineReadingEntry 3 }
+
+---------------------------------------------------------------------------------------------------
+-- neutralStatusTable
+---------------------------------------------------------------------------------------------------
+neutralStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF NeutralStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Line reading table."
+    ::= { line 4 }
+
+neutralStatusEntry OBJECT-TYPE
+    SYNTAX NeutralStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing line reading info."
+    INDEX { staId }
+    ::= { neutralStatusTable 1 }
+     
+NeutralStatusEntry ::=
+    SEQUENCE {
+        neutralStatusLeakageCur INTEGER
+    }
+
+neutralStatusLeakageCur OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no-detection(1), detection(2), not-support(3) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Neutral leakage current status.
+        If the station is not available, it returns value -3000000."
+    ::= { neutralStatusEntry 1 }
+	
+---------------------------------------------------------------------------------------------------
+-- inletStatusTable
+---------------------------------------------------------------------------------------------------
+inletStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF InletStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Inlet status table."
+    ::= { inlet 1 }
+
+inletStatusEntry OBJECT-TYPE
+    SYNTAX InletStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing inlet status info."
+    INDEX { staId, inletId }
+    ::= { inletStatusTable 1 }
+     
+InletStatusEntry ::=
+    SEQUENCE {
+        inletId             INTEGER,
+        inletStatusRatedCur INTEGER
+    }
+
+inletId OBJECT-TYPE
+    SYNTAX INTEGER (1..3)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Line ID."
+    ::= { inletStatusEntry 1 }
+
+inletStatusRatedCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The Inlet Max Current value. unit: (0.1mA).
+		If device is phase wye, then means L1 or L2 or L3 current.
+		If device is phase delta, then means L1L2 or L2L3 or L3L1 current.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletStatusEntry 2 }
+
+---------------------------------------------------------------------------------------------------
+-- inletConfigTable
+---------------------------------------------------------------------------------------------------
+inletConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF InletConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Inlet config table."
+    ::= { inlet 2 }
+
+inletConfigEntry OBJECT-TYPE
+    SYNTAX InletConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing inlet config info."
+    INDEX { staId, inletId }
+    ::= { inletConfigTable 1 }
+     
+InletConfigEntry ::=
+    SEQUENCE {
+        inletConfigMinCurThresh   INTEGER,
+        inletConfigMaxCurThresh   INTEGER,
+        inletConfigMinVolThresh   INTEGER,
+        inletConfigMaxVolThresh   INTEGER,
+        inletConfigMinPowerThresh INTEGER,
+        inletConfigMaxPowerThresh INTEGER,
+		inletConfigMaxPDThresh 	  INTEGER
+    }
+
+inletConfigMinCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet Minimum current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 1 }
+
+inletConfigMaxCurThresh OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet Maximum electric current measurement threshold. 
+        Example: range 0.0 ~16.0 represents 0~160
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 2 }
+
+inletConfigMinVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..3800)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet minimum voltage measurement threshold. 
+        Example: range 90.0 ~380.0 represents 900~3800
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 3 }
+ 
+inletConfigMaxVolThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 900..3800)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet maximum voltage measurement threshold. 
+        Example: range 90.0 ~380.0 represents 900~3800
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 4 }
+
+inletConfigMinPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet minimum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 5 }
+
+inletConfigMaxPowerThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..99999)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet maximum power measurement threshold.
+        Example: range 0.0 ~ 9999.9 represents 0~99999
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 6 }
+	
+inletConfigMaxPDThresh OBJECT-TYPE
+    SYNTAX INTEGER (-2000000 | -3000 | 0..999990)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the inlet maximum power dissipation measurement threshold.
+        Example: range 0.0 ~ 99999.0 represents 0~999990
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletConfigEntry 7 }
+ 
+---------------------------------------------------------------------------------------------------
+-- inletReadingTable
+---------------------------------------------------------------------------------------------------
+inletReadingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF InletReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Inlet reading table."
+    ::= { inlet 3 }
+
+inletReadingEntry OBJECT-TYPE
+    SYNTAX InletReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing inlet reading info."
+    INDEX { staId, inletId }
+    ::= { inletReadingTable 1 }
+     
+InletReadingEntry ::=
+    SEQUENCE {
+        inletReadingCur    INTEGER,
+        inletReadingVol    INTEGER,
+        inletReadingPower  INTEGER,
+		inletReadingPD     INTEGER
+    }
+
+inletReadingCur OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Inlet current value.
+		If device is phase wye, then means L1 or L2 or L3 current.
+		If device is phase delta, then means L1L2 or L2L3 or L3L1 current.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletReadingEntry 1 }
+
+inletReadingVol OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Inlet voltage value.
+		If device is phase wye, then means L1 or L2 or L3 voltage.
+		If device is phase delta, then means L1L2 or L2L3 or L3L1 voltage.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletReadingEntry 2 } 
+
+inletReadingPower OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Inlet power value.
+		If device is phase wye, then means L1 or L2 or L3 power.
+		If device is phase delta, then means L1L2 or L2L3 or L3L1 power.
+        This value indicates that 10,000 times.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { inletReadingEntry 3 }
+	
+inletReadingPD OBJECT-TYPE
+SYNTAX INTEGER
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION
+	"Inlet power value.
+	If device is phase wye, then means L1 or L2 or L3 power dissipation.
+	If device is phase delta, then means L1L2 or L2L3 or L3L1 power dissipation.
+	This value indicates that 10,000 times.
+	If the station does not support this OID, it returns value -2000000.
+	If the station is not available, it returns value -3000000."
+::= { inletReadingEntry 4 }
+
+---------------------------------------------------------------------------------------------------
+-- sensorConfigTable
+---------------------------------------------------------------------------------------------------
+sensorConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF SensorConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Sensor config table.
+        Use port/addr as indexes to access sensor configurations."
+    ::= { sensor 3 }
+
+sensorConfigEntry OBJECT-TYPE
+    SYNTAX SensorConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing sensor config info."
+    INDEX { staId, sensorPort, sensorAddr }
+    ::= { sensorConfigTable 1 }
+
+SensorConfigEntry ::=
+    SEQUENCE {
+        sensorPort                 INTEGER,
+        sensorAddr                 INTEGER,
+        sensorConfigMinTempThresh  INTEGER,
+        sensorConfigMaxTempThresh  INTEGER,
+        sensorConfigMinHumThresh   INTEGER,
+        sensorConfigMaxHumThresh   INTEGER,
+        sensorConfigMinPressThresh INTEGER,
+        sensorConfigMaxPressThresh INTEGER
+    }
+
+sensorPort OBJECT-TYPE
+    SYNTAX INTEGER (1..4)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Sensor Port Number."
+    ::= { sensorConfigEntry 1 }
+
+sensorAddr OBJECT-TYPE
+    SYNTAX INTEGER (1..31)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Sensor Address."
+    ::= { sensorConfigEntry 2 }
+
+sensorConfigMinTempThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | -200..600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set sensor minimum temperature measurement threshold.
+        Example: range -20.0 ~ 60.0 represents -200~600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorConfigEntry 3 }
+
+sensorConfigMaxTempThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | -200..600)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set sensor maximum temperature measurement threshold.
+        Example: range -20.0 ~ 60.0 represents -200~600
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorConfigEntry 4 }
+
+sensorConfigMinHumThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 100..950)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set sensor minimum humidity measurement threshold.
+        Example: range 10.0 ~ 95.0 represents 100~950
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorConfigEntry 5 }
+
+sensorConfigMaxHumThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | 100..950)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set sensor maximum humidity measurement threshold.
+        Example: range 10.0 ~ 95.0 represents 100~950
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorConfigEntry 6 }
+
+sensorConfigMinPressThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | -2500..2500)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set sensor minimum pressure measurement threshold.
+        Example: range -250.0 ~ 250.0 represents -2500 ~ 2500
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorConfigEntry 7 }
+
+sensorConfigMaxPressThresh OBJECT-TYPE
+    SYNTAX INTEGER (-3000 | -2500..2500)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set sensor maximum pressure measurement threshold.
+        Example: range -250.0 ~ 250.0 represents -2500 ~ 2500
+        NOTICE: Minimum threshold should be smaller than maximum threshold.
+        Empty value: -3000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorConfigEntry 8 }
+
+---------------------------------------------------------------------------------------------------
+-- sensorReadingTable
+---------------------------------------------------------------------------------------------------
+sensorReadingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF SensorReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Sensor reading table.
+        Use port/addr as indexes to access sensor readings."
+    ::= { sensor 4 }
+
+sensorReadingEntry OBJECT-TYPE
+    SYNTAX SensorReadingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing sensor reading info."
+    INDEX { staId, sensorPort, sensorAddr }
+    ::= { sensorReadingTable 1 }
+
+SensorReadingEntry ::=
+    SEQUENCE {
+        sensorReadingTemp  INTEGER,
+        sensorReadingHum   INTEGER,
+        sensorReadingPress INTEGER
+    }
+
+sensorReadingTemp OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Sensor's Temperature value.
+        This value indicates that 1,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorReadingEntry 1 }
+
+sensorReadingHum OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Sensor's Humidity value.
+        This value indicates that 1,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorReadingEntry 2 }
+
+sensorReadingPress OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Sensor's Pressure value.
+        This value indicates that 1,000 times.
+        If this measurement value is not available, it returns value -1000000.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { sensorReadingEntry 3 }
+
+---------------------------------------------------------------------------------------------------
+-- dryContactStatusTable
+---------------------------------------------------------------------------------------------------
+dryContactStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DryContactStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Dry contact status table."
+    ::= { dryContact 1 }
+
+dryContactStatusEntry OBJECT-TYPE
+    SYNTAX DryContactStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing dry contact status info."
+    INDEX { staId, dryContactId }
+    ::= { dryContactStatusTable 1 }
+     
+DryContactStatusEntry ::=
+    SEQUENCE {
+        dryContactId     INTEGER,
+        dryContactStatus INTEGER
+    }
+
+dryContactId OBJECT-TYPE
+    SYNTAX INTEGER (1..2)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Dry contact ID."
+    ::= { dryContactStatusEntry 1 } 
+  
+dryContactStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), close(0), open(1), not-attached(2), not-support(10) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Display dry contact status.
+        close(0) represents door close.
+        open(1) represents door open.
+        not-attached(2) represents door sensor don't attach to device.
+        If the station is not available, it returns value -3000000."
+    ::= { dryContactStatusEntry 2 }
+
+---------------------------------------------------------------------------------------------------
+-- dryContactConfigTable
+---------------------------------------------------------------------------------------------------
+dryContactConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DryContactConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Dry contact config table."
+    ::= { dryContact 2 }
+
+dryContactConfigEntry OBJECT-TYPE
+    SYNTAX DryContactConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing dry contact config info."
+    INDEX { staId, dryContactId }
+    ::= { dryContactConfigTable 1 }
+     
+DryContactConfigEntry ::=
+    SEQUENCE {
+        dryContactConfigType INTEGER
+    }
+
+dryContactConfigType OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), notinstalled(0), photo(1), inductiveproximity(2), reed(3), waterleakage(4), smoke(5), not-support(10) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set dry contact type.
+        If the station is not available, it returns value -3000000."
+    ::= { dryContactConfigEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- netStatusTable
+---------------------------------------------------------------------------------------------------
+netStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF NetStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Net status table."
+    ::= { network 1 }
+
+netStatusEntry OBJECT-TYPE
+    SYNTAX NetStatusEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing net status info."
+    INDEX { staId }
+    ::= { netStatusTable 1 }
+     
+NetStatusEntry ::=
+    SEQUENCE {
+        netStatusMAC MacAddress
+    }
+
+netStatusMAC OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station MAC address.
+        The value is hex format with length 12.
+        If the station does not support this OID, it return '00-00-00-00-00-00'.
+        If the station is not available, it returns '00-00-00-00-00-00'."
+    ::= { netStatusEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- httpConfigTable
+---------------------------------------------------------------------------------------------------
+httpConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF HttpConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "HTTP config table."
+    ::= { network 2 }
+
+httpConfigEntry OBJECT-TYPE
+    SYNTAX HttpConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing HTTP config info."
+    INDEX { staId }
+    ::= { httpConfigTable 1 }
+     
+HttpConfigEntry ::=
+    SEQUENCE {
+        httpConfigHttpPort    INTEGER,
+        httpConfigHttpsPort   INTEGER,
+        httpConfigHttpsOnlyEn INTEGER
+    }
+
+httpConfigHttpPort OBJECT-TYPE
+    SYNTAX INTEGER (1..65535)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the HTTP port of the station.
+        If the station is not available, it returns value -3000000." 
+    ::= { httpConfigEntry 1 }
+
+httpConfigHttpsPort OBJECT-TYPE
+    SYNTAX INTEGER (1..65535)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set the HTTPs port of the station.
+        If the station is not available, it returns value -3000000."
+    ::= { httpConfigEntry 2 }
+
+httpConfigHttpsOnlyEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether to use HTTPS only or HTTP/HTTPS for the web page.
+        If the station is not available, it returns value -3000000."
+    ::= { httpConfigEntry 3 }
+
+---------------------------------------------------------------------------------------------------
+-- netConfigTable
+---------------------------------------------------------------------------------------------------
+netConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF NetConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Net config table."
+    ::= { network 3 }
+
+netConfigEntry OBJECT-TYPE
+    SYNTAX NetConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing net config info."
+    INDEX { staId, netCablePort }
+    ::= { netConfigTable 1 }
+
+NetConfigEntry ::=
+    SEQUENCE {
+        netCablePort            INTEGER,
+        netConfigAutoIP         INTEGER,
+        netConfigIPv4           IpAddress,
+        netConfigSubMask        IpAddress,
+        netConfigGateway        IpAddress,
+        netConfigAutoDNS        INTEGER,
+        netConfigPreferDNSIPv4  IpAddress,
+        netConfigAlterDNSIPv4   IpAddress
+    }
+
+netCablePort OBJECT-TYPE
+    SYNTAX INTEGER (1..2)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Network Port Number."
+    ::= { netConfigEntry 1 }
+
+netConfigAutoIP  OBJECT-TYPE
+    SYNTAX INTEGER { no(1), yes(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set IPv4 address automatically or not"
+    ::= { netConfigEntry 2 }
+netConfigIPv4  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set fixed IPv4 address"
+    ::= { netConfigEntry 3 }
+netConfigSubMask  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set subnet mask address"
+    ::= { netConfigEntry 4 }
+netConfigGateway  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set gateway address"
+    ::= { netConfigEntry 5 }
+netConfigAutoDNS  OBJECT-TYPE
+    SYNTAX INTEGER { no(1), yes(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set DNS address automatically or not"
+    ::= { netConfigEntry 6 }
+netConfigPreferDNSIPv4  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set prefer DNS address"
+    ::= { netConfigEntry 7 }
+netConfigAlterDNSIPv4  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set alternate DNS address"
+    ::= { netConfigEntry 8 }
+
+---------------------------------------------------------------------------------------------------
+-- trapConfigTable
+---------------------------------------------------------------------------------------------------
+trapConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF TrapConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Trap config table."
+    ::= { trap 1 }
+
+trapConfigEntry OBJECT-TYPE
+    SYNTAX TrapConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing trap config info."
+    INDEX { staId }
+    ::= { trapConfigTable 1 }
+     
+TrapConfigEntry ::=
+    SEQUENCE {
+        trapConfigEn  INTEGER,
+        trapConfigVer INTEGER
+    }
+
+trapConfigEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether this trap entry is enabled or not.
+        You should set the username/auth-password/priv-password first, when choosing snmpv3.
+        You should set the community string first, when choosing snmpv1/v2c.
+        If the station is not available, it returns value -3000000."
+    ::= { trapConfigEntry 1 }
+
+trapConfigVer OBJECT-TYPE
+ SYNTAX INTEGER { staNotAvailable(-3000000), v1(1), v2c(2), v3(3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set SNMP trap version for sending trap.
+        You should set the username/auth-password/priv-password first, when choosing snmpv3.
+        You should set the community string first, when choosing snmpv1/v2c.
+        If the station is not available, it returns value -3000000."
+    ::= { trapConfigEntry 2 }
+
+---------------------------------------------------------------------------------------------------
+-- trapReceiverConfigTable
+---------------------------------------------------------------------------------------------------
+trapReceiverConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF TrapReceiverConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "SNMP agent trap setup table. If users want to use trap, 
+        they must set enable trap, IP and community first."
+    ::= { trap 2 }
+
+trapReceiverConfigEntry OBJECT-TYPE
+    SYNTAX TrapReceiverConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing trap receiver config info."
+    INDEX { staId, trapReceiverConfigIdx }
+    ::= { trapReceiverConfigTable 1 }
+     
+TrapReceiverConfigEntry ::=
+    SEQUENCE {
+        trapReceiverConfigIdx         INTEGER,
+        trapReceiverConfigIp          IpAddress,
+        trapReceiverConfigPort        INTEGER,
+        trapReceiverConfigCommunity   DisplayString,
+        trapReceiverConfigUsername    DisplayString,
+        trapReceiverConfigAuthPwd     DisplayString,
+        trapReceiverConfigPrivacyPwd  DisplayString
+    }
+
+trapReceiverConfigIdx OBJECT-TYPE
+    SYNTAX INTEGER (1..2)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Index of trap receiver."
+    ::= { trapReceiverConfigEntry 1 }
+
+trapReceiverConfigIp OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "Trap receiver IP address.
+        If the station does not support this OID, it returns value '0.0.0.0'.
+        If the station is not available, it returns '0.0.0.0'."
+    ::= { trapReceiverConfigEntry 2 }
+
+trapReceiverConfigPort OBJECT-TYPE
+ SYNTAX INTEGER (1..65535)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "NMS trap port to be used by agent to send trap.
+        If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { trapReceiverConfigEntry 3 }
+
+trapReceiverConfigCommunity OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..20))
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "If use SNMPv1/v2c to receive trap should set this community string.
+        MAX string length: 20
+        If the station does not support this OID, it returns value 'not-support'.
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { trapReceiverConfigEntry 4 }
+
+trapReceiverConfigUsername OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..20))
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "If use SNMPv3 to receive trap should set this username string.
+        MAX string length: 20.
+        If the station does not support this OID, it returns value 'not-support'.
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { trapReceiverConfigEntry 5 }
+
+trapReceiverConfigAuthPwd OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (8..20))
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "If use SNMPv3 to receive trap should set this auth password string.
+        MAX string length: 20
+        If the station does not support this OID, it returns value 'not-support'.
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { trapReceiverConfigEntry 6 }
+
+trapReceiverConfigPrivacyPwd OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (8..20))
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "If use SNMPv3 to receive trap should set this privacy password string.
+        MAX string length: 20
+        If the station does not support this OID, it returns value 'not-support'.
+        If the station is not available, it returns 'station N/A'.
+        NOTE: Input string as /empty to set this object to NULL."
+    ::= { trapReceiverConfigEntry 7 }
+	
+---------------------------------------------------------------------------------------------------
+-- trapReceiverIpTable
+---------------------------------------------------------------------------------------------------
+trapReceiverIpTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF TrapReceiverIpEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Trap Receiver Ip table."
+    ::= { trap 3 }
+	
+trapReceiverIpEntry OBJECT-TYPE
+    SYNTAX TrapReceiverIpEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing trap receiver ip info."
+    INDEX { staId, trapReceiverIpIdx }
+    ::= { trapReceiverIpTable 1 }
+	
+TrapReceiverIpEntry ::=
+    SEQUENCE {
+		trapReceiverIpIdx       INTEGER,
+		trapReceiverIpType		InetAddressType,
+        trapReceiverIp    		InetAddress
+    }
+
+trapReceiverIpIdx OBJECT-TYPE
+    SYNTAX INTEGER (1..2)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Index of trap receiver."
+    ::= { trapReceiverIpEntry 1 }
+
+trapReceiverIpType OBJECT-TYPE
+    SYNTAX InetAddressType {ipv4(1), ipv6(2)}
+    MAX-ACCESS  read-only
+    STATUS current
+    DESCRIPTION
+        "Represents the type of the corresponding instance
+            of trapReceiverIp object.
+		If the station does not support this OID, it returns value -2000000.
+        If the station is not available, it returns value -3000000."
+    ::= { trapReceiverIpEntry 2 }
+	
+trapReceiverIp OBJECT-TYPE
+    SYNTAX InetAddress
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "Outlet auto-ping destination IP address.
+        If the station does not support this OID, it returns value '0.0.0.0'.
+        If the station is not available, it returns '0.0.0.0'."
+    ::= { trapReceiverIpEntry 3 }
+
+---------------------------------------------------------------------------------------------------
+-- trapNotifConfigTable
+---------------------------------------------------------------------------------------------------
+trapNotifConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF TrapNotifConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Trap notification config table."
+    ::= { trapNotification 1 }
+
+trapNotifConfigEntry OBJECT-TYPE
+    SYNTAX TrapNotifConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Single entry containing trap notification config info."
+    INDEX { staId }
+    ::= { trapNotifConfigTable 1 }
+     
+TrapNotifConfigEntry ::=
+    SEQUENCE {
+        trapNotifConfigEn INTEGER
+    }
+
+trapNotifConfigEn OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), no(1), yes(2) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Display or set whether this trap entry is enabled or not.
+        You should set the username/auth-password/priv-password first, when choosing snmpv3.
+        You should set the community string first, when choosing snmpv1/v2c.
+        If the station is not available, it returns value -3000000."
+    ::= { trapNotifConfigEntry 1 }
+
+---------------------------------------------------------------------------------------------------
+-- trapNotifAlarmTable
+---------------------------------------------------------------------------------------------------
+trapNotifAlarmTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF TrapNotifAlarmEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION "Trap notification alarm table."
+    ::= { trapNotification 2 }
+
+trapNotifAlarmEntry OBJECT-TYPE
+    SYNTAX TrapNotifAlarmEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION "Single entry containing trap notification alarm info."
+    INDEX { staId }
+    ::= { trapNotifAlarmTable 1 }
+     
+TrapNotifAlarmEntry ::=
+    SEQUENCE {
+        trapNotifAlarmBreakerStatus INTEGER,
+        trapNotifAlarmCurrentStatus INTEGER,
+        trapNotifAlarmVoltageStatus INTEGER,
+        trapNotifAlarmPowerStatus INTEGER,
+        trapNotifAlarmSensorStatus INTEGER
+    }
+
+trapNotifAlarmBreakerStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), normal(0), alarm(1) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station breaker alarm status.
+        If the station is not available, it returns value -3000000."
+    ::= { trapNotifAlarmEntry 1 }
+
+trapNotifAlarmCurrentStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), normal(0), alarm(1) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station current alarm status.
+        If the station is not available, it returns value -3000000."
+    ::= { trapNotifAlarmEntry 2 }
+
+trapNotifAlarmVoltageStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), normal(0), alarm(1) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station voltage alarm status.
+        If the station is not available, it returns value -3000000."
+    ::= { trapNotifAlarmEntry 3 }
+
+trapNotifAlarmPowerStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), normal(0), alarm(1) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station power alarm status.
+        If the station is not available, it returns value -3000000."
+    ::= { trapNotifAlarmEntry 4 }
+
+trapNotifAlarmSensorStatus OBJECT-TYPE
+    SYNTAX INTEGER { staNotAvailable(-3000000), normal(0), alarm(1) }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Station sensor alarm status.
+        If the station is not available, it returns value -3000000."
+    ::= { trapNotifAlarmEntry 5 }
+
+---------------------------------------------------------------------------------------------------
+-- trapNotifEvent
+---------------------------------------------------------------------------------------------------
+trapNotifEvent NOTIFICATION-TYPE
+    STATUS current
+    DESCRIPTION "Display trap notification alarm status."
+    ::= { trapNotification 3 }
+---------------------------------------------------------------------------------------------------
+-- deviceLock
+---------------------------------------------------------------------------------------------------
+staCommunityLock OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Change SNMPV1 or SNMPV2 community for California passes law.
+		Please follow the format as readcommunity||writecommunity"
+    ::= { deviceLock 1 }
+staPasswordLock OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Change SNMPV3 password for California passes law.
+		Please follow the format as authpassword||privpassword"
+    ::= { deviceLock 2 }
+
+END

@@ -1,56 +1,47 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
-/*
-
-*/
-
 // SensorTypeEnumeration
 $oid_types = [
-  'rmsCurrent',
-  'peakCurrent',
-  'unbalancedCurrent',
-  'rmsVoltage',
-  'activePower',
-  'apparentPower',
-  'powerFactor',
-  //'activeEnergy',   // currently not supported
-  //'apparentEnergy', // currently not supported
-  'temperature',
-  'humidity',
-  'airFlow',
-  'airPressure',
-  'onOff',
-  /*
-  trip(15),
-  */
-  'vibration',
-  'waterDetection',
-  'smokeDetection',
-  'binary',
-  /*
-  contact(20),
-  */
-  'fanSpeed',
-  'absoluteHumidity',
-  /*
-  other(30),
-  none(31),
-  */
-  'illuminance',
-  'doorContact',
-  'tamperDetection',
-  'motionDetection',
+    'rmsCurrent',
+    'peakCurrent',
+    'unbalancedCurrent',
+    'rmsVoltage',
+    'activePower',
+    'apparentPower',
+    'powerFactor',
+    'activeEnergy',
+    'apparentEnergy',
+    'temperature',
+    'humidity',
+    'airFlow',
+    'airPressure',
+    'onOff',
+    //'trip',
+    'vibration',
+    'waterDetection',
+    'smokeDetection',
+    'binary',
+    //'contact',
+    'fanSpeed',
+    'absoluteHumidity',
+    /*
+    other(30),
+    none(31),
+    */
+    'illuminance',
+    'doorContact',
+    'tamperDetection',
+    'motionDetection',
 ];
 
 // SensorUnitsEnumeration
@@ -59,39 +50,37 @@ $oid_units = [
     none(-1),
     other(0),
     */
-    'volt'            => ['type' => 'voltage'],
-    'amp'             => ['type' => 'current'],
-    'watt'            => ['type' => 'power'],
-    'voltamp'         => ['type' => 'apower'],
-    /*
-    wattHour(5),
-    voltampHour(6),
-    */
-    'degreeC'         => ['type' => 'temperature', 'unit' => 'C'],
-    'hertz'           => ['type' => 'frequency'],
-    'percent'         => ['type' => 'humidity'],
-    'meterpersec'     => ['type' => 'velocity'],
-    'pascal'          => ['type' => 'pressure'],
-    'psi'             => ['type' => 'pressure', 'unit' => 'psi'],
+    'volt'            => [ 'class' => 'voltage' ],
+    'amp'             => [ 'class' => 'current' ],
+    'watt'            => [ 'class' => 'power' ],
+    'voltamp'         => [ 'class' => 'apower' ],
+    'wattHour'        => [ 'counter' => 'energy' ],
+    'voltampHour'     => [ 'counter' => 'aenergy' ],
+    'degreeC'         => [ 'class' => 'temperature', 'unit' => 'C' ],
+    'hertz'           => [ 'class' => 'frequency' ],
+    'percent'         => [ 'class' => 'humidity' ],
+    'meterpersec'     => [ 'class' => 'velocity' ],
+    'pascal'          => [ 'class' => 'pressure' ],
+    'psi'             => [ 'class' => 'pressure', 'unit' => 'psi' ],
     /*
     g(13),
     */
-    'degreeF'         => ['type' => 'temperature', 'unit' => 'F'],
+    'degreeF'         => [ 'class' => 'temperature', 'unit' => 'F' ],
     /*
     feet(15),
     inches(16),
     cm(17),
     meters(18),
     */
-    'rpm'             => ['type' => 'fanspeed'],
+    'rpm'             => [ 'class' => 'fanspeed' ],
     /*
     degrees(20),
     */
-    'lux'             => ['type' => 'illuminance'],
+    'lux'             => [ 'class' => 'illuminance' ],
     /*
     grampercubicmeter(22),
     */
-    'voltampReactive' => ['type' => 'rpower'],
+    'voltampReactive' => [ 'class' => 'rpower' ],
 ];
 
 $oids = snmpwalk_cache_oid($device, 'externalSensorConfigurationEntry', [], $mib);
@@ -114,7 +103,6 @@ foreach ($oids as $index => $entry) {
 
     $oid_name = 'measurementsExternalSensorValue';
     $oid_num  = '.1.3.6.1.4.1.13742.8.2.1.1.1.3.' . $index;
-    $type     = $mib . '-' . $oid_name;
     $value    = $entry[$oid_name];
 
     // Limits (based on enabled thresholds)
@@ -151,7 +139,7 @@ foreach ($oids as $index => $entry) {
         // Other sensors based on SensorTypeEnumeration
         switch ($entry['externalSensorType']) {
             case 'powerFactor':
-                $unit = ['type' => 'powerfactor'];
+                $unit = [ 'class' => 'powerfactor' ];
                 break;
 
             // Status sensors
@@ -167,17 +155,23 @@ foreach ($oids as $index => $entry) {
                 $type     = 'emdSensorStateEnumeration';
                 $value    = $entry[$oid_name];
 
-                discover_status($device, $oid_num, $oid_name . '.' . $index, $type, $descr, $value, ['entPhysicalClass' => 'other']);
-                break;
+                discover_status($device, $oid_num, $oid_name . '.' . $index, $type, $descr, $value, [ 'entPhysicalClass' => 'other' ]);
+                continue 2;
         }
     }
 
-    if (isset($unit['type'])) {
+    if (isset($unit['class'])) {
         if (isset($unit['unit'])) {
             $options['sensor_unit'] = $unit['unit'];
         }
 
-        discover_sensor_ng($device, $unit['type'], $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $unit['class'], $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
+    } elseif (isset($unit['counter'])) {
+        if (isset($unit['unit'])) {
+            $options['counter_unit'] = $unit['unit'];
+        }
+
+        discover_counter($device, $unit['counter'], $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
     }
 }
 

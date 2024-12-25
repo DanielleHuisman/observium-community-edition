@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -67,9 +67,9 @@
                                     //r($notifications);
                                     foreach ($notifications as $notification) {
                                         if (isset($notification['markdown']) && $notification['markdown']) {
-                                            $notification['text'] = get_markdown($notification['text'], TRUE, TRUE);
+                                            $notification['text'] = get_markdown_extra($notification['text']);
                                             if (isset($notification['title'])) {
-                                                $notification['title'] = get_markdown($notification['title'], TRUE, TRUE);
+                                                $notification['title'] = get_markdown_extra($notification['title']);
                                             }
                                         }
                                         // FIXME handle severity parameter with colour or icon?

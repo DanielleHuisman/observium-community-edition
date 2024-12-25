@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -38,11 +37,10 @@ foreach ($oids['FanStatus'] as $index => $entry) {
 
     $oid_name = 'extremeFanSpeed';
     $oid_num  = ".1.3.6.1.4.1.1916.1.1.1.9.1.4.$index";
-    $type     = $mib . '-' . $oid_name;
     $value    = $entry[$oid_name];
-    $options  = ['entPhysicalIndex' => $entry['extremeFanEntPhysicalIndex']];
+    $options  = [ 'entPhysicalIndex' => $entry['extremeFanEntPhysicalIndex'] ];
 
-    discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
 
     // Fan Status
     $oid_name = 'extremeFanOperational';
@@ -104,9 +102,8 @@ foreach ($oids['PowerSupply'] as $index => &$entry) {
     $value    = $entry[$oid_name];
     if ($value > 0) {
         $oid_num = ".1.3.6.1.4.1.1916.1.1.1.27.1.9.$index";
-        $type    = $mib . '-' . $oid_name;
 
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, si_to_scale($entry['extremePowerSupplyInputPowerUsageUnitMultiplier']), $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, si_to_scale($entry['extremePowerSupplyInputPowerUsageUnitMultiplier']), $value, $options);
     }
 }
 
@@ -140,18 +137,16 @@ foreach ($oids['PowerSupplyOutput'] as $extremePowerSupplyIndex => $entry1) {
         $value    = $entry[$oid_name];
         if ($value > 0) {
             $oid_num = ".1.3.6.1.4.1.1916.1.1.1.38.1.3.$index";
-            $type    = $mib . '-' . $oid_name;
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
         }
 
         $oid_name = 'extremePowerSupplyOutputCurrent';
         $value    = $entry[$oid_name];
         if ($value > 0) {
             $oid_num = ".1.3.6.1.4.1.1916.1.1.1.38.1.4.$index";
-            $type    = $mib . '-' . $oid_name;
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
         }
     }
 }
@@ -172,9 +167,8 @@ $oid_name = 'extremeSystemPowerUsageValue';
 $value    = $entry[$oid_name];
 if ($value > 0) {
     $oid_num = ".1.3.6.1.4.1.1916.1.1.1.40.1.$index";
-    $type    = $mib . '-' . $oid_name;
 
-    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 }
 
 unset($oids);

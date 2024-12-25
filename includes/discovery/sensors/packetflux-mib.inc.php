@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -16,24 +15,24 @@ $oids = snmpwalk_cache_oid($device, 'analogInputEntry', [], 'PACKETFLUX-SITEMONI
 foreach ($oids as $index => $data) {
 
     $match   = [];
-    $match[] = ['string' => '(0.1C)', 'class' => 'temperature', 'scale' => 0.1];
-    $match[] = ['string' => '(0.1mV)', 'class' => 'voltage', 'scale' => 0.0001];
-    $match[] = ['string' => '(C)', 'class' => 'temperature', 'scale' => 1];
-    $match[] = ['string' => '(0.1V)', 'class' => 'voltage', 'scale' => 0.1];
-    $match[] = ['string' => '(mA)', 'class' => 'current', 'scale' => 0.001];
-    $match[] = ['string' => 'AH*10', 'class' => 'charge', 'scale' => 0.1];
-    $match[] = ['string' => 'KwH*10', 'class' => 'energy', 'scale' => 0.0001];
-    $match[] = ['string' => 'V*100', 'class' => 'voltage', 'scale' => 0.01];
-    $match[] = ['string' => 'Volts*100', 'class' => 'voltage', 'scale' => 0.01];
-    $match[] = ['string' => 'Amps*100', 'class' => 'current', 'scale' => 0.01];
-    $match[] = ['string' => 'Watts*100', 'class' => 'power', 'scale' => 0.01];
-    $match[] = ['string' => 'W*100', 'class' => 'power', 'scale' => 0.01];
-    $match[] = ['string' => 'Temperature', 'class' => 'temperature', 'scale' => 0.1]; // This seems common.
+    $match[] = [ 'string' => '(0.1C)',    'class' => 'temperature', 'scale' => 0.1];
+    $match[] = [ 'string' => '(0.1mV)',   'class' => 'voltage', 'scale' => 0.0001 ];
+    $match[] = [ 'string' => '(C)',       'class' => 'temperature', 'scale' => 1 ];
+    $match[] = [ 'string' => '(0.1V)',    'class' => 'voltage', 'scale' => 0.1 ];
+    $match[] = [ 'string' => '(mA)',      'class' => 'current', 'scale' => 0.001 ];
+    $match[] = [ 'string' => 'AH*10',     'class' => 'charge', 'scale' => 0.1 ];
+    $match[] = [ 'string' => 'KwH*10',    'class' => 'energy', 'scale' => 0.0001 ];
+    $match[] = [ 'string' => 'V*100',     'class' => 'voltage', 'scale' => 0.01 ];
+    $match[] = [ 'string' => 'Volts*100', 'class' => 'voltage', 'scale' => 0.01 ];
+    $match[] = [ 'string' => 'Amps*100',  'class' => 'current', 'scale' => 0.01 ];
+    $match[] = [ 'string' => 'Watts*100', 'class' => 'power', 'scale' => 0.01 ];
+    $match[] = [ 'string' => 'W*100',     'class' => 'power', 'scale' => 0.01 ];
+    $match[] = [ 'string' => 'Temperature', 'class' => 'temperature', 'scale' => 0.1 ]; // This seems common.
 
 
     foreach ($match as $m) {
 
-        if (strpos($data['analogInputDescr'], $m['string'])) {
+        if (str_contains($data['analogInputDescr'], $m['string'])) {
             $data['class']            = $m['class'];
             $data['scale']            = $m['scale'];
             $data['analogInputDescr'] = str_replace($m['string'], "", $data['analogInputDescr']);
@@ -51,7 +50,7 @@ foreach ($oids as $index => $data) {
     }
 
     if (is_array($data) && !isset($data['class'])) {
-        print_r($data);
+        print_debug_vars($data);
         unset($data);
     }
 
@@ -63,7 +62,7 @@ foreach ($oids as $index => $data) {
 
     if (is_array($data)) {
         // energy and charge will forced to discover_counter()
-        discover_sensor_ng($device, $data['class'], $mib, 'analogInputValue', $data['oid'], $index, NULL, $data['analogInputDescr'], $data['scale'], $data['analogInputValue'], ['rename_rrd' => "packetflux-packetflux-analog-$index"]);
+        discover_sensor_ng($device, $data['class'], $mib, 'analogInputValue', $data['oid'], $index, $data['analogInputDescr'], $data['scale'], $data['analogInputValue'], ['rename_rrd' => "packetflux-packetflux-analog-$index"]);
     }
 
 }

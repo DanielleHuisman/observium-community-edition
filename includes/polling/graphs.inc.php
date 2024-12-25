@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -27,7 +27,11 @@ foreach (get_device_mibs_permitted($device) as $mib) {
     }
 }
 
-$vrf_contexts = get_device_vrf_contexts($device); // SNMP VRF context discovered for device
+// FIXME. Polling graphs in VRF disabled, while troubles for polling time on Cisco IOSXR (CISCO-AAA-SESSION-MIB)
+// NOTE. Need mib definition key for allow polling in vrf (per mib)
+// NOTE 2. I do not found MIB where really used polling graphs in VRF.
+//$vrf_contexts = get_device_vrf_contexts($device); // SNMP VRF context discovered for device
+$vrf_contexts = FALSE;
 
 foreach ($table_defs as $mib => $mib_tables) {
     print_cli_data_field("$mib", 2);

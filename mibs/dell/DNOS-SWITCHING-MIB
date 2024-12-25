@@ -1,7 +1,7 @@
 DNOS-SWITCHING-MIB DEFINITIONS ::= BEGIN
 
 -- Broadcom FastPath Switching MIB
--- Copyright 2016-2020 Broadcom.
+-- Copyright 2016-2022 Broadcom.
 -- This SNMP Management Information Specification
 -- embodies Broadcom's confidential and proprietary
 -- intellectual property. Broadcom retains all title
@@ -30,13 +30,54 @@ IMPORTS
     AgentLogSeverity                    FROM DNOS-LOGGING-MIB;
 
     fastPathSwitching MODULE-IDENTITY
-        LAST-UPDATED "202005140000Z" -- 14 May 2020 12:00:00 GMT
-        ORGANIZATION "Dell EMC"
+        LAST-UPDATED "202111220000Z" -- 22 Nov 2021 12:00:00 GMT
+        ORGANIZATION "Dell"
         CONTACT-INFO ""
         DESCRIPTION
           "The Dell Networking Private MIB for Switching"
 
         -- Revision history.
+        REVISION
+          "202205180000Z" -- 18 May 2022 12:00:00 GMT
+        DESCRIPTION
+          "Added information of:
+           agentUserPasswordEncryptType, agentUserAccessLevel,
+           agentUserPasswordEncrypted
+           obsoleted information:
+           agentUserAccessMode
+           in agentUserConfigEntry."
+        REVISION
+          "202204110000Z" -- 11 Apr 2022 12:00:00 GMT
+        DESCRIPTION
+          "Added mfa parameters."
+        REVISION
+          "202203300000Z" -- 30 Mar 2022 12:00:00 GMT
+        DESCRIPTION
+           "Changed ERSPAN destination switch objects to obsolete.
+            Changed agentPortMirrorRemoteSrcErspanDstReflectorPort object 
+            to obsolete for routing enabled platforms."
+        REVISION
+          "202111220000Z" -- 22 Nov 2021 12:00:00 GMT
+        DESCRIPTION
+           "Added IPv6 RA Guard support."
+        REVISION
+          "202108120000Z" -- 12 Aug 2021 12:00:00 GMT
+        DESCRIPTION
+             "Added agentDasAllClientStatsClear, agentDasClientStatsTable and
+              agentDasClientStatsClearTable to agentDynamicAuthorizationGroup."
+        REVISION
+          "202106110000Z" -- 11 Jun 2021 12:00:00 GMT
+        DESCRIPTION
+             "Added agentSwitchMbufUsed in AgentSwitchMbufEntry.
+              Added agentClearMbufStats in agentSystemGroup."
+        REVISION
+          "202008080000Z" -- 8 Aug 2020 12:00:00 GMT
+        DESCRIPTION
+           "Added MAC notification support."
+        REVISION
+          "202008030000Z" -- 3 Aug 2020 12:00:00 GMT
+        DESCRIPTION
+           "Added ERSPAN support."
         REVISION
           "202005140000Z" -- 14 May 2020 12:00:00 GMT
         DESCRIPTION
@@ -45,7 +86,10 @@ IMPORTS
         REVISION
           "201909200000Z" -- 20 Sep 2019 12:00:00 GMT
         DESCRIPTION
-          "Added agentPortType20GigBaseX, agentPortType25GigBaseX,
+          "Modified object agentLagSummaryHashOption
+           with Dynamic load balance hashing and
+           random hashing modes.
+           Added agentPortType20GigBaseX, agentPortType25GigBaseX,
            agentPortType5GigBaseX and agentPortType2pt5GigBaseX to 
            agentPortTypeGroup."
         REVISION
@@ -85,7 +129,7 @@ IMPORTS
           "201404090000Z" -- 09 Apr 2014 12:00:00 GMT
         DESCRIPTION
           "Added group agentDynamicAuthorizationGroup to the agentConfigGroup to support
-           Dynamic Authorization."		
+           Dynamic Authorization."
         REVISION
           "201110170000Z" -- 17 Oct 2011 12:00:00 GMT
         DESCRIPTION
@@ -820,6 +864,8 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
           agentSwitchMbufAllocAttempts
               Counter32,
           agentSwitchMbufAllocFails
+              Counter32,
+          agentSwitchMbufUsed
               Counter32
           }
 
@@ -856,6 +902,14 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      "Number of message buffer allocation failures for this
                      class of message buffer."
          ::= { agentSwitchMbufEntry 4 }
+
+    agentSwitchMbufUsed OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of message buffer used for this class of message buffer."
+         ::= { agentSwitchMbufEntry 5 }
 
    --**************************************************************************************
    -- agentPortStatsRateGroup
@@ -1325,7 +1379,17 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                  agentUserLockoutStatus
                      INTEGER,
                  agentUserPasswordExpireTime
-                     DateAndTime
+                     DateAndTime,
+                 agentUserAccessLevel
+                     INTEGER,
+                 agentUserPasswordEncryptType
+                     INTEGER,
+                 agentUserPasswordEncrypted
+                     INTEGER, 
+                 agentUserMfa
+                     INTEGER,
+                 agentUserEmailId
+                     DisplayString 
              }
 
     agentUserIndex OBJECT-TYPE
@@ -1346,7 +1410,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
          ::= { agentUserConfigEntry 2 }
 
     agentUserPassword OBJECT-TYPE
-         SYNTAX      DisplayString (SIZE(0..64))
+         SYNTAX      DisplayString (SIZE(0..128))
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
@@ -1361,9 +1425,10 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      suspended(3)
                   }
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
-                     "Agent User Access Mode"
+                     "Agent User Access Mode.
+                      This object is deprecated in favor of agentUserAccessLevel."
          ::= { agentUserConfigEntry 4 }
 
     agentUserStatus OBJECT-TYPE
@@ -1396,8 +1461,61 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                       password aging is enabled."
          ::= { agentUserConfigEntry 10 }
 
+    agentUserAccessLevel OBJECT-TYPE
+         SYNTAX      INTEGER (0..15)
+         MAX-ACCESS  read-write
+         STATUS      current 
+         DESCRIPTION
+                     "Agent User Access Level. Supported values are 0, 1 and 15."
+         ::= { agentUserConfigEntry 11 }
+    agentUserPasswordEncryptType OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     md5(5),
+                     aes(6),
+                     md5Salt(7),
+                     sha256(8),
+                     sha512(10)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "User password encryption algorithm Type.
+                           md5(5) - MD5
+                           aes(6) - AES - 128
+                           md5Salt(7) - MD5 Salted Hash
+                           sha256(8) - SHA256 Salted Hash
+                           sha512(10) - SHA512 Salted Hash"
+         ::= { agentUserConfigEntry 12 }
 
+    agentUserPasswordEncrypted OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     false(0),
+                     true(1)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Specifies whether the password is encrypted or not."
+         ::= { agentUserConfigEntry 13 }
 
+    agentUserMfa OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     disable(0),
+                     enable(1)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Specifies Multifactor authentication state [enable/disable]."
+         ::= { agentUserConfigEntry 14 }
+
+   agentUserEmailId OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Specifies EmailId."
+         ::= { agentUserConfigEntry 15 } 
 
     --**************************************************************************************
     -- agentSerialGroup
@@ -2024,7 +2142,11 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      4  - Destination IP and Destination TCP/UDP Port.
                      5  - Source/Destination MAC, VLAN, EtherType, source MODID/port.
                      6  - Source/Destination IP and source/destination TCP/UDP Port.
-                     7  - Enhanced hashing mode."
+                     7  - Enhanced hashing mode.
+                     8  - Dynamic Load Balancing hashing mode.
+                     9  - Dynamic Load Balancing Optimal hashing mode.
+                    10  - Dynamic Load Balancing Assigned hashing mode.
+                    11  - Random hashing mode."
          DEFVAL { 3 }
          ::= { agentLagSummaryConfigEntry 12 }
 
@@ -2362,7 +2484,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              STATUS      current
              DESCRIPTION
                      "The network port IPv6 Gateway Address"
-             ::=  { agentNetworkConfigGroup 13 }
+             ::= { agentNetworkConfigGroup 13 }
 
       agentNetworkIpv6AddrTable OBJECT-TYPE
              SYNTAX  SEQUENCE OF AgentNetworkIpv6AddrEntry
@@ -2371,7 +2493,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              DESCRIPTION
                   "The list of IPv6 address prefixes
                    for the network port."
-             ::=  { agentNetworkConfigGroup 14 }
+             ::= { agentNetworkConfigGroup 14 }
 
  agentNetworkIpv6AddrEntry OBJECT-TYPE
              SYNTAX  AgentNetworkIpv6AddrEntry
@@ -2401,7 +2523,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              STATUS      current
              DESCRIPTION
                   "The service port IPv6 Address Prefix"
-             ::=  { agentNetworkIpv6AddrEntry 1 }
+             ::= { agentNetworkIpv6AddrEntry 1 }
 
      agentNetworkIpv6AddrPrefixLength OBJECT-TYPE
              SYNTAX      INTEGER (0..128)
@@ -2409,7 +2531,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              STATUS      current
              DESCRIPTION
                   "The service port IPv6 Address Prefix Length"
-             ::=  { agentNetworkIpv6AddrEntry 2 }
+             ::= { agentNetworkIpv6AddrEntry 2 }
 
      agentNetworkIpv6AddrEuiFlag OBJECT-TYPE
              SYNTAX      INTEGER {
@@ -2420,7 +2542,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              STATUS      current
              DESCRIPTION
                   "The service port IPv6 Eui Flag"
-             ::=  { agentNetworkIpv6AddrEntry 3 }
+             ::= { agentNetworkIpv6AddrEntry 3 }
 
       agentNetworkIpv6AddrStatus OBJECT-TYPE
              SYNTAX      RowStatus
@@ -2655,7 +2777,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              STATUS      current
              DESCRIPTION
                   "The IPv6 Gateway Address configured on the Servie port."
-             ::=  { agentServicePortConfigGroup 8 }
+             ::= { agentServicePortConfigGroup 8 }
 
     agentServicePortIpv6AddrTable OBJECT-TYPE
              SYNTAX  SEQUENCE OF AgentServicePortIpv6AddrEntry
@@ -2664,7 +2786,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              DESCRIPTION
                   "The list of IPv6 address prefixes 
                    configured on the Service port."
-             ::=  { agentServicePortConfigGroup 9 }
+             ::= { agentServicePortConfigGroup 9 }
 
     agentServicePortIpv6AddrEntry OBJECT-TYPE
              SYNTAX  AgentServicePortIpv6AddrEntry
@@ -2694,7 +2816,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              DESCRIPTION
                   "The IPv6 Address Prefix configured on the 
                    Servie port."
-             ::=  { agentServicePortIpv6AddrEntry 1 }
+             ::= { agentServicePortIpv6AddrEntry 1 }
 
      agentServicePortIpv6AddrPrefixLength OBJECT-TYPE
              SYNTAX      INTEGER (0..128)
@@ -2703,7 +2825,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              DESCRIPTION
                   "The IPv6 Address Prefix Length of the 
                    address configured on the Service port."
-             ::=  { agentServicePortIpv6AddrEntry 2 }
+             ::= { agentServicePortIpv6AddrEntry 2 }
 
      agentServicePortIpv6AddrEuiFlag OBJECT-TYPE
              SYNTAX      INTEGER {
@@ -2714,7 +2836,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
              STATUS      current
              DESCRIPTION
                   "The service port IPv6 Eui Flag"
-             ::=  { agentServicePortIpv6AddrEntry 3 }
+             ::= { agentServicePortIpv6AddrEntry 3 }
 
       agentServicePortIpv6AddrStatus OBJECT-TYPE
              SYNTAX      RowStatus
@@ -2864,7 +2986,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
     --
     --**************************************************************************************
 
-    agentSnmpConfigGroup                OBJECT IDENTIFIER  ::=  {agentConfigGroup 6}
+    agentSnmpConfigGroup                OBJECT IDENTIFIER  ::= { agentConfigGroup 6}
 
     --**************************************************************************************
     -- agentSnmpTrapFlagsConfigGroup
@@ -5434,6 +5556,25 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
               Unsigned32,
          agentPortMirrorMacAccessListNumber
               Unsigned32
+         ,
+         agentPortMirrorRemoteDstErspanSrcId
+              Unsigned32,
+         agentPortMirrorRemoteDstErspanSrcIp
+              IpAddress,
+         agentPortMirrorRemoteSrcErspanDstId
+              Unsigned32,
+         agentPortMirrorRemoteSrcErspanDstIp
+              IpAddress,
+         agentPortMirrorRemoteSrcErspanDstOriginIp
+              IpAddress,
+         agentPortMirrorRemoteSrcErspanDstIpTtl
+              Unsigned32,
+         agentPortMirrorRemoteSrcErspanDstIpDscp
+              Unsigned32,
+         agentPortMirrorRemoteSrcErspanDstIpPrec
+              Unsigned32,
+         agentPortMirrorRemoteSrcErspanDstReflectorPort
+              Unsigned32
          }
 
     agentPortMirrorSessionNum OBJECT-TYPE
@@ -5526,6 +5667,88 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
          DESCRIPTION
                      "The MAC access-list number attached to the port mirroring session."
          ::= { agentPortMirrorEntry 11 }
+
+
+   agentPortMirrorRemoteDstErspanSrcId OBJECT-TYPE
+         SYNTAX      Unsigned32(1..1023)
+         MAX-ACCESS  read-write
+         STATUS      obsolete
+         DESCRIPTION
+                     "The Source Flow ID number used by the Destination ERSPAN session to
+                      identify the ERSPAN traffic"
+         ::= { agentPortMirrorEntry 12 }
+
+    agentPortMirrorRemoteDstErspanSrcIp OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      obsolete
+         DESCRIPTION
+                     "The Source IP address of Destination ERSPAN session from which traffic will be
+                      sent to the destination port"
+         ::= { agentPortMirrorEntry 13 }
+
+     agentPortMirrorRemoteSrcErspanDstId OBJECT-TYPE
+         SYNTAX      Unsigned32(1..1023)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The Destination Flow ID number used by the Source ERSPAN session to
+                      identify the ERSPAN traffic."
+         ::= { agentPortMirrorEntry 14 }
+
+    agentPortMirrorRemoteSrcErspanDstIp OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The Destination IP address of Source ERSPAN session from which traffic will be
+                      received and sent to the destination port."
+         ::= { agentPortMirrorEntry 15 }
+
+    agentPortMirrorRemoteSrcErspanDstOriginIp OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The Destination IP address of Source ERSPAN session, which will be used 
+                      as the source of the ERSPAN traffic."
+         ::= { agentPortMirrorEntry 16 }
+
+    agentPortMirrorRemoteSrcErspanDstIpTtl OBJECT-TYPE
+         SYNTAX      Unsigned32(1..255)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The IP time-to-live (TTL) value of the packets
+                      in the Source ERSPAN session traffic."
+         ::= { agentPortMirrorEntry 17 }
+
+    agentPortMirrorRemoteSrcErspanDstIpDscp OBJECT-TYPE
+         SYNTAX      Unsigned32(0..63)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The differentiated services code point (DSCP) value of the packets
+                      in the Source ERSPAN session traffic."
+         ::= { agentPortMirrorEntry 18 }
+
+    agentPortMirrorRemoteSrcErspanDstIpPrec OBJECT-TYPE
+         SYNTAX      Unsigned32(0..7)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The IP precedence value of the packets in the Source ERSPAN session traffic."
+         ::= { agentPortMirrorEntry 19 }
+
+    agentPortMirrorRemoteSrcErspanDstReflectorPort OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-write
+         STATUS      obsolete
+         DESCRIPTION
+                     "The port which traffic from the mirrored ports will be sent to
+                      in case of destination being Source ERSPAN."
+         ::= { agentPortMirrorEntry 20 }
+
 
 agentPortMirrorTypeTable OBJECT-TYPE
          SYNTAX      SEQUENCE OF AgentPortMirrorTypeEntry
@@ -8969,7 +9192,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                     "Configures the Dynamic Authorization mode which must be 
                      enabled to support CoA functionality."
         ::= { agentDynamicAuthorizationGroup 1 }
-		  
+
     agentDynamicAuthorizationServerKey OBJECT-TYPE
         SYNTAX      DisplayString
         MAX-ACCESS  read-write
@@ -8982,7 +9205,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                      set to true, then the length of this string has to be 
                      exactly 256 else it can be 1-128."
         ::= { agentDynamicAuthorizationGroup 2 }
-		
+
     agentDynamicAuthorizationEncryptServerKey OBJECT-TYPE
         SYNTAX      INTEGER {
                     true(1),
@@ -8996,7 +9219,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                      agentDynamicAuthorizationServerKey."
         ::= { agentDynamicAuthorizationGroup 3 }
 
-    agentDynamicAuthorizationPortNum OBJECT-TYPE		
+    agentDynamicAuthorizationPortNum OBJECT-TYPE
         SYNTAX      Integer32 (1025..65535)
         MAX-ACCESS  read-write
         STATUS      current
@@ -9007,7 +9230,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                      The supported range for the port-number is 1025 to 65535."
         DEFVAL { 3799 }
         ::= { agentDynamicAuthorizationGroup 4 }
-		
+
     agentDynamicAuthorizationType OBJECT-TYPE
         SYNTAX      INTEGER {
                     any(1),
@@ -9044,7 +9267,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
         DESCRIPTION
                     "Specifies whether the server-key is to be ignored or not."
         ::= { agentDynamicAuthorizationGroup 7 }
-		
+
     agentDynamicAuthorizationClientTable OBJECT-TYPE
          SYNTAX      SEQUENCE OF AgentDynamicAuthorizationClientEntry
          MAX-ACCESS  not-accessible
@@ -9072,7 +9295,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
           agentDynamicAuthorizationClientRowStatus
               RowStatus
           }
-		  
+
     agentDynamicAuthorizationClientAddress OBJECT-TYPE
          SYNTAX      DisplayString
          MAX-ACCESS  not-accessible
@@ -9091,7 +9314,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                       set to true, then the length of this string has to be 
                       exactly 256 else it can be 1-128."
          ::= { agentDynamicAuthorizationClientEntry 2 }
-		 
+
     agentDynamicAuthorizationClientEncryptServerKey OBJECT-TYPE
         SYNTAX       INTEGER {
                      true(1),
@@ -9126,7 +9349,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                     "When set to enable(1), all dynamic authorization statistics will be reset."
+                     "When set to enable(1), all dynamic authorization global statistics will be reset."
          DEFVAL { disable }
          ::= { agentDynamicAuthorizationGroup 9 }
 
@@ -9151,6 +9374,158 @@ agentPortMirrorTypeTable OBJECT-TYPE
         DESCRIPTION
                     "Specifies whether the CoA disable port request will be ignored or not."
         ::= { agentDynamicAuthorizationGroup 11 }
+
+    agentDasAllClientStatsClear OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "When set to enable(1), all dynamic authorization per client statistics will be reset."
+         DEFVAL { disable }
+         ::= { agentDynamicAuthorizationGroup 12 }
+
+    agentDasClientStatsTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDasClientStatsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Table to display Coa statistics of DAS client."
+         ::= { agentDynamicAuthorizationGroup 13 }
+
+    agentDasClientStatsEntry OBJECT-TYPE
+         SYNTAX      AgentDasClientStatsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Entry consisting Coa statistics of DAS client ."
+         AUGMENTS     { agentDynamicAuthorizationClientEntry }
+         ::= { agentDasClientStatsTable 1 }
+         
+    AgentDasClientStatsEntry ::=
+         SEQUENCE {
+         agentDasClientRequestsReceived
+                 Unsigned32,
+         agentDasClientACKResponsesSent
+                 Unsigned32,
+         agentDasClientNAKResponsesSent
+                 Unsigned32,
+         agentDasClientRequestsIgnored
+                 Unsigned32,
+         agentDasClientRequestsWithMissingOrUnsupportedAttribute
+                 Unsigned32,
+         agentDasClientRequestsWithSessionContextNotFound
+                 Unsigned32,
+         agentDasClientRequestsWithInvalidAttributeValue
+                 Unsigned32,
+         agentDasClientRequestsAdministrativelyProhibited
+                 Unsigned32
+         }
+
+    agentDasClientRequestsReceived OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization requests received."
+         ::= { agentDasClientStatsEntry 1 }
+
+    agentDasClientACKResponsesSent OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization ACK responses sent."
+         ::= { agentDasClientStatsEntry 2 }
+
+    agentDasClientNAKResponsesSent OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization NAK responses sent."
+         ::= { agentDasClientStatsEntry 3 }
+
+    agentDasClientRequestsIgnored OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization requests ignored."
+         ::= { agentDasClientStatsEntry 4 }
+
+    agentDasClientRequestsWithMissingOrUnsupportedAttribute OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization requests received with
+                      missing or unsupported attribute."
+         ::= { agentDasClientStatsEntry 5 }
+
+    agentDasClientRequestsWithSessionContextNotFound OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization requests received with
+                      session context not found."
+         ::= { agentDasClientStatsEntry 6 }
+
+    agentDasClientRequestsWithInvalidAttributeValue OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization requests received with
+                      invalid attribute value."
+         ::= { agentDasClientStatsEntry 7 }
+
+    agentDasClientRequestsAdministrativelyProhibited OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of dynamic authorization requests administratively
+                      prohibited."
+         ::= { agentDasClientStatsEntry 8 }
+
+    agentDasClientStatsClearTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDasClientStatsClearEntry 
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "To Clear dynamic authorization statistics."
+          ::= { agentDynamicAuthorizationGroup 14}
+
+    agentDasClientStatsClearEntry OBJECT-TYPE
+         SYNTAX      AgentDasClientStatsClearEntry 
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Entry to clear per client stats."
+         AUGMENTS    { agentDynamicAuthorizationClientEntry }            
+          ::= { agentDasClientStatsClearTable 1 }
+
+    AgentDasClientStatsClearEntry ::=
+         SEQUENCE {
+         agentDasClientStatsClear
+              INTEGER
+         } 
+
+    agentDasClientStatsClear OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "When set to enable(1), dynamic authorization statistics for the requested client will be reset."
+         DEFVAL { disable }
+         ::= { agentDasClientStatsClearEntry 1 }
 
     --**************************************************************************************
     -- agentKeepalivePortTable
@@ -9278,7 +9653,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
          ::= { agentKeepalivePortEntry 7 }
 
 
-		 
+
 --**************************************************************************************
 --    agentSystemGroup
 --**************************************************************************************
@@ -9436,6 +9811,16 @@ agentSystemGroup                             OBJECT IDENTIFIER ::= { fastPathSwi
                       stored in non-volatile memory.On read returns 0."
           ::= { agentSystemGroup 14 }
 
+    agentClearMbufStats OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Clear Mbuf statistics."
+          ::= { agentSystemGroup 15 }
 
 --**************************************************************************************
 --    agentCableTesterGroup
@@ -10234,7 +10619,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
                      "Row of the ARP ACL rule remarks table."
          INDEX       { agentArpAclName, agentArpAclRuleMatchSenderIpAddr, agentArpAclRuleMatchSenderMacAddr, agentArpAclRuleRemarkIndex}
          ::= { agentArpAclRemarkRuleTable 1 }
-         
+
     AgentArpAclRemarkRuleEntry ::= SEQUENCE {         
            agentArpAclRuleRemarkIndex
                Unsigned32,
@@ -10243,7 +10628,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
            agentArpAclRuleRemarkStatus
                RowStatus
            }
-		   
+
     agentArpAclRuleRemarkIndex OBJECT-TYPE
          SYNTAX      Unsigned32 (1..10)
          MAX-ACCESS  read-only
@@ -10251,7 +10636,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
          DESCRIPTION
                      "The index of the remark instance within ARP ACL rule."
          ::= { agentArpAclRemarkRuleEntry 1 }
-		 
+
     agentArpAclRuleRemarkStr OBJECT-TYPE
          SYNTAX      DisplayString (SIZE(1..100))
          MAX-ACCESS  read-only
@@ -11236,6 +11621,22 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
              "Trap is sent when DHCP snoop violation occurs on an interface."
              ::= { fastPathSwitchingTraps 33 }
 
+     agentMacChangedNotificationTrap NOTIFICATION-TYPE
+         OBJECTS {
+                     agentSwitchMnHistRecord,
+                     agentSwitchMnHistTimestamp 
+                 }
+         STATUS             current
+         DESCRIPTION
+              "This notification is generated when there is at least one MAC 
+               address added or removed and the time elapsed from the previous
+               notification is greater than the time specified by 
+               agentSwitchMacNotificationInterval object. 
+
+               If the information to be sent cannot fit into a single notification,
+               then multiple notifications will be generated." 
+             ::= { fastPathSwitchingTraps 34 }
+
 
 --*****************************************************************************************
 --    sdmTemplate
@@ -11945,115 +12346,6 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
         "This object indicates the number of DHCP client messages received without Option-82 field
          on the trusted interface."
     ::= { agentDhcpL2RelayStatsEntry  4 }
-
-    --**************************************************************************************
-    -- agentDhcpL2RelaySubscriptionConfigGroup
-    --
-    --**************************************************************************************
-
-    agentDhcpL2RelaySubscriptionConfigTable OBJECT-TYPE
-         SYNTAX      SEQUENCE OF AgentDhcpL2RelaySubscriptionConfigEntry
-         MAX-ACCESS  not-accessible
-         STATUS      current
-         DESCRIPTION
-                     "A table of the DHCP L2 Relay Interface subscription configuration entries."
-         ::= { agentDhcpL2RelayConfigGroup 8 }
-
-    agentDhcpL2RelaySubscriptionConfigEntry OBJECT-TYPE
-         SYNTAX      AgentDhcpL2RelaySubscriptionConfigEntry
-         MAX-ACCESS  not-accessible
-         STATUS      current
-         DESCRIPTION
-                     "Represents entry for a DHCP L2 Relay subscription configuration on an interface."
-         INDEX       {
-                       agentDhcpL2RelaySubscriptionIntfIndex,
-                       agentDhcpL2RelaySubscriptionName
-                     }
-         ::= { agentDhcpL2RelaySubscriptionConfigTable 1 }
-
-   AgentDhcpL2RelaySubscriptionConfigEntry ::= SEQUENCE {
-          agentDhcpL2RelaySubscriptionIntfIndex        Unsigned32,
-          agentDhcpL2RelaySubscriptionName             DisplayString,
-          agentDhcpL2RelaySubscriptionEnable           INTEGER,
-          agentDhcpL2RelayCircuitIdSubscriptionEnable  INTEGER,
-          agentDhcpL2RelayRemoteIdSubscriptionEnable   DisplayString,
-          agentDhcpL2RelaySubscriptionRowStatus        RowStatus
-          }
-
-   agentDhcpL2RelaySubscriptionIntfIndex OBJECT-TYPE
-         SYNTAX      Unsigned32 (1..65535)
-         MAX-ACCESS  not-accessible
-         STATUS      current
-         DESCRIPTION
-                     "The port number to be selected. Each port maps to an interface."
-         ::= { agentDhcpL2RelaySubscriptionConfigEntry 1 }
-
-   agentDhcpL2RelaySubscriptionName OBJECT-TYPE
-         SYNTAX      DisplayString (SIZE(1..31))
-         MAX-ACCESS  not-accessible
-
-         STATUS      current
-         DESCRIPTION
-                     "The subscription name on an interface to be selected."
-         ::= { agentDhcpL2RelaySubscriptionConfigEntry 2 }
-
-    agentDhcpL2RelaySubscriptionEnable OBJECT-TYPE
-         SYNTAX      INTEGER {
-                               disable(0),
-                               enable(1)
-                             }
-        MAX-ACCESS  read-create
-        STATUS      current
-        DESCRIPTION
-            "This object indicates whether DHCP L2 Relay is
-             enabled on this Subscription for a given interface.
-
-             If this object is set to 'enable', DHCP L2 Relay
-             is enabled.
-
-             If this object is set to 'disable', DHCP L2 Relay
-             is disabled."
-        DEFVAL      { disable }
-        ::= { agentDhcpL2RelaySubscriptionConfigEntry 3 }
-
-    agentDhcpL2RelayCircuitIdSubscriptionEnable OBJECT-TYPE
-         SYNTAX      INTEGER {
-                               disable(0),
-                               enable(1)
-                             }
-        MAX-ACCESS  read-create
-        STATUS      current
-        DESCRIPTION
-            "This object indicates whether DHCP CircuitId is
-             enabled for L2 relaying on this Subscription for a
-             given interface.
-
-             If this object is set to 'enable', DHCP CircuitId
-             is enabled.
-
-             If this object is set to 'disable', DHCP CircuitId
-             is disabled."
-        DEFVAL      { disable }
-        ::= { agentDhcpL2RelaySubscriptionConfigEntry 4 }
-
-    agentDhcpL2RelayRemoteIdSubscriptionEnable OBJECT-TYPE
-        SYNTAX      DisplayString (SIZE(1..128))
-        MAX-ACCESS  read-create
-        STATUS      current
-        DESCRIPTION
-            "When this object is set with a non-empty string,
-             DHCP RemoteId is enabled for L2 relaying on this
-             Subscription for a given interface."
-        ::= { agentDhcpL2RelaySubscriptionConfigEntry 5 }
-
-    agentDhcpL2RelaySubscriptionRowStatus OBJECT-TYPE
-         SYNTAX      RowStatus
-         MAX-ACCESS  read-create
-         STATUS      current
-         DESCRIPTION
-                      "The row status variable is used according to installation
-          and removal conventions for conceptual rows."
-         ::= { agentDhcpL2RelaySubscriptionConfigEntry 6 }
   --**************************************************************************************
     --    agentPvrstpSwitchConfigGroup
     --**************************************************************************************
@@ -12887,153 +13179,153 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
 
 
 
-		--**************************************************************************************
-		-- agentSwitchportConfigTable
-		--
-		--**************************************************************************************
+--**************************************************************************************
+-- agentSwitchportConfigTable
+--
+--**************************************************************************************
 
-		agentSwitchportConfigTable OBJECT-TYPE
-				SYNTAX      SEQUENCE OF AgentSwitchportConfigEntry
-				MAX-ACCESS  not-accessible
-				STATUS      current
-				DESCRIPTION
-										""
-				::= { agentSwitchConfigGroup 37 }
+   agentSwitchportConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentSwitchportConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     ""
+         ::= { agentSwitchConfigGroup 37 }
 
-		agentSwitchportConfigEntry OBJECT-TYPE
-				SYNTAX      AgentSwitchportConfigEntry
-				MAX-ACCESS  not-accessible
-				STATUS      current
-				DESCRIPTION
-										""
-				INDEX       { agentSwitchportIntfIndex }
-				::= { agentSwitchportConfigTable 1 }
+   agentSwitchportConfigEntry OBJECT-TYPE
+         SYNTAX      AgentSwitchportConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     ""
+         INDEX       { agentSwitchportIntfIndex }
+         ::= { agentSwitchportConfigTable 1 }
 
-		AgentSwitchportConfigEntry ::= SEQUENCE {
-						agentSwitchportIntfIndex
-						Integer32,
-						agentSwitchportMode
-						INTEGER,
-						agentSwitchportAccessVlanID
-						VlanIndex,
-						agentSwitchportTrunkNativeVlanID
-						VlanIndex,
-						agentSwitchportTrunkNativeVlanTagging
-						INTEGER,
-						agentSwitchportTrunkAllowedVlanList
-						VlanList,
-						agentSwitchportGeneralUntaggedVlanList
-						VlanList,
-						agentSwitchportGeneralTaggedVlanList
-						VlanList,
-						agentSwitchportGeneralForbiddenVlanList
-						VlanList,
-						agentSwitchportGeneralDynamicallyAddedVlanList
-						VlanList,
-						agentSwitchportOperMode
-						INTEGER
-		}		
+   AgentSwitchportConfigEntry ::= SEQUENCE {
+         agentSwitchportIntfIndex
+            Integer32,
+         agentSwitchportMode
+            INTEGER,
+         agentSwitchportAccessVlanID
+            VlanIndex,
+         agentSwitchportTrunkNativeVlanID
+            VlanIndex,
+         agentSwitchportTrunkNativeVlanTagging
+            INTEGER,
+         agentSwitchportTrunkAllowedVlanList
+            VlanList,
+         agentSwitchportGeneralUntaggedVlanList
+            VlanList,
+         agentSwitchportGeneralTaggedVlanList
+            VlanList,
+         agentSwitchportGeneralForbiddenVlanList
+            VlanList,
+         agentSwitchportGeneralDynamicallyAddedVlanList
+            VlanList,
+         agentSwitchportOperMode
+            INTEGER
+         }
 
-			agentSwitchportIntfIndex OBJECT-TYPE
-					SYNTAX      Integer32 (1..65535)
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											"The port or LAG number to be selected. Each port/LAG maps to an interface."
-					::= { agentSwitchportConfigEntry 1 }
+   agentSwitchportIntfIndex OBJECT-TYPE
+         SYNTAX      Integer32 (1..65535)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The port or LAG number to be selected. Each port/LAG maps to an interface."
+         ::= { agentSwitchportConfigEntry 1 }
 
-			agentSwitchportMode OBJECT-TYPE
-					SYNTAX      INTEGER {
-											access(1),
-											trunk(2),
-											general(3)
-										}
-					MAX-ACCESS  read-write
-					STATUS      current
-					DESCRIPTION
-											"Configure the VLAN membership mode of a port."
-					::= { agentSwitchportConfigEntry 2 }
+   agentSwitchportMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+            access(1),
+            trunk(2),
+            general(3)
+         }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configure the VLAN membership mode of a port."
+         ::= { agentSwitchportConfigEntry 2 }
 
-			agentSwitchportAccessVlanID OBJECT-TYPE
-					SYNTAX      VlanIndex
-					MAX-ACCESS  read-write
-					STATUS      current
-					DESCRIPTION
-											"Configures the Access VLAN Id for the interface."
-			::= { agentSwitchportConfigEntry 3 }
+   agentSwitchportAccessVlanID OBJECT-TYPE
+         SYNTAX      VlanIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the Access VLAN Id for the interface."
+   ::= { agentSwitchportConfigEntry 3 }
 
-			agentSwitchportTrunkNativeVlanID OBJECT-TYPE
-					SYNTAX      VlanIndex
-					MAX-ACCESS  read-write
-					STATUS      current
-					DESCRIPTION
-											"Configures the Native VLAN Id for the interface."
-			::= { agentSwitchportConfigEntry 4 }
+   agentSwitchportTrunkNativeVlanID OBJECT-TYPE
+         SYNTAX      VlanIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the Native VLAN Id for the interface."
+   ::= { agentSwitchportConfigEntry 4 }
 
-			agentSwitchportTrunkNativeVlanTagging OBJECT-TYPE
-					SYNTAX      INTEGER {
-											enable(1),
-											disable(2)
-											}
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											"Describes the Native VLAN tagging for the interface.
-											'disable' mean that packets marked with Native VLAN are transmitted untagged from Trunk port. "
-			::= { agentSwitchportConfigEntry 5 }
+   agentSwitchportTrunkNativeVlanTagging OBJECT-TYPE
+         SYNTAX      INTEGER {
+            enable(1),
+            disable(2)
+         }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Describes the Native VLAN tagging for the interface.
+                     'disable' mean that packets marked with Native VLAN are transmitted untagged from Trunk port. "
+   ::= { agentSwitchportConfigEntry 5 }
 
 
-			agentSwitchportTrunkAllowedVlanList OBJECT-TYPE
-					SYNTAX      VlanList
-					MAX-ACCESS  read-write
-					STATUS      current
-					DESCRIPTION
-											"Configures the allowed VLAN list of Trunk switch interface."
-			::= { agentSwitchportConfigEntry 6 }
+   agentSwitchportTrunkAllowedVlanList OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the allowed VLAN list of Trunk switch interface."
+   ::= { agentSwitchportConfigEntry 6 }
 
-			agentSwitchportGeneralUntaggedVlanList OBJECT-TYPE
-					SYNTAX      VlanList
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											"Shows the allowed untagged VLAN list of general switch interface."
-			::= { agentSwitchportConfigEntry 7 }
+   agentSwitchportGeneralUntaggedVlanList OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Shows the allowed untagged VLAN list of general switch interface."
+   ::= { agentSwitchportConfigEntry 7 }
 
-			agentSwitchportGeneralTaggedVlanList OBJECT-TYPE
-					SYNTAX      VlanList
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											" Shows the allowed tagged VLAN list of general switch interface."
-			::= { agentSwitchportConfigEntry 8 }
+   agentSwitchportGeneralTaggedVlanList OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     " Shows the allowed tagged VLAN list of general switch interface."
+   ::= { agentSwitchportConfigEntry 8 }
 
-			agentSwitchportGeneralForbiddenVlanList OBJECT-TYPE
-					SYNTAX      VlanList
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											"Shows the Forbidden VLAN list of general switch interface."
-			::= { agentSwitchportConfigEntry 9 }
+   agentSwitchportGeneralForbiddenVlanList OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Shows the Forbidden VLAN list of general switch interface."
+   ::= { agentSwitchportConfigEntry 9 }
 
-			agentSwitchportGeneralDynamicallyAddedVlanList OBJECT-TYPE
-					SYNTAX      VlanList
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											"Shows the list of dynamically added VLANs for general switch interface."
-		::= { agentSwitchportConfigEntry 10 }
+   agentSwitchportGeneralDynamicallyAddedVlanList OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Shows the list of dynamically added VLANs for general switch interface."
+   ::= { agentSwitchportConfigEntry 10 }
 
-			agentSwitchportOperMode OBJECT-TYPE
-					SYNTAX      INTEGER {
-											access(1),
-											trunk(2),
-											general(3)
-										}
-					MAX-ACCESS  read-only
-					STATUS      current
-					DESCRIPTION
-											"Fetch the operational switchport mode of a port." 
-					::= { agentSwitchportConfigEntry 11 }
+   agentSwitchportOperMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+            access(1),
+            trunk(2),
+            general(3)
+         }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Fetch the operational switchport mode of a port." 
+   ::= { agentSwitchportConfigEntry 11 }
 
 --**********************************************************************--
     agentSwitchVlanStatsGroup         OBJECT IDENTIFIER ::= { agentSwitchConfigGroup 47 }
@@ -13170,5 +13462,330 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
             STATUS       current
             DESCRIPTION  "When set to enable(1), all statistics for the VLAN will be cleared."
             ::={ agentSwitchVlanStatsEntry 11 }
+
+--**************MAC Notification configuration objects group****************
+--MAC Notification MIB have below groups
+--[1] Mac Notification Global Group (agentSwitchMnGlobalGroup).
+--[2] Mac Notification Interface Group (agentSwitchMnInterfaceGroup).
+
+--**********************MAC Notification Global group***********************
+    agentSwitchMnObjGroup OBJECT IDENTIFIER ::= { agentSwitchConfigGroup 48 }
+
+        agentSwitchMnGlobalGroup    OBJECT IDENTIFIER ::= { agentSwitchMnObjGroup 1 }
+            agentSwitchMnGlobalFeatureEnabled  OBJECT-TYPE
+                SYNTAX        TruthValue
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION
+                    "This object indicates MAC notification feature is currently 
+                    enabled or not.
+    
+                    If the object value is set to false (2), feature is disabled 
+                    and no notifications are generated by the device.
+
+                    If the object value set to true (1), feature is enabled.
+                    Once the MAC notification feature is enabled on the device,
+                    behavior for each interface is controlled by the 
+                    agentSwitchMnIfConfigTable."   
+                DEFVAL  { false } 
+                ::= { agentSwitchMnGlobalGroup 1 }
+
+            agentSwitchMacNotificationInterval  OBJECT-TYPE
+                SYNTAX        Unsigned32 (1..4294967295)
+                UNITS         "seconds"
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION
+                    "This object specifies the interval between the MAC notifications
+                     generated by the device.
+                     If the value of agentSwitchMnTrapEnabled is true(1), the
+                     device will send MAC change notifications and archive the events in
+                     the agentSwitchMnHistoryTable. If the value of 
+                     agentSwitchMnTrapEnabled is false(2), then device will not
+                     send the MAC notifications but it will archive these events
+                     in the agentSwitchMnHistoryTable.   
+            
+                     If the value of this object is greater or equal to 1, then device
+                     will wait for a configured time and generate the MAC change 
+                     notifications and archive the events in the 
+                     agentSwitchMnHistoryTable."
+                DEFVAL  { 1 } 
+                ::= { agentSwitchMnGlobalGroup 2 }
+
+            agentSwitchMnMacAddressesLearnt OBJECT-TYPE
+                SYNTAX        Counter32 
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION
+                    "Indicates the number of MAC addresses learnt by the
+                    device." 
+                ::= { agentSwitchMnGlobalGroup 3 }
+
+            agentSwitchMnMacAddressesRemoved OBJECT-TYPE
+                SYNTAX        Counter32 
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION
+                    "Indicates the number of MAC addresses removed from the
+                     forwarding database." 
+                ::= { agentSwitchMnGlobalGroup 4 }
+
+        agentSwitchMnTrapEnabled OBJECT-TYPE
+                 SYNTAX          TruthValue
+                 MAX-ACCESS      read-write
+                 STATUS          current
+                 DESCRIPTION
+                     "This object tells whether MAC change notifications 
+                      will or will not be sent when there are MAC addresses
+                      learnt or removed/ages out from the device's forwarding
+                      database. If the value of agentSwitchMnTrapEnabled is 
+                      true(1) switch will send the MAC notifications via traps
+                      or informs. If the value is false(2) MAC notifications 
+                      won't be sent to snmp server but MAC address info will be
+                      added to the agentSwitchMnHistoryTable."
+                DEFVAL { false }
+                ::= { agentSwitchMnGlobalGroup 5 }
+
+        agentSwitchMacNotificationsSent OBJECT-TYPE
+            SYNTAX         Counter32 
+            MAX-ACCESS     read-only
+            STATUS         current
+            DESCRIPTION
+                "Indicates the number of MAC notifications sent out
+                 by the device."
+            ::= { agentSwitchMnGlobalGroup 6 }
+
+        agentSwitchMnHistTableMaxLength OBJECT-TYPE
+            SYNTAX          Unsigned32 (1..255)
+            UNITS           "records"
+            MAX-ACCESS      read-write
+            STATUS          current
+            DESCRIPTION
+                "Maximum number of records that the agentSwitchMnHistoryTable
+                 can hold in the table. When the table is full, the oldest entry 
+                 will be over written with a new MAC change notification entry."
+            DEFVAL  { 1 }
+            ::= { agentSwitchMnGlobalGroup 7 }
+
+        agentSwitchMnHistoryTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF AgentSwitchMnHistoryEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                "This table will archive the MAC change notification events 
+                 generated by this device. The MAC change notification
+                 events are archived after those are sent to server."
+            ::= { agentSwitchMnGlobalGroup 8 }
+
+        agentSwitchMnHistoryEntry OBJECT-TYPE
+            SYNTAX     AgentSwitchMnHistoryEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                "A MAC change notification message that was previously
+                 sent by this device.  Each entry is indexed by a message
+                 index."
+            INDEX   { agentSwitchMnHistIndex }
+            ::= { agentSwitchMnHistoryTable 1 }
+
+        AgentSwitchMnHistoryEntry ::=
+            SEQUENCE {
+                agentSwitchMnHistIndex
+                    Unsigned32,
+                agentSwitchMnHistRecord
+                    OCTET STRING,
+                agentSwitchMnHistTimestamp
+                    Unsigned32
+                }
+
+        agentSwitchMnHistIndex OBJECT-TYPE
+            SYNTAX          Unsigned32 (1..4294967295)
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+                "agentSwitchMnHistIndex is an unique value. It specifies 
+                 previously generated MAC notification event by the device. 
+                 This index starts at 1 and increments by one when any MAC
+                 entry got added or removed from the device.  When index 
+                 reaches the value of agentSwitchMnHistTableMaxLength, 
+                 the device re-start the value to 1."
+            ::= { agentSwitchMnHistoryEntry 1 }
+
+        agentSwitchMnHistRecord OBJECT-TYPE
+            SYNTAX        OCTET STRING (SIZE(1..1465))
+            MAX-ACCESS    read-only
+            STATUS        current
+            DESCRIPTION
+                "This object contains the information of a MAC change
+                 notification event. The notification message contains
+                 a list of MAC adresses in the following format:
+                 '<operation><VLAN><MAC><dot1dBasePort>'
+
+                  <operation> is of size 1 octet and supports the following 
+                  values
+                  0 - End of MIB object.
+                  1 - MAC learnt.
+                  2 - MAC removed.
+
+                  <VLAN> VLAN IDENTIFIER
+                  <MAC> Layer2 Mac Address.
+                  <dot1dBasePort> is the value of dot1dBasePort for the
+                  port from which the MAC address is learnt or removed."
+            ::= { agentSwitchMnHistoryEntry 2 }
+
+        agentSwitchMnHistTimestamp  OBJECT-TYPE
+            SYNTAX          Unsigned32 (1..4294967295)
+            MAX-ACCESS      read-only
+            STATUS          current
+            DESCRIPTION
+                  "The value of sysUpTime when the agentSwitchMacChangedNotification
+                   was generated."
+            ::= { agentSwitchMnHistoryEntry 3 }
+
+-- *********************** Mac Notification Interface Group ***************
+-- agentSwitchMnIfConfigTable
+        agentSwitchMnInterfaceGroup OBJECT IDENTIFIER ::= { agentSwitchMnObjGroup 2 }
+
+            agentSwitchMnIfConfigTable  OBJECT-TYPE
+                SYNTAX        SEQUENCE OF AgentSwitchMnIfConfigEntry
+                MAX-ACCESS    not-accessible
+                STATUS        current
+                DESCRIPTION
+                    "This table enables or disables the generation of 
+                     MAC notification at each interface when MAC address
+                     is learnt or removed or aged out." 
+            ::= { agentSwitchMnInterfaceGroup 1 }
+
+            agentSwitchMnIfConfigEntry  OBJECT-TYPE
+                SYNTAX        AgentSwitchMnIfConfigEntry
+                MAX-ACCESS    not-accessible
+                STATUS        current
+                DESCRIPTION
+                    "Each entry contains the configuration for enabling the
+                     MAC notification at each interface." 
+                INDEX { ifIndex }
+            ::= { agentSwitchMnIfConfigTable 1 }
+
+            AgentSwitchMnIfConfigEntry  ::= SEQUENCE {
+                agentSwitchMnMacLearntEnable    TruthValue, 
+                agentSwitchMnMacRemovedEnable   TruthValue 
+            }
+
+            agentSwitchMnMacLearntEnable OBJECT-TYPE
+                SYNTAX        TruthValue 
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION
+                    "This object indicates whether this interface is enabled to send 
+                     agentSwitchMacChangedNotification when it learns a new MAC address.
+                     This variable has no effect when the value of 
+                     agentSwitchMnGlobalFeatureEnabled object is false(2)."      
+                DEFVAL { false }
+            ::= { agentSwitchMnIfConfigEntry 1 }
+
+            agentSwitchMnMacRemovedEnable OBJECT-TYPE
+                SYNTAX        TruthValue 
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION
+                "This object indicates whether this interface is enabled to send 
+                 agentSwitchMacChangedNotification when a MAC address which it learnt
+                 previously is removed or aged out from the forwarding database. This
+                 variable has no effect when the value of 
+                 agentSwitchMnGlobalFeatureEnabled object is false(2)."
+            DEFVAL { false }
+            ::= { agentSwitchMnIfConfigEntry 2 }
+
+--**************IPv6 RA GUARD objects group****************
+--RA Guard MIB have below groups
+--[1] IPv6 RAGUARD Global Group (agentIpv6RaGuardGlobalGroup).
+--[2] IPv6 RAGUARD Interface Group (agentIpv6RaGuardInterfaceGroup).
+--*********************************************************
+
+    agentIpv6RaGuardObjGroup OBJECT IDENTIFIER ::= { agentSwitchConfigGroup 49 }
+
+--**********************IPv6 RAGUARD Global group *******************************
+
+    agentIpv6RaGuardGlobalGroup    OBJECT IDENTIFIER ::= { agentIpv6RaGuardObjGroup 1 }
+
+        agentIpv6RADropCounter OBJECT-TYPE
+            SYNTAX        Counter32
+            MAX-ACCESS    read-only
+            STATUS        current
+            DESCRIPTION
+                "Indicates the number of RA packets dropped in hardware."
+            ::= { agentIpv6RaGuardGlobalGroup 1 }
+
+        agentIpv6RedirectDropCounter OBJECT-TYPE
+            SYNTAX        Counter32
+            MAX-ACCESS    read-only
+            STATUS        current
+            DESCRIPTION
+                "Indicates the number of redirect packets dropped in hardware."
+            ::= { agentIpv6RaGuardGlobalGroup 2 }
+
+--**********************IPv6 RAGUARD Interface group*******************************
+-- agentIpv6RaGuardIfConfigTable
+
+    agentIpv6RaGuardInterfaceGroup OBJECT IDENTIFIER ::= { agentIpv6RaGuardObjGroup 2 }
+
+        agentIpv6RaGuardIfConfigTable OBJECT-TYPE
+            SYNTAX          SEQUENCE OF AgentIpv6RaGuardIfConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+                "A table provides the mechanism to configure the RA Guard
+                 state at every interface capable of this feature."
+            ::= { agentIpv6RaGuardInterfaceGroup 1 }
+
+        agentIpv6RaGuardIfConfigEntry OBJECT-TYPE
+            SYNTAX          AgentIpv6RaGuardIfConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+                "A row instance contains the configuration to enable or
+                 disable RA Guard on an interface."
+            INDEX { ifIndex }
+            ::= { agentIpv6RaGuardIfConfigTable 1 }
+
+        AgentIpv6RaGuardIfConfigEntry ::= SEQUENCE {
+            agentIpv6RaGuardIfEnabled       INTEGER
+        }
+
+        agentIpv6RaGuardIfEnabled OBJECT-TYPE
+            SYNTAX         INTEGER {
+                                enable(1),
+                                disable(0)
+                            }
+            MAX-ACCESS      read-write
+            STATUS          current
+            DESCRIPTION
+                "This object enables RA Guard on the interface, if set this
+                 object to 'enable'.
+                 Setting this object to 'disable' disables the RA Guard on the
+                 interface."
+            DEFVAL      { disable }
+
+            ::= { agentIpv6RaGuardIfConfigEntry 1 }
+
+
+--**************************************************************************************
+    -- agentGlobalMultifactorAuthenticationConfigGroup -> Contains MIB object to configure
+    --                                                   multifactor authentication
+    --**************************************************************************************
+
+    agentGlobalMultifactorAuthenticationConfigGroup OBJECT IDENTIFIER ::= { agentCLIConfigGroup 9 }
+
+    agentGlobalMultifactorAuthentication OBJECT-TYPE
+        SYNTAX            INTEGER {
+                          disable(0),
+                          enable(1)
+                          }
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+                    "Specifies global Multifactor Authentication state [enable/disable]."
+        ::= { agentGlobalMultifactorAuthenticationConfigGroup 1 }
+
 
 END

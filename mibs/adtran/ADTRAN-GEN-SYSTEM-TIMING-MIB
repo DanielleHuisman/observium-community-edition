@@ -1,0 +1,798 @@
+ADTRAN-GEN-SYSTEM-TIMING-MIB
+
+-- TITLE:     The ADTRAN Generic System  MIB
+-- PRODUCT:   SYSTEM Level Support
+-- VERSION:   1.0
+-- DATE:      03/02/09
+-- AUTHOR:    Larry Deaton/ Andria Dyess
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifiers (OIDs) for the
+-- ADTRAN GENERIC SYSTEM TIMING objects
+
+-- HISTORY:
+-- 02/16/09 aed   Preliminary Draft
+-- 03/02/09 lmd   Revised draft after initial design review
+-- 03/25/09 aed   Added more provisioning and status OIDs from adTa5kSm.mi2
+-- 04/07/09 jlb   Changed the description of adGenSystemTimingInterfaceType to change the return
+--                value from notApplicable to unknown in the event the timing source is not an interface.
+-- 09/02/09 mguo  Added a new timingSrc switch trap.
+-- 09/21/09 mguo  moved pri/sec source failed alarms from adTA5KSm.mi2 to the mib file.
+-- 04/07/10 mguo  Added a new entry to support E1 clock timing.
+-- 05/03/10 Balaji KP:
+--                Added internal(5),holdover(6) options to adGenSystemTimingCurrentSource
+--                when all the clocks are down, system uses holdover if the memory is available otherwise
+--                uses Internal Oscillator clock.
+-- 02/17/11 Rajesh Perumal  Added external source provisioning OID - adGenSystemTimingExternalSourceHopCount.         
+-- DO NOT MAKE HISTORY COMMENTS HERE!!!! Revision history is now in REVISION/DESCRIPTION clauses below. 
+-- ******************************************************************************************
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+   adGenSystemTiming,
+   adGenSystemTimingID
+      FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+
+   GenSystemInterfaceType
+      FROM ADTRAN-SHARED-CND-SYSTEM-TC-MIB
+
+   OBJECT-TYPE,
+   MODULE-IDENTITY,
+   Integer32,
+   NOTIFICATION-TYPE
+      FROM SNMPv2-SMI
+
+   sysName
+      FROM SNMPv2-MIB
+
+   ifIndex
+      FROM IF-MIB
+
+   adTrapInformSeqNum
+      FROM ADTRAN-GENTRAPINFORM-MIB
+
+   TEXTUAL-CONVENTION,
+   TruthValue
+      FROM SNMPv2-TC
+   ;
+
+adGenSystemTimingMIB MODULE-IDENTITY
+   LAST-UPDATED "201801090000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO
+     "CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+                 Tel: +1 800 726-8663
+                 Fax: +1 256 963 6217
+                 E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the Generic System Timing MIB."  
+   
+   REVISION "201801090000Z"
+   DESCRIPTION "- Added support for the VDSL Uplink NTR timing source for the VXP DMT"
+
+   REVISION "201709290000Z"
+   DESCRIPTION "- Added new external source type bitsD5 for clock input to the AdGenExternalSourceType 
+                  And updated the description of adGenSystemTimingExternalSourceType."
+
+   REVISION "201707250000Z"
+   DESCRIPTION "- Added localPortSyncE and fixedPortSyncE to the AdGenTimingSourceSelection."
+
+   REVISION "201706120000Z"
+   DESCRIPTION "- Added adGenSystemTimingProvPortTable and new OID adGenSystemTimingTransmitSSMEnable to it."
+
+   REVISION "201309090000Z"
+   DESCRIPTION "Add adGenSystemTimingSelectionMode, which takes the place of adGenSystemTimingModeRevertive and adGenSystemTimingUseHopCount.
+                Also added two new timing source selection options for phy timing."
+
+   REVISION "201110261100Z"
+   DESCRIPTION "Add support for the alarm enables."
+
+   REVISION "201109020000Z"
+   DESCRIPTION "Added OIDs 11-19 under System Timing Status Information for the primary, secondary, and fallback timing sources."
+
+   REVISION "200903020000Z"
+   DESCRIPTION "Created"
+::= { adGenSystemTimingID 1 }
+
+   adGenSystemTimingProv          OBJECT IDENTIFIER ::= {adGenSystemTiming 1}
+   adGenSystemTimingStatus        OBJECT IDENTIFIER ::= {adGenSystemTiming 2}
+   adGenSystemTimingAlarmPrefix   OBJECT IDENTIFIER ::= {adGenSystemTiming 3}
+   adGenSystemTimingAlarms        OBJECT IDENTIFIER ::= {adGenSystemTimingAlarmPrefix 0}
+
+
+-- ==================================================================================================================
+-- TEXTUAL-CONVENTIONS
+-- ==================================================================================================================
+
+   AdGenTimingSource ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Enumerates the timing sources that may be provisioned for the system."
+        SYNTAX INTEGER {
+            primaryTimingSource (1),
+            secondaryTimingSource (2),
+            fallbackTimingSource (3)
+        }
+
+   AdGenTimingSourceSelection ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Specifies the available timing source selections in the system."
+        SYNTAX   INTEGER {
+           internal (1),
+           externalPrimary  (2),
+           externalSecondary (3),
+           loopA (4),
+           loopB (5),
+           localPort (6),
+           fixedPort (7),
+           localPortSyncE (8),
+           fixedPortSyncE (9),
+           localPortPhy (10),
+           fixedPortPhy (11),
+           vdslUplinkNTR (12)
+        }
+
+   AdGenExternalSource ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+             "Enumerates the available external timing sources in the system."
+        SYNTAX   INTEGER {
+           externalPrimary(1),
+           externalSecondary(2)
+        }
+
+   AdGenTimingConfigurationStatus ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Specifies the current state of timing configuration in the system."
+        SYNTAX   INTEGER {
+           invalidConfiguration (1),
+           incompleteConfiguration  (2),
+           okConfiguration (3)
+        }
+
+   AdGenExternalSourceType ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Specifies the type of external timing source."
+        SYNTAX    INTEGER {
+           bitsD4 (1),
+           bitsOD (2),
+           composite (3),
+           composite8kHz (4),
+           bitsG704 (5),
+           bitsD5 (6)
+        }
+
+   AdGenTimingSourceQuality ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+           "Specifies the quality of the external timing source."
+        SYNTAX   INTEGER {
+           stratum1 (1),
+           synchronized (2),
+           stratum2 (3),
+           transmitModeClock (4),
+           stratum3e (5),
+           stratum3 (6),
+           sonetClock (7),
+           stratum4or4e (8),
+           doNotUseForSync (15)
+        }
+
+    AdGenSystemTimingSourceHealth ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+           "Specifies the health of a timing source."
+        SYNTAX   INTEGER {
+            up(1),
+            down(2)
+        }
+
+-- ==================================================================================================================
+-- System Timing Provisioning Table provisions the primary, secondary, and fallback timing sources.
+-- ==================================================================================================================
+
+   adGenSystemTimingProvTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenSystemTimingProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The Generic System Timing Provisioning table."
+      ::= { adGenSystemTimingProv 1 }
+
+   adGenSystemTimingProvEntry OBJECT-TYPE
+      SYNTAX  AdGenSystemTimingProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in Generic System Timing Table"
+      INDEX  { adGenSystemTimingSource }
+      ::= { adGenSystemTimingProvTable 1 }
+
+   AdGenSystemTimingProvEntry ::=
+      SEQUENCE {
+         adGenSystemTimingSource
+            AdGenTimingSource,
+         adGenSystemTimingSelection
+            AdGenTimingSourceSelection,
+         adGenSystemTimingInterfaceType
+            GenSystemInterfaceType,
+         adGenSystemTimingShelf
+            Integer32,
+         adGenSystemTimingSlot
+            Integer32,
+         adGenSystemTimingPort
+            Integer32,
+         adGenSystemTimingConfigurationStatus
+            AdGenTimingConfigurationStatus
+      }
+
+   adGenSystemTimingSource       OBJECT-TYPE
+       SYNTAX AdGenTimingSource
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+           "Identifies the timing source for this entry: primary, secondary, or fallback."
+       ::= { adGenSystemTimingProvEntry 1 }
+
+   adGenSystemTimingSelection       OBJECT-TYPE
+       SYNTAX   AdGenTimingSourceSelection
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+           "The timing source selection"
+       ::= { adGenSystemTimingProvEntry 2 }
+
+   adGenSystemTimingInterfaceType    OBJECT-TYPE
+       SYNTAX   GenSystemInterfaceType
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Returns which type of interface is providing timing.
+            Returns unknown(1) if adGenSystemTimingSelection
+            is internal, externalPrimary or externalSecondary."
+       ::= { adGenSystemTimingProvEntry 3 }
+
+   adGenSystemTimingShelf   OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The shelf number for the timing source.
+            Returns a value of 0 when adGenSystemTimingSelection
+            is internal, externalPrimary, or externalSecondary."
+       ::= { adGenSystemTimingProvEntry 4 }
+
+   adGenSystemTimingSlot   OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The slot number for the timing source.
+            Returns a value of 0 when adGenSystemTimingSelection
+            is internal, externalPrimary, or externalSecondary.
+            Access module slots are 1 - 22.
+            SM-A slot is 252.
+            SM-B slot is 253."
+       ::= { adGenSystemTimingProvEntry 5 }
+
+   adGenSystemTimingPort   OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The port number for the timing source.
+            Returns a value of 0 when adGenSystemTimingSelection
+            is internal, externalPrimary, or externalSecondary."
+       ::= { adGenSystemTimingProvEntry 6 }
+
+
+   adGenSystemTimingConfigurationStatus OBJECT-TYPE
+       SYNTAX   AdGenTimingConfigurationStatus
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "Returns the current configuration status of timing subsystem"
+       ::= { adGenSystemTimingProvEntry 7 }
+
+-- ==================================================================================================================
+-- External Source Provisioning Table  provisions the primary and secondary external clock inputs
+-- ==================================================================================================================
+
+   adGenSystemTimingExternalSourceProvTable   OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenSystemTimingExternalSourceProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The System Timing External Source Provisioning Table."
+      ::= { adGenSystemTimingProv 2 }
+
+   adGenSystemTimingExternalSourceProvEntry OBJECT-TYPE
+      SYNTAX  AdGenSystemTimingExternalSourceProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the System Timing External Source Provisioning Table"
+      INDEX  { adGenSystemTimingExternalSourceId }
+      ::= { adGenSystemTimingExternalSourceProvTable 1 }
+
+   AdGenSystemTimingExternalSourceProvEntry ::=
+      SEQUENCE {
+         adGenSystemTimingExternalSourceId
+            AdGenExternalSource,
+         adGenSystemTimingExternalSourceType
+            AdGenExternalSourceType,
+         adGenSystemTimingExternalSourceQuality
+            AdGenTimingSourceQuality,
+         adGenSystemTimingExternalSourcePriority
+            INTEGER,
+         adGenSystemTimingExternalSourceHopCount
+            INTEGER
+      }
+
+   adGenSystemTimingExternalSourceId      OBJECT-TYPE
+      SYNTAX     AdGenExternalSource
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+         "Identifies the external timing source (primary or secondary)."
+      ::= { adGenSystemTimingExternalSourceProvEntry 1 }
+
+   adGenSystemTimingExternalSourceType       OBJECT-TYPE
+      SYNTAX     AdGenExternalSourceType
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+         "Select which type the External clock input should expect.
+          If one external timing source type (primary or secondary) 
+          is set to bits-d5 from default type i.e. bits-d4 then other 
+          type will be overwritten to bits-d5 and vice versa."
+      ::= { adGenSystemTimingExternalSourceProvEntry 2 }
+
+   adGenSystemTimingExternalSourceQuality   OBJECT-TYPE
+      SYNTAX     AdGenTimingSourceQuality
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+         "Select the quality for the external clock."
+      ::= { adGenSystemTimingExternalSourceProvEntry 3 }
+
+   adGenSystemTimingExternalSourcePriority    OBJECT-TYPE
+      SYNTAX     INTEGER (0..255)
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+         "Select the priority for the external clock.
+          Set adGenSystemTimingExternalSourcePriority to 0
+          to use the node number as the priority.  Override this
+          default behavior by setting a value from 1 to 255."
+      ::= { adGenSystemTimingExternalSourceProvEntry 4 }    
+
+   adGenSystemTimingExternalSourceHopCount    OBJECT-TYPE
+      SYNTAX     INTEGER (0..255)
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+         "Select the Hop Count for the external clock.
+          The hop count is the number of nodes between a source 
+          and a destination. The Hop Count takes a value from 
+          0 to 255."
+      ::= { adGenSystemTimingExternalSourceProvEntry 5 }
+
+
+
+-- ==================================================================================================================
+-- Additional System Timing Scalars
+-- ==================================================================================================================
+
+   adGenSystemTimingModeRevertive   OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Enabling this allows the clock to fail back to the primary should the primary source's
+            health return to normal.  Disabled means the clock will remain on the secondary source after
+            a failover.  This object has been deprecated in favor of adGenSystemTimingSelectionMode."
+       ::= { adGenSystemTimingProv 3 }
+
+   adGenSystemTimingForceClockFailover    OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           failover (1),
+           notavailable (2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Writing a value to this will cause the clock source to failover, a get will always return 1"
+       ::= { adGenSystemTimingProv 4 }
+
+   adGenSystemTimingUseHopCount         OBJECT-TYPE
+        SYNTAX                  INTEGER {
+                enabled (1),
+                disabled (2)
+                }
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "Enable or disable the hop count in SM timing messages. This object has been deprecated.  Set adGenSystemTimingSelectionMode to useHopCount(3)."
+        ::= {adGenSystemTimingProv 5 }
+
+
+-- ******************************************************************************************
+-- Alarm Provisioning
+-- ******************************************************************************************
+   adGenSystemTimingSrcSwitchAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adGenSystemTimingProv 6 }           
+        
+   adGenSystemTimingPriSrcFailAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adGenSystemTimingProv 7 }
+
+   adGenSystemTimingSecSrcFailAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adGenSystemTimingProv 8 }
+        
+    adGenSystemTimingSelectionMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+                    revertive(1),
+                    nonRevertive(2),
+                    useHopCount(3)
+                }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                "Specify how the current timing source will be selected.
+                 The system will failover to the secondary timing source if the primary source fails.
+                 When set to revertive(1), the system will revert back when the primary timing source health returns to normal.
+                 When set to nonRevertive(2), the system will continue to use the secondary timing source.
+                 When set to useHopCount(3), the system will choose the best timing source based on the hop count in SM timing messages."
+        DEFVAL  { revertive }
+        ::= {adGenSystemTimingProv 9 }
+
+
+-- ==================================================================================================================
+-- System Timing Port Provisioning Table
+-- ==================================================================================================================
+
+   adGenSystemTimingProvPortTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenSystemTimingProvPortEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The Generic System Timing Port Provisioning table."
+      ::= { adGenSystemTimingProv 10 }
+
+   adGenSystemTimingProvPortEntry OBJECT-TYPE
+      SYNTAX  AdGenSystemTimingProvPortEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in Generic System Timing Port Provisioning Table"
+      INDEX  { ifIndex }
+      ::= { adGenSystemTimingProvPortTable 1 }
+
+   AdGenSystemTimingProvPortEntry ::=
+      SEQUENCE {
+          adGenSystemTimingTransmitSSMEnable                  INTEGER
+      }
+
+   adGenSystemTimingTransmitSSMEnable    OBJECT-TYPE
+        SYNTAX             INTEGER {
+                               enable (1),
+                               disable (2)
+                                   }
+        MAX-ACCESS         read-write
+        STATUS             current
+        DESCRIPTION
+                "This object indicates if SSM transmission is enabled/disabled on a port."
+
+        DEFVAL {disable}
+
+        ::= { adGenSystemTimingProvPortEntry 1 }
+
+
+-- ==================================================================================================================
+-- System Timing Status Information
+-- ==================================================================================================================
+
+    adGenSystemTimingCurrentSource          OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           primary (1),
+           secondary (2),
+           fallback (3),
+           standby (4),
+           internal(5),
+           holdover(6)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Read-Only: Displays which timing source is currently in use by the system"
+       ::= { adGenSystemTimingStatus 1 }
+
+   adGenSystemTimingLoopAClockHealth      OBJECT-TYPE
+       SYNTAX       AdGenSystemTimingSourceHealth
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "Displays the health of the loop A timing source"
+       ::= { adGenSystemTimingStatus 2 }
+
+   adGenSystemTimingLoopBClockHealth      OBJECT-TYPE
+       SYNTAX       AdGenSystemTimingSourceHealth
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "Displays the health of the loop B timing source"
+       ::= { adGenSystemTimingStatus 3 }
+
+   adGenSystemTimingBitsAClockHealth      OBJECT-TYPE
+       SYNTAX      AdGenSystemTimingSourceHealth
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "Displays the health of the bits A timing source"
+       ::= { adGenSystemTimingStatus 4 }
+
+   adGenSystemTimingBitsBClockHealth      OBJECT-TYPE
+       SYNTAX       AdGenSystemTimingSourceHealth
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "Displays the health of the bits B timing source"
+       ::= { adGenSystemTimingStatus 5 }
+
+   adGenSystemTimingPrimaryClockHealth      OBJECT-TYPE
+       SYNTAX       AdGenSystemTimingSourceHealth
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "Displays the health of the primary timing source"
+       ::= { adGenSystemTimingStatus 6 }
+
+   adGenSystemTimingSecondaryClockHealth      OBJECT-TYPE
+       SYNTAX       AdGenSystemTimingSourceHealth
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "Displays the health of the secondary timing source"
+       ::= { adGenSystemTimingStatus 7 }
+
+   adGenSystemTimingCurrentHopCount       OBJECT-TYPE
+       SYNTAX                    INTEGER (1..255)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The number of hops for the current timing source."
+       ::= { adGenSystemTimingStatus 8 }
+
+   adGenSystemTimingCurrentTimingSourcePriority     OBJECT-TYPE
+       SYNTAX       INTEGER (0..255)
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "The priority value for the current timing source."
+       ::= { adGenSystemTimingStatus 9 }
+
+   adGenSystemTimingCurrentTimingSourceQuality      OBJECT-TYPE
+       SYNTAX         AdGenTimingSourceQuality
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION
+           "The quality of the current timing source."
+       ::= { adGenSystemTimingStatus 10 }             
+       
+   adGenSystemTimingPrimaryHopCount       OBJECT-TYPE
+       SYNTAX                    INTEGER (1..255)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The number of hops for the primary timing source."
+       ::= { adGenSystemTimingStatus 11 }
+
+   adGenSystemTimingPrimaryTimingSourcePriority     OBJECT-TYPE
+       SYNTAX       INTEGER (0..255)
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "The priority value for the primary timing source."
+       ::= { adGenSystemTimingStatus 12 }
+
+   adGenSystemTimingPrimaryTimingSourceQuality      OBJECT-TYPE
+       SYNTAX         AdGenTimingSourceQuality
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION
+           "The quality of the primary timing source."
+       ::= { adGenSystemTimingStatus 13 }          
+       
+   adGenSystemTimingSecondaryHopCount       OBJECT-TYPE
+       SYNTAX                    INTEGER (1..255)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The number of hops for the secondary timing source."
+       ::= { adGenSystemTimingStatus 14 }
+
+   adGenSystemTimingSecondaryTimingSourcePriority     OBJECT-TYPE
+       SYNTAX       INTEGER (0..255)
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "The priority value for the secondary timing source."
+       ::= { adGenSystemTimingStatus 15 }
+
+   adGenSystemTimingSecondaryTimingSourceQuality      OBJECT-TYPE
+       SYNTAX         AdGenTimingSourceQuality
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION
+           "The quality of the secondary timing source."
+       ::= { adGenSystemTimingStatus 16 }
+             
+   adGenSystemTimingFallbackHopCount       OBJECT-TYPE
+       SYNTAX                    INTEGER (1..255)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The number of hops for the fallback timing source."
+       ::= { adGenSystemTimingStatus 17 }
+
+   adGenSystemTimingFallbackTimingSourcePriority     OBJECT-TYPE
+       SYNTAX       INTEGER (0..255)
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "The priority value for the fallback timing source."
+       ::= { adGenSystemTimingStatus 18 }
+
+   adGenSystemTimingFallbackTimingSourceQuality      OBJECT-TYPE
+       SYNTAX         AdGenTimingSourceQuality
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION
+           "The quality of the fallback timing source."
+       ::= { adGenSystemTimingStatus 19 }
+
+
+
+
+-- -------------------------------------
+-- System Timing Alarms
+-- -------------------------------------
+
+      adGenSystemTimingSrcSwitch         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSystemTimingCurrentSource
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the system timing source has occured a protection switch."
+
+         --#TYPE         "Status - TimingSrc Switch"
+         --#SUMMARY      "TA5000 system timing: Timing Source Switch"
+         --#SUMMARY      "Shelf: %s curSrc: %d"
+         --#ARGUMENTS    {1 ,2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenSystemTimingAlarms 1 }
+
+   adGenSystemTimingPriSrcClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the primary timing source alarm has cleared"
+
+         --#TYPE         "Status - Primary Timing Src Alarm Clear"
+         --#SUMMARY      "TA5000 system timing: Timing Source Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenSystemTimingAlarms 2 }
+
+   adGenSystemTimingPriSrcFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the primary timing source has failed"
+
+         --#TYPE         "Status - Primary Timing Src Alarm Active"
+         --#SUMMARY      "TA5000 system timing: Timing Source Failure on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenSystemTimingAlarms 3 }
+
+   adGenSystemTimingSecSrcClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the secondary timing source alarm has cleared"
+
+         --#TYPE         "Status - Secondary Timing Src Alarm Clear"
+         --#SUMMARY      "TA5000 system timing: Timing Source Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenSystemTimingAlarms 4 }
+
+   adGenSystemTimingSecSrcFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the secondary timing source has failed"
+
+         --#TYPE         "Status - Secondary Timing Src Alarm Active"
+         --#SUMMARY      "TA5000 system timing: Timing Source Failure on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenSystemTimingAlarms 5 }
+
+
+END
+

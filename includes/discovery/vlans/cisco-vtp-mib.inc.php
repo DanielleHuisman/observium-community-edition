@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -72,8 +72,8 @@ switch ($vtpversion) {
 $check_ports_vlans = isset($config['os'][$device['os']]['snmp']['virtual']) &&
                      $config['os'][$device['os']]['snmp']['virtual'];
 if ($check_ports_vlans && is_device_mib($device, 'Q-BRIDGE-MIB')) {
-    // This shit only seems to work on Cisco (probably only IOS/IOS-XE and NX-OS)
-    // But don't worry, walking do only if vlans previously found
+    // This shit only seems to work on Cisco (probably only IOS/IOS-XE and NX-OS),
+    // But doesn't worry, walking do only if vlans previously found
 
     $ios_version = explode('(', $device['version'])[0];
 
@@ -81,8 +81,8 @@ if ($check_ports_vlans && is_device_mib($device, 'Q-BRIDGE-MIB')) {
         // Already configured snmp context
         print_warning("WARNING: Device already configured with SNMP context, polling ports vlans not possible.");
         $check_ports_vlans = FALSE;
-    } elseif ($device['snmp_version'] === 'v3' && $device['os'] === "ios" && ($ios_version * 10) <= 121) {
-        // vlan context not worked on Cisco IOS <= 12.1 (SNMPv3)
+    } elseif ($device['snmp_version'] === 'v3' && $device['os'] === "ios" && version_compare($ios_version, '12.1', '<=')) {
+        // vlan context isn't worked on Cisco IOS <= 12.1 (SNMPv3)
         print_error("ERROR: For VLAN context to work on this device please use SNMP v2/v1 for this device (or upgrade IOS).");
         $check_ports_vlans = FALSE;
     }

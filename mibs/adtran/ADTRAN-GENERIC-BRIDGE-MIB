@@ -1,0 +1,1772 @@
+ADTRAN-GENERIC-BRIDGE-MIB
+
+-- TITLE:     The ADTRAN GENERIC BRIDGING MIB
+-- PRODUCT:   ADTRAN MSAP PRODUCTS
+-- VERSION:   1.0
+-- DATE:      02/11/2007
+-- AUTHOR:    Peter Som de Cerff
+-- STATUS:    PRELIMINARY
+--
+-- This MIB defines the object identifiers (OID) for the
+-- ADTRAN GENERIC Bridge MIB objects
+--
+-- The generic bonding model follows the general approach of the
+-- ATM IMA model published by the ATM Forum.
+-- The intent is for the generic MIB described here to form the basis of multiple
+-- bonding and bridging solutions, with helper MIBs as necessary for the
+-- specific needs of each application.
+-- Applications to be supported by this MIB include:
+--      EFM Any Port Bonding
+--      For this application, GenBridge provides the bonding layer model,
+--      and GenEFM will continue to provide the statistics and alarm MIBs.
+--  TR101 Aggregation
+--      For this application, GenBridge provides the bridging layer model,
+--      and GenTR101 will be created to provide bridge/port descriptors
+--      and support any necessary statistics and alarm MIBs.
+--  ML-PPP Cross-slot Bonding
+--      Future helper MIB for stats and so forth.
+--  ATM IMA Cross-slot Bonding
+--      GenBridge provides the bonding layer, while the IMA MIB will
+--      continue to provide the statistics and alarm MIBs.  Test and OAM needs TBD.
+--  Ethernet Link Aggregation
+--      Future consideration.
+--  Ethernet Provider Bridging
+--      Future consideration.
+--  DSL Cross-slot Bonding
+--      Should support Ethernet or ATM cross-slot bonding, akin to EFM or IMA
+--  DS1 CES Transport
+--      Will require PHYL cross-connect table, TBD.
+--  DS0 CES Switching
+--      Possible future consideration.
+--
+-- The intent is for this MIB to augment, but not in general to replace, the existing
+-- Adtran GenEFM MIB and the ATM Forum IMA MIB (partially replaced).
+-- This MIB is expected to augment the GenEthernet MIB, and to be augmented by
+-- additional application-specific MIBs.
+--
+-- This MIB defines the following entities:
+-- (1) Bridge table (for various bridging and bonding types)
+-- (2) PHYL-Bridge mapping table (for adding physical links to bridges)
+-- (3) PHYL assignment table (for displaying physical links)
+-- (4) Easy Bridge Creation Table (simplified way of creating bridges in the bridge table)
+-- (5) Bridge Name - IfIndex lookup table (specify a name and retrieve an IfIndex)
+--
+-- HISTORY:
+-- 02/11/07 pcs STATUS: PRELIMINARY.
+-- 03/01/07 pcs Updated structures and added details per comments.  STATUS: PRELIMINARY.
+-- 03/12/07 djb Removed PHYL table. Changed "BridgeGroup" to "Bridge". Removed txId and rxId
+--              from the Bridge table. Added PHYL-Bridge mapping table. Added a table to
+--              display the available PHYLs in the system and their current status.
+--              STATUS: PRELIMINARY
+-- 03/16/07 aed Changed enum definition for textual convention adGenBridgeType.
+--              Use "notProvisioned" rather than "default."
+-- 03/28/07 aed Corrected module identity definition, and placed this MIB under genTa5k.
+--              Corrected compiler warnings about mixing read-write and read-create columns
+--              in the same table.
+-- 04/04/07 aed Added a bridge type for link aggregation
+--              Added new objects for bandwidth management.
+--              Changed protection parameters to read-only.
+-- 04/05/07 aed Modified indexing to correct errors found on smic compile.
+--              Added a new bridge type for a mac-switched bridge.
+-- 10/26/07 twc Removed "unknown" enum from AdGenBridgeOperStatus.
+-- 11/08/07 twc Added enums noLinksInGroup(4) and upPartial(5) to AdGenBridgeOperStatus. This list now matches
+--		AdGenEFMGroupStatus in genefm.mi2 mib.
+-- 11/29/07 mcr Added protection alarms and fix AdGenBridgeManualSwitch to include enable/disable
+-- 11/06/07 jga Added GenEasyBridge and GenBridgeNameLookup tables
+-- 02/05/08 aed Fixed some errors found by the SMIC compiler.
+-- 02/20/08 aed Changed adGenEasyBridgeStatusString to be 1..255.
+--              Modified the type and description for adGenBridgeProtectionState
+-- 02/25/08 twc Added adGenBridgeLockoutProtectionAlmACT and adGenBridgeLockoutProtectionAlmCLR Alarm Traps.
+-- 03/07/08 twc Corrected adGenEasyBridgeMemberPhyls comment.
+-- 04/23/08 twc Removed unnecessary import of SnmpAdminString, also added ifIndex import from IF-MIB.
+-- 08/26/08 dcc Added ATM bridge type
+--              DO NOT ADD REVISION INFORMATION HERE.
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        TimeTicks, Integer32, Unsigned32,NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+        sysName
+            FROM SNMPv2-MIB
+        DisplayString, RowStatus, TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+        ifIndex,
+        InterfaceIndex
+            FROM IF-MIB
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+        adGenBridge, adGenBridgeID
+            FROM ADTRAN-GENTA5K-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB
+        ;
+
+    adGenBridgeMIB MODULE-IDENTITY
+        LAST-UPDATED "201112230000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Generic Bridge MIB"
+            
+        REVISION "201112230000Z"
+        DESCRIPTION  "Added new Table, adGenBridgeBulkInstanceTable, and OID,adGenBridgeBulkInstance, for TLV instance number"
+
+        REVISION "201112010000Z"
+        DESCRIPTION  "Added adGenBridgeCount "
+        
+        REVISION "201108100000Z"
+        DESCRIPTION  "Added adGenBridgeSecondaryUpstreamRate and adGenBridgeSecondaryDownstreamRate"
+
+        REVISION "201104180000Z"
+        DESCRIPTION  "Added adGenBridgeAlarmSuppress"
+
+        ::= {adGenBridgeID 1}
+
+-- OBJECT IDENTIFIERS
+adGenBridgeMIBObjects       OBJECT IDENTIFIER ::= {adGenBridge 1}
+adGenEasyBridgeMIBObjects   OBJECT IDENTIFIER ::= {adGenBridge 2}
+adGenBridgeAlarmsPrefix     OBJECT IDENTIFIER ::= {adGenBridge 3}
+adGenBulkBridge             OBJECT IDENTIFIER ::= {adGenBridge 4}
+adGenBridgeAlarms           OBJECT IDENTIFIER ::= {adGenBridgeAlarmsPrefix 0}
+
+
+-- **********************************************************************
+-- Textual Conventions
+-- **********************************************************************
+AdGenBridgeProtMode ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Specifies the protection mode of a particular bridge.
+             Unsupported indicates that the particular bridge cannot support
+             protection. Unprotected indicates that the particular bridge
+             could support protection but chooses not to."
+        SYNTAX   INTEGER {
+          unsupported(1),
+          unprotected(2),
+          protected(3)
+          }
+
+AdGenBridgeProtAvail ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Indicates if the selected protection slot is available
+             for protection switchover."
+        SYNTAX   INTEGER {
+          unsupported(1),
+          unavailable(2),
+          available(3)
+          }
+
+AdGenBridgeProtState ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Indicates if the protection card is actively running this bonding
+             group."
+        SYNTAX   INTEGER {
+          unsupported(1),
+          unprotected(2),
+          protected(3)
+          }
+
+AdGenBridgeOperStatus ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "The value determines the operational status of a
+            bridge or cross-connect. The up and down
+            states indicate that the traffic flow is enabled
+            or disabled respectively on the bridge or
+            cross-connect."
+        SYNTAX   INTEGER {
+           up(1),
+           down(2),
+           testing(3),
+           noLinksInGroup(4),
+           upPartial(5)
+           }
+
+AdGenBridgePhylOperStatus ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "The current operational status of the Bridge-PHYL
+            mapping indicating if the physical link is actively
+            participating in the Bridge. This can be down if the
+            row status of the BridgePhyl Map entry is down, the
+            row status of the Bridge is down, or the physical link is down."
+        SYNTAX   INTEGER {
+           up(1),
+           down(2),
+           testing(3),
+           unknown(4)
+           }
+
+AdGenBridgeType ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "This value indicates the particular type of bridge, such
+             as EFM, TR101, IMA, etc. The enumeration should be updated
+             for each new bridge type that is created."
+        SYNTAX   INTEGER {
+           notProvisioned(1),
+           efm(2),
+           tr101(3),
+           ima(4),
+           linkAggregation(5),
+           macSwitched(6),
+           ppp(7),
+           atm(8)
+           }
+
+AdGenBridgeRateControl ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "This value indicates the rate control is enabled or not"
+        SYNTAX   INTEGER {
+           rateControlOn(1),
+           rateControlOff(2)
+           }
+
+AdGenBridgeLastChange ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The value of MIB II's sysUpTime at the time a
+            virtual link or cross-connect entered its current
+            operational state. If the current state was
+            entered prior to the last re-initialization of the
+            agent then this object contains a zero value."
+        SYNTAX   TimeTicks
+
+AdGenBridgeAlarmSuppress ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+                "Indicates whether or not alarms will be generated
+                 by this interface.  It is only applicable if
+                 rowStatus = active."
+        SYNTAX  INTEGER {
+                suppress(1),
+                noSuppress(2)
+                }
+
+AdGenBridgePhylInstalled ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+                "Indicates whether or not the physical interface
+                 associated with this PHYL exists."
+        SYNTAX  INTEGER {
+                uninstalled(1),
+                installed(2)
+                }
+-- **********************************************************************
+-- Textual Conventions - Bonding Engine Protection Related
+-- **********************************************************************
+AdGenBridgeProtectionRevertiveSwitch ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+                "Indicates whether Revertive Switch is enabled or disabled."
+        SYNTAX  INTEGER {
+                enabled(1),
+                disabled(2)
+                }
+
+AdGenBridgeProtectionLockout ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+                "Indicates whether Lockout is enabled or disabled."
+        SYNTAX  INTEGER {
+                enabled(1),
+                disabled(2)
+                }
+
+AdGenBridgeManualSwitch ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+                "Triggers a switch to protected or Non Protected."
+        SYNTAX  INTEGER {
+                switchToProtect(1),
+                switchToNonProtect(2)
+                }
+
+AdGenProtectionVersion ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Version indicates the capacity of protection module. Whether the Protection
+            Module is capable of protecting the Protected Modules. A higher version (capacity)
+            Protection Module can be compatible with a lower version of Protected Modules."
+        SYNTAX   INTEGER {
+           notsupported(0),
+           version1(1)
+           }
+
+
+-- **********************************************************************
+-- Configuration
+-- **********************************************************************
+-- Module (card) level configuration table, indicates maximum values
+-- supported by each card as well as the currently configured number
+
+adGenBridgeModuleConfTable  OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgeModuleConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This table contains global bridge configuration
+            parameters, per populated card slot."
+          ::= { adGenBridgeMIBObjects 1 }
+
+adGenBridgeModuleConfEntry    OBJECT-TYPE
+          SYNTAX         AdGenBridgeModuleConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This list contains bridge group limits per module ."
+          INDEX { adGenSlotInfoIndex }
+          ::= { adGenBridgeModuleConfTable  1}
+
+AdGenBridgeModuleConfEntry    ::= SEQUENCE  {
+          adGenBridgeModuleMaxBridges           INTEGER,
+          adGenBridgeModuleMaxPhyls             INTEGER,
+          adGenBridgeModuleConfBridges          INTEGER,
+          adGenBridgeModuleConfPhyls            INTEGER,
+          adGenBridgeModuleMaxBandwidth         Integer32,
+          adGenBridgeModuleConfBandwidth        Integer32
+          }
+
+adGenBridgeModuleMaxBridges OBJECT-TYPE
+          SYNTAX         INTEGER  (0..100)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of bridges this module will support. "
+          ::= { adGenBridgeModuleConfEntry 1}
+
+adGenBridgeModuleMaxPhyls OBJECT-TYPE
+          SYNTAX         INTEGER  (0..2200)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The total number of physical links that may be mapped to
+            bridges on the module, including active and inactive mappings."
+          ::= { adGenBridgeModuleConfEntry 2}
+
+adGenBridgeModuleConfBridges OBJECT-TYPE
+          SYNTAX         INTEGER  (0..100)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current number of bridges configured on the module."
+          ::= { adGenBridgeModuleConfEntry 3}
+
+adGenBridgeModuleConfPhyls OBJECT-TYPE
+          SYNTAX         INTEGER  (0..2200)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The total number of physical links currently mapped to
+            bridges on the module, including in-service and
+            out-of-service mappings."
+          ::= { adGenBridgeModuleConfEntry 4}
+
+adGenBridgeModuleMaxBandwidth OBJECT-TYPE
+          SYNTAX        Integer32
+          MAX-ACCESS    read-write
+          STATUS        current
+          DESCRIPTION
+          "The maximum bandwith allocated for this module in kbps."
+          ::= { adGenBridgeModuleConfEntry 5}
+
+adGenBridgeModuleConfBandwidth OBJECT-TYPE
+          SYNTAX        Integer32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+          "The bandwidth currently being used by this module in kbps."
+          ::= { adGenBridgeModuleConfEntry 6}
+          
+          
+--==================================================================================================================
+-- Bulk Bridge instance
+--==================================================================================================================
+
+    adGenBridgeBulkInstanceTable
+     OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenBridgeBulkInstanceEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Table contains instances that are created when there is a request to a bulk bridge instance."
+       ::= { adGenBulkBridge 1 }
+
+    adGenBridgeBulkInstanceEntry OBJECT-TYPE
+       SYNTAX      AdGenBridgeBulkInstanceEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Index is the slot number."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adGenBridgeBulkInstanceTable 1 }
+
+    AdGenBridgeBulkInstanceEntry ::=
+       SEQUENCE {
+           adGenBridgeBulkInstance           Integer32
+       }
+
+    adGenBridgeBulkInstance     OBJECT-TYPE
+       SYNTAX                           Integer32
+       MAX-ACCESS                       read-only
+       STATUS                           current
+       DESCRIPTION
+           "Used to index the TlV table; Each time this is called by slot it
+            creates an instance for that viewer. Once an instance is created, it may
+            be found by doing a get on adTa5kTlvBySlotInstance with the instance 
+            number"
+        ::= { adGenBridgeBulkInstanceEntry 1 }
+
+-- **********************************************************************
+-- Provisioning
+-- **********************************************************************
+-- Bridge entity, providing multi-link any port bonding of PHYL interfaces
+
+adGenBridgeStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Bridge entities."
+         ::= { adGenBridgeMIBObjects 2 }
+
+adGenBridgeTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgeEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Bridge table.  A unique Bridge is created
+            for every bonding or bridging instance, with an associated
+            type that determines its functionality."
+          ::= { adGenBridgeMIBObjects 3}
+
+adGenBridgeEntry         OBJECT-TYPE
+          SYNTAX         AdGenBridgeEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the Bridge table.  This entry is
+            used to model a single instance of an aggregation
+            (bridging or bonding) engine."
+          INDEX  {adGenBridgeIfIndex}
+          ::= { adGenBridgeTable  1}
+
+     AdGenBridgeEntry    ::= SEQUENCE  {
+          adGenBridgeIfIndex               InterfaceIndex,
+          adGenBridgeType                  AdGenBridgeType,
+          adGenBridgeName                  DisplayString,
+          adGenBridgeProtMode              AdGenBridgeProtMode,
+          adGenBridgeProtAvail             AdGenBridgeProtAvail,
+          adGenBridgeProtState             AdGenBridgeProtState,
+          adGenBridgeProtSlot              Unsigned32,
+          adGenBridgeMinNumActivePhyls     INTEGER,
+          adGenBridgeOperStatus            AdGenBridgeOperStatus,
+          adGenBridgeLastChange            AdGenBridgeLastChange,
+          adGenBridgeNumCfgEVPLs           INTEGER,
+          adGenBridgeNumCfgEVCLs           INTEGER,
+          adGenBridgeNumCfgPhyls           INTEGER,
+          adGenBridgeNumActPhyls           INTEGER,
+          adGenBridgeLastError             DisplayString,
+          adGenBridgeRowStatus             RowStatus,
+          adGenBridgeMaxBandwidth          Integer32,
+          adGenBridgeCurrentBandwidth      Integer32,
+          adGenBridgeUpstreamRate          Unsigned32,
+          adGenBridgeDownstreamRate        Unsigned32,
+          adGenBridgeCurrentUpstreamRate   Unsigned32,
+          adGenBridgeCurrentDownstreamRate Unsigned32,
+          adGenBridgeRateControl           AdGenBridgeRateControl,
+          adGenBridgeAlarmSuppress         AdGenBridgeAlarmSuppress,
+          adGenBridgeSecondaryUpstreamRate    Unsigned32,
+          adGenBridgeSecondaryDownstreamRate    Unsigned32
+}
+
+adGenBridgeIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the interface associated
+            with this Bridge. The IANA type should be linegroup (210)."
+          ::= { adGenBridgeEntry 1 }
+
+adGenBridgeType OBJECT-TYPE
+          SYNTAX         AdGenBridgeType
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The intended type of this bridge EFM, IMA, TR-101, etc."
+          ::= { adGenBridgeEntry 2 }
+
+adGenBridgeName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this Bridge."
+          ::= { adGenBridgeEntry 3 }
+
+adGenBridgeProtMode OBJECT-TYPE
+          SYNTAX         AdGenBridgeProtMode
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The protection mode of the group single-slot (not protectable),
+             unprotected (but potentially protectable), or protected."
+          ::= { adGenBridgeEntry 4 }
+
+adGenBridgeProtAvail OBJECT-TYPE
+        SYNTAX         AdGenBridgeProtAvail
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "Indicates if the selected protection slot is available
+             for protection switchover."
+          ::= { adGenBridgeEntry 5 }
+
+adGenBridgeProtState OBJECT-TYPE
+        SYNTAX         AdGenBridgeProtState
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "Indicates if the protection card is actively running this bridge."
+          ::= { adGenBridgeEntry 6 }
+
+
+adGenBridgeProtSlot OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "A bit map of Protection Module slots part of this Protection Group.
+            Slot 1  0x00000001
+            Slot 2  0x00000002
+            Slot 3  0x00000004
+            Slot 4  0x00000008
+            Slot 5  0x00000010
+                        |
+                        |
+            Slot 30 0x20000000
+            Slot 31 0x40000000
+            Slot 32 0x80000000
+            For all slots ranging from slot 1 to 32 (inclusive of both), the
+            value will be 0xFFFFFFFF (4294967295)"
+          ::= { adGenBridgeEntry 7 }
+
+adGenBridgeMinNumActivePhyls OBJECT-TYPE
+          SYNTAX         INTEGER (1..16)
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The minimum number of active PHYLS that have
+            to be mapped to this group before the OperStatus
+            of the bridge can be declared to be 'up'.
+            If the active number ever drops below this number
+            then the Bridge will enter an OperStatus of 'down'"
+          ::= { adGenBridgeEntry 8 }
+
+
+adGenBridgeOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenBridgeOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the local end of the group."
+          ::= { adGenBridgeEntry 9}
+
+adGenBridgeLastChange    OBJECT-TYPE
+          SYNTAX         AdGenBridgeLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            Bridge group entered its current operational state."
+          ::= { adGenBridgeEntry 10 }
+
+adGenBridgeNumCfgEVPLs  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of EVPLs currently assigned against the ifIndex
+           of this bridge. This value is incremented by the agent
+           upon the creation of an EVPL against this bridge and
+           decremented upon the deletion of an EVPL that was assigned
+           against this bridge."
+          ::= { adGenBridgeEntry 11}
+
+adGenBridgeNumCfgEVCLs  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of EVCLs currently assigned against the ifIndex
+           of this bridge. This value is incremented by the agent
+           upon the creation of an EVCL against this bridge and
+           decremented upon the deletion of an EVCL that was assigned
+           against this bridge."
+          ::= { adGenBridgeEntry 12}
+
+adGenBridgeNumCfgPhyls  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..2200)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of PHYLs currently mapped to this bridge.
+           This value is incremented by the agent upon the creation
+           of a Bridge-PHYL mapping."
+          ::= { adGenBridgeEntry 13}
+
+adGenBridgeNumActPhyls  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..2200)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of PHYLs currently active
+           as part of this group."
+          ::= { adGenBridgeEntry 14}
+
+adGenBridgeLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenBridgeEntry 15 }
+
+adGenBridgeRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create a new row or modify or delete an
+            existing row in this table. Setting this value to 'active'
+            indicates that the Bridge is administratively In-Service.
+            Setting this value to 'inactive' indicates that the
+            Bridge is administratively 'Out-Of-Service'"
+          DEFVAL  { active }
+          ::= {adGenBridgeEntry 16}
+
+adGenBridgeMaxBandwidth    OBJECT-TYPE
+          SYNTAX        Integer32
+          MAX-ACCESS    read-create
+          STATUS        current
+          DESCRIPTION
+          "The maximum bandwidth allocated for this bridge in kbps."
+          ::= { adGenBridgeEntry 17 }
+
+adGenBridgeCurrentBandwidth  OBJECT-TYPE
+          SYNTAX        Integer32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+          "The bandwith currently used by this bridge in kpbs."
+          ::= { adGenBridgeEntry 18 }
+
+adGenBridgeUpstreamRate OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+            "The Upstream Rate configured on the bridge in kbps."
+          ::= { adGenBridgeEntry 19 }
+
+adGenBridgeDownstreamRate OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+            "The Downstream Rate configured on the bridge in kbps."
+          ::= { adGenBridgeEntry 20 }
+
+adGenBridgeCurrentUpstreamRate OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+            "The Upstream Rate current status on the bridge in kbps."
+          ::= { adGenBridgeEntry 21 }
+
+adGenBridgeCurrentDownstreamRate OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+            "The Downstream Rate current status on the bridge in kbps."
+          ::= { adGenBridgeEntry 22 }
+
+adGenBridgeRateControl OBJECT-TYPE
+          SYNTAX         AdGenBridgeRateControl
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+            "Mode that divides the bridge rates over the links.
+             Bridge Rate Control On is 1
+             Bridge Rate Control Off is 2"
+          ::= { adGenBridgeEntry 23 }
+
+adGenBridgeAlarmSuppress    OBJECT-TYPE
+          SYNTAX         AdGenBridgeAlarmSuppress
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+            "Indicates whether or not alarms will be generated
+             by this Bridge group.  It is only applicable if
+             rowStatus = active."
+          ::= { adGenBridgeEntry 24 }
+
+adGenBridgeSecondaryUpstreamRate OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+            "The Secondary Upstream Rate threshold configured on the bridge in kbps. This is only a threshold used to trigger an alarm.
+             A non-zero value enables the alarm associated with the provisioned threshold, default is disabled (0)"
+          ::= { adGenBridgeEntry 25 }
+
+adGenBridgeSecondaryDownstreamRate OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+            "The Secondary Downstream Rate threshold configured on the bridge in kbps. This is only a threshold used to trigger an alarm.
+             A non-zero value enables the alarm associated with the provisioned threshold, default is disabled (0)"
+          ::= { adGenBridgeEntry 26 }
+
+-- Bridge to Phyl mapping table.
+adGenBridgePhylMapStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Bridge-PHYL mappings."
+         ::= { adGenBridgeMIBObjects 4 }
+
+adGenBridgePhylMapTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgePhylMapEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Row creation adds/maps the physical link to a bridge."
+          ::= { adGenBridgeMIBObjects 5 }
+
+ adGenBridgePhylMapEntry OBJECT-TYPE
+          SYNTAX       AdGenBridgePhylMapEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the PHYL Map table.
+            This entry is represents one link that
+            is associated with a bridge."
+
+        INDEX { adGenBridgePhylMapBridgeIfIndex,
+                adGenBridgePhylMapPhylIfIndex
+              }
+          ::= { adGenBridgePhylMapTable 1 }
+
+     AdGenBridgePhylMapEntry ::= SEQUENCE {
+          adGenBridgePhylMapBridgeIfIndex       InterfaceIndex,
+          adGenBridgePhylMapPhylIfIndex         InterfaceIndex,
+          adGenBridgePhylMapOperStatus          AdGenBridgePhylOperStatus,
+          adGenBridgePhylMapLastChange          AdGenBridgeLastChange,
+          adGenBridgePhylMapLastError           DisplayString,
+          adGenBridgePhylMapRowStatus           RowStatus
+          }
+
+adGenBridgePhylMapBridgeIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the Bridge to which the physical link
+            is mapped."
+          ::= { adGenBridgePhylMapEntry 1 }
+
+adGenBridgePhylMapPhylIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the physical link."
+          ::= { adGenBridgePhylMapEntry 2 }
+
+adGenBridgePhylMapOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenBridgePhylOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the Bridge-PHYL mapping
+            indicating if the physical link is actively participating
+            in the Bridge. This can be down if the row status of the
+            BridgePhyl Map entry is down, the row status of the Bridge
+            is down, or the physical link is down."
+          ::= { adGenBridgePhylMapEntry 3}
+
+adGenBridgePhylMapLastChange    OBJECT-TYPE
+          SYNTAX         AdGenBridgeLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            Bridge-PHYL mapping entered its current operational state."
+          ::= { adGenBridgePhylMapEntry 4 }
+
+adGenBridgePhylMapLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenBridgePhylMapEntry 5 }
+
+adGenBridgePhylMapRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create a new row or modify or delete an
+            existing row in this table. Creating a row adds the
+            PHYL to the Bridge. Setting this value to 'active'
+            indicates that the Bridge-PHYL mapping is
+            administratively In-Service. Setting this value to
+            'Not-In-Service' indicates that the PHYL will no longer
+            participate in the bridge. This does not effect the physical link."
+          DEFVAL  { active }
+          ::= {adGenBridgePhylMapEntry 6}
+
+-- Phyl Status table.
+adGenBridgePhylStatusTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgePhylStatusEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+          "Displays the status of the available PHYLs in the system,
+           including which Bridge (if any) a PHYL is associated.
+           It also indicates the installed status of a certain
+           PHYL."
+          ::= { adGenBridgeMIBObjects 6 }
+
+ adGenBridgePhylStatusEntry OBJECT-TYPE
+          SYNTAX       AdGenBridgePhylStatusEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the PHYL Status table.
+            This entry is represents one link."
+
+        INDEX { adGenBridgePhylStatusPhylIfIndex }
+          ::= { adGenBridgePhylStatusTable 1 }
+
+     AdGenBridgePhylStatusEntry ::= SEQUENCE {
+          adGenBridgePhylStatusPhylIfIndex         InterfaceIndex,
+          adGenBridgePhylStatusBridgeIfIndex       InterfaceIndex,
+          adGenBridgePhylStatusBridgeType          AdGenBridgeType,
+          adGenBridgePhylStatusInstallStatus       AdGenBridgePhylInstalled,
+          adGenBridgePhylStatusOperStatus          AdGenBridgePhylOperStatus
+          }
+
+
+adGenBridgePhylStatusPhylIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the physical link. IANA type should be propVirtual(53)."
+          ::= { adGenBridgePhylStatusEntry 1 }
+
+adGenBridgePhylStatusBridgeIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the Bridge of which this
+            physical link is apart. A value of '0' indicates
+            that the link is currently not mapped to any
+            Bridge.  IANA type should be linegroup(210)."
+          ::= { adGenBridgePhylStatusEntry 2 }
+
+adGenBridgePhylStatusBridgeType    OBJECT-TYPE
+          SYNTAX         AdGenBridgeType
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Indicates the type (if any) of bridge with which this PHYL is associated."
+          ::= { adGenBridgePhylStatusEntry 3}
+
+adGenBridgePhylStatusInstallStatus    OBJECT-TYPE
+          SYNTAX         AdGenBridgePhylInstalled
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Indicates whether or not the physical interface associated with this PHYL
+            exists."
+          ::= { adGenBridgePhylStatusEntry 4}
+
+adGenBridgePhylStatusOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenBridgePhylOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the Bridge-PHYL Mapping. This status
+            should match the adGenBridgePhylMapOperStatus of the
+            corresponding row in the adGenBridgePhylMapTable.
+            The current operational status of the Bridge-PHYL
+            mapping indicates if the physical link is actively
+            participating in the Bridge. This can be down if the
+            row status of the BridgePhyl Map entry is down, the
+            row status of the Bridge is down, or the physical link is down."
+          ::= { adGenBridgePhylStatusEntry 5}
+
+-- **********************************************************************
+-- Bonding Engine Protection Provisioning
+-- **********************************************************************
+adGenBridgeProtectionGroupIndexNext OBJECT-TYPE
+      SYNTAX      INTEGER (1..10)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the next available Protection Group Index."
+      ::= { adGenBridgeMIBObjects 7 }
+
+adGenBridgeProtectionGroupStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Protection Group Creation."
+         ::= { adGenBridgeMIBObjects 8 }
+
+adGenBridgeProtectionGroupTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgeProtectionGroupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Bridge Protection Group table.  A unique Bridge Protection Group is created
+            to protect bonding engine. This fecilitates creating a Protection Group and
+            adding or removing Protection Slots (PM slots) and Protected Slots (AM slots) to or
+            from an existing Protection Groups. The Protection or Protected slots can be added
+            or removed when the Protection Group Row Status is in active state. The Last Error
+            string will return the error message if for some reason the slots cannot be added
+            (for e.g. Bridge Type mismatch) or the Protection Group cannot be created. There
+            are no variables in this table that needs to be set before the row status can be
+            set to active."
+          ::= { adGenBridgeMIBObjects 9}
+
+adGenBridgeProtectionGroupEntry         OBJECT-TYPE
+          SYNTAX         AdGenBridgeProtectionGroupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the Bridge Protection Group table.  This entry is
+            used to model a protection group for a protection engine."
+          INDEX  {adGenBridgeProtectionGroupGroupIndex}
+          ::= { adGenBridgeProtectionGroupTable  1}
+
+     AdGenBridgeProtectionGroupEntry    ::= SEQUENCE  {
+          adGenBridgeProtectionGroupGroupIndex            INTEGER,
+          adGenBridgeProtectionGroupBridgeType            AdGenBridgeType,
+          adGenBridgeProtectionGroupName                  DisplayString,
+          adGenBridgeProtectionGroupProtectingSlots       Unsigned32,
+          adGenBridgeProtectionGroupProtectedSlots        Unsigned32,
+          adGenBridgeProtectionGroupAddProtectingModule   INTEGER,
+          adGenBridgeProtectionGroupAddProtectedModule    INTEGER,
+          adGenBridgeProtectionGroupRmvProtectingModule   INTEGER,
+          adGenBridgeProtectionGroupRmvProtectedModule    INTEGER,
+          adGenBridgeProtectionGroupWaitToRestoreTime     INTEGER,
+          adGenBridgeProtectionGroupLastError             DisplayString,
+          adGenBridgeProtectionGroupRowStatus             RowStatus
+          }
+
+adGenBridgeProtectionGroupGroupIndex OBJECT-TYPE
+          SYNTAX         INTEGER (1..10)
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "A unique value to identify this Bridge Protection Group."
+          ::= { adGenBridgeProtectionGroupEntry 1 }
+
+adGenBridgeProtectionGroupBridgeType OBJECT-TYPE
+          SYNTAX         AdGenBridgeType
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Indicates the type of bridge this Protection Group is created for.
+           This must be compatible with the Protection and Protected Module slot
+           bridge type."
+          ::= { adGenBridgeProtectionGroupEntry 2 }
+
+adGenBridgeProtectionGroupName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this Protection Group."
+          ::= { adGenBridgeProtectionGroupEntry 3 }
+
+adGenBridgeProtectionGroupProtectingSlots OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "A bit map of Protection Module slots part of this Protection Group.
+           Displays the Protection Modules in this Protection Group.
+            Slot 1  0x00000001
+            Slot 2  0x00000002
+            Slot 3  0x00000004
+            Slot 4  0x00000008
+            Slot 5  0x00000010
+                        |
+                        |
+            Slot 30 0x20000000
+            Slot 31 0x40000000
+            Slot 32 0x80000000
+            For all slots ranging from slot 1 to 32 (inclusive of both), the
+            value will be 0xFFFFFFFF (4294967295)"
+          ::= { adGenBridgeProtectionGroupEntry 4 }
+
+adGenBridgeProtectionGroupProtectedSlots OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "A bit map of Bonding Engine slots to be protected (part of this Protection Group).
+           Displays the Protecting Modules in this Protection Group.
+            Slot 1  0x00000001
+            Slot 2  0x00000002
+            Slot 3  0x00000004
+            Slot 4  0x00000008
+            Slot 5  0x00000010
+                        |
+                        |
+            Slot 30 0x20000000
+            Slot 31 0x40000000
+            Slot 32 0x80000000
+            For all slots ranging from slot 1 to 32 (inclusive of both), the
+            value will be 0xFFFFFFFF (4294967295)"
+          ::= { adGenBridgeProtectionGroupEntry 5 }
+
+adGenBridgeProtectionGroupAddProtectingModule OBJECT-TYPE
+          SYNTAX         INTEGER (1..32)
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Add a Protecting Module (slot) to the Protection Group identified by
+           adGenBridgeProtectionGroupIndex."
+          ::= { adGenBridgeProtectionGroupEntry 6 }
+
+adGenBridgeProtectionGroupAddProtectedModule OBJECT-TYPE
+          SYNTAX         INTEGER (1..32)
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Add a Protected Module (slot) to the Protection Group identified by
+           adGenBridgeProtectionGroupIndex."
+          ::= { adGenBridgeProtectionGroupEntry 7 }
+
+adGenBridgeProtectionGroupRmvProtectingModule OBJECT-TYPE
+          SYNTAX         INTEGER (1..32)
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Remove a Protecting Module (slot) from the Protection Group identified by
+           adGenBridgeProtectionGroupIndex."
+          ::= { adGenBridgeProtectionGroupEntry 8 }
+
+adGenBridgeProtectionGroupRmvProtectedModule OBJECT-TYPE
+          SYNTAX         INTEGER (1..32)
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Remove a Protected Module (slot) from the Protection Group identified by
+           adGenBridgeProtectionGroupIndex."
+          ::= { adGenBridgeProtectionGroupEntry 9 }
+
+adGenBridgeProtectionGroupWaitToRestoreTime OBJECT-TYPE
+          SYNTAX         INTEGER(1..20)
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "In case of a revertive swicth, this indicates the time in minutes
+           to wait before a switch back can take place. Wait To Restore time is
+           set for the whole group and is applicable to all the Protected Slots
+           (AMs) in the group."
+          ::= { adGenBridgeProtectionGroupEntry 10 }
+
+adGenBridgeProtectionGroupLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced provisioning the Protection Group
+           or adding or removing Protection or Protected slots."
+          ::= { adGenBridgeProtectionGroupEntry 11 }
+
+adGenBridgeProtectionGroupRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create a new row or modify or delete an
+            existing row in this table. Creating a row adds either a Protected Module or
+            a Protecting Module to a Protection Group.
+            Setting this value to 'active' indicates that the Protection Group is
+            administratively In-Service. Setting this value to
+            'Not-In-Service' indicates that the Protection Group will not function or
+            the whole Protection Group is in Lockout."
+          DEFVAL  { active }
+          ::= {adGenBridgeProtectionGroupEntry 12}
+
+adGenBridgeProtectionTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgeProtectionEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Bridge Protection table containing protection related provisioning
+            for each of the Protected Modules or Protection Modules. This is
+            a static table for all the slots in the system. The Protected Modules and
+            Protection Modules forming a Protection Group are identified by the
+            adGenBridgeProtectionGroupTable."
+          ::= { adGenBridgeMIBObjects 10}
+
+adGenBridgeProtectionEntry         OBJECT-TYPE
+          SYNTAX         AdGenBridgeProtectionEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the Bridge Protection table. This entry is
+            used to provision the protection related parameters for bonding
+            engine protection. These parameters are provisioned for Protected
+            Module slots and Protection Module slots. This is a static table, a
+            row created for every slot in the system. These values are only
+            meaningful if they are part of a protection group, otherwise they are
+            ignored."
+          INDEX  {adGenSlotInfoIndex}
+          ::= { adGenBridgeProtectionTable  1}
+
+     AdGenBridgeProtectionEntry    ::= SEQUENCE  {
+          adGenBridgeProtectionGroupIndex            INTEGER,
+          adGenBridgeProtectionBridgeType            AdGenBridgeType,
+          adGenBridgeProtectionVersion               AdGenProtectionVersion,
+          adGenBridgeProtectionSlot                  INTEGER,
+          adGenBridgeProtectionState                 Integer32,
+          adGenBridgeProtectionPriority              INTEGER,
+          adGenBridgeProtectionRevertiveSwitch       AdGenBridgeProtectionRevertiveSwitch,
+          adGenBridgeProtectionLockout               AdGenBridgeProtectionLockout,
+          adGenBridgeProtectionManualSwitch          AdGenBridgeManualSwitch,
+          adGenBridgeProtectionManualSwitchTime      INTEGER,
+          adGenBridgeProtectionErrorStatus           DisplayString
+          }
+
+adGenBridgeProtectionGroupIndex OBJECT-TYPE
+          SYNTAX         INTEGER (0..2147483647)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Displays the Protection Group Index this slot is part of. If this slot
+           is not part of any Protection Group, then this value will be zero."
+          ::= { adGenBridgeProtectionEntry 1 }
+
+adGenBridgeProtectionBridgeType OBJECT-TYPE
+          SYNTAX         AdGenBridgeType
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This is the value read from the module that is plugged into the slot. If bridge
+           type of this module is incompatible with the Bridge Type of the Protection
+           Group this module is part of then an alarm will be generated. "
+          ::= { adGenBridgeProtectionEntry 2 }
+
+adGenBridgeProtectionVersion OBJECT-TYPE
+          SYNTAX         AdGenProtectionVersion
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This must be compatible with Protection and Protected Modules. A higher
+           version Protection Module can protect a lower or equal version Protected
+           module. This versioning is done to make sure that the Protection Module
+           has enough bandwidth capacity to protect the Protected Modules. This value
+           is read from the module that is plugged into the slot."
+          ::= { adGenBridgeProtectionEntry 3 }
+
+adGenBridgeProtectionSlot OBJECT-TYPE
+          SYNTAX         INTEGER (0..32)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This is a read only value and indicates the slot number of this entry."
+          ::= { adGenBridgeProtectionEntry 4 }
+
+adGenBridgeProtectionState OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This is a read only value and indicates state of the Protection or Protected Module.
+            A value of zero indicates the module plugged into this slot is not being protected
+            or is not protecting another module. A non-zero value indicates the module plugged
+            into this slot is being protected or is protecting another module. A non-zero value
+            contains the protecting module slot number and the protected module slot number
+            encoded with in it. Least significant 16 bits indicate the protected module slot and
+            most significant 16 bits indicate the protecting module slot."
+          ::= { adGenBridgeProtectionEntry 5 }
+
+adGenBridgeProtectionPriority OBJECT-TYPE
+          SYNTAX         INTEGER (0..32)
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "This is the priority of the Protected Modules within the protection
+           group in case priority protection is enabled. This value can be set to
+           zero. If all the Protected Modules priority is set to zero then priority
+           protection is disabled. Protected Modules with in a group can have equal
+           priority. This item is not intended for the Protection Module and is ignored."
+          ::= { adGenBridgeProtectionEntry 6 }
+
+adGenBridgeProtectionRevertiveSwitch OBJECT-TYPE
+          SYNTAX         AdGenBridgeProtectionRevertiveSwitch
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "Indicates whether revertive switch is enabled or not for this Protected
+           Module. This item is not intended for the Protection Module and is ignored."
+          ::= { adGenBridgeProtectionEntry 7 }
+
+adGenBridgeProtectionLockout OBJECT-TYPE
+          SYNTAX         AdGenBridgeProtectionLockout
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "Indicates whether lockout is enabled or not for this Module."
+          ::= { adGenBridgeProtectionEntry 8 }
+
+adGenBridgeProtectionManualSwitch OBJECT-TYPE
+          SYNTAX         AdGenBridgeManualSwitch
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "Indicates whether to do a manual switch to protection or to manual switch
+           back from protect. Not intended for the Protection Module and is ignored."
+          ::= { adGenBridgeProtectionEntry 9 }
+
+adGenBridgeProtectionManualSwitchTime OBJECT-TYPE
+          SYNTAX         INTEGER(1..10)
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "In case a manual switch is triggered, this time in minutes
+           indicates for how long the manual switch will be in effect. This
+           item is not intended for the Protection Module and is ignored."
+          ::= { adGenBridgeProtectionEntry 10 }
+
+adGenBridgeProtectionErrorStatus OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Displays error status in case the manual switch command fails."
+          ::= { adGenBridgeProtectionEntry 11 }
+
+    -- ======================================================================
+    --
+    adGenEasyBridgeIndexNext OBJECT-TYPE
+      SYNTAX      INTEGER (1..2147483647)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the next available EasyBridge index number."
+      ::= { adGenEasyBridgeMIBObjects 1 }
+
+    adGenEasyBridgeTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenEasyBridgeEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Activation of a row in this table causes the TA5000 to perform the following:
+            1) Verify that all pertinent parameters are set.
+            2) Verify that there are resources available to perform the requested operation
+            3) If resources are available then apply to the GenBridge and GenBridgePhylMap tables
+            This table abstracts the user from internal bandwidth constraints, AM incompatabilities, and
+            other TA5000 limitations that will change over time. If a requested operation cannot
+            occur then the status string will be set with an appropriate error."
+       ::= { adGenEasyBridgeMIBObjects 2 }
+
+   adGenEasyBridgeEntry OBJECT-TYPE
+       SYNTAX      AdGenEasyBridgeEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Each entry corresponds to a different bridge. An entry will be deleted after 2 minutes of
+           inactivity. This table is indexed by the values returned from the
+           adGenEasyBridgeIndexNext OID."
+       INDEX { adGenEasyBridgeIndex }
+       ::= { adGenEasyBridgeTable 1 }
+
+   AdGenEasyBridgeEntry ::=
+       SEQUENCE {
+           adGenEasyBridgeIndex              Integer32,
+           adGenEasyBridgeName               DisplayString,
+           adGenEasyBridgeType               AdGenBridgeType,
+           adGenEasyBridgeCreateOrModify     INTEGER,
+           adGenEasyBridgeUpstreamRate       Integer32,
+           adGenEasyBridgeDownstreamRate     Integer32,
+           adGenEasyBridgeMemberPhyls        DisplayString,
+           adGenEasyBridgeMinNumActivePhyls  Integer32,
+           adGenEasyBridgeStatusString       DisplayString,
+           adGenEasyBridgeRowStatus          RowStatus,
+           adGenEasyBridgeRateControl        AdGenBridgeRateControl,
+           adGenEasyBridgeAddMemberPhyls     DisplayString,
+           adGenEasyBridgeDeleteMemberPhyls  DisplayString
+       }
+
+   adGenEasyBridgeIndex OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+       "This is an arbitrary index assigned by the adGenEasyBridgeIndexNext
+       OID."
+       ::= { adGenEasyBridgeEntry 1 }
+
+   adGenEasyBridgeName OBJECT-TYPE
+       SYNTAX       DisplayString (SIZE (1..50))
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+       "This object must be set before a row is activated whether this row is
+       'Create' or 'Modify'. If it is 'Create' then this string will be set
+       in the adGenBridgeName OID. If the row is 'Modify' then this name
+       will only be used for lookup. Once a bridge is created the name
+       may not be changed.
+       DEFAULT: Empty String"
+       ::= { adGenEasyBridgeEntry 2 }
+
+    adGenEasyBridgeType OBJECT-TYPE
+          SYNTAX         AdGenBridgeType
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The intended type of this bridge EFM, IMA, TR-101, etc."
+          ::= { adGenEasyBridgeEntry 3 }
+
+   adGenEasyBridgeCreateOrModify OBJECT-TYPE
+       SYNTAX      INTEGER {
+                     create(1),
+                     modify(2)}
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This OID indicates if this row is attempting to create a new bridge
+       or modify an existing one. If the mode is 'create' then the bridge will
+       be created with the parameters in this table unless they are invalid
+       (such as an unspecified name). If the mode is 'modify' then only those
+       parameters that are not invalid will be applied.
+       DEFAULT: create"
+       ::= { adGenEasyBridgeEntry 4 }
+
+    adGenEasyBridgeUpstreamRate OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object specifies the rate of the bridge for the upstream direction in Kbps. This parameter
+           helps the agent determine the location of the bridge as well as the
+           rate of each of the links associated with this bridge. The rate must be
+           non-zero on a 'create' operation.
+           DEFAULT: 0"
+         ::= { adGenEasyBridgeEntry 5 }
+
+    adGenEasyBridgeDownstreamRate OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object specifies the rate of the bridge for the downstream direction in Kbps. This parameter
+           helps the agent determine the location of the bridge as well as the
+           rate of each of the links associated with this bridge. The rate must be
+           non-zero on a 'create' operation.
+           DEFAULT: 0"
+         ::= { adGenEasyBridgeEntry 6 }
+
+    adGenEasyBridgeMemberPhyls OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object is a comma delimited string of ifIndices. Each ifIndices
+           corresponds to a GenBridgePhyl that should be attached to the bridge.
+           This string must contain at least one ifIndex on a 'create' operation. For
+           example, if the user wanted to create a bridge with the following phyls
+           slot 1/port 1, slot 1/port 5, slot 10/port 3, slot 21/port 14, the string that
+           would represent this would be:
+           '23910101,23910105,23911003,23912114'.
+           DEFAULT: Empty String"
+         ::= { adGenEasyBridgeEntry 7 }
+
+    adGenEasyBridgeMinNumActivePhyls OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object specifies the genBridgeMinNumActivePhyls value. It must
+           always be at most the same number as phyls specified in
+           adGenEasyBridgeMemberPhyls. If the number of phyls specified by
+           adGenEasyBridgeMemberPhyls is greater than this object's value then
+           the user is trying to indicate the notion of spare links. This number must
+           be non-zero on a 'create' operation.
+           DEFAULT: 0"
+         ::= { adGenEasyBridgeEntry 8 }
+
+    adGenEasyBridgeStatusString OBJECT-TYPE
+       SYNTAX          DisplayString
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+           "This object indicates the status of the last attempted activation of this
+           row. It will indicate pass/fail status as well as reasons in the case of
+           a failure."
+         ::= { adGenEasyBridgeEntry 9 }
+
+    adGenEasyBridgeRowStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "For this row to go active all pertinent parameters must be set (see
+           individual parameter descriptions) as well as the agent must
+           be able to create a bridge or modify the selected bridge. If an activate
+           fails then the adGenEasyBridgeStatusString will be populated with
+           the failure reasons."
+         ::= { adGenEasyBridgeEntry 10 }
+
+    adGenEasyBridgeRateControl OBJECT-TYPE
+       SYNTAX          AdGenBridgeRateControl
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           ""
+         ::= { adGenEasyBridgeEntry 11 }
+
+    adGenEasyBridgeAddMemberPhyls OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object is a comma delimited string of ifIndices. This OID is referred
+           to when adGenEasyBridgeCreateOrModify is set to modify(2), which must be done
+           prior to setting this OID. Each ifIndex corresponds to a GenBridgePhyl that
+           should be added to the bridge. This string must contain at least one ifIndex.
+           For example, if the user wants to add the following phyls to a bridge;
+           slot 1/port 1, slot 1/port 5, slot 10/port 3, slot 21/port 14, the string
+           that would represent this would be: '23910101,23910105,23911003,23921014'.
+           DEFAULT: Empty String"
+         ::= { adGenEasyBridgeEntry 12 }
+
+    adGenEasyBridgeDeleteMemberPhyls OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object is a comma delimited string of ifIndices. This OID is referred
+           to when adGenEasyBridgeCreateOrModify is set to modify(2), which must be done
+           prior to setting this OID. Each ifIndex corresponds to a GenBridgePhyl that
+           should be delete from the bridge. This string must contain at least one ifIndex.
+           For example, if the user wants to delete the following phyls from a bridge;
+           slot 1/port 1, slot 1/port 5, slot 10/port 3, slot 21/port 14, the string
+           that would represent this would be: '23910101,23910105,23911003,23921014'.
+           DEFAULT: Empty String"
+         ::= { adGenEasyBridgeEntry 13 }
+
+-- Bridge Name Lookup Table - table indexed by the AdGenBridgeName and returns the ifIndex
+
+adGenBridgeBridgeNameLookupStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for lookups."
+         ::= { adGenBridgeMIBObjects 11 }
+
+adGenBridgeNameLookupTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenBridgeNameLookupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Bridge Name Lookup table. As each bridge receives a name
+            it is inserted into a lookup table along with it's ifIndex."
+          ::= { adGenBridgeMIBObjects 12}
+
+adGenBridgeNameLookupEntry         OBJECT-TYPE
+          SYNTAX         AdGenBridgeNameLookupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the Bridge Name Lookup table.  This entry is
+            used to store the bridge IfIndex and indexed by the name."
+          INDEX  {adGenBridgeNameLookupIndex}
+          ::= { adGenBridgeNameLookupTable  1}
+
+AdGenBridgeNameLookupEntry    ::= SEQUENCE  {
+      adGenBridgeNameLookupIndex          DisplayString,
+      adGenBridgeNameIfIndex              Unsigned32
+}
+
+adGenBridgeNameLookupIndex OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The sring name value of the the bridge enity"
+          ::= { adGenBridgeNameLookupEntry 1 }
+
+adGenBridgeNameIfIndex OBJECT-TYPE
+          SYNTAX         Unsigned32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The Bridge IfIndex that is retrieved from the table"
+          ::= { adGenBridgeNameLookupEntry 2 }
+
+adGenBridgeCount OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+            "The total number of bridges in the system."
+        ::= { adGenBridgeMIBObjects 13 }
+
+-- ******************************************************************************************
+
+-- Alarms
+--
+
+-- ********************************************
+-- Active/Clear Type Alarms
+-- ********************************************
+
+adGenBridgeNonProtectedAlmCLR    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Non-Protected"
+    --#TYPE         "Minor - Non-Protected"
+    --#SUMMARY      "Non-Protected Alarm "
+    --#SUMMARY      "cleared at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 2}
+
+adGenBridgeNonProtectedAlmACT    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Non-Protected"
+    --#TYPE         "Minor - Non Protected"
+    --#SUMMARY      "Non-Protected Alarm "
+    --#SUMMARY      "detected at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 3}
+
+adGenBridgeProtectedAlmCLR    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Protected"
+    --#TYPE         "Minor - Protected"
+    --#SUMMARY      "Protected Alarm "
+    --#SUMMARY      "cleared at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 4}
+
+adGenBridgeProtectedAlmACT    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Protected"
+    --#TYPE         "Minor - Protected"
+    --#SUMMARY      "Protected Alarm "
+    --#SUMMARY      "detected at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 5}
+
+adGenBridgeNeedsProtectionAlmCLR    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Needs-Protection"
+    --#TYPE         "Major - Needs-Protection"
+    --#SUMMARY      "Needs-Protection Alarm "
+    --#SUMMARY      "cleared at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MAJOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 6}
+
+adGenBridgeNeedsProtectionAlmACT    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Needs Protection"
+    --#TYPE         "Major - Needs Protection"
+    --#SUMMARY      "Needs-Protection Alarm "
+    --#SUMMARY      "detected at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MAJOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 7}
+
+adGenBridgeManualProtectionAlmCLR    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module ManualSwitch Protection"
+    --#TYPE         "Minor - Protect-ManualSw"
+    --#SUMMARY      "Protect-ManualSw Alarm "
+    --#SUMMARY      "cleared at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 8}
+
+adGenBridgeManualProtectionAlmACT    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module ManualSwitch Protection"
+    --#TYPE         "Minor - Protect-ManaulSw"
+    --#SUMMARY      "Protect-ManualSw Alarm "
+    --#SUMMARY      "detected at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 9}
+
+adGenBridgeLockoutProtectionAlmCLR    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Protection Lockout"
+    --#TYPE         "Minor - Protection Lockout-OFPR"
+    --#SUMMARY      "Protection Lockout Alarm "
+    --#SUMMARY      "cleared at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 10}
+
+adGenBridgeLockoutProtectionAlmACT    NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "Access Module Protection Lockout"
+    --#TYPE         "Minor - Protection Lockout-OFPR"
+    --#SUMMARY      "Protection Lockout Alarm "
+    --#SUMMARY      "detected at shelf: %s, slot: %d and port: %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Error Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenBridgeAlarms 11}
+
+
+END

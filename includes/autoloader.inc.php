@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -45,11 +45,12 @@ function observium_autoload($class_name) {
         case 'flight':
         case 'Flight':
             $class_file = array_pop($class_array) . '.php';
-            if (PHP_VERSION_ID >= 70400) {
-                // PHP 7.4+ (for 8.1 required)
-                $class_file = 'flight3/' . $class_file;
+            if (PHP_VERSION_ID < 70400) {
+                // Old compat version 1.x
+                // CLEANME. Remove this when a minimum php version is set to 7.4
+                $class_file = 'flight1/' . $class_file;
             } else {
-                // Old compat version
+                // PHP 7.4+ (for 8.1 required)
                 $class_file = 'flight/' . $class_file;
             }
             break;

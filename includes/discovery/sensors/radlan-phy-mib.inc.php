@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -135,21 +135,14 @@ foreach ($new_oids as $ifIndex => $entry1) {
             continue;
         }
 
-        switch ($entry['rlPhyTestGetUnits']) {
-            case 'microVolt':
-            case 'microAmper':
-            case 'microOham':
-            case 'microWatt':
-                $scale = si_to_scale('micro');
-                break;
-            case 'milidbm':
-                $scale = si_to_scale('milli');
-                break;
-            case 'decidbm':
-                $scale = si_to_scale('deci');
-                break;
-            default:
-                $scale = 1;
+        if (str_starts_with($entry['rlPhyTestGetUnits'], 'micro')) {
+            $scale = si_to_scale('micro');
+        } elseif (str_starts_with($entry['rlPhyTestGetUnits'], 'mili')) {
+            $scale = si_to_scale('milli');
+        } elseif (str_starts_with($entry['rlPhyTestGetUnits'], 'deci')) {
+            $scale = si_to_scale('deci');
+        } else {
+            $scale = 1;
         }
 
         $entry['ifIndex'] = $ifIndex;
@@ -289,10 +282,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 if (is_device_mib($device, 'ELTEX-MES-PHYSICAL-DESCRIPTION-MIB', FALSE)) {
                     // microWatt (really milli dBm)
                     $entry_limits = $oids[$ifIndex]['txOutput'];
-                    // $options['limit_high']      = value_to_si($entry_limits['eltPhdTransceiverThresholdHighAlarm']   * 0.000001, 'w', 'dbm');
-                    // $options['limit_high_warn'] = value_to_si($entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.000001, 'w', 'dbm');
-                    // $options['limit_low']       = value_to_si($entry_limits['eltPhdTransceiverThresholdLowAlarm']    * 0.000001, 'w', 'dbm');
-                    // $options['limit_low_warn']  = value_to_si($entry_limits['eltPhdTransceiverThresholdLowWarning']  * 0.000001, 'w', 'dbm');
+                    // $options['limit_unit']      = 'W';
                     $options['limit_high']      = $entry_limits['eltPhdTransceiverThresholdHighAlarm'] * 0.001;
                     $options['limit_high_warn'] = $entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.001;
                     $options['limit_low']       = $entry_limits['eltPhdTransceiverThresholdLowAlarm'] * 0.001;
@@ -313,10 +303,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 if (is_device_mib($device, 'ELTEX-MES-PHYSICAL-DESCRIPTION-MIB', FALSE)) {
                     // microWatt
                     $entry_limits = $oids[$ifIndex]['rxOpticalPower'];
-                    // $options['limit_high']      = value_to_si($entry_limits['eltPhdTransceiverThresholdHighAlarm']   * 0.000001, 'w', 'dbm');
-                    // $options['limit_high_warn'] = value_to_si($entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.000001, 'w', 'dbm');
-                    // $options['limit_low']       = value_to_si($entry_limits['eltPhdTransceiverThresholdLowAlarm']    * 0.000001, 'w', 'dbm');
-                    // $options['limit_low_warn']  = value_to_si($entry_limits['eltPhdTransceiverThresholdLowWarning']  * 0.000001, 'w', 'dbm');
+                    // $options['limit_unit']      = 'W';
                     $options['limit_high']      = $entry_limits['eltPhdTransceiverThresholdHighAlarm'] * 0.001;
                     $options['limit_high_warn'] = $entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.001;
                     $options['limit_low']       = $entry_limits['eltPhdTransceiverThresholdLowAlarm'] * 0.001;
@@ -339,10 +326,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 if (is_device_mib($device, 'ELTEX-MES-PHYSICAL-DESCRIPTION-MIB', FALSE)) {
                     // microWatt
                     $entry_limits = $oids[$ifIndex]['rxOpticalPower'];
-                    // $options['limit_high']      = value_to_si($entry_limits['eltPhdTransceiverThresholdHighAlarm']   * 0.000001, 'w', 'dbm');
-                    // $options['limit_high_warn'] = value_to_si($entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.000001, 'w', 'dbm');
-                    // $options['limit_low']       = value_to_si($entry_limits['eltPhdTransceiverThresholdLowAlarm']    * 0.000001, 'w', 'dbm');
-                    // $options['limit_low_warn']  = value_to_si($entry_limits['eltPhdTransceiverThresholdLowWarning']  * 0.000001, 'w', 'dbm');
+                    // $options['limit_unit']      = 'W';
                     $options['limit_high']      = $entry_limits['eltPhdTransceiverThresholdHighAlarm'] * 0.001;
                     $options['limit_high_warn'] = $entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.001;
                     $options['limit_low']       = $entry_limits['eltPhdTransceiverThresholdLowAlarm'] * 0.001;
@@ -365,10 +349,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 if (is_device_mib($device, 'ELTEX-MES-PHYSICAL-DESCRIPTION-MIB', FALSE)) {
                     // microWatt
                     $entry_limits = $oids[$ifIndex]['rxOpticalPower'];
-                    // $options['limit_high']      = value_to_si($entry_limits['eltPhdTransceiverThresholdHighAlarm']   * 0.000001, 'w', 'dbm');
-                    // $options['limit_high_warn'] = value_to_si($entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.000001, 'w', 'dbm');
-                    // $options['limit_low']       = value_to_si($entry_limits['eltPhdTransceiverThresholdLowAlarm']    * 0.000001, 'w', 'dbm');
-                    // $options['limit_low_warn']  = value_to_si($entry_limits['eltPhdTransceiverThresholdLowWarning']  * 0.000001, 'w', 'dbm');
+                    // $options['limit_unit']      = 'W';
                     $options['limit_high']      = $entry_limits['eltPhdTransceiverThresholdHighAlarm'] * 0.001;
                     $options['limit_high_warn'] = $entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.001;
                     $options['limit_low']       = $entry_limits['eltPhdTransceiverThresholdLowAlarm'] * 0.001;
@@ -391,10 +372,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 if (is_device_mib($device, 'ELTEX-MES-PHYSICAL-DESCRIPTION-MIB', FALSE)) {
                     // microWatt
                     $entry_limits = $oids[$ifIndex]['rxOpticalPower'];
-                    // $options['limit_high']      = value_to_si($entry_limits['eltPhdTransceiverThresholdHighAlarm']   * 0.000001, 'w', 'dbm');
-                    // $options['limit_high_warn'] = value_to_si($entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.000001, 'w', 'dbm');
-                    // $options['limit_low']       = value_to_si($entry_limits['eltPhdTransceiverThresholdLowAlarm']    * 0.000001, 'w', 'dbm');
-                    // $options['limit_low_warn']  = value_to_si($entry_limits['eltPhdTransceiverThresholdLowWarning']  * 0.000001, 'w', 'dbm');
+                    // $options['limit_unit']      = 'W';
                     $options['limit_high']      = $entry_limits['eltPhdTransceiverThresholdHighAlarm'] * 0.001;
                     $options['limit_high_warn'] = $entry_limits['eltPhdTransceiverThresholdHighWarning'] * 0.001;
                     $options['limit_low']       = $entry_limits['eltPhdTransceiverThresholdLowAlarm'] * 0.001;
@@ -406,7 +384,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 continue 2;
         }
         $value = $entry['rlPhyTestGetResult'];
-        discover_sensor_ng($device, $class, $mib, 'rlPhyTestGetResult', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, 'rlPhyTestGetResult', $oid, $index, $descr, $scale, $value, $options);
     }
 }
 

@@ -1,19 +1,18 @@
 CISCOSB-DIGITALKEYMANAGE-MIB DEFINITIONS ::= BEGIN
 
--- Title:                CISCOSB ROS
+-- Title: CISCOSB ROS
 --                       Private DIGITAL KEY MANAGE MIB
 -- Version:              7.50
 -- Date:                 26-Jan-2011
 
 IMPORTS
-    switch001                                               FROM CISCOSB-MIB
     OBJECT-TYPE, MODULE-IDENTITY                            FROM SNMPv2-SMI
-    DisplayString, RowStatus, DateAndTime, TruthValue       FROM SNMPv2-TC;
+    DisplayString, RowStatus, DateAndTime, TruthValue       FROM SNMPv2-TC
+    switch001                                                FROM CISCOSB-MIB;
 
 rlDigitalKeyManage MODULE-IDENTITY
                 LAST-UPDATED "200701020000Z"
                 ORGANIZATION "Cisco Systems, Inc."
-
                 CONTACT-INFO
                 "Postal: 170 West Tasman Drive
                 San Jose , CA 95134-1706
@@ -28,6 +27,21 @@ rlDigitalKeyManage MODULE-IDENTITY
                 DESCRIPTION
                       "Initial revision."
         ::= { switch001 86 }
+
+RlKeyChainKeyAuthType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Authentication key type"
+    SYNTAX INTEGER {
+        none (0),
+        simple-password (1),
+        md5 (2),
+        hmac-sha-1 (3),
+        hmac-sha-256 (4),
+        hmac-sha-384 (5),
+        hmac-sha-512 (6)
+    }
+
 
 rlMD5KeyChainTable OBJECT-TYPE
     SYNTAX  SEQUENCE  OF RlMD5KeyChainEntry
@@ -153,6 +167,143 @@ rlMD5KeyChainRowStatus OBJECT-TYPE
     DESCRIPTION
         "It is used to insert, update or delete an entry"
     ::= { rlMD5KeyChainEntry 10 }
+
+
+
+rlKeyChainMngTable OBJECT-TYPE
+    SYNTAX  SEQUENCE  OF RlKeyChainMngEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "Key-chains and keys"
+    ::=   { rlDigitalKeyManage 2 }
+
+rlKeyChainMngEntry   OBJECT-TYPE
+    SYNTAX  RlKeyChainMngEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+            "Key-chain with key ID that belongs to this chain"
+    INDEX  {rlKeyChainMngName, rlKeyChainMngKeyId}
+    ::=  { rlKeyChainMngTable 1 }
+
+RlKeyChainMngEntry ::= SEQUENCE {
+    rlKeyChainMngName                       DisplayString,
+    rlKeyChainMngKeyId                      INTEGER,
+    rlKeyChainMngKeyAuthType                RlKeyChainKeyAuthType,
+    rlKeyChainMngKey                        DisplayString,
+    rlKeyChainMngKeyStartAccept             DateAndTime,
+    rlKeyChainMngKeyStartGenerate           DateAndTime,
+    rlKeyChainMngKeyStopGenerate            DateAndTime,
+    rlKeyChainMngKeyStopAccept              DateAndTime,
+    rlKeyChainMngKeyValidForAccept          TruthValue,
+    rlKeyChainMngKeyValidForGenerate        TruthValue,
+    rlKeyChainMngRowStatus                  RowStatus
+}
+
+rlKeyChainMngName OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "Name of the key-chain to which belongs
+         the secret authentication key"
+    ::= { rlKeyChainMngEntry 1 }
+
+rlKeyChainMngKeyId OBJECT-TYPE
+    SYNTAX  INTEGER  (1..255)
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "A 8-bit identifier for the secret authentication key.
+         This identifier unique only for specific key chain"
+    ::= { rlKeyChainMngEntry 2 }
+
+rlKeyChainMngKeyAuthType OBJECT-TYPE
+    SYNTAX RlKeyChainKeyAuthType
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "A identifier for the secret authentication key type."
+    DEFVAL { none }
+    ::= { rlKeyChainMngEntry 3 }
+
+rlKeyChainMngKey OBJECT-TYPE
+    SYNTAX  DisplayString (SIZE (0..64))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The secret authentication key. Size is determined by rlKeyChainMngKeyType."
+    ::= { rlKeyChainMngEntry 4 }
+
+rlKeyChainMngKeyStartAccept OBJECT-TYPE
+    SYNTAX  DateAndTime
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        "The time that the router will start accepting packets
+          that have been created with the given key"
+    DEFVAL   { '00000000'H }
+    ::= { rlKeyChainMngEntry 5 }
+
+rlKeyChainMngKeyStartGenerate OBJECT-TYPE
+    SYNTAX  DateAndTime
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The time that the router will start using the key
+         for packet generation"
+    DEFVAL   { '00000000'H }
+    ::= { rlKeyChainMngEntry 6 }
+
+rlKeyChainMngKeyStopGenerate OBJECT-TYPE
+    SYNTAX  DateAndTime
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The time that the router will stop using the key
+         for packet generation"
+    DEFVAL   { 'FFFFFFFF'H }
+    ::= { rlKeyChainMngEntry 7 }
+
+rlKeyChainMngKeyStopAccept OBJECT-TYPE
+    SYNTAX  DateAndTime
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The time that the router will stop accepting packets
+          that have been created with the given key"
+    DEFVAL   { 'FFFFFFFF'H }
+    ::= { rlKeyChainMngEntry 8 }
+
+
+rlKeyChainMngKeyValidForAccept  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "A value of 'true' indicates that given key is valid for
+             accepting packets"
+    DEFVAL { false }
+    ::= { rlKeyChainMngEntry 9 }
+
+rlKeyChainMngKeyValidForGenerate  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "A value of 'true' indicates that given key is valid for
+             packet generation"
+    DEFVAL { false }
+    ::= { rlKeyChainMngEntry 10 }
+
+rlKeyChainMngRowStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        "It is used to insert, update or delete an entry"
+    ::= { rlKeyChainMngEntry 11 }
 
 
 END

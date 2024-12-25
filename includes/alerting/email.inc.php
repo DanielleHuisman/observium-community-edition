@@ -4,58 +4,83 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     alerting
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage alerting
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 // Find local hostname
 $localhost = get_localhost();
 
+$cfg         = $GLOBALS['config']['email'];
 $emails      = [];
 $mail_params = [];
 
 $emails[$endpoint['email']] = $endpoint['contact_descr'];
 
 // Mail backend params
-$backend = strtolower(trim($config['email']['backend']));
+$backend = strtolower(trim($cfg['backend']));
 switch ($backend) {
     case 'sendmail':
-        $mail_params['sendmail_path'] = $config['email']['sendmail_path'];
+        $sendmail_exec = explode(' ', $cfg['sendmail_path'])[0];
+        if (empty($cfg['sendmail_path']) || !is_executable($sendmail_exec)) {
+            $notify_status['success'] = FALSE;
+            $notify_status['error']   = "Sendmail exec ($sendmail_exec) is not found or not executable";
+            return;
+        }
+        $mail_params['sendmail_path'] = $cfg['sendmail_path'];
         break;
+
     case 'smtp':
-        $mail_params['host'] = $config['email']['smtp_host'];
-        $mail_params['port'] = $config['email']['smtp_port'];
-        if ($config['email']['smtp_secure'] === 'ssl') {
-            $mail_params['host'] = 'ssl://' . $config['email']['smtp_host'];
-            if ($config['email']['smtp_port'] == 25) {
+        $mail_params['host'] = $cfg['smtp_host'];
+        $mail_params['port'] = $cfg['smtp_port'];
+        if ($cfg['smtp_secure'] === 'ssl') {
+            $mail_params['host'] = 'ssl://' . $cfg['smtp_host'];
+            if ($cfg['smtp_port'] == 25) {
                 $mail_params['port'] = 465; // Default port for SSL
             }
         }
-        $mail_params['timeout']   = $config['email']['smtp_timeout'];
-        $mail_params['auth']      = $config['email']['smtp_auth'];
-        $mail_params['username']  = $config['email']['smtp_username'];
-        $mail_params['password']  = $config['email']['smtp_password'];
+        $mail_params['timeout']   = $cfg['smtp_timeout'];
+        $mail_params['auth']      = $cfg['smtp_auth'];
+        $mail_params['username']  = $cfg['smtp_username'];
+        $mail_params['password']  = $cfg['smtp_password'];
         $mail_params['localhost'] = $localhost;
         if (OBS_DEBUG) {
             $mail_params['debug'] = TRUE;
         }
         break;
+
     case 'smtpmx':
     case 'mx':
         $mail_params['mailname'] = $localhost;
         $mail_params['netdns']   = FALSE;
 
-        $mail_params['timeout'] = $config['email']['smtp_timeout'];
+        $mail_params['timeout'] = $cfg['smtp_timeout'];
         if (OBS_DEBUG) {
             $mail_params['debug'] = TRUE;
         }
 
         $backend = 'smtpmx';
         break;
+
     case 'mail':
     default:
+        $sendmail_path = ini_get('sendmail_path');
+        $sendmail_exec = explode(' ', $sendmail_path)[0];
+        if (empty($sendmail_path) || !is_executable($sendmail_exec)) {
+
+            if (!empty($cfg['sendmail_path']) && is_executable(explode(' ', $cfg['sendmail_path'])[0])) {
+                // Try set from our config
+                //$mail_params['sendmail_path'] = $cfg['sendmail_path'];
+                ini_set('sendmail_path', $cfg['sendmail_path']);
+            } else {
+                $notify_status['success'] = FALSE;
+                $notify_status['error']   = "mail() exec ($sendmail_exec) is not found or not executable";
+
+                return;
+            }
+        }
         $backend = 'mail'; // Default mailer backend
 }
 
@@ -64,13 +89,13 @@ $time_rfc = date('r', time());
 
 // Mail headers
 $headers = [];
-if (empty($config['email']['from'])) {
+if (empty($cfg['from'])) {
     // Default "From:"
     $headers['From']        = 'Observium <observium@' . $localhost . '>';
     $headers['Return-Path'] = 'observium@' . $localhost;
 } else {
     // Validate configured mail from
-    foreach(parse_email($config['email']['from']) as $from => $from_name) {
+    foreach(parse_email($cfg['from']) as $from => $from_name) {
         $headers['From']        = (empty($from_name) ? $from : '"' . $from_name . '" <' . $from . '>'); // From:
         $headers['Return-Path'] = $from;
         break; // use only first entry
@@ -186,7 +211,7 @@ $status = $mail->send($rcpts, $headers, $body);
 if (PEAR::isError($status)) {
     //print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
     $notify_status['success'] = FALSE;
-    $notify_status['error']   = $status -> getMessage();
+    $notify_status['error']   = $status->getMessage();
 } else {
     $notify_status['success'] = TRUE;
 }

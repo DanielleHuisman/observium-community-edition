@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -80,7 +79,7 @@ foreach ($cmmTrans as $unit => $unit_entry) {
                     $limits['limit_low'] = $entry['cmmTransTempCriticalThresholdMin'] * $scale;
                 }
 
-                discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $limits);
+                discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $limits);
             }
 
             $descr    = $name . ' Voltage' . $name_ext;
@@ -106,7 +105,7 @@ foreach ($cmmTrans as $unit => $unit_entry) {
                     $limits['limit_low'] = $entry['cmmTransVoltCriticalThresholdMin'] * $scale;
                 }
 
-                discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $limits);
+                discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $limits);
             }
 
             $descr    = $name . ' Bias Current' . $name_ext;
@@ -132,7 +131,7 @@ foreach ($cmmTrans as $unit => $unit_entry) {
                     $limits['limit_low'] = $entry['cmmTransLaserBiasCurrCriticalThresholdMin'] * $scale;
                 }
 
-                discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $limits);
+                discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $limits);
             }
 
             $descr    = $name . ' Transmit Power' . $name_ext;
@@ -158,7 +157,7 @@ foreach ($cmmTrans as $unit => $unit_entry) {
                     $limits['limit_low'] = $entry['cmmTransTxPowerCriticalThresholdMin'] * $scale;
                 }
 
-                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $limits);
+                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $limits);
             }
 
             $descr    = $name . ' Receive Power' . $name_ext;
@@ -184,7 +183,7 @@ foreach ($cmmTrans as $unit => $unit_entry) {
                     $limits['limit_low'] = $entry['cmmTransRxPowerCriticalThresholdMin'] * $scale;
                 }
 
-                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $limits);
+                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $limits);
             }
 
         }

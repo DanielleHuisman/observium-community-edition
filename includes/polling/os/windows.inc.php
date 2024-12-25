@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -22,6 +22,7 @@
 // Hardware: Intel64 Family 6 Model 44 Stepping 2 AT/AT COMPATIBLE - Software: Windows Version 6.3 (Build 9600 Multiprocessor Free)
 // Hardware: ARMv8 (64-bit) Family 8 Model 0 Revision   0 ARM processor family - Software: Windows Version 6.3 (Build 22000 Multiprocessor Free)
 // Hardware: Intel64 Family 6 Model 63 Stepping 2 AT/AT COMPATIBLE - Software: Windows Version 6.3 (Build 20348 Multiprocessor Free)
+// Hardware: Intel64 Family 6 Model 85 Stepping 4 AT/AT COMPATIBLE - Software: Windows Version 6.3 (Build 26100 Multiprocessor Free)
 // Microsoft Windows CE Version 5.0 (Build 1400)
 // Microsoft Windows CE Version 6.0 (Build 0)
 
@@ -47,7 +48,10 @@ if (preg_match('/Version ([\d\.]+) +\(Build (?:Number: )?(\d+)/', $poll_device['
     $windows['build']   = $matches[2];
 }
 
+// https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
 if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.311.1.1.3.1.1') { // Workstation
+
+    // References Table: https://www.lifewire.com/windows-version-numbers-2625171
     switch ($windows['version']) {
         case '3.1':
         case '3.5':
@@ -95,40 +99,52 @@ if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.311.1.1.3.1.1') { // Workstati
         case '6.3':
             if ($windows['build'] <= 9600) {
                 $icon = 'windows8';
-                if ($windows['build'] > '9200') {
+                if ($windows['build'] > 9200) {
                     $windows['sp'] = ', Update 1';
                 }
                 $version = '8.1' . $windows['sp'] . ' (NT 6.3)';
             } elseif ($windows['build'] <= 21326) {
-                $version = '10 (NT ' . $windows['version'] . ')';
+                $version = '10 (NT 10.0)';
                 $icon    = 'windows10';
 
                 /*
                    10.0.10240	Windows 10 Version 1507
-                   10.0.10586	Windows 10 Version 1511 (November Update)
-                   10.0.14393	Windows 10 Version 1607 (Anniversary Update)
-                   10.0.15063	Windows 10 Version 1703 (Creators Update)
-                   10.0.16299	Windows 10 Version 1709 (Fall Creators Update)
-                   10.0.17134	Windows 10 Version 1803 (April 2018 Update)
+                   10.0.10586	Windows 10 (1511)
+                   10.0.14393	Windows 10 (1607)
+                   10.0.15063	Windows 10 (1703)
+                   10.0.16299	Windows 10 (1709)
+                   10.0.17134	Windows 10 (1803)
+                   10.0.17763   Windows 10 (1809)
+                   10.0.18362   Windows 10 (1903)
+                   10.0.18363   Windows 10 (1909)
+                   10.0.19041   Windows 10 (2004)
+                   10.0.19042   Windows 10 (20H2)
+                   10.0.19043   Windows 10 (21H1)
+                   10.0.19044   Windows 10 (21H2)
                 */
             } else {
                 // https://betawiki.net/wiki/Windows_11_(original_release)
-                $version = '11 (NT ' . $windows['version'] . ')';
+                $version = '11 (NT 10.0)';
                 $icon    = 'windows11';
 
                 /*
                    10.0.21996.1	Windows 11 version Dev
+                   10.0.22000   Windows 11 (21H2)
+                   10.0.22621   Windows 11 (22H2)
+                   10.0.22631   Windows 11 (23H2)
+                   10.0.26100   Windows 11 (24H2)
                 */
 
             }
             break;
         default:
-            $icon    = 'windows_old';
+            $icon    = $windows['version'] >= 6.3 ? 'windows11' : 'windows_old';
             $version = 'NT ' . $windows['version'] . ' Workstation';
     }
     $windows['type'] = 'workstation';
 } elseif ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.311.1.1.3.1.2' || // Server
           $poll_device['sysObjectID'] === '.1.3.6.1.4.1.311.1.1.3.1.3') { // Datacenter Server
+
     $windows['subtype'] = ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.311.1.1.3.1.3') ? 'Datacenter ' : '';
     switch ($windows['version']) {
         case '3.1':
@@ -172,25 +188,37 @@ if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.311.1.1.3.1.1') { // Workstati
             break;
         case '6.3':
             if ($windows['build'] <= 9600) {
+                // https://betawiki.net/wiki/Windows_Server_2012_R2
+                // 9309-9600
                 $icon = 'windows8';
                 if ($windows['build'] > '9200') {
                     $windows['sp'] = ', Update 1';
                 }
                 $version = 'Server 2012 ' . $windows['subtype'] . 'R2' . $windows['sp'] . ' (NT 6.3)';
-            } elseif ($windows['build'] <= 17744) {
-                $version = 'Server 2016 ' . $windows['subtype'] . '(NT ' . $windows['version'] . ')';
+            } elseif ($windows['build'] < 17040) {
+                // https://betawiki.net/wiki/Windows_Server_2016
+                // 9726-15063
+                $version = 'Server 2016 ' . $windows['subtype'] . '(NT 10.0)';
                 $icon    = 'windows10';
-            } elseif ($windows['build'] <= 19503) {
-                $version = 'Server 2019 ' . $windows['subtype'] . '(NT ' . $windows['version'] . ')';
+            } elseif ($windows['build'] < 19504) {
+                // https://betawiki.net/wiki/Windows_Server_2019
+                // 17040-17763
+                $version = 'Server 2019 ' . $windows['subtype'] . '(NT 10.0)';
                 $icon    = 'windows10';
-            } else {
+            } elseif ($windows['build'] < 25871) {
                 // https://betawiki.net/wiki/Windows_Server_2022
-                $version = 'Server 2022 ' . $windows['subtype'] . '(NT ' . $windows['version'] . ')';
+                // 19504-20348
+                $version = 'Server 2022 ' . $windows['subtype'] . '(NT 10.0)';
                 $icon    = 'windows11';
+            } else {
+                // https://betawiki.net/wiki/Windows_Server_2025
+                // 25871-26100
+                $version = 'Server 2025 ' . $windows['subtype'] . '(NT 10.0)';
+                $icon    = 'windows2025';
             }
             break;
         default:
-            $icon    = 'windows_old';
+            $icon    = $windows['version'] >= 6.3 ? 'windows11' : 'windows_old';
             $version = 'NT ' . $windows['subtype'] . 'Server ' . $windows['version'];
     }
     $windows['type'] = 'server';

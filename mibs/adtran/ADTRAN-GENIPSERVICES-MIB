@@ -1,0 +1,1477 @@
+    ADTRAN-GENIPSERVICES-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN Total Access IP Services MIB
+    -- PRODUCT:   multiple Total Access products
+    -- VERSION:   1.14
+    -- DATE:      08/06/16
+
+    -- This MIB uses SMIv2 to define variables needed to manage IP Services for Total Access
+    -- products such as the TA1100F and TA5000.
+
+    -- MIBs supported:
+
+    -- HISTORY:
+    --     05/08/18 tgc First edition: table for VLAN-to-VC mapping indexed by ifIndex, VPI, VCI, & VID
+    --                  & table for customer port provisioning related to IP services indexed by
+    --                  customer port's (probably GigE - see notes below) ifIndex.
+    --     05/09/07 tgc Added table for VLAN membership, etc. indexed by access port (GigE) ifIndex;
+    --                  added table for VLAN name indexed by VID;
+    --     05/09/12 tgc Added table for system provisioning indexed by port number;
+    --                  added table for VLAN status indexed by VID and an ordinal number;
+    --     06/03/31 gdo Added objects for PPPoA IWF, PPPoE intermediate agent, and DHCP Relay provisioning.
+    --     06/03/31 gdo Typo in name of PPPoA session timeout object.
+    --     06/05/08 gdo Lost the adGenIpAndVlanPortTable in one of the last versions... added back in, and add new encapsulation mode.
+    --     06/05/09 gdo Change the CircuitIdFormat range from 1..63 to 0..63.
+    --     06/06/08 gdo Add enum option for autoDetect to encapsMode
+    --     06/08/04 gdo Update description for CircuitIdFormat OID
+    --     07/03/21 tgc Corrected range for VlanId to match firmware implementation; updated the descriptions of
+    --                  adGenIpVlanVcVID and adGenIpVlanVcPBits; added variables for C-tag support
+    --     08/01/25 gdo Add multicast vlan options
+    --     08/02/08 gdo Add multicast vlan enable/disable
+    --     08/02/08 gdo Reconcile MIB with tgc's last changes (see above)
+    --     08/05/13 jlb Added downstream and upstream policers
+    --     08/05/22 jlb Added Multicast Session Control options
+    --     08/06/12 jlb Changed Multicast Session Control Start and End IP values to IpAddress object-type
+    --     08/06/16 jlb Added adGenIpVlanVcPolicerStatus string
+    --     08/12/05 djb Added adGenIpVlanVcUpstreamMACDAFilter
+    --     08/12/16 djb Added adGenIpVlanVcIGMPRouterIP
+	--     10/05/24 jlb Expanded adGenIpVlanVcPBits to use a value of 8 for priority inherit.
+
+-- REVISIT IMPORTS TO PRUNE EXCESS!!!
+    IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+--        Gauge32,
+        Counter32,
+--        Counter64,
+--        TimeTicks,
+--        Unsigned32,
+        IpAddress
+            FROM SNMPv2-SMI
+
+        ifIndex
+--        InterfaceIndexOrZero,
+--        InterfaceIndex
+            FROM IF-MIB
+
+        DisplayString,
+        TruthValue,
+        RowStatus,
+--        TimeInterval,
+--        MacAddress,
+        TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+
+--        SnmpAdminString
+--            FROM SNMP-FRAMEWORK-MIB
+
+	  adIdentityShared
+--        adProducts,
+--        adMgmt
+            FROM ADTRAN-MIB
+
+        AtmVpIdentifier,
+        AtmVcIdentifier
+            FROM ATM-TC-MIB
+
+--        IANAifType
+--                FROM IANAifType-MIB
+
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB;
+
+--        adCSM2TCID,
+--        AdSM2MasterProfileType,
+--        AdSM2IngressVlanEType,
+--        AdSM2EgressVlan,
+--        AdSM2AllowedVlanPriority,
+--        AdSM2VlanPriorityTranslation,
+--        AdSM2IngressVlanActionType,
+--        AdSM2IngressPolicingActionType,
+--        AdSM2AddressAgingMethodType,
+--        AdSM2ProfileIndex,
+--        AdSM2SystemStatusType,
+--        AdSM2VlanListType
+--            FROM ADTRAN-TASM2-TC-MIB
+
+-- Textual Convention from QBRIDGE-MIB (hybrid MIB problem for MIB2RMD); see updated entry below
+--        VlanId
+--            FROM Q-BRIDGE-MIB
+
+--        atmVplVpi, atmVclVpi, atmVclVci
+--            FROM ATM-MIB;
+
+-- *********************************************************************************************************
+
+    adGenCndIP MODULE-IDENTITY
+            LAST-UPDATED "201210040000Z"
+            ORGANIZATION "ADTRAN, Inc."
+            CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+            DESCRIPTION
+                "The is the MIB module that describes
+                IP Services SMIv2 objects."
+            REVISION "201210040000Z"
+            DESCRIPTION "add adGenIpSysProvIgmpHostIP to set the IGMP Host for the slot"
+
+            ::= { adIdentityShared 62}
+
+-- *********************************************************************************************************
+-- OBJECT IDENTIFIERS
+--  adtran           OBJECT IDENTIFIER ::= { enterprises 664 }
+--    adProducts       OBJECT IDENTIFIER ::= { adtran 1 }
+--    adMgmt           OBJECT IDENTIFIER ::= { adtran 2 }
+--    adPerform        OBJECT IDENTIFIER ::= { adtran 4 }
+--    adShared         OBJECT IDENTIFIER ::= { adtran 5 }
+--    adIdentity       OBJECT IDENTIFIER ::= { adtran 6 }
+--      adIdentityShared OBJECT IDENTIFIER ::= { adIdentity 10000 }
+--        adGenCndIP       OBJECT IDENTIFIER ::= { adIdentityShared 62 }
+            adGenIpConfig    OBJECT IDENTIFIER ::= { adGenCndIP 1 }
+            adGenIpProv      OBJECT IDENTIFIER ::= { adGenCndIP 2 }
+            adGenIpStatus    OBJECT IDENTIFIER ::= { adGenCndIP 3 }
+
+-- ======================================================================
+-- Textual Convention from QBRIDGE-MIB (hybrid MIB problem for MIB2RMD)
+-- Phil Bergstresser, 09/19/2005
+
+VlanId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A 12-bit VLAN ID used in the VLAN Tag header."
+    SYNTAX      INTEGER (1..4095)
+
+
+    -- ======================================================================
+    -- Provisioning Menu Items
+
+    adGenIpVlanVcMapProfileTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenIpVlanVcMapProfileEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains information on the VLAN mappings
+           in an ATM-oriented system (i.e., 'cross-connects'
+           between VLANs and VCLs).  One entry in this
+           table reflects a profile defined by a manager
+           which can be used to provision a VLAN-to-VCL
+           mapping."
+       ::= { adGenIpProv 1 }
+
+   adGenIpVlanVcMapProfileEntry OBJECT-TYPE
+       SYNTAX      AdGenIpVlanVcMapProfileEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Each entry corresponds to an Ethernet/VLAN-to-VCL
+           Mapping Profile. The ifIndex used here is the GigE ifIndex
+           associated with the DSL port of interest."
+       INDEX { ifIndex, adGenIpVlanVcVpi, adGenIpVlanVcVci, adGenIpVlanVcVID }
+       ::= { adGenIpVlanVcMapProfileTable 1 }
+
+   AdGenIpVlanVcMapProfileEntry ::=
+       SEQUENCE {
+           adGenIpVlanVcVpi                       			AtmVpIdentifier,
+           adGenIpVlanVcVci                       			AtmVcIdentifier,
+           adGenIpVlanVcVID                       			VlanId,
+           adGenIpVlanVcMapProfileName            			DisplayString,
+           adGenIpVlanVcEncapsMode                			INTEGER,
+           adGenIpVlanVcPBits                     			Integer32,
+           adGenIpVlanVcManualAddrAging           			Integer32,
+           adGenIpVlanVcPPPoERelay                			INTEGER,
+           adGenIpVlanVcIntermedAgent             			INTEGER,
+           adGenIpVlanVcDhcpRelay                 			INTEGER,
+           adGenIpVlanVcOption82Insert            			INTEGER,
+           adGenIpVlanVcLearnedIpAddrAgingMethod  			INTEGER,
+           adGenIpVlanVcIgmpProcessing            			INTEGER,
+           adGenIpVlanVcIgmpVersion               			INTEGER,
+           adGenIpVlanVcLastMemberQueryInterval   			Integer32,
+           adGenIpVlanVcLastMemberQueryCount      			Integer32,
+           adGenIpVlanVcImmediateLeave            			INTEGER,
+           adGenIpVlanVcMaxAllowedMcastSessions   			Integer32,
+           adGenIpVlanVcL2L4Classifier            			INTEGER,
+           adGenIpVlanVcL2L4Value                 			Integer32,
+           adGenIpVlanVcMapProfileRowStatus       			RowStatus,
+           adGenIpVlanVcDhcpTrustedInterface                            INTEGER,
+           adGenIpVlanVcDhcpPPPoERemoteId                               INTEGER,
+           adGenIpVlanVcDhcpPPPoELoopCharacteristics                    INTEGER,
+    	   adGenIpVlanVcDhcpPPPoECircuitIdFormat  			DisplayString,
+    	   adGenIpVlanVcPPPoASessionTimeout		 	    	Integer32,
+           adGenIpVlanVcCtagVID                                         VlanId,
+    	   adGenIpVlanVcCtagPbitsMethod  			        INTEGER,
+           adGenIpVlanVcCtagPbitsValue                                  Integer32,
+           adGenIpVlanVcMulticastVlanVID                                INTEGER,
+           adGenIpVlanVcMulticastVlanUpstreamPriority                   INTEGER,
+    	   adGenIpVlanVcMulticastDownstreamVlanVID			INTEGER,
+    	   adGenIpVlanVcDownstreamPolicer   				INTEGER,
+    	   adGenIpVlanVcDownstreamPolicerCIR   				Integer32,
+    	   adGenIpVlanVcDownstreamPolicerCBS   				Integer32,
+    	   adGenIpVlanVcDownstreamPolicerEIR   				Integer32,
+           adGenIpVlanVcDownstreamPolicerEBS                            Integer32,
+           adGenIpVlanVcUpstreamPolicer                                 INTEGER,
+    	   adGenIpVlanVcUpstreamPolicerCIR   				Integer32,
+    	   adGenIpVlanVcUpstreamPolicerCBS   				Integer32,
+    	   adGenIpVlanVcUpstreamPolicerEIR   				Integer32,
+           adGenIpVlanVcUpstreamPolicerEBS                              Integer32,
+           adGenIpVlanVcMCastSessionControlStartIP                      IpAddress,
+           adGenIpVlanVcMCastSessionControlEndIP                        IpAddress,
+           adGenIpVlanVcMCastSessionControlBitrate                      Integer32,
+           adGenIpVlanVcPolicerStatus                                   DisplayString,
+           adGenIpVlanVcUpstreamMACDAFilter				INTEGER,
+           adGenIpVlanVcIgmpRouterIP                      		IpAddress
+       }
+
+   adGenIpVlanVcVpi OBJECT-TYPE
+       SYNTAX       AtmVpIdentifier
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION  "VPI for the VCL that is being mapped. May be
+         the same as atmVclVpi from atmVclTable in the ATM-MIB. The
+         current line of thought is that adGenIpVpi should NOT be
+         duplicated in atmVclTable. This implies that the agent will
+         be responsible for checking both tables every time a VCL is
+         created in either table to ensure that the ifIndex, VPI, and
+         VCI combination is unique to the system."
+       ::= { adGenIpVlanVcMapProfileEntry 1 }
+
+   adGenIpVlanVcVci OBJECT-TYPE
+       SYNTAX       AtmVcIdentifier
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION  "VCI for the VCL that is being mapped. May be
+         the same as atmVclVci from atmVclTable in the ATM-MIB. The
+         current line of thought is that adGenIpVci should NOT be
+         duplicated in atmVclTable. This implies that the agent will
+         be responsible for checking both tables every time a VCL is
+         created in either table to ensure that the ifIndex, VPI, and
+         VCI combination is unique to the system."
+       ::= { adGenIpVlanVcMapProfileEntry 2 }
+
+   adGenIpVlanVcVID OBJECT-TYPE
+       SYNTAX      VlanId
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "VLAN ID for the VLAN that is being mapped (see indexes above).
+           This VLAN ID is in the range (1..4095), and it is associated with the 'S-tag'.
+           If traffic is untagged, this value MUST be 4095, and adGenIpVlanVcCtagVID
+           (defined below) MUST also be set to 4095.
+           If traffic is single-tagged, this value MUST be 1-4094, and adGenIpVlanVcCtagVID
+           MUST be set to 4095.
+           If traffic is double-tagged, this value MUST be 1-4094, and adGenIpVlanVcCtagVID
+           MUST be set to 1-4094."
+       ::= { adGenIpVlanVcMapProfileEntry 3 }
+
+    adGenIpVlanVcMapProfileName    OBJECT-TYPE
+       SYNTAX          DisplayString (SIZE (1..32))
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object is provided so that the user can identify
+           the characteristics of the mapping between the specified
+           VLAN and VCL. The profile will be stored in the EMS by
+           name and applied to the user-specified VLAN(s) and VCL(s).
+           This profile name is NOT intended to be used in the same
+           way as the ADSL profile names defined in the ADSL-LINE-MIB.
+           However, it does borrow from characteristics of both the
+	   `dynamic' and`static' profiles defined in the ADSL-LINE-MIB.
+	   For instance, like those dynamic profiles, the profile name
+           is user-specified. However these are static profiles, so
+           there is a one-to-one relationship between each mapping
+           and its profile. Furthermore, these profiles are indexed
+           by the integer form of the ifIndex as well as VPI, VCI and
+           VID, which is completely unlike the profiles defined
+           in the ADSL-LINE-MIB."
+         ::= { adGenIpVlanVcMapProfileEntry 4 }
+
+    adGenIpVlanVcEncapsMode    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           ipoe (1),
+           pppoe (2),
+           pppoa (3),
+           notApplicable (4),
+           atmoe (5),
+           pppoaVcMux(6),
+           autoDetect(7)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Encapsulation mode/type if applicable; 'notApplicable' otherwise.
+            Note: pppoa(2) is for PPPoA LLC."
+         ::= { adGenIpVlanVcMapProfileEntry 5 }
+
+    adGenIpVlanVcPBits    OBJECT-TYPE
+       SYNTAX          Integer32 (0..8)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Priority bits, 0-7, where 0 is the highest priority.
+           This priority is associated with adGenIpVlanVcVID (the S-tag)
+           defined above. A value of 8 means inherit priority from
+		   the CE VLAN."
+         ::= { adGenIpVlanVcMapProfileEntry 6 }
+
+    adGenIpVlanVcManualAddrAging    OBJECT-TYPE
+       SYNTAX          Integer32 (0..1440)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Manual Address Aging in minutes for PPPoE and DHCP."
+         ::= { adGenIpVlanVcMapProfileEntry 7 }
+
+    adGenIpVlanVcPPPoERelay    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          deprecated
+       DESCRIPTION
+           "Enable/disable PPPoE Relay if applicable; 'notApplicable' otherwise.
+            This object is deprecated and will be obsoleted in a future version of this mib."
+         ::= { adGenIpVlanVcMapProfileEntry 8 }
+
+    adGenIpVlanVcIntermedAgent    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Intermediate Agent if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 9 }
+
+    adGenIpVlanVcDhcpRelay    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable DHCP Relay if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 10 }
+
+    adGenIpVlanVcOption82Insert    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Option 82 Insertion if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 11 }
+
+    adGenIpVlanVcLearnedIpAddrAgingMethod    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           lease (1),
+           fixed (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Method for Learned IP Address Aging if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 12 }
+
+    adGenIpVlanVcIgmpProcessing    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           block (1),
+           forward (2),
+           snooping (3),
+           proxy (4),
+           notApplicable (5)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Method for IGMP Processing if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 13 }
+
+    adGenIpVlanVcIgmpVersion    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           v1 (1),
+           v2 (2),
+           v3 (3),
+           notApplicable (4)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "IGMP Version if applicable: v3 implies v1, v2, and v3;
+           v2 implies v1 and v2; v1 is v1 only; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 14 }
+
+    adGenIpVlanVcLastMemberQueryInterval    OBJECT-TYPE
+       SYNTAX          Integer32 (100..1500)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Last Member Query Interval in milliseconds.
+         This is the amount of time between Queries.  Low
+         value results in faster detection of missed leaves."
+         ::= { adGenIpVlanVcMapProfileEntry 15 }
+
+    adGenIpVlanVcLastMemberQueryCount    OBJECT-TYPE
+       SYNTAX          Integer32 (1..12)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Last Member Query Count. This is the number of
+         queries before declaring no membership of a group
+         (channel). Setting to 0 is the equivalent of setting
+         Immediate Leave to disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 16 }
+
+    adGenIpVlanVcImmediateLeave    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Immediate Leave if applicable; 'notApplicable' otherwise.
+         Disable is the equivalent of setting Last Member Query Count to 0."
+         ::= { adGenIpVlanVcMapProfileEntry 17 }
+
+    adGenIpVlanVcMaxAllowedMcastSessions    OBJECT-TYPE
+       SYNTAX          Integer32 (1..6)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Maximum Allowed Multicast Sessions."
+         ::= { adGenIpVlanVcMapProfileEntry 18 }
+
+    adGenIpVlanVcL2L4Classifier    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           ethertype (1),
+           protocolId (2),
+           reserved1 (3),
+           reserved2 (4),
+	   notApplicable (5)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Layer 2 - Layer 4 Classifier to be used; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 19 }
+
+    adGenIpVlanVcL2L4Value    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Layer 2 - Layer 4 Value; should be displayed in hexadecimal format."
+         ::= { adGenIpVlanVcMapProfileEntry 20 }
+
+    adGenIpVlanVcMapProfileRowStatus OBJECT-TYPE
+         SYNTAX          RowStatus
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+             "This object is used to create a new row or modify or
+             delete an existing row in this table. This object will
+             most likely be used to represent .........."
+         ::= { adGenIpVlanVcMapProfileEntry 21 }
+
+    adGenIpVlanVcDhcpTrustedInterface    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           trusted (1),
+           untrusted (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "trusted/untrusted interface for DHCP Relay if applicable."
+         ::= { adGenIpVlanVcMapProfileEntry 22 }
+
+    adGenIpVlanVcDhcpPPPoERemoteId    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Remote ID insertion into DHCP Option 82 or
+            PPPoE Vendor Specific tag if applicable."
+         ::= { adGenIpVlanVcMapProfileEntry 23 }
+
+    adGenIpVlanVcDhcpPPPoELoopCharacteristics    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable loop characteristics insertion into DHCP Option 82 or
+            PPPoE Vendor Specific tag if applicable."
+         ::= { adGenIpVlanVcMapProfileEntry 24 }
+
+    adGenIpVlanVcDhcpPPPoECircuitIdFormat    OBJECT-TYPE
+       SYNTAX          DisplayString (SIZE (0..63))
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to provision the format of the circuit ID string. This
+            string is returned by the PPPoE intermediate agent and
+            DHCP relay agent in sub option 1. TR-101 states that the
+            format of the circuit ID should be user defineable. The string
+            may contain both fixed static string elements specified by the
+            user and also variable and fixed length elements which are
+            populated by the network element. Variable length elements
+            are specified by enclosing the names of the variables with a
+            dollar sign '$'. For instance, a user could specify
+            a circuit id string as follows:
+            'TA1148-$accessnodeid$ Port: $port$ $vpi$/$vci$'
+
+            which would expand to
+            'TA1148-TID Port: 1 0/35'.
+
+            In this implementation, the access-node-id is equivalent to the
+            system's provisioned TID or SNMP sysName. If this string is
+            provisioned zero-length, then the default format is used.
+            The total length of the expanded string MUST NOT exceed
+            63 characters.
+
+            Variables include (but are not limited to) the following:
+            	Variable Name				Character Length
+            	accessnodeid				Varies
+				shelf						2
+            	slot                        3
+            	port                        3
+            	vpi                         4
+            	vci                         5
+            	q-vid                       4
+            	pbits						1
+
+
+            If a user defined circuit ID is not desired, this object can
+            be set to simply 'default' and the default format described in
+            TR-101 will be used:
+
+            access-node-id atm slot/port:vpi.vci
+            or
+            access-node-id eth slot/port[:vlan-id]"
+         ::= { adGenIpVlanVcMapProfileEntry 25 }
+
+    adGenIpVlanVcPPPoASessionTimeout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the PPPoA Session timeout when the
+            mapping is provisioned for PPPoA encapsulation."
+         ::= { adGenIpVlanVcMapProfileEntry 26 }
+
+   adGenIpVlanVcCtagVID OBJECT-TYPE
+       SYNTAX      VlanId
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "This VLAN ID is in the range (1..4095), and it is associated with the 'C-tag'.
+           If traffic is untagged, this value MUST be 4095, and adGenIpVlanVcVID
+           (defined above) MUST also be set to 4095.
+           If traffic is single-tagged, this value MUST be 4095, and adGenIpVlanVcVID
+           MUST be set to 1-4094.
+           If traffic is double-tagged, this value MUST be 1-4094, and adGenIpVlanVcVID
+           MUST be set to 1-4094."
+       ::= { adGenIpVlanVcMapProfileEntry 27 }
+
+    adGenIpVlanVcCtagPbitsMethod    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           copyFromStag (1),
+           specifyFixedValue(2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Method to be used to determine the Priority Bits value for
+           the C-tag if applicable. If the C-tag (adGenIpVlanVcCtagVID
+           defined above for double-tagged traffic) is to be used and
+           the method 'specifyFixedValue' is selected, then
+           adGenIpVlanVcCtagPbitsValue (defined below) must be set to
+           the desired value."
+         ::= { adGenIpVlanVcMapProfileEntry 28 }
+
+    adGenIpVlanVcCtagPbitsValue    OBJECT-TYPE
+       SYNTAX          Integer32 (0..7)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Priority bits, 0-7, where 0 is the highest priority.
+           This priority is associated with adGenIpVlanVcCtagVID
+           (the C-tag) defined above."
+         ::= { adGenIpVlanVcMapProfileEntry 29 }
+
+
+    adGenIpVlanVcMulticastVlanVID    OBJECT-TYPE
+       SYNTAX          INTEGER(2..4095)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set which VID carries multicast (IGMP)
+            traffic. If set to 4095, the separate multicast
+            Vlan VID is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 30 }
+
+    adGenIpVlanVcMulticastVlanUpstreamPriority    OBJECT-TYPE
+       SYNTAX          INTEGER(0..7)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the multicast upstream vlan priority."
+         ::= { adGenIpVlanVcMapProfileEntry 31 }
+
+    adGenIpVlanVcMulticastDownstreamVlanVID    OBJECT-TYPE
+       SYNTAX          INTEGER (0..4095)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the downstream VLAN ID. If set to 4095,
+            the downstream VID is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 32 }
+
+    adGenIpVlanVcDownstreamPolicer    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Downstream Policer if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 33 }
+
+    adGenIpVlanVcDownstreamPolicerCIR    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Downstream Policer Committed Information Rate (CIR) in bps.
+           Not applicable if the Downstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 34 }
+
+    adGenIpVlanVcDownstreamPolicerCBS    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Downstream Policer Committed Burst Size (CBS) in bits.
+           Not applicable if the Downstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 35 }
+
+
+    adGenIpVlanVcDownstreamPolicerEIR    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Downstream Policer Excess Information Rate (EIR) in bps.
+           Not applicable if the Downstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 36 }
+
+    adGenIpVlanVcDownstreamPolicerEBS    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Downstream Policer Excess Burst Size (EBS) in bits.
+           Not applicable if the Downstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 37 }
+
+    adGenIpVlanVcUpstreamPolicer    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Upstream Policer if applicable; 'notApplicable' otherwise."
+         ::= { adGenIpVlanVcMapProfileEntry 38 }
+
+    adGenIpVlanVcUpstreamPolicerCIR    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Upstream Policer Committed Information Rate (CIR) in bps.
+           Not applicable if the Upstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 39 }
+
+    adGenIpVlanVcUpstreamPolicerCBS    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Upstream Policer Committed Burst Size (CBS) in bits.
+           Not applicable if the Upstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 40 }
+
+
+    adGenIpVlanVcUpstreamPolicerEIR    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Upstream Policer Excess Information Rate (EIR) in bps.
+           Not applicable if the Upstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 41 }
+
+    adGenIpVlanVcUpstreamPolicerEBS    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the Upstream Policer Excess Burst Size (EBS) in bits.
+           Not applicable if the Upstream Policer is disabled."
+         ::= { adGenIpVlanVcMapProfileEntry 42 }
+
+    adGenIpVlanVcMCastSessionControlStartIP    OBJECT-TYPE
+       SYNTAX          IpAddress
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The first Multicast IP Address in a range of IP addresses
+           that are used by the Multicast Session Control."
+         ::= { adGenIpVlanVcMapProfileEntry 43 }
+
+    adGenIpVlanVcMCastSessionControlEndIP    OBJECT-TYPE
+       SYNTAX          IpAddress
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The last Multicast IP Address in a range of IP addresses
+           that are used by the Multicast Session Control."
+         ::= { adGenIpVlanVcMapProfileEntry 44 }
+
+    adGenIpVlanVcMCastSessionControlBitrate    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Used to set the bitrate associated with the multicast IP address range
+            of the Multicast Session Control."
+         ::= { adGenIpVlanVcMapProfileEntry 45 }
+
+    adGenIpVlanVcPolicerStatus    OBJECT-TYPE
+       SYNTAX          DisplayString
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "String description of the error that occurred as a result of
+           the last set to adGenIpVlanVcDownstreamPolicer or adGenIpVlanVcUpstreamPolicer."
+         ::= { adGenIpVlanVcMapProfileEntry 46 }
+
+    adGenIpVlanVcUpstreamMACDAFilter    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           gatewayMACOnly (1),
+           allowAllValidMACs (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This item defines how upstream traffic is filtered on MAC DA.
+           gatewayMACOnly - indicates that upstream traffic is forwarded to the network only
+           				    if uses the gateway MAC as the DA.
+           allowAllValidMACs - indicates that upstream traffic is forwarded to the network, regardless
+                                       of the MAC DA used (as long as it is a valid unicast MAC."
+         ::= { adGenIpVlanVcMapProfileEntry 47 }
+
+    adGenIpVlanVcIgmpRouterIP OBJECT-TYPE
+       SYNTAX          IpAddress
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The source IP address that the DSLAM places in IGMP messages destined
+           for the subscriber. This value only applies when IGMP is in proxy mode."
+         ::= { adGenIpVlanVcMapProfileEntry 48 }
+
+
+
+
+-- ***************************************************************
+    adGenIpPortProfileTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenIpPortProfileEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains information on the port profiles.
+           One entry in this table reflects a profile defined by a
+           manager which can be used to provision a port for IP
+           services."
+       ::= { adGenIpProv 2 }
+
+   adGenIpPortProfileEntry OBJECT-TYPE
+       SYNTAX      AdGenIpPortProfileEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Each entry corresponds to a Port Profile. The ifIndex used
+           here is the GigE ifIndex associated with the DSL/customer port
+           of interest."
+       INDEX { ifIndex }
+       ::= { adGenIpPortProfileTable 1 }
+
+   AdGenIpPortProfileEntry ::=
+       SEQUENCE {
+           adGenIpPortProfileName             DisplayString,
+           adGenIpPortNetTrafficTags          INTEGER,
+           adGenIpPortNetworkModel            INTEGER,
+           adGenIpPortSTagVID                 VlanId,
+           adGenIpPortSTagPBitsMethod         INTEGER,
+           adGenIpPortSTagPBitsValue          Integer32,
+           adGenIpPortMaxMacAddr              Integer32,
+           adGenIpPortLearnAndLockAddr        INTEGER,
+           adGenIpPortIgmpLimit               Integer32,
+           adGenIpPortIgmpLockout             Integer32,
+           adGenIpPortArpLimit                Integer32,
+           adGenIpPortArpLockout              Integer32,
+           adGenIpPortDhcpLimit               Integer32,
+           adGenIpPortDhcpLockout             Integer32,
+           adGenIpPortPppoeLimit              Integer32,
+           adGenIpPortPppoeLockout            Integer32,
+           adGenIpPortMcastBcastLimit         Integer32,
+           adGenIpPortMcastBcastLockout       Integer32,
+           adGenIpPortUcastExceptionLimit     Integer32,
+           adGenIpPortUcastExceptionLockout   Integer32,
+           adGenIpPortProfileRowStatus        RowStatus
+       }
+
+    adGenIpPortProfileName    OBJECT-TYPE
+       SYNTAX          DisplayString (SIZE (1..32))
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This object is provided to assist the user in identifying
+           the characteristics of the port profile by name. The
+           profile will be stored in the EMS by name and applied
+           to the user-specified port(s)/ifIndex(es). This
+           profile name is NOT intended to be used in the same
+           way as the ADSL profile names defined in the ADSL-LINE-MIB.
+           However, it does borrow from characteristics of both the
+	   `dynamic' and`static' profiles defined in the ADSL-LINE-MIB.
+	   For instance, like those dynamic profiles, the profile name
+           is user-specified. However these are static profiles, so
+           there is a one-to-one relationship between each port
+           and its profile. Furthermore, these profiles are indexed
+           by the integer form of the ifIndex, which is completely
+           unlike the profiles defined in the ADSL-LINE-MIB."
+         ::= { adGenIpPortProfileEntry 1 }
+
+    adGenIpPortNetTrafficTags    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           noTags (1),
+           singleTagged (2),
+           doubleTagged (3)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Network Traffic Tagging options. Note: no tags for flat network ."
+         ::= { adGenIpPortProfileEntry 2 }
+
+    adGenIpPortNetworkModel    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           vlanPerServicePvcPerService (1),     -- VLAN/service, PVC/service
+           vlanPerSubscriberPvcPerService (2),  -- VLAN/subscriber, PVC/service
+           vlanPerServiceSinglePvc (3),         -- VLAN/service, single PVC
+           vlanPerSubscriberSinglePvc (4),      -- VLAN/subscriber, single PVC
+           noVlanTagsSinglePvc (5)              -- Flat Network, no VLAN tags, single PVC
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "This is the Network Model, also referred to as VC/VLAN
+           Classification."
+         ::= { adGenIpPortProfileEntry 3 }
+
+    adGenIpPortSTagVID    OBJECT-TYPE
+       SYNTAX      VlanId
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION "S-Tag VLAN ID in the range (1..4094)."
+         ::= { adGenIpPortProfileEntry 4 }
+
+    adGenIpPortSTagPBitsMethod    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           copyFromCTag (1),
+           specifyFixedValue (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "S-Tag Priority Bits Method. If 'specifyFixedValue' is to be used,
+           see also adGenIpSTagPBitsValue."
+         ::= { adGenIpPortProfileEntry 5 }
+
+    adGenIpPortSTagPBitsValue    OBJECT-TYPE
+       SYNTAX      Integer32 (0..7)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "S-Tag Priority Bits Value if 'specifyFixedValue' is to be used.
+           See also adGenIpSTagPBitsMethod. Priority bits range is 0-7, where
+           0 is the highest priority."
+         ::= { adGenIpPortProfileEntry 6 }
+
+    adGenIpPortMaxMacAddr    OBJECT-TYPE
+       SYNTAX          Integer32 (1..8)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The total (maximum) number of Learned/Dynamic MAC
+           addresses plus Learned-and-Locked MAC addresses."
+         ::= { adGenIpPortProfileEntry 7 }
+
+    adGenIpPortLearnAndLockAddr    OBJECT-TYPE
+       SYNTAX      INTEGER {
+           enabled (1),
+           disabled (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable Learn-and-Lock feature for MAC addresses. If
+           'disabled' is set, then Learned/Dynamic method is implied."
+         ::= { adGenIpPortProfileEntry 8 }
+
+    adGenIpPortIgmpLimit    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "IGMP Limit in frames/sec."
+         ::= { adGenIpPortProfileEntry 9 }
+
+    adGenIpPortIgmpLockout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "IGMP Violation Lockout in minutes."
+         ::= { adGenIpPortProfileEntry 10 }
+
+    adGenIpPortArpLimit    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "ARP Limit in frames/sec."
+         ::= { adGenIpPortProfileEntry 11 }
+
+    adGenIpPortArpLockout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "ARP Violation Lockout in minutes."
+         ::= { adGenIpPortProfileEntry 12 }
+
+    adGenIpPortDhcpLimit    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "DHCP Limit in frames/sec."
+         ::= { adGenIpPortProfileEntry 13 }
+
+    adGenIpPortDhcpLockout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "DHCP Lockout in minutes."
+         ::= { adGenIpPortProfileEntry 14 }
+
+    adGenIpPortPppoeLimit    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "PPPoE Limit in frames/sec."
+         ::= { adGenIpPortProfileEntry 15 }
+
+    adGenIpPortPppoeLockout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "PPPoE Lockout in minutes."
+         ::= { adGenIpPortProfileEntry 16 }
+
+    adGenIpPortMcastBcastLimit    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Multicast/Broadcast Limit in frames/sec."
+         ::= { adGenIpPortProfileEntry 17 }
+
+    adGenIpPortMcastBcastLockout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Multicast/Broadcast Violation Lockout in minutes."
+         ::= { adGenIpPortProfileEntry 18 }
+
+    adGenIpPortUcastExceptionLimit    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Unicast Exception Limit in frames/sec."
+         ::= { adGenIpPortProfileEntry 19 }
+
+    adGenIpPortUcastExceptionLockout    OBJECT-TYPE
+       SYNTAX          Integer32
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Unicast Exception Violation Lockout in minutes."
+         ::= { adGenIpPortProfileEntry 20 }
+
+    adGenIpPortProfileRowStatus OBJECT-TYPE
+        SYNTAX          RowStatus
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+            "This type of object is normally used to create a new row or
+            modify or delete an existing row in the table with which it
+            is associated. A profile is activated by setting this object
+            to`active'.  When `active' is set, the system will validate
+            the profile. Before a profile can be deleted or taken out of
+            service, (by setting this object to `destroy' or
+            `outOfService') it must be first unreferenced from all
+            associated lines. According to the ADSL-LINE-MIB, if the
+            implementor of this MIB has chosen not to implement
+            `dynamic assignment' of profiles, this object's MIN-ACCESS
+            is read-only and its value is always to be `active'.
+
+            There has been some discussion of using the 'active' and
+            'notInService' states for the TA5000/TA1100F implementation.
+            But it appears more likely that we will follow the
+            recommendation in the ADSL-LINE-MIB for static profiles
+            and maintain 'active' row status."
+         ::= { adGenIpPortProfileEntry 21 }
+
+-- ***************************************************************
+--  adGenIpVlanMemberTable OBJECT-TYPE
+--       SYNTAX      SEQUENCE OF AdGenIpVlanMemberEntry
+--       MAX-ACCESS  not-accessible
+--       STATUS      current
+--       DESCRIPTION
+--           "This table contains information on VLAN membership."
+--       ::= { adGenIpProv 3 }
+
+--   adGenIpVlanMemberEntry OBJECT-TYPE
+--       SYNTAX      AdGenIpVlanMemberEntry
+--       MAX-ACCESS  not-accessible
+--       STATUS      current
+--       DESCRIPTION
+--           "The ifIndex used
+--           here is associated with the GigE port that is being added or
+--           removed as a member of the specified VLAN. The GigE port may
+--	   be a network port, expansion port, access port, or inband
+--           management port. When the management VLAN is provisioned (see
+--           adGenIpSysProvTable), the network
+--           and inband management ports will be automatically added
+--           as members of it and will not be removable. For the TA1100F,
+--           the access ports will also be added automatically as members
+--           of the management VLAN to support remote management via the
+--           TA1148 craft interface, but they will be removable."
+--       INDEX { ifIndex }
+--       ::= { adGenIpVlanMemberTable 1 }
+
+--   AdGenIpVlanMemberEntry ::=
+--       SEQUENCE {
+--           adGenIpVlanMembership                OCTET STRING,
+--           adGenIpVlanMemMappingsInUse          OCTET STRING,
+--           adGenIpVlanMemAddPort                Integer32,
+--           adGenIpVlanMemRemovePort             Integer32,
+--	   adGenIpVlanMemLastActionStatus       DisplayString
+--       }
+
+--    adGenIpVlanMembership    OBJECT-TYPE
+--       SYNTAX          OCTET STRING (SIZE(512))
+--       MAX-ACCESS      read-only
+--       STATUS          current
+--       DESCRIPTION
+--           "A  read-only bit-encoded representation of the VLANs (one bit per
+--           possible VLAN, 0-4094) of which this GigE port is
+--           a member. A bit value of 1 indicates membership. Membership of the
+--           0th VLAN implies no tagging. The 0th bit represents the 0th VLAN, the
+--	   1st bit represents the 1st VLAN, etc.
+
+--           For the TA1100F
+--           system all eligible GigE ports are physically on the TA1100F unit as
+--           opposed to being on the TA1148s."
+--         ::= { adGenIpVlanMemberEntry 1 }
+
+--    adGenIpVlanMemMappingsInUse    OBJECT-TYPE
+--       SYNTAX          OCTET STRING (SIZE(512))
+--       MAX-ACCESS      read-only
+--       STATUS          current
+--       DESCRIPTION
+--           "A  read-only bit-encoded representation of the VLANs (one bit per
+--           possible VLAN, 0-4094) indexed by the ifIndex of the GigE port on the
+--           DSL card. A bit value of 1 indicates that the VLAN is mapped to one or
+--           more VCs on the DSL card. Mapping to the 0th VLAN (if deemed necessary
+--           implies no tagging. The 0th bit represents the 0th VLAN, the
+--	     1st bit represents the 1st VLAN, etc.
+--
+--           For the TA1100F system all
+--           eligible GigE ports are physically on the TA1148s (i.e., they are
+--           the WAN-side ports that connect to the GigE access ports on the
+--           TA1100F unit).
+--
+--           This variable is to be used to police the removal
+--           of VLAN memberships at the access port level."
+--         ::= { adGenIpVlanMemberEntry 2 }
+
+--    adGenIpVlanMemAddPort    OBJECT-TYPE
+--       SYNTAX          Integer32 (1..4094)
+--       MAX-ACCESS      read-write
+--       STATUS          current
+--       DESCRIPTION
+--           "The data associated with this object is the VID, and
+--           the index of this object is the ifIndex of the GigE
+--           port that is to become a member of the specified VLAN/VID."
+--         ::= { adGenIpVlanMemberEntry 3 }
+
+--    adGenIpVlanMemRemovePort    OBJECT-TYPE
+--       SYNTAX          Integer32 (1..4094)
+--       MAX-ACCESS      read-write
+--       STATUS          current
+--       DESCRIPTION
+--           "The data associated with this object is the VID, and
+--           the index of this object is the ifIndex of the GigE
+--           port that is to be removed from membership to the specified
+--           VLAN/VID."
+--         ::= { adGenIpVlanMemberEntry 4 }
+
+--    adGenIpVlanMemLastActionStatus    OBJECT-TYPE
+--       SYNTAX          DisplayString
+--       MAX-ACCESS      read-only
+--       STATUS          current
+--       DESCRIPTION
+--           "String description of the error that occurred as a result of
+--           the last set to adGenIpVlanAddPort or adGenIpVlanRemovePort."
+--         ::= { adGenIpVlanMemberEntry 5 }
+
+-- *********************************
+  adGenIpVlanPropertiesTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenIpVlanPropertiesEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains information on properties, such as
+           name, of the specified VLAN."
+       ::= { adGenIpProv 4 }
+
+   adGenIpVlanPropertiesEntry OBJECT-TYPE
+       SYNTAX      AdGenIpVlanPropertiesEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The index used is the VID of the VLAN of interest."
+       INDEX { adGenIpVlanVcVID }
+       ::= { adGenIpVlanPropertiesTable 1 }
+
+   AdGenIpVlanPropertiesEntry ::=
+       SEQUENCE {
+           adGenIpVlanPropName          DisplayString
+       }
+
+    adGenIpVlanPropName    OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS      read-write
+       STATUS          current
+       DESCRIPTION
+           "Name associated with the specified VLAN."
+         ::= { adGenIpVlanPropertiesEntry 1 }
+
+-- *********************************
+  adGenIpSysProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenIpSysProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains provisioning variables for the system."
+       ::= { adGenIpProv 5 }
+
+   adGenIpSysProvEntry OBJECT-TYPE
+       SYNTAX      AdGenIpSysProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The index used is the slot number of the active switch module."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adGenIpSysProvTable 1 }
+
+   AdGenIpSysProvEntry ::=
+       SEQUENCE {
+           adGenIpSysProvMgmtVID                  Integer32,
+           adGenIpSysProvMgmtTagEnable            INTEGER,
+           adGenIpSysProvMgmtPBits                Integer32,
+--           adGenIpSysProvMacLearningMode          INTEGER,
+           adGenIpSysProvMacAgingTimeout          Integer32,
+           adGenIpSysProvIgmpVID                  Integer32,
+           adGenIpSysProvIgmpTagEnable            INTEGER,
+           adGenIpSysProvIgmpPBits                Integer32,
+           adGenIpSysProvIgmpHostIP               IpAddress
+       }
+
+    adGenIpSysProvMgmtVID    OBJECT-TYPE
+       SYNTAX          Integer32 (0..4094)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The Management VLAN ID for this system. The index is the slot
+           number of the switch module. Management VID = 0 implies no
+           tagging; however, also see adGenIpSysMgmtTagEnable which is
+           the master variable for enabling tagging."
+         ::= { adGenIpSysProvEntry 1 }
+
+    adGenIpSysProvMgmtTagEnable    OBJECT-TYPE
+       SYNTAX          INTEGER {
+           enable (1),
+           disable (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable the switch module to receive and transmit tagged
+           (as opposed to untagged) traffic on the Management VLAN."
+         ::= { adGenIpSysProvEntry 2 }
+
+    adGenIpSysProvMgmtPBits    OBJECT-TYPE
+       SYNTAX          Integer32 (0..7)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Priority bits, 0-7, where 0 is the highest priority."
+         ::= { adGenIpSysProvEntry 3 }
+
+--    adGenIpSysProvMacLearningMode    OBJECT-TYPE
+--       SYNTAX          INTEGER {
+--           learnAndLock (1),
+--           macAging (2)
+--           }
+--       MAX-ACCESS      read-create
+--       STATUS          current
+--       DESCRIPTION
+--           "Method for learning and either keeping or aging out MAC
+--           addresses at the system level (e.g., in the Switch Module).
+--           Learn-and-lock implies keeping the addresses. So the
+--           timeout variable that applies to MAC aging does not
+--           apply to learn-and-lock."
+--         ::= { adGenIpSysProvEntry 4 }
+
+    adGenIpSysProvMacAgingTimeout    OBJECT-TYPE
+       SYNTAX          Integer32 (0..255)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Time limit (in seconds) for keeping MAC addresses while
+         in MAC aging mode. If this limit is set to zero, the mode of
+         operation is learn-and-lock."
+         ::= { adGenIpSysProvEntry 5 }
+
+    adGenIpSysProvIgmpVID    OBJECT-TYPE
+       SYNTAX          Integer32 (0..4094)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "The IGMP VLAN ID for this system. The index is the slot
+           number of the switch module. IGMP VID = 0 implies no
+           tagging; however, also see adGenIpSysIgmpTagEnable which is
+           the master variable for enabling tagging."
+         ::= { adGenIpSysProvEntry 6 }
+
+    adGenIpSysProvIgmpTagEnable    OBJECT-TYPE
+       SYNTAX          INTEGER {
+           enable (1),
+           disable (2)
+           }
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Enable/disable the switch module to receive and transmit tagged
+           (as opposed to untagged) traffic on the IGMP VLAN."
+         ::= { adGenIpSysProvEntry 7 }
+
+    adGenIpSysProvIgmpPBits    OBJECT-TYPE
+       SYNTAX          Integer32 (0..7)
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+           "Priority bits, 0-7, where 0 is the highest priority."
+         ::= { adGenIpSysProvEntry 8 }
+
+    adGenIpSysProvIgmpHostIP    OBJECT-TYPE
+       SYNTAX          IpAddress
+       MAX-ACCESS      read-create
+       STATUS          current
+       DESCRIPTION
+          "The IGMP Host IP address for this system. The index is the slot
+           number of the switch module."
+         ::= { adGenIpSysProvEntry 9 }
+
+-- ****************************************************************
+
+  adGenIpVlanAndPortProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenIpVlanAndPortProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains provisioning (row status) for VLAN membership."
+       ::= { adGenIpProv 6 }
+
+   adGenIpVlanAndPortProvEntry OBJECT-TYPE
+       SYNTAX      AdGenIpVlanAndPortProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenIpVlanVcVID, ifIndex }
+       ::= { adGenIpVlanAndPortProvTable 1 }
+
+   AdGenIpVlanAndPortProvEntry ::=
+       SEQUENCE {
+           adGenIpAccessPortVlanMemRowStatus       RowStatus
+       }
+
+    adGenIpAccessPortVlanMemRowStatus OBJECT-TYPE
+         SYNTAX          RowStatus
+         MAX-ACCESS      read-create
+         STATUS          current
+         DESCRIPTION
+             "This object is used to create a new row or to modify or
+             delete an existing row in this table. This object, by the
+	     definition of its indexes, represents the membership of
+             the specified port (ifIndex) to the specified VLAN
+             (adGenIpVlanVcVID). NOTE: Due to firmware complications,
+             the TA1100F and TA5000 will implement only the
+             createAndGo(4)...which implies active(1).. and destroy(6)
+             enums for RowStatus."
+         ::= { adGenIpVlanAndPortProvEntry 1 }
+
+
+   -- *********************************
+--  adGenIpVlanStatusTable OBJECT-TYPE
+--       SYNTAX      SEQUENCE OF AdGenIpVlanStatusEntry
+--       MAX-ACCESS  not-accessible
+--       STATUS      current
+--       DESCRIPTION
+--           "This table contains information on the members of the
+--           specified VLAN."
+--       ::= { adGenIpStatus 1 }
+
+--   adGenIpVlanStatusEntry OBJECT-TYPE
+--       SYNTAX      AdGenIpVlanStatusEntry
+--       MAX-ACCESS  not-accessible
+--       STATUS      current
+--       DESCRIPTION
+--           "The indexes used are the VID of interest and an ordinal
+--	   number for each member of that VLAN."
+--       INDEX { adGenIpVlanVcVID, adGenIpVlanStatIndex }
+--       ::= { adGenIpVlanStatusTable 1 }
+
+--   AdGenIpVlanStatusEntry ::=
+--       SEQUENCE {
+--           adGenIpVlanStatIndex         Integer32,
+--           adGenIpVlanStatMember        Integer32
+--       }
+
+--    adGenIpVlanStatIndex    OBJECT-TYPE
+--       SYNTAX      Integer32
+--       MAX-ACCESS      not-accessible
+--       STATUS          current
+--       DESCRIPTION
+--           "Ordinal number of the ifIndex/port that is a member of this VLAN."
+--         ::= { adGenIpVlanStatusEntry 1 }
+
+--    adGenIpVlanStatMember     OBJECT-TYPE
+--       SYNTAX      Integer32
+--       MAX-ACCESS      read-only
+--       STATUS          current
+--       DESCRIPTION
+--           "The ifIndexes of the ports that are memebers of this VLAN."
+--         ::= { adGenIpVlanStatusEntry 2 }
+
+-- ***************************************************************
+  adGenIpVlanAndPortStatusTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenIpVlanAndPortStatusEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains status information on VLAN membership."
+       ::= { adGenIpStatus 2 }
+
+   adGenIpVlanAndPortStatusEntry OBJECT-TYPE
+       SYNTAX      AdGenIpVlanAndPortStatusEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { ifIndex, adGenIpVlanVcVID }
+       ::= { adGenIpVlanAndPortStatusTable 1 }
+
+   AdGenIpVlanAndPortStatusEntry ::=
+       SEQUENCE {
+--           adGenIpVlanAccessPortMembership       TruthValue,
+           adGenIpConfVlanMapping                Counter32
+       }
+
+--    adGenIpVlanAccessPortMembership    OBJECT-TYPE
+--       SYNTAX          TruthValue
+--       MAX-ACCESS      read-only
+--       STATUS          current
+--       DESCRIPTION
+--           "This variable is indexed by the ifIndex of the Access/LAN GigE port(s)
+--           on the Switch Module (e.g., the Access GigE ports on the TA1100F) and
+--           the VID of interest. The possible values are true(1) and false(2) to
+--           indicate whether the specified port/ifIndex is a member of the
+--           specified VLAN/VID."
+--         ::= { adGenIpVlanAndPortStatusEntry 1 }
+
+    adGenIpConfVlanMapping    OBJECT-TYPE
+       SYNTAX          Counter32
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+           "This variable is indexed by the ifIndex of the GigE port on the
+           'backplane' of the card (e.g., the TA1148, the TA5000 ADSL card,
+           etc.) and the VID of interest. The counter is incremented once for
+           every mapping that is created between a VC on that card and the
+           specified VID. It is decremented once for every mapping that is
+           deleted. This variable may be used to police the removal of
+           mappings between the WAN GigEs and the LAN GigEs on the
+           Switch Module."
+         ::= { adGenIpVlanAndPortStatusEntry 2 }
+
+   END
+

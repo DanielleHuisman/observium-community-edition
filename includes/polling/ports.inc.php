@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -597,6 +597,9 @@ foreach ($ports as $port) {
         // rewrite the ifPhysAddress
         // IF-MIB::ifPhysAddress.2 = STRING: 66:c:9b:1b:62:7e
         // IF-MIB::ifPhysAddress.2 = Hex-STRING: 00 02 99 09 E9 84
+        // deeerp device return snmp string instead mac
+        // ifPhysAddress.3 = 30:30:2d:30:36:2d:33:39:2d:30:41:2d:35:46:2d:36:38
+        // ifPhysAddress.3 = STRING: "00-06-39-0A-5F-68"
         $this_port['ifPhysAddress'] = mac_zeropad($this_port['ifPhysAddress']);
 
         // ifSpeed processing

@@ -1,0 +1,1554 @@
+ADTRAN-PLUGGABLE-PORT-MIB
+
+DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN CN PLUGGABLE PORT MIB
+    -- PRODUCT:   Modules with pluggable ports (SM, RPR LM, GE, ...)
+    -- VERSION:   1.0
+    -- DATE:      Sept 10, 2008
+
+    -- This MIB Contains tables for pluggable ports on CN products.
+    --
+    -- HISTORY:
+    --        2008/09/10 jmz - First Revision
+    --        2010/06/04 jmz - Added capability bit for diagnostics
+    --        2010/06/22 jlb - Added adGenPluggablePortVendorRevision
+    --        2010/10/29 tgc - Updated the Description fields for adGenPluggablePortMismatchSet/Clear traps
+    --                       - in an attempt to cover all possible mismatches, with speed and type being regarded
+    --                       - as likely/common mismatches.
+    --                       * PLEASE DO NOT ADD ANY REVISION HISTORY HERE!  USE REVISION/DESCRIPTION!
+
+IMPORTS
+
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Integer32, Unsigned32
+        FROM SNMPv2-SMI
+    sysName
+        FROM SNMPv2-MIB
+    DisplayString, TruthValue, TEXTUAL-CONVENTION
+        FROM SNMPv2-TC
+    InterfaceIndex, ifIndex, ifDescr
+        FROM IF-MIB
+    adIdentity
+        FROM ADTRAN-MIB
+    adGenSlotInfoIndex
+        FROM ADTRAN-GENSLOT-MIB
+    adGenPortTrapIdentifier
+        FROM ADTRAN-GENPORT-MIB
+    adTrapInformSeqNum
+        FROM ADTRAN-GENTRAPINFORM-MIB
+    adGenPluggablePort, adGenPluggablePortID
+        FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+     adTAeSCUTrapAlarmLevel
+        FROM ADTRAN-TAeSCUEXT1-MIB;
+
+
+    adGenPluggablePortMIB MODULE-IDENTITY
+        LAST-UPDATED "202003190000Z"
+        ORGANIZATION "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Adtran Pluggable Port MIB"
+
+        REVISION "202003190000Z"
+        DESCRIPTION "Added adGenPluggableAlarmSlotProvTable to provision the pluggable alarm levels on a slot."
+
+
+        REVISION "201908140000Z"
+        DESCRIPTION "Change adGenPluggableNumberOfChannels to adGenPluggableNumberOfXcvrChannels and
+                     adGenPluggablePortChannelIndex to adGenPluggablePortChannelXcvrIndex to prevent
+                     confusion with wavelength channel OID names."
+
+        REVISION "201905310000Z"
+        DESCRIPTION "Add 'opticalPigtail', 'noSeparable', and 'mpo' definitions to adGenPluggablePortConnectorType for optical pigtail and MPO (multi-fiber push on)cables.
+                     Add QSFP definition to adGenPluggablePortPluggableType. Add adGenPluggablePortTable objects.
+                     Deprecate several objects in adGenPluggablePortTable."
+
+        REVISION "201604150000Z"
+        DESCRIPTION "Add 'copperPigtail' definition to adGenPluggablePortConnectorType for copper pigtail (infiniband) cables."
+        REVISION "201306130000Z"
+        DESCRIPTION "Add 'none' definition to adGenPluggablePortConnectorType to deal with the condition when SFP/XFP is uninstalled."
+
+        REVISION "201201230000Z"
+        DESCRIPTION  "Added adGenPluggablePortProvTable to support Wavelength and
+                      channel number provisioning.  Updated adGenPluggablePortCapabilities
+                      to indicate if wavelength is provisionable.  Added wavelengths
+                      mismatch alarm. Also updated adGenPluggablePortStatusBits,
+                      adGenPluggablePortAlarmBits and adGenPluggablePortAlarmsSuppressed
+                      for a new wavelength mismatch condition."
+
+        REVISION "201103220000Z"
+        DESCRIPTION "Added adGenPluggablePortWavelengthPicoMeter."
+
+        ::= { adGenPluggablePortID 1 }
+
+--
+-- Object Hierarchy
+--
+
+adGenPluggablePortObjects       OBJECT IDENTIFIER ::= { adGenPluggablePort 1 }
+adGenPluggablePortStats         OBJECT IDENTIFIER ::= { adGenPluggablePort 2 }
+adGenPluggablePortScalars       OBJECT IDENTIFIER ::= { adGenPluggablePort 3 }
+adGenPluggablePortTraps         OBJECT IDENTIFIER ::= { adGenPluggablePort 4 }
+adGenPluggablePortProv          OBJECT IDENTIFIER ::= { adGenPluggablePort 5 }
+adGenPluggablePortAlarms        OBJECT IDENTIFIER ::= { adGenPluggablePortTraps 0 }
+
+
+PluggablePortPowerUnits ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Possible units for reporting power levels."
+    SYNTAX      INTEGER {
+                    dBm               (1),
+                    tenthsDBm         (2),
+                    microWatts        (3),
+                    tenthsMicroWatts  (4)
+                }
+
+--
+-- Pluggable Port Information Table
+--
+
+adGenPluggablePortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenPluggablePortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Provides information about pluggable ports/interfaces,
+        such as SFPs and XFPs."
+    ::= { adGenPluggablePortObjects 1 }
+
+adGenPluggablePortEntry OBJECT-TYPE
+    SYNTAX      AdGenPluggablePortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Provides information about pluggable ports/interfaces.
+         that are plugged into the system."
+    INDEX { adGenPluggablePortIndex }
+    ::= { adGenPluggablePortTable 1 }
+
+AdGenPluggablePortEntry ::=
+    SEQUENCE {
+       adGenPluggablePortIndex                     InterfaceIndex,
+
+       adGenPluggablePortPluggableType             INTEGER,
+       adGenPluggablePortConnectorType             INTEGER,
+       adGenPluggablePortCapabilities              BITS,
+       adGenPluggablePortState                     BITS,
+       adGenPluggablePortStatusBits                BITS,
+       adGenPluggablePortAlarmBits                 BITS,
+       adGenPluggablePortAlarmsSuppressed          BITS,
+       adGenPluggablePortBer                       Unsigned32,
+       adGenPluggablePortVendorName                OCTET STRING,
+       adGenPluggablePortVendorPartNumber          OCTET STRING,
+       adGenPluggablePortVendorSerialNumber        OCTET STRING,
+       adGenPluggablePortAdtranName                OCTET STRING,
+       adGenPluggablePortAdtranPartNumber          OCTET STRING,
+       adGenPluggablePortAdtranClei                OCTET STRING,
+       adGenPluggablePortWavelength                Unsigned32,
+       adGenPluggablePortMinBitRate                Unsigned32,
+       adGenPluggablePortMaxBitRate                Unsigned32,
+       adGenPluggablePortReachLength               Unsigned32,
+       adGenPluggablePortReachUnits                INTEGER,
+       adGenPluggablePortRxPower                   Integer32,
+       adGenPluggablePortRxPowerUnits              PluggablePortPowerUnits,
+       adGenPluggablePortTxPower                   Integer32,
+       adGenPluggablePortTxPowerUnits              PluggablePortPowerUnits,
+       adGenPluggablePortTxBias                    Integer32,
+       adGenPluggablePortTxBiasUnits               INTEGER,
+       adGenPluggablePortTemperature               Integer32,
+       adGenPluggablePortTemperatureUnits          INTEGER,
+       adGenPluggablePortVoltage                   Integer32,
+       adGenPluggablePortVendorRevision            OCTET STRING,
+       adGenPluggablePortWavelengthPicoMeter       Unsigned32,
+       adGenPluggableNumberOfXcvrChannels          Integer32
+    }
+
+adGenPluggablePortIndex OBJECT-TYPE
+    SYNTAX             InterfaceIndex
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interface index of the pluggable port."
+    ::= { adGenPluggablePortEntry 1 }
+
+adGenPluggablePortPluggableType OBJECT-TYPE
+    SYNTAX             INTEGER {
+                           none        (1),
+                           sfp         (2),
+                           xfp         (3),
+                           unknown     (4),
+                           qsfp        (5)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the form factor of the pluggable port."
+    ::= { adGenPluggablePortEntry 2 }
+
+adGenPluggablePortConnectorType OBJECT-TYPE
+    SYNTAX             INTEGER {
+                           other         (1),
+                           fiberLC       (2),
+                           fiberSC       (3),
+                           mtrj          (4),
+                           hssdc         (5),
+                           copperRJ45    (6),
+                           none          (7),
+                           copperPigtail (8),
+                           opticalPigtail (9),
+                           mpo           (10),
+                           noSeparable   (11)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the type of the pluggable port."
+    ::= { adGenPluggablePortEntry 3 }
+
+adGenPluggablePortCapabilities OBJECT-TYPE
+    SYNTAX             BITS {
+                           pluggable            (0),
+                           berReadable          (1),
+                           voltageReadable      (2),
+                           wavelengthReadable   (3),
+                           diagnosticsAvailable (4),
+                           wavelengthProvisionable (5)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the capabilities of the pluggable port;
+        whether the port is pluggable (0) (if not pluggable,
+        the port might still be able to report optical data),
+        or if the bit error rate is readable (1). Also reports
+        if the voltage is readable (2), wavelength is
+        readable (3), if the diagnostics information is
+        available (4) or if wavelength is provisionable (5).
+        If diagnostics are available, values in
+        adGenPluggablePortRxPower, adGenPluggablePortTxPower,
+        adGenPluggablePortTxBias, adGenPluggablePortTemperature,
+        and adGenPluggablePortVoltage are valid.  If wavelength
+        provisioning is available then use adGenPluggablePortProvTable
+        to provision wavelength or channel."
+    ::= { adGenPluggablePortEntry 4 }
+
+adGenPluggablePortState OBJECT-TYPE
+    SYNTAX             BITS {
+                           portUnsupported   (0),
+                           portUp            (1),
+                           portDown          (2),
+                           portLos           (3),
+                           portLol           (4),
+                           portSignalDegrade (5),
+                           portSignalFail    (6),
+                           portMissing       (7),
+                           cardMissing       (8)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the state of the pluggable port; multiple
+        bits can be set for various details of 'portDown'. If the
+        port is 'portUp', there shouldn't be any other bits set.
+
+        portDown: Port is non-operational, for the following reasons:
+        portUnsupported: Implies the port is not an ADTRAN part.
+        portLos: Port has a Loss-of-Signal condition.
+        portLol: Port has a Loss-of-Lock condition.
+        portSignalDegrade: Port has high enough BER that it is degraded.
+        portSignalFail: Port has general failure condition.
+        portMissing: Pluggable is not plugged in.
+        cardMissing: Port exists on a peer card that is missing."
+    ::= { adGenPluggablePortEntry 5 }
+
+adGenPluggablePortStatusBits OBJECT-TYPE
+    SYNTAX             BITS {
+                           isPresent    (0),
+                           isValid      (1),
+                           isSupported  (2),
+                           isMismatched (3),
+                           isTxEnabled  (4),
+                           isTxFault    (5),
+                           isWavelengthMismatch (6)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports other status information for the pluggable port.
+        isSupported: Pluggable is an ADTRAN part.
+        isPresent: Pluggable has been detected.
+        isValid: Pluggable information has been read correctly.
+        isMismatched: Pluggable reported speed (adGenPluggablePortMin/MaxBitRate)
+                      does not match required speed for this port.
+        isTxEnabled: Pluggable has been enabled (laser on).
+        isTxFault: Pluggable has a TxFault condition.
+        isWavelengthMismatch: Pluggable has a wavelength mismatch condition."
+    ::= { adGenPluggablePortEntry 6 }
+
+adGenPluggablePortAlarmBits OBJECT-TYPE
+    SYNTAX             BITS {
+                           txFault      (0),
+                           missing      (1),
+                           unsupported  (2),
+                           speedMismatch(3),
+                           highTemp     (4),
+                           wavelengthMismatch  (5)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the alarm status of the pluggable port, matching
+        each bit to a supported alarm on the pluggable. This may be
+        set, even if the related bit in adGenPluggablePortAlarmsSuppressed
+        is set to block the alarm being raised to the management system."
+    ::= { adGenPluggablePortEntry 7 }
+
+adGenPluggablePortAlarmsSuppressed OBJECT-TYPE
+    SYNTAX             BITS {
+                           txFault      (0),
+                           missing      (1),
+                           unsupported  (2),
+                           speedMismatch(3),
+                           highTemp     (4),
+                           wavelengthMismacth (5)
+                       }
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+       "Allows the alarm to be suppressed; if the bit is set, the
+        alarm will not be raised, even if the condition is met."
+    ::= { adGenPluggablePortEntry 8 }
+
+adGenPluggablePortBer OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the exponent of the Bit Error Rate reading
+        on the port; resulting BER should be 1E-N, where N
+        is the reported value. This is valid only if the
+        berReadable bit is set in adGenPluggablePortCapabilities."
+    ::= { adGenPluggablePortEntry 9 }
+
+adGenPluggablePortVendorName OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..40))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's vendor name
+        as read from the pluggable PROM."
+    ::= { adGenPluggablePortEntry 10 }
+
+adGenPluggablePortVendorPartNumber OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..40))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's vendor part number
+        as read from the pluggable PROM."
+    ::= { adGenPluggablePortEntry 11 }
+
+adGenPluggablePortVendorSerialNumber OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..40))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's vendor serial number
+        as read from the pluggable PROM."
+    ::= { adGenPluggablePortEntry 12 }
+
+adGenPluggablePortAdtranName OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..40))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's Adtran name as
+        read from the pluggable PROM (if isApproved)."
+    ::= { adGenPluggablePortEntry 13 }
+
+adGenPluggablePortAdtranPartNumber OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..40))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's Adtran part number as
+        read from the pluggable PROM (if isApproved)."
+    ::= { adGenPluggablePortEntry 14 }
+
+adGenPluggablePortAdtranClei OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..40))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's Adtran CLEI as
+        read from the pluggable PROM (if isApproved)."
+    ::= { adGenPluggablePortEntry 15 }
+
+adGenPluggablePortWavelength OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the wavelength of the pluggable port in nanometers, only if the
+        adGenPluggablePortCapabilities has the wavelengthReadable bit set."
+    ::= { adGenPluggablePortEntry 16 }
+
+adGenPluggablePortMinBitRate OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the minimum rate of the pluggable port in Mb/s."
+    ::= { adGenPluggablePortEntry 17 }
+
+adGenPluggablePortMaxBitRate OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the maximum rate of the pluggable port in Mb/s."
+    ::= { adGenPluggablePortEntry 18 }
+
+adGenPluggablePortReachLength OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the maximum transmission length of the pluggable port
+        in units reported by adGenPluggablePortReachUnits."
+    ::= { adGenPluggablePortEntry 19 }
+
+adGenPluggablePortReachUnits OBJECT-TYPE
+    SYNTAX             INTEGER {
+                           reachUnit1Kmfor09um  (1),
+                           reachUnit100mfor09um (2),
+                           reachUnit10mfor50um  (3),
+                           reachUnit10mfor62um  (4),
+                           reachUnit1mforCu     (5),
+                           reachUnit1KmforSmf   (6),
+                           reachUnit2mforEBW    (7),
+                           reachUnit1mfor50um   (8),
+                           reachUnit1mfor62um   (9)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortReachLength."
+    ::= { adGenPluggablePortEntry 20 }
+
+adGenPluggablePortRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             deprecated
+    DESCRIPTION
+       "Reports the receive power of the pluggable port in
+        units reported by adGenPluggablePortRxPowerUnits.
+        This object is deprecated for new development.
+        Please use the relevant OID in the
+        adGenPluggablePortChannelTable for new development."
+    ::= { adGenPluggablePortEntry 21 }
+
+adGenPluggablePortRxPowerUnits OBJECT-TYPE
+    SYNTAX             PluggablePortPowerUnits
+    MAX-ACCESS         read-only
+    STATUS             deprecated
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortRxPower.
+        This object is deprecated for new development.
+        Please use the relevant OID in the
+        adGenPluggablePortChannelTable for new development."
+    ::= { adGenPluggablePortEntry 22 }
+
+adGenPluggablePortTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             deprecated
+    DESCRIPTION
+       "Reports the transmit power of the pluggable port in
+        units reported by adGenPluggablePortTxPowerUnits.
+        This object is deprecated for new development.
+        Please use the relevant OID in the
+        adGenPluggablePortChannelTable for new development."
+    ::= { adGenPluggablePortEntry 23 }
+
+adGenPluggablePortTxPowerUnits OBJECT-TYPE
+    SYNTAX             PluggablePortPowerUnits
+    MAX-ACCESS         read-only
+    STATUS             deprecated
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortTxPower.
+       This object is deprecated for new development.
+        Please use the relevant OID in the
+        adGenPluggablePortChannelTable for new development."
+    ::= { adGenPluggablePortEntry 24 }
+
+adGenPluggablePortTxBias OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             deprecated
+    DESCRIPTION
+       "Reports the transmit bias current of the pluggable port in
+        units reported by adGenPluggablePortTxBiasUnits.
+        This object is deprecated for new development.
+        Please use the relevant OID in the
+        adGenPluggablePortChannelTable for new development."
+    ::= { adGenPluggablePortEntry 25 }
+
+adGenPluggablePortTxBiasUnits OBJECT-TYPE
+    SYNTAX             INTEGER {
+                           milliAmps   (1)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             deprecated
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortTxBias.
+        This object is deprecated for new development.
+        Please use the relevant OID in the
+        adGenPluggablePortChannelTable for new development."
+    ::= { adGenPluggablePortEntry 26 }
+
+adGenPluggablePortTemperature OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the temperature of the pluggable port in
+        units reported by adGenPluggablePortTemperatureUnits."
+    ::= { adGenPluggablePortEntry 27 }
+
+adGenPluggablePortTemperatureUnits OBJECT-TYPE
+    SYNTAX             INTEGER {
+                           celsius          (1),
+                           tenthsCelsius    (2),
+                           fahrenheit       (3),
+                           tenthsFahrenheit (4)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortTemperature."
+    ::= { adGenPluggablePortEntry 28 }
+
+adGenPluggablePortVoltage OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the voltage of the pluggable port in mV, only if
+        adGenPluggablePortCapabilities has the voltageReadable bit set."
+    ::= { adGenPluggablePortEntry 29 }
+
+adGenPluggablePortVendorRevision OBJECT-TYPE
+    SYNTAX             OCTET STRING (SIZE (0..4))
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the pluggable port's vendor revision level
+        as read from the pluggable PROM."
+    ::= { adGenPluggablePortEntry 30 }
+
+adGenPluggablePortWavelengthPicoMeter OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the wavelength of the pluggable port in picometer, only if the
+        adGenPluggablePortCapabilities has the wavelengthReadable bit set."
+    ::= { adGenPluggablePortEntry 31 }
+
+adGenPluggableNumberOfXcvrChannels OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the number of channels that this pluggable module supports.
+        Example: for SFPs this should be 1, for QSFP this will typically
+        be 4. Can be used to determine the max indices supported by
+        tables indexed by ChannelId such as the adGenPluggablePortChannelTable."
+    ::= { adGenPluggablePortEntry 32 }
+
+--
+-- Pluggable Port Channel Table
+--
+
+adGenPluggablePortChannelTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenPluggablePortChannelEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Provides information about pluggable port channels
+        for Pluggable modules that have more than one communication
+        channel per module, such as QSFP."
+    ::= { adGenPluggablePortObjects 2 }
+
+adGenPluggablePortChannelEntry OBJECT-TYPE
+    SYNTAX      AdGenPluggablePortChannelEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Provides information about pluggable port transceiver channels
+         for Pluggable modules that have more than one transceiver
+         channel per module, such as QSFP."
+    INDEX { adGenPluggablePortIndex, adGenPluggablePortChannelXcvrIndex }
+    ::= { adGenPluggablePortChannelTable 1 }
+
+AdGenPluggablePortChannelEntry ::=
+    SEQUENCE {
+       adGenPluggablePortChannelModuleIndex               InterfaceIndex,
+       adGenPluggablePortChannelXcvrIndex                 Unsigned32,
+       adGenPluggablePortChannelRxPower                   Integer32,
+       adGenPluggablePortChannelRxPowerUnits              PluggablePortPowerUnits,
+       adGenPluggablePortChannelTxPower                   Integer32,
+       adGenPluggablePortChannelTxPowerUnits              PluggablePortPowerUnits,
+       adGenPluggablePortChannelTxBias                    Integer32,
+       adGenPluggablePortChannelTxBiasUnits               INTEGER
+    }
+
+adGenPluggablePortChannelModuleIndex OBJECT-TYPE
+    SYNTAX             InterfaceIndex
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interface index of the pluggable port."
+    ::= { adGenPluggablePortChannelEntry 1 }
+
+adGenPluggablePortChannelXcvrIndex OBJECT-TYPE
+    SYNTAX             Unsigned32
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the transceiver channel of the pluggable port."
+    ::= { adGenPluggablePortChannelEntry 2 }
+
+adGenPluggablePortChannelRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the receive power of the pluggable port in
+        units reported by adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortChannelEntry 3 }
+
+adGenPluggablePortChannelRxPowerUnits OBJECT-TYPE
+    SYNTAX             PluggablePortPowerUnits
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortRxPower."
+    ::= { adGenPluggablePortChannelEntry 4 }
+
+adGenPluggablePortChannelTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the transmit power of the pluggable port in
+        units reported by adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortChannelEntry 5 }
+
+adGenPluggablePortChannelTxPowerUnits OBJECT-TYPE
+    SYNTAX             PluggablePortPowerUnits
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortTxPower."
+    ::= { adGenPluggablePortChannelEntry 6 }
+
+adGenPluggablePortChannelTxBias OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the transmit bias current of the pluggable port in
+        units reported by adGenPluggablePortTxBiasUnits."
+    ::= { adGenPluggablePortChannelEntry 7 }
+
+adGenPluggablePortChannelTxBiasUnits OBJECT-TYPE
+    SYNTAX             INTEGER {
+                           milliAmps   (1)
+                       }
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the units of adGenPluggablePortTxBias."
+    ::= { adGenPluggablePortChannelEntry 8 }
+
+
+--
+-- Pluggable Port Statistics - Total
+--
+
+adGenPluggablePortTotalStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenPluggablePortTotalStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Provides cumulative statistics for pluggable ports."
+    ::= { adGenPluggablePortStats 1 }
+
+adGenPluggablePortTotalStatsEntry OBJECT-TYPE
+    SYNTAX      AdGenPluggablePortTotalStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Provides cumulative statistics for pluggable ports."
+    INDEX { adGenPluggablePortTotalStatsIndex }
+    ::= { adGenPluggablePortTotalStatsTable 1 }
+
+AdGenPluggablePortTotalStatsEntry ::=
+    SEQUENCE {
+       adGenPluggablePortTotalStatsIndex           InterfaceIndex,
+
+       adGenPluggablePortTotalStatsMaxRxPower      Integer32,
+       adGenPluggablePortTotalStatsMinRxPower      Integer32,
+       adGenPluggablePortTotalStatsAvgRxPower      Integer32,
+       adGenPluggablePortTotalStatsMaxTxPower      Integer32,
+       adGenPluggablePortTotalStatsMinTxPower      Integer32,
+       adGenPluggablePortTotalStatsAvgTxPower      Integer32
+    }
+
+adGenPluggablePortTotalStatsIndex OBJECT-TYPE
+    SYNTAX             InterfaceIndex
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interface index of the pluggable port."
+    ::= { adGenPluggablePortTotalStatsEntry 1 }
+
+adGenPluggablePortTotalStatsMaxRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the overall maximum Rx Power seen on this
+        pluggable port, in units of adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortTotalStatsEntry 2 }
+
+adGenPluggablePortTotalStatsMinRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the overall minimum Rx Power seen on this
+        pluggable port, in units of adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortTotalStatsEntry 3 }
+
+adGenPluggablePortTotalStatsAvgRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the overall average Rx Power seen on this
+        pluggable port, in units of adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortTotalStatsEntry 4 }
+
+adGenPluggablePortTotalStatsMaxTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the overall maximum Tx Power seen on this
+        pluggable port, in units of adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortTotalStatsEntry 5 }
+
+adGenPluggablePortTotalStatsMinTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the overall minimum Tx Power seen on this
+        pluggable port, in units of adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortTotalStatsEntry 6 }
+
+adGenPluggablePortTotalStatsAvgTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the overall average Tx Power seen on this
+        pluggable port, in units of adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortTotalStatsEntry 7 }
+
+
+
+--
+-- Pluggable Port Statistics - Current
+--
+
+adGenPluggablePortCurrentStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenPluggablePortCurrentStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Provides statistics from the current interval
+       for pluggable ports."
+    ::= { adGenPluggablePortStats 2 }
+
+adGenPluggablePortCurrentStatsEntry OBJECT-TYPE
+    SYNTAX      AdGenPluggablePortCurrentStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Provides statistics from the current interval
+         for pluggable ports."
+    INDEX { adGenPluggablePortCurrentStatsIndex }
+    ::= { adGenPluggablePortCurrentStatsTable 1 }
+
+AdGenPluggablePortCurrentStatsEntry ::=
+    SEQUENCE {
+       adGenPluggablePortCurrentStatsIndex           InterfaceIndex,
+
+       adGenPluggablePortCurrentStatsMaxRxPower      Integer32,
+       adGenPluggablePortCurrentStatsMinRxPower      Integer32,
+       adGenPluggablePortCurrentStatsAvgRxPower      Integer32,
+       adGenPluggablePortCurrentStatsMaxTxPower      Integer32,
+       adGenPluggablePortCurrentStatsMinTxPower      Integer32,
+       adGenPluggablePortCurrentStatsAvgTxPower      Integer32
+    }
+
+adGenPluggablePortCurrentStatsIndex OBJECT-TYPE
+    SYNTAX             InterfaceIndex
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interface index of the pluggable port."
+    ::= { adGenPluggablePortCurrentStatsEntry 1 }
+
+adGenPluggablePortCurrentStatsMaxRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the maximum Rx Power seen on this pluggable
+        port in the current interval, in units of
+        adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortCurrentStatsEntry 2 }
+
+adGenPluggablePortCurrentStatsMinRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the minimum Rx Power seen on this pluggable
+        port, in the current interval, in units of
+        adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortCurrentStatsEntry 3 }
+
+adGenPluggablePortCurrentStatsAvgRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the average Rx Power seen on this pluggable
+        port, in the current interval, in units of
+        adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortCurrentStatsEntry 4 }
+
+adGenPluggablePortCurrentStatsMaxTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the maximum Tx Power seen on this pluggable
+        port, in the current interval, in units of
+        adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortCurrentStatsEntry 5 }
+
+adGenPluggablePortCurrentStatsMinTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the minimum Tx Power seen on this pluggable
+        port, in the current interval, in units of
+        adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortCurrentStatsEntry 6 }
+
+adGenPluggablePortCurrentStatsAvgTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the average Tx Power seen on this pluggable
+        port, in the current interval, in units of
+        adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortCurrentStatsEntry 7 }
+
+
+
+--
+-- Pluggable Port Statistics - Day
+--
+
+adGenPluggablePortDayStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenPluggablePortDayStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Provides 24 hour statistics for pluggable ports."
+    ::= { adGenPluggablePortStats 3 }
+
+adGenPluggablePortDayStatsEntry OBJECT-TYPE
+    SYNTAX      AdGenPluggablePortDayStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Provides 24 hour statistics for pluggable ports."
+    INDEX { adGenPluggablePortDayStatsIndex }
+    ::= { adGenPluggablePortDayStatsTable 1 }
+
+AdGenPluggablePortDayStatsEntry ::=
+    SEQUENCE {
+       adGenPluggablePortDayStatsIndex           InterfaceIndex,
+
+       adGenPluggablePortDayStatsMaxRxPower      Integer32,
+       adGenPluggablePortDayStatsMinRxPower      Integer32,
+       adGenPluggablePortDayStatsAvgRxPower      Integer32,
+       adGenPluggablePortDayStatsMaxTxPower      Integer32,
+       adGenPluggablePortDayStatsMinTxPower      Integer32,
+       adGenPluggablePortDayStatsAvgTxPower      Integer32
+    }
+
+adGenPluggablePortDayStatsIndex OBJECT-TYPE
+    SYNTAX             InterfaceIndex
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interface index of the pluggable port."
+    ::= { adGenPluggablePortDayStatsEntry 1 }
+
+adGenPluggablePortDayStatsMaxRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the 24 hour maximum Rx Power seen on this
+        pluggable port, in units of adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortDayStatsEntry 2 }
+
+adGenPluggablePortDayStatsMinRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the 24 hour minimum Rx Power seen on this
+        pluggable port, in units of adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortDayStatsEntry 3 }
+
+adGenPluggablePortDayStatsAvgRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the 24 hour average Rx Power seen on this
+        pluggable port, in units of adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortDayStatsEntry 4 }
+
+adGenPluggablePortDayStatsMaxTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the 24 hour maximum Tx Power seen on this
+        pluggable port, in units of adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortDayStatsEntry 5 }
+
+adGenPluggablePortDayStatsMinTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the 24 hour minimum Tx Power seen on this
+        pluggable port, in units of adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortDayStatsEntry 6 }
+
+adGenPluggablePortDayStatsAvgTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the 24 hour average Tx Power seen on this
+        pluggable port, in units of adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortDayStatsEntry 7 }
+
+
+
+--
+-- Pluggable Port Statistics - Interval
+--
+
+adGenPluggablePortIntervalStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenPluggablePortIntervalStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Provides cumulative statistics for pluggable ports."
+    ::= { adGenPluggablePortStats 4 }
+
+adGenPluggablePortIntervalStatsEntry OBJECT-TYPE
+    SYNTAX      AdGenPluggablePortIntervalStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Provides cumulative statistics for pluggable ports."
+    INDEX { adGenPluggablePortIntervalStatsIndex,
+            adGenPluggablePortIntervalStatsInterval }
+    ::= { adGenPluggablePortIntervalStatsTable 1 }
+
+AdGenPluggablePortIntervalStatsEntry ::=
+    SEQUENCE {
+       adGenPluggablePortIntervalStatsIndex           InterfaceIndex,
+       adGenPluggablePortIntervalStatsInterval        Unsigned32,
+
+       adGenPluggablePortIntervalStatsMaxRxPower      Integer32,
+       adGenPluggablePortIntervalStatsMinRxPower      Integer32,
+       adGenPluggablePortIntervalStatsAvgRxPower      Integer32,
+       adGenPluggablePortIntervalStatsMaxTxPower      Integer32,
+       adGenPluggablePortIntervalStatsMinTxPower      Integer32,
+       adGenPluggablePortIntervalStatsAvgTxPower      Integer32
+    }
+
+adGenPluggablePortIntervalStatsIndex OBJECT-TYPE
+    SYNTAX             InterfaceIndex
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interface index of the pluggable port."
+    ::= { adGenPluggablePortIntervalStatsEntry 1 }
+
+adGenPluggablePortIntervalStatsInterval OBJECT-TYPE
+    SYNTAX             Unsigned32 (1..96)
+    MAX-ACCESS         not-accessible
+    STATUS             current
+    DESCRIPTION
+       "Identifies the interval for which these stats are valid."
+    ::= { adGenPluggablePortIntervalStatsEntry 2 }
+
+adGenPluggablePortIntervalStatsMaxRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the maximum Rx Power seen on this pluggable
+        port, in this interval, in units of
+        adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortIntervalStatsEntry 3 }
+
+adGenPluggablePortIntervalStatsMinRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the minimum Rx Power seen on this pluggable
+        port, in this interval, in units of
+        adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortIntervalStatsEntry 4 }
+
+adGenPluggablePortIntervalStatsAvgRxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the average Rx Power seen on this pluggable
+        port, in this interval, in units of
+        adGenPluggablePortRxPowerUnits."
+    ::= { adGenPluggablePortIntervalStatsEntry 5 }
+
+adGenPluggablePortIntervalStatsMaxTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the maximum Tx Power seen on this pluggable
+        port, in this interval, in units of
+        adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortIntervalStatsEntry 6 }
+
+adGenPluggablePortIntervalStatsMinTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the minimum Tx Power seen on this pluggable
+        port, in this interval, in units of
+        adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortIntervalStatsEntry 7 }
+
+adGenPluggablePortIntervalStatsAvgTxPower OBJECT-TYPE
+    SYNTAX             Integer32
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+       "Reports the average Tx Power seen on this pluggable
+        port, in this interval, in units of
+        adGenPluggablePortTxPowerUnits."
+    ::= { adGenPluggablePortIntervalStatsEntry 8 }
+
+
+--
+-- Pluggable Port Provisioning
+--
+
+
+adGenPluggablePortProvTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF AdGenPluggablePortProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "The Pluggable Port provisioning table."
+    ::= { adGenPluggablePortProv 1 }
+
+adGenPluggablePortProvEntry OBJECT-TYPE
+    SYNTAX  AdGenPluggablePortProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+      "An entry in the Pluggable Port provisioning table."
+      INDEX  { ifIndex }
+      ::= { adGenPluggablePortProvTable 1 }
+
+AdGenPluggablePortProvEntry ::=
+    SEQUENCE {
+       adGenPluggablePortProvWaveLength
+          Integer32,
+       adGenPluggablePortProvChannelNumber
+          Integer32
+    }
+
+adGenPluggablePortProvWaveLength OBJECT-TYPE
+     SYNTAX         Integer32
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "Used to specify a wavelength of light associated with pluggable module supported on this
+        interface. A set value to 0 to auto detects and locks in the wavelength of the first
+        pluggable module present when the interface reaches a running state. To specify
+        CWDM or DWDM wavelengths in nanometer, values are entered after multiplying by 100.
+        Example:
+                wavelength 850.00 will be entered as 85000
+                wavelength 1271   will be entered as 127100
+                wavelength 1563.86 will be entered as 156386"
+    ::= { adGenPluggablePortProvEntry 1 }
+
+adGenPluggablePortProvChannelNumber OBJECT-TYPE
+     SYNTAX         Integer32
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "Used to specify a wavelength channel number of DWDM wavelength associated with pluggable module
+        supported on this interface.  Set value to 0 to auto detects and locks in the DWDM
+        wavelength channel number of the first pluggable module present when the interface reaches a
+        running state.  To specify DWDM wavelength channel number, values are entered after multiplying
+        by 100.
+        Example:
+                Channel 17    will be entered as 1700
+                Channel 17.25 will be entered as 1725
+                Channel 60.5  will be entered as 6050"
+     ::= { adGenPluggablePortProvEntry 2 }
+
+
+--
+-- Pluggable Alarm Slot Prov Levels
+--
+
+ adGenPluggableAlarmSlotProvTable    OBJECT-TYPE
+     SYNTAX          SEQUENCE OF AdGenPluggableAlarmSlotProvEntry
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+        "This table sets alarm severity for all Pluggable ports."
+ ::= { adGenPluggablePortProv 2 }
+
+ adGenPluggableAlarmSlotProvEntry    OBJECT-TYPE
+     SYNTAX          AdGenPluggableAlarmSlotProvEntry
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+        ""
+     INDEX { adGenSlotInfoIndex }
+ ::= { adGenPluggableAlarmSlotProvTable 1}
+
+ AdGenPluggableAlarmSlotProvEntry ::=
+     SEQUENCE {
+         adGenPluggableAlarmSlotTxFaultLevel    INTEGER,
+         adGenPluggableAlarmSlotMissingLevel    INTEGER
+ }
+
+ adGenPluggableAlarmSlotTxFaultLevel OBJECT-TYPE
+    SYNTAX INTEGER    {
+                          info(2),
+                          alert(3),
+                          minor(4),
+                          major(5),
+                          critical(6)
+                      }
+
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+            "Sets the Pluggable Tx Fault alarm level (affects all Pluggable Ports)"
+    DEFVAL    { major }
+    ::= { adGenPluggableAlarmSlotProvEntry 1 }
+
+ adGenPluggableAlarmSlotMissingLevel OBJECT-TYPE
+    SYNTAX INTEGER    {
+                          info(2),
+                          alert(3),
+                          minor(4),
+                          major(5),
+                          critical(6)
+                      }
+
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+            "Sets the Pluggable Missing alarm level (affects all Pluggable Ports)"
+    DEFVAL    { major }
+    ::= { adGenPluggableAlarmSlotProvEntry 2 }
+
+--
+-- Pluggable Port Scalars for Alarm Level
+--
+
+adGenPluggablePortAlarmLevel OBJECT-TYPE
+    SYNTAX INTEGER    {
+                          disabled(1),
+                          info(2),
+                          alert(3),
+                          minor(4),
+                          major(5),
+                          critical(6)
+                      }
+    MAX-ACCESS        read-only
+    STATUS            deprecated
+    DESCRIPTION
+        "Criticality Level of an alarm. This value is invalid if read.
+         This is used as a varbind in an alarm trap to indicate
+         its alarm level."
+    ::= { adGenPluggablePortScalars 1 }
+
+
+
+
+--
+-- Pluggable Port Alarms
+--
+
+adGenPluggablePortTxFaultClear         NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port has the Tx Fault condition cleared."
+
+        --#TYPE         "Status - Tx Fault Alarm Clear"
+        --#SUMMARY      "Tx Fault Alarm Cleared on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 2 }
+
+
+adGenPluggablePortTxFaultSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port has the Tx Fault condition set."
+
+        --#TYPE         "Status - Tx Fault Alarm Set"
+        --#SUMMARY      "Tx Fault Alarm Set on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 3 }
+
+
+adGenPluggablePortMissingClear         NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port is no longer missing."
+
+        --#TYPE         "Status - Pluggable Missing Alarm Clear"
+        --#SUMMARY      "Pluggable Missing Alarm Cleared on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 4 }
+
+
+adGenPluggablePortMissingSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port is missing."
+
+        --#TYPE         "Status - Pluggable Missing Alarm Set"
+        --#SUMMARY      "Pluggable Missing Alarm Set on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 5 }
+
+ adGenPluggablePortUnsupportedClear         NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable unsupported condition has been cleared."
+
+        --#TYPE         "Status - Pluggable Unsupported Alarm Clear"
+        --#SUMMARY      "Pluggable Unsupported Alarm Cleared on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 6 }
+
+
+adGenPluggablePortUnsupportedSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port is Unsupported."
+
+        --#TYPE         "Status - Pluggable Unsupported Alarm Set"
+        --#SUMMARY      "Pluggable Unsupported Alarm Set on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 7 }
+
+
+adGenPluggablePortMismatchClear         NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the port no longer has a mismatch between the expected and the actual pluggable."
+
+        --#TYPE         "Status - Mismatch Alarm Clear"
+        --#SUMMARY      "Mismatch Alarm Cleared on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 8 }
+
+
+adGenPluggablePortMismatchSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the port has a mismatch between the expected and the actual pluggable (check speed, type, etc.)."
+
+        --#TYPE         "Status - Mismatch Alarm Set"
+        --#SUMMARY      "Mismatch Alarm Set on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 9 }
+
+
+adGenPluggablePortTempClear         NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port temperature alarm has been cleared."
+
+        --#TYPE         "Status - Temperature Alarm Clear"
+        --#SUMMARY      "Temperature Alarm Cleared on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 10 }
+
+
+adGenPluggablePortTempSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port temperature alarm has been set."
+
+        --#TYPE         "Status - Temperature Alarm Set"
+        --#SUMMARY      "Temperature Alarm Set on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 11 }
+
+adGenPluggablePortProvWavelengthMismatchClear         NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port wavelength match the provisioned wavelength."
+
+        --#TYPE         "Status - Plug Provisioned Wavelength Mismatch Alarm Clear"
+        --#SUMMARY      "Plug Provisioned Wavelength Mismatch Alarm Cleared on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 12 }
+
+
+adGenPluggablePortProvWavelengthMismatchSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        adGenSlotInfoIndex,
+        adGenPortTrapIdentifier,
+        ifIndex,
+        adTAeSCUTrapAlarmLevel,
+        ifDescr
+    }
+    STATUS  current
+    DESCRIPTION
+        "Indicates that the pluggable port wavelength does not match the provisioned wavelength."
+
+        --#TYPE         "Status - Plug Provisioned Wavelength Mismatch Alarm Set"
+        --#SUMMARY      "Plug Provisioned Wavelength Mismatch Alarm Set on"
+        --#SUMMARY      "Shelf: %s, Slot: %d, %s"
+        --#ARGUMENTS    {1, 2, 6}
+        --#SEVERITY     MAJOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenPluggablePortAlarms 13 }
+
+
+END

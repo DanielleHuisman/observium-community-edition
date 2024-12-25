@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -48,12 +48,12 @@ if (OBS_DEBUG) {
     print_vars($graphtype);
 }
 
-if (isset($graphtype['type']) && isset($graphtype['subtype'])) {
+if (isset($graphtype['type'], $graphtype['subtype'])) {
     $type    = $graphtype['type'];
     $subtype = $graphtype['subtype'];
 } else {
-    graph_error("Invalid graph type format.");
-    exit;
+    $image_data_uri = graph_error("Invalid graph type format.");
+    return;
 }
 
 // Get device array
@@ -169,26 +169,26 @@ if ($graph_include) {
 
     }
 } elseif (!isset($vars['command_only'])) {
-    graph_error('no ' . $type . '_' . $subtype . ''); // Graph Template Missing
+    $image_data_uri = graph_error('no ' . $type . '_' . $subtype); // Graph Template Missing
 }
 
 if ($error_msg) {
     // We have an error :(
-    graph_error($graph_error);
+    $image_data_uri = graph_error($graph_error);
 } elseif (!$auth) {
     // We are unauthenticated :(
     if ($width < 200) {
-        graph_error("No Auth");
+        $image_data_uri = graph_error("No Auth");
     } else {
-        graph_error("No Authorization");
+        $image_data_uri = graph_error("No Authorization");
     }
 } else {
     #$rrd_options .= " HRULE:0#999999";
     if ($no_file) {
         if ($width < 200) {
-            graph_error("No RRD");
+            $image_data_uri = graph_error("No RRD");
         } else {
-            graph_error("Missing RRD Datafile");
+            $image_data_uri = graph_error("Missing RRD Datafile");
         }
     } elseif (isset($vars['command_only']) && $vars['command_only'] == TRUE) {
         $return = rrdtool_graph($graphfile, $rrd_options);
@@ -221,7 +221,7 @@ if ($error_msg) {
                 unlink($graphfile);
             } else {
                 if ($width < 200) {
-                    graph_error("Draw Error");
+                    $image_data_uri = graph_error("Draw Error");
                 } else {
 
                     if (isset($graph_return['output']) && strlen($graph_return['output']) > 10) {
@@ -230,14 +230,14 @@ if ($error_msg) {
                         $string = "Error Drawing Graph";
                     }
 
-                    graph_error($string);
+                    $image_data_uri = graph_error($string);
                 }
             }
         } else {
             if ($width < 200) {
-                graph_error("Def Error");
+                $image_data_uri = graph_error("Def Error");
             } else {
-                graph_error("Graph Definition Error");
+                $image_data_uri = graph_error("Graph Definition Error");
             }
         }
     }

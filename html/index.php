@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -130,14 +130,7 @@ ob_start('html_callback');
 
         $vars = get_vars(); // Parse vars from GET/POST/URI
 
-        if (get_var_true($vars['export'])) // This is for display XML on export pages
-        {
-            // Code prettify (but it's still horrible)
-            register_html_resource('js', 'google-code-prettify.js');
-            register_html_resource('css', 'google-code-prettify.css');
-        }
-
-        $page_refresh = print_refresh($vars); // $page_refresh used in navbar for refresh menu
+        $page_refresh = print_refresh($vars); // $page_refresh used in navbar for a refresh menu
 
         $feeds = [ 'eventlog' ];
         //if ($config['enable_syslog']) { $feeds[] = 'syslog'; }
@@ -169,7 +162,7 @@ ob_start('html_callback');
 <?php
 
 if ($_SESSION['authenticated']) {
-    // Determine type of web browser.
+    // Determine a type of web browser.
     $browser = detect_browser();
 
     // FIXME. Old MS IE..Someone still use it (for observium)???
@@ -190,7 +183,7 @@ if ($_SESSION['authenticated']) {
         session_unset_var('touch');
     }
 
-    $allow_mobile = (in_array($browser_type, [ 'mobile', 'tablet' ]) ? $config['web_mouseover_mobile'] : TRUE);
+    $allow_mobile = in_array($browser_type, [ 'mobile', 'tablet' ]) ? $config['web_mouseover_mobile'] : TRUE;
     if ($config['web_mouseover'] && $allow_mobile) {
         register_html_resource('js', 'jquery.qtip.min.js');
         register_html_resource('script', 'jQuery(function ($) { entity_popups(); popups_from_data(); });');
@@ -325,8 +318,8 @@ if (get_obs_attrib('alerts_require_rebuild')) {
 
 foreach ($alerts as $alert) {
     if (isset($alert['markdown']) && $alert['markdown']) {
-        $alert['text']  = get_markdown($alert['text'], TRUE, TRUE);
-        $alert['title'] = get_markdown($alert['title'], TRUE, TRUE);
+        $alert['text']  = get_markdown_extra($alert['text']);
+        $alert['title'] = get_markdown_extra($alert['title']);
     }
     register_html_alert($alert['text'], $alert['title'], $alert['severity']);
 }

@@ -14,7 +14,7 @@
  */
 // Keep more actual information in first 2 lines
 {{#ALERT_EMOJI}}{{{ALERT_EMOJI}}}&#160;{{/ALERT_EMOJI}}<strong><a href="{{{ALERT_URL}}}">{{ALERT_MESSAGE}}</a></strong>
-//<b>{{ALERT_STATE}} :</b> {{ALERT_MESSAGE}} (<a href="{{{ALERT_URL}}}">Modify</a>)
+//<b>{{ALERT_STATE_NAME}} :</b> {{ALERT_MESSAGE}} (<a href="{{{ALERT_URL}}}">Modify</a>)
 {{#ENTITY_LINK}}
 
 <b>Entity:</b> <strong>{{{ENTITY_LINK}}}</strong>

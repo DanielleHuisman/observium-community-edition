@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -68,28 +68,14 @@ foreach ($packages as $name => $package) {
             foreach ($devices as $entry) {
                 $this_device = ['device_id' => $entry['device_id'], 'hostname' => $GLOBALS['cache']['devices']['hostname_map'][$entry['device_id']]];
 
-                $arch_classes        = [
-                  'amd64' => 'label-success',
-                  'i386'  => 'label-info'
-                ];
-
-                $entry['arch_class'] = $arch_classes[$entry['arch']] ?? '';
-
-                $manager_classes        = [
-                  'deb' => 'label-warning',
-                  'rpm' => 'label-important'
-                ];
-
-                $entry['manager_class'] = $manager_classes[$entry['manager']] ?? '';
-
                 $dbuild = !empty($entry['build']) ? '-' . $entry['build'] : '';
 
                 if (!empty($this_device['hostname'])) {
                     if (!empty($vars['name'])) {
 
                         $table .= '<tr>';
-                        $table .= '<td>' . $entry['version'] . $dbuild . '</td><td><span class="label ' . $entry['arch_class'] . '">' . $entry['arch'] . '</span></td>
-                  <td><span class="label ' . $entry['manager_class'] . '">' . $entry['manager'] . '</span></td>
+                        $table .= '<td>' . $entry['version'] . $dbuild . '</td><td>' . get_type_class_label($entry['arch'], 'arch') . '</td>
+                  <td>' . get_type_class_label($entry['manager'], 'pkg') . '</td>
                   <td class="entity">' . generate_device_link($this_device) . '</td><td></td><td>' . format_si($entry['size']) . '</td>';
                         $table .= '</tr>';
                     } else {

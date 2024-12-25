@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -61,8 +61,7 @@ foreach ($oids as $index => $entry) {
       'entPhysicalClass' => 'temperature'];
 
     $options['rename_rrd'] = "$mib-boxServicesTempSensorTemperature.$index";
-    discover_sensor_ng($device, 'temperature', $mib, 'boxServicesTempSensorTemperature', $sensor_oid, $index, NULL,
-                       $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'temperature', $mib, 'boxServicesTempSensorTemperature', $sensor_oid, $index, $descr, 1, $value, $options);
 
     // State
     $descr      = "Unit $unit Temperature Sensor " . ($iter + 1);
@@ -143,7 +142,6 @@ foreach ($oids as $index => $entry) {
           'boxServicesFanSpeed',
           ".1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.6.1.4.$index",
           $index,
-          NULL,
           $descr,
           1,
           $entry['boxServicesFanSpeed'],
@@ -159,7 +157,6 @@ foreach ($oids as $index => $entry) {
           'boxServicesFanDutyLevel',
           ".1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.6.1.5.$index",
           $index,
-          NULL,
           $descr,
           1,
           $entry['boxServicesFanDutyLevel'],
@@ -237,6 +234,11 @@ foreach ($oids as $index => $entry) {
 // DNOS-BOXSERVICES-PRIVATE-MIB::boxsPwrUsageHistoryStackPowerConsumption.3.60 = INTEGER: 94224
 
 //$oid  = 'boxsUnitPwrUsageHistoryTable';
+
+/**
+ * This is a History table, on next polling index will be changed.
+ * See: https://jira.observium.org/browse/OBS-4891
+
 $oid = 'boxsPwrUsageHistoryUnitPowerConsumption';
 
 $oids = snmpwalk_cache_oid($device, $oid, [], $mib);
@@ -255,7 +257,7 @@ end($oids);
 [, $samples_per_unit] = explode('.', key($oids));
 
 foreach ($oids as $index => $entry) {
-    [$unit, $sample] = explode('.', $index);
+    [ $unit, $sample ] = explode('.', $index);
     if ((int)$sample != $samples_per_unit) {
         continue;
     }
@@ -268,8 +270,9 @@ foreach ($oids as $index => $entry) {
 
     if (is_numeric($value) && $value) {
         $options['rename_rrd'] = "$mib-boxsPwrUsageHistoryUnitPowerConsumption.$unit";
-        discover_sensor_ng($device, 'power', $mib, 'boxsPwrUsageHistoryUnitPowerConsumption', $sensor_oid, $index, NULL, $descr, 0.001, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, 'boxsPwrUsageHistoryUnitPowerConsumption', $sensor_oid, $index, $descr, 0.001, $value, $options);
     }
 }
+*/
 
 // EOF

@@ -1,0 +1,1091 @@
+ADTRAN-GENERIC-VECTORING-MIB
+
+DEFINITIONS ::= BEGIN
+
+-- TITLE:     The ADTRAN GENERIC VECTORING MIB
+-- PRODUCT:   ADTRAN MSAP PRODUCTS
+-- VERSION:   1.0
+-- DATE:      03/18/2013
+-- AUTHOR:    Gean Johnson, Daniel Barnes
+-- STATUS:    PRELIMINARY
+--
+-- This MIB defines the object identifiers (OID) for the
+-- ADTRAN GENERIC Vectoring MIB objects
+--
+--              DO NOT ADD REVISION INFORMATION HERE.
+-- ******************************************************************************************
+
+
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        TimeTicks, Integer32, Unsigned32,NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+        sysName
+            FROM SNMPv2-MIB
+        DisplayString, RowStatus, TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+        ifIndex,
+        InterfaceIndex
+            FROM IF-MIB
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+        adGenVector, adGenVectorID
+            FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB
+        adTAeSCUTrapAlarmLevel
+           FROM ADTRAN-TAeSCUEXT1-MIB;
+
+    adGenVectorMIB MODULE-IDENTITY
+        LAST-UPDATED "201802010000Z"
+        ORGANIZATION "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "ADTRAN Generic Vectoring MIB"
+
+        REVISION "201802010000Z"
+        DESCRIPTION "Added dlv(5) and blv-dlv-slv(7) to AdGenVectorMode."
+
+        REVISION "201706140000Z"
+        DESCRIPTION "Added tables adGenVectorSlotConfTable and adGenVectorSlotStatusTable along with items
+                     adGenVectorSlotConfForceFallback and adGenVectorSlotStatusFallbackState."
+
+        REVISION "201609220000Z"
+        DESCRIPTION "Add non-vectored (4) to adGenVectorGroupFallbackMode"
+
+        REVISION "201508130000Z"
+        DESCRIPTION "Added adGenVectorBulkFilterInstance, adGenVectorBulkFilterInterface, adGenVectorBulkFilterSlot, 
+                     adGenVectorBulkFilterDirection, adGenVectorBulkFilterType, and adGenVectorBulkFilterCreate need 
+                     to get Vector Group Weight values through a TLV block."
+
+        REVISION "201507170000Z"
+        DESCRIPTION "Remove underscores from AdGenVectorPhyPortVectoringState enum."
+
+        REVISION "201505270000Z"
+        DESCRIPTION "Add adGenVectorGroupFallbackAlarmSeverity, adGenVectorGroupFallbackAlarmEnable, adGenVectorGroupVectoringMode, and
+                     adGenVectorGroupAutoAddEnable OIDs to adGenVectorGroupTable.
+                     Add adGenVectorAlarmsForcedFallbackClr and adGenVectorAlarmsForcedFallbackAct notifications.
+                     Deprecate adsl2-multimode option of adGenVectorGroupFallbackMode and add adsl2 as new default option." 
+ 
+        REVISION "201407260000Z"
+        DESCRIPTION "Add adGenVectorPhyStatusVectoringErrorDateTime, adGenVectorGroupStatusNumFallbackPorts, adGenVectorGroupFallbackMode.
+                     Deprecate adGenVectorGroupStatusNumUntrainedPorts and adGenVectorPhyStatusPortLineState."
+	
+        REVISION "201407250000Z"
+        DESCRIPTION  "Fix AdGenVectorPhyPortVectoringState TC to report proper state order"
+
+        REVISION "201403030000Z"
+        DESCRIPTION  "Updates to adGenVectorPhyMap and adGenVectorPhyStatus tables"
+
+        REVISION "201311260000Z"
+        DESCRIPTION  "Creation"
+
+        ::= { adGenVectorID 1 }
+
+--
+-- Ojbect Hierarchy
+--
+adGenVectorMIBObjects              OBJECT IDENTIFIER ::= { adGenVector 1 }
+--adGenVectorModuleConfTable       OBJECT-TYPE       ::= { adGenVectorMIBObjects 1 }
+--adGenVectorGroupTableLastError   OBJECT-TYPE       ::= { adGenVectorMIBObjects 2 }
+--adGenVectorGroupTable            OBJECT-TYPE       ::= { adGenVectorMIBObjects 3 }
+--adGenVectorPhyMapTableLastError  OBJECT-TYPE       ::= { adGenVectorMIBObjects 4 }
+--adGenVectorPhyMapTable           OBJECT-TYPE       ::= { adGenVectorMIBObjects 5 }
+--adGenVectorGroupStatusTable      OBJECT-TYPE       ::= { adGenVectorMIBObjects 6 }
+--adGenVectorPhyStatusTable        OBJECT-TYPE       ::= { adGenVectorMIBObjects 7 }
+--adGenVectorAlarmsPrefix          OBJECT-TYPE       ::= { adGenVectorMIBObjects 8 }
+--adGenVectorSlotConfTable         OBJECT-TYPE       ::= { adGenVectorMIBObjects 9 }
+--adGenVectorSlotStatusTable       OBJECT-TYPE       ::= { adGenVectorMIBObjects 10 }
+adGenVectorBulk                    OBJECT IDENTIFIER ::= { adGenVector 2}
+--adGenVectorBulkInstanceTable     OBJECT-TYPE       ::= { adGenVectorBulk 1}
+--adGenVectorBulkFilterTable       OBJECT-TYPE       ::= { adGenVectorBulk 2 }
+
+-- **********************************************************************
+-- Textual Conventions
+-- **********************************************************************
+
+AdGenVectorMode ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Specifies the vectoring mode of a particular group or the vectoring
+             mode capabilities of a slot."
+        SYNTAX   INTEGER {
+           blv         (1), -- Board Level Vectoring is vectoring of physical ports on a single board.
+           slv         (2), -- System Level Vectoring is vectoring on ports that span multiple boards.
+           both        (3), -- This board can participate in both blv and slv groups.
+           none        (4), -- This board cannot participate in any type of vectoring group.
+           dlv         (5), -- Device Level Vectoring is vectoring of physical ports between two boards.
+           blv-dlv-slv (7)  -- This board can participate in blv, slv, and dlv groups.
+           }
+
+AdGenVectorGroupOperStatus ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "The value determines the operational status of a vectoring 
+            group. A vectoring group consists of one resource slot controlling 
+            one or more target slots. The value up indicates that all target 
+            slots are being successfully controlled by the resource slot.  
+            The value down indicates that no target slots are being successfully 
+            controlled by the resource slot. The value upPartial indicates that 
+            one or more, but not all, target slots are being successfully controlled 
+            by the resource slot. "
+        SYNTAX   INTEGER {
+           up        (1),
+           down      (2),
+           upPartial (3)
+           }
+
+AdGenVectorLastChange ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The value of MIB II's sysUpTime at the time a
+            vectoring object entered its current
+            operational state. If the current state was
+            entered prior to the last re-initialization of the
+            agent then this object contains a zero value."
+        SYNTAX   TimeTicks
+    
+AdGenVectorPhyPortErrorTimestamp ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "The card's uptime in seconds when a port
+            in a vectoring group experienced a vectoring error.
+            If the port has no uncleared errors then this object 
+            contains a zero value."
+        SYNTAX   TimeTicks    
+
+AdGenVectorPhyLineState ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "The value determines the line state of a
+            physical port."
+        SYNTAX   INTEGER {
+           notAvailable      (0),
+           down              (1),
+           train             (2),
+           up                (3),
+           deltActive        (4),
+           deltDataExchange  (5),
+           deltDataRequest   (6),
+           deltComplete      (7),
+           seltActive        (8),
+           seltDataRequest   (9),
+           seltComplete      (10)
+           }
+
+AdGenVectorPhyPortVectoringState ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "The value determines the vectoring state of a
+            physical port. The ff suffix designates 
+            vectoring friendly states.  The Legacy suffix designates 
+            states for modems without vectoring support."
+        SYNTAX   INTEGER {
+           idle                (0),
+           dsInit-1-0          (1),
+           dsInit-2-1          (2),
+           usInit-1            (3),
+           usInit-2            (4),
+           steady              (5),
+           trans               (6),
+           waitForStart        (7),
+           dsInit-1-1          (8),
+           dsInit-2-0          (9),
+           reset               (10),
+           nonVectoring        (11),
+           handshake           (12),
+           waitForStart-Legacy (13),
+           init-Legacy         (14),
+           steady-Legacy       (15),
+           steadyB             (16),
+           stopPending         (17),
+           idle-FF             (18),
+           dsInit-1-0-ff       (19),
+           dsInit-2-1-ff       (20),
+           usInit-1-ff         (21),
+           usInit-2-ff         (22),
+           steady-ff           (23),
+           trans-ff            (24),
+           waitForStart-ff     (25),
+           dsInit-1-1-ff       (26),
+           dsInit-2-0-ff       (27),
+           steadyB-ff          (28),
+           stopPending-ff      (29),
+           unknown             (30),
+           fallback            (31)
+           }
+
+AdGenVectorGroupBandPlans ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "These are the superset band plans for a vectoring
+            group.  An individual port in the vectoring group
+            must be a subset of the group's band plan."
+        SYNTAX   INTEGER {
+           g998      (1),   -- Annex A (EU32)
+           g998e     (2),   -- G.998 Extension
+           g998ade   (3),   -- G.998 Annex A Direct Extension
+           g997      (4),   -- G.997 (not supported)
+           g997e     (5),   -- G.997 Extension
+           hpe       (6)    -- Hybrid Partial Extension
+           }
+
+AdGenVectorGroupFallbackModes ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "Vectoring group fallback modes determine port behavior
+            during misconfiguration and system failure events."
+        SYNTAX   INTEGER {
+           adsl2-multimode  (1),  -- DEPRECATED, this value will change the mode to adsl2
+           shutdown         (2),  -- disable ports
+           adsl2            (3),  -- train ports in non-disturbing mode
+           non-vectored     (4)   -- train ports in vdsl non-vectored
+           }
+
+-- **********************************************************************
+-- Configuration
+-- **********************************************************************
+-- Module (card) level configuration table, indicates the vectoring
+-- capabilities of the slot.
+
+adGenVectorModuleConfTable  OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorModuleConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This table contains global vectoring configuration
+            parameters, per populated card slot."
+          ::= { adGenVectorMIBObjects 1 }
+
+adGenVectorModuleConfEntry    OBJECT-TYPE
+          SYNTAX         AdGenVectorModuleConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This list contains vector limits per module ."
+          INDEX { adGenSlotInfoIndex }
+          ::= { adGenVectorModuleConfTable  1}
+
+AdGenVectorModuleConfEntry    ::= SEQUENCE  {
+          adGenVectorModuleConfSupportedVectorModeTypes     AdGenVectorMode,
+          adGenVectorModuleConfMaxBLVGroups                 Integer32,
+          adGenVectorModuleConfMaxSLVGroups                 Integer32,
+          adGenVectorModuleConfMaxPhysPerSLVGroup           Integer32,
+          adGenVectorModuleConfNumPhys                      Integer32,
+          adGenVectorModuleConfVectorEngineHwRev            DisplayString,
+          adGenVectorModuleConfVectorEngineSwRev            DisplayString
+          }
+
+adGenVectorModuleConfSupportedVectorModeTypes OBJECT-TYPE
+          SYNTAX         AdGenVectorMode
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Indicates the vectoring modes in which the card is capable of participating."
+          ::= { adGenVectorModuleConfEntry 1 }
+
+adGenVectorModuleConfMaxBLVGroups OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of Board-Level vectoring groups the module can support."
+          ::= { adGenVectorModuleConfEntry 2 }
+
+adGenVectorModuleConfMaxSLVGroups OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of System-Level vectoring groups the module can support."
+          ::= { adGenVectorModuleConfEntry 3 }
+
+adGenVectorModuleConfMaxPhysPerSLVGroup OBJECT-TYPE
+          SYNTAX        Integer32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+          "The maximum number of physical ports available per System-Level vectoring group."
+          ::= { adGenVectorModuleConfEntry 4 }
+
+adGenVectorModuleConfNumPhys OBJECT-TYPE
+          SYNTAX        Integer32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+          "The number of physical ports available for vectoring on the given slot."
+          ::= { adGenVectorModuleConfEntry 5 }
+
+adGenVectorModuleConfVectorEngineHwRev OBJECT-TYPE
+          SYNTAX        DisplayString
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+          "The hardware revision of the vectoring engine chip set."
+          ::= { adGenVectorModuleConfEntry 6 }
+
+adGenVectorModuleConfVectorEngineSwRev OBJECT-TYPE
+          SYNTAX        DisplayString
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+          "The software revision of the vectoring engine chip set."
+          ::= { adGenVectorModuleConfEntry 7 }
+
+-- **********************************************************************
+-- Provisioning
+-- **********************************************************************
+-- Vectoring group. A group of physical ports that will be vectored
+
+adGenVectorGroupTableLastError OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for group entities."
+         ::= { adGenVectorMIBObjects 2 }
+
+adGenVectorGroupTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorGroupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Vectoring Group Table.  A unique group is created for each
+            unique set of physical ports that will be independently vectored."
+          ::= { adGenVectorMIBObjects 3 }
+
+adGenVectorGroupEntry         OBJECT-TYPE
+          SYNTAX         AdGenVectorGroupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the Vectoring Group table."
+          INDEX  {adGenVectorGroupIfIndex}
+          ::= { adGenVectorGroupTable  1}
+
+AdGenVectorGroupEntry    ::= SEQUENCE  {
+          adGenVectorGroupIfIndex                   InterfaceIndex,
+          adGenVectorGroupDescription               DisplayString,
+          adGenVectorGroupLastError                 DisplayString,
+          adGenVectorGroupBandPlan                  AdGenVectorGroupBandPlans,
+          adGenVectorGroupRowStatus                 RowStatus,
+          adGenVectorGroupFallbackMode              AdGenVectorGroupFallbackModes,
+          adGenVectorGroupFallbackAlarmSeverity     INTEGER,
+          adGenVectorGroupFallbackAlarmEnable       INTEGER,
+          adGenVectorGroupVectoringMode             AdGenVectorMode,
+          adGenVectorGroupAutoAddEnable             INTEGER
+}
+
+adGenVectorGroupIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the interface associated
+            with this Vectoring Group. The IANA type should be linegroup (210)."
+          ::= { adGenVectorGroupEntry 1 }
+
+adGenVectorGroupDescription OBJECT-TYPE
+          SYNTAX         DisplayString (SIZE (1..80))
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this group."
+          ::= { adGenVectorGroupEntry 2 }
+
+adGenVectorGroupLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenVectorGroupEntry 3 }
+
+adGenVectorGroupBandPlan OBJECT-TYPE
+          SYNTAX         AdGenVectorGroupBandPlans
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The superset band plan for the vectoring group.
+            An individual port in the vectoring group must
+            be a subset of the group's band plan.
+            Valid options listed below:
+                g998      (1)   -- Annex A (EU32)
+                g998e     (2)   -- G.998 Extension
+                g998ade   (3)   -- G.998 Annex A Direct Extension
+                g997      (4)   -- G.997 (not supported)
+                g997e     (5)   -- G.997 Extension
+                hpe       (6)   -- Hybrid Partial Extension"
+          ::= { adGenVectorGroupEntry 4 }
+          
+adGenVectorGroupRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create a new row or modify or delete an
+            existing row in this table. Setting this value to 'active'
+            indicates that the vectoring group is administratively In-Service.
+            Setting this value to 'inactive' indicates that the
+            vectoring group is administratively 'Out-Of-Service'"
+          ::= { adGenVectorGroupEntry 5 }
+
+adGenVectorGroupFallbackMode OBJECT-TYPE
+          SYNTAX         AdGenVectorGroupFallbackModes
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The vectoring group fallback mode determines port behavior
+            during misconfiguration and system failure events.
+            Valid options listed below:
+                adsl2-multimode  (1)  -- DEPRECATED, this value will change the mode to adsl2
+                shutdown         (2)  -- disable ports
+                adsl2            (3)  -- train ports in non-disturbing mode
+                non-vectored     (4)  -- train ports in vdsl non-vectored"
+          DEFVAL  { adsl2 }
+          ::= { adGenVectorGroupEntry 6 }
+
+adGenVectorGroupFallbackAlarmSeverity OBJECT-TYPE
+          SYNTAX         INTEGER {
+                                critical(0),
+                                major(1),
+                                minor(2),
+                                alert(3),
+                                info(4)
+                         }
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Sets the severity for adGenVectorAlarmsForcedFallbackAlarm. This severity
+            applies to the entire group, which may span several slots.
+            Valid options listed below:
+                critical  (0)
+                major     (1)
+                minor     (2)
+                alert     (3)
+                info      (4)"
+          DEFVAL  { major }
+          ::= { adGenVectorGroupEntry 7 }
+		  
+adGenVectorGroupFallbackAlarmEnable OBJECT-TYPE
+          SYNTAX         INTEGER {
+                         disable(0),
+                         enable(1)
+                         }
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Controls whether the adGenVectorAlarmsForcedFallback alarm is
+            generated when the alarm condition is active. This selection
+            applies to the entire group, which may span several slots.
+            Valid options listed below:
+                disable (0)  -- alarm disabled
+                enable  (1)  -- alarm enabled"
+          DEFVAL  { enable }
+          ::= { adGenVectorGroupEntry 8 }
+
+adGenVectorGroupVectoringMode OBJECT-TYPE
+          SYNTAX         AdGenVectorMode
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Controls the vectoring mode in which the card is currently operating.
+            Valid options listed below:
+                blv   (1)  -- Board Level Vectoring is vectoring of physical ports on a single board.
+                slv   (2)  -- System Level Vectoring is vectoring on ports that span multiple boards.
+                dlv   (5)  -- Device Level Vectoring is vectoring of physical ports between two boards."
+          ::= { adGenVectorGroupEntry 9 }
+
+adGenVectorGroupAutoAddEnable OBJECT-TYPE
+          SYNTAX         INTEGER {
+                         disable(0),
+                         enable(1)
+                         }
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "Controls whether a slot is automatically added to a System Level vecotoring group when
+        Inserted into a shelf:
+                disable (0)  -- auto add disabled
+                enable  (1)  -- auto add enabled"
+          DEFVAL  { disable }
+          ::= { adGenVectorGroupEntry 10 }
+          
+-- Vectoring Group to physical port mapping table.
+adGenVectorPhyMapTableLastError OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for group to physical port mappings."
+         ::= { adGenVectorMIBObjects 4 }
+
+adGenVectorPhyMapTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorPhyMapEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Row creation adds/maps the physical port to a vectoring group."
+          ::= { adGenVectorMIBObjects 5 }
+
+adGenVectorPhyMapEntry OBJECT-TYPE
+          SYNTAX       AdGenVectorPhyMapEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the Phy Map table.
+            This entry is represents one port that
+            is associated with a vectoring group."
+
+          INDEX { adGenVectorPhyMapGroupIfIndex,
+                  adGenVectorPhyMapPhyIfIndex }
+          ::= { adGenVectorPhyMapTable 1 }
+
+AdGenVectorPhyMapEntry ::= SEQUENCE {
+          adGenVectorPhyMapGroupIfIndex               InterfaceIndex,
+          adGenVectorPhyMapPhyIfIndex                 InterfaceIndex,
+          adGenVectorPhyMapLastChange                 AdGenVectorLastChange,
+          adGenVectorPhyMapLastError                  DisplayString,
+          adGenVectorPhyMapRowStatus                  RowStatus
+          }
+
+adGenVectorPhyMapGroupIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the vectoring group to which the physical port
+            is mapped."
+          ::= { adGenVectorPhyMapEntry 1 }
+
+adGenVectorPhyMapPhyIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the physical port."
+          ::= { adGenVectorPhyMapEntry 2 }
+
+adGenVectorPhyMapLastChange OBJECT-TYPE
+          SYNTAX         AdGenVectorLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            Group-Phy mapping entered its current operational state."
+          ::= { adGenVectorPhyMapEntry 3 }
+
+adGenVectorPhyMapLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenVectorPhyMapEntry 4 }
+          
+adGenVectorPhyMapRowStatus OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create a new row or modify or delete an
+            existing row in this table. Creating a row adds the
+            Phy to the Group. Setting this value to 'active'
+            indicates that the Group-Phy mapping is
+            administratively In-Service. Setting this value to
+            'Not-In-Service' indicates that the Phy will no longer
+            participate in the group. This does not effect the physical port."
+          ::= {adGenVectorPhyMapEntry 5 }
+
+-- **********************************************************************
+-- Status
+-- **********************************************************************
+          
+adGenVectorGroupStatusTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorGroupStatusEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Vectoring Group Status Table displays the status of
+            each vectoring group."
+          ::= { adGenVectorMIBObjects 6 }
+
+adGenVectorGroupStatusEntry         OBJECT-TYPE
+          SYNTAX         AdGenVectorGroupStatusEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the Vectoring Group table."
+          INDEX  {adGenVectorGroupStatusIfIndex}
+          ::= { adGenVectorGroupStatusTable  1}
+
+AdGenVectorGroupStatusEntry    ::= SEQUENCE  {
+          adGenVectorGroupStatusIfIndex                  InterfaceIndex,
+          adGenVectorGroupStatusNumProvisionedPorts      Integer32,
+          adGenVectorGroupStatusNumVectoredPorts         Integer32,
+          adGenVectorGroupStatusNumUntrainedPorts        Integer32,
+          adGenVectorGroupStatusNumVectorFriendlyPorts   Integer32,
+          adGenVectorGroupStatusNumNonVectoredPorts      Integer32,
+          adGenVectorGroupStatusNumLegacyPorts           Integer32,
+          adGenVectorGroupStatusOperStatus               AdGenVectorGroupOperStatus,
+          adGenVectorGroupStatusReset                    INTEGER,
+          adGenVectorGroupStatusNumFallbackPorts         Integer32
+}
+
+adGenVectorGroupStatusIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the interface associated
+            with this Vectoring Group. The IANA type should be linegroup (210)."
+          ::= { adGenVectorGroupStatusEntry 1 }
+
+adGenVectorGroupStatusNumProvisionedPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group."
+          ::= { adGenVectorGroupStatusEntry 2 }
+
+adGenVectorGroupStatusNumVectoredPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group
+            that are trained and being vectored (g993.5)."
+          ::= { adGenVectorGroupStatusEntry 3 }
+
+adGenVectorGroupStatusNumUntrainedPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         deprecated
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group
+            that are not currently trained."
+          ::= { adGenVectorGroupStatusEntry 4 }
+
+adGenVectorGroupStatusNumVectorFriendlyPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group that
+            are trained and are vectoring friendly (g993.2 annex y)."
+          ::= { adGenVectorGroupStatusEntry 5 }
+
+adGenVectorGroupStatusNumNonVectoredPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group
+            that are trained and are not vectored."
+          ::= { adGenVectorGroupStatusEntry 6 }
+
+adGenVectorGroupStatusNumLegacyPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group
+            that are trained with a legacy VDSL2 modem that does not 
+            support vectoring."
+          ::= { adGenVectorGroupStatusEntry 7 }          
+          
+adGenVectorGroupStatusOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenVectorGroupOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the vectoring group."
+          ::= { adGenVectorGroupStatusEntry 8 }
+          
+adGenVectorGroupStatusReset OBJECT-TYPE
+          SYNTAX      INTEGER
+          {
+              reset(1)
+          }
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+          "A SET clears the status information for each interface
+           in the specified group.
+           A GET will always return a one (1)."
+          ::= { adGenVectorGroupStatusEntry 9 }
+
+adGenVectorGroupStatusNumFallbackPorts OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of ports assigned to this vectoring group
+            that have been forced into the fallback mode specified by
+            adGenVectorGroupFallbackMode."
+          ::= { adGenVectorGroupStatusEntry 10 } 
+          
+-- Physical port status table.
+adGenVectorPhyStatusTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorPhyStatusEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+          "Displays the status of the available physical ports in the system,
+           including the group, if any, a physical port is associated with.
+           It also indicates the installed status of a certain physical port
+           along with the type of group to which the physical port is installed."
+          ::= { adGenVectorMIBObjects 7 }
+
+adGenVectorPhyStatusEntry OBJECT-TYPE
+          SYNTAX       AdGenVectorPhyStatusEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the Physical Port Status table.
+            This entry represents one physical port."
+
+        INDEX { adGenVectorPhyStatusPhyIfIndex }
+          ::= { adGenVectorPhyStatusTable 1 }
+
+AdGenVectorPhyStatusEntry ::= SEQUENCE {
+          adGenVectorPhyStatusPhyIfIndex                InterfaceIndex,
+          adGenVectorPhyStatusGroupIfIndex              InterfaceIndex,
+          adGenVectorPhyStatusGroupType                 AdGenVectorMode,
+          adGenVectorPhyStatusPortLineState             AdGenVectorPhyLineState,
+          adGenVectorPhyStatusPortVectoringState        AdGenVectorPhyPortVectoringState,
+          adGenVectorPhyStatusVectoringError            DisplayString,
+          adGenVectorPhyStatusVectoringErrorTimestamp   AdGenVectorPhyPortErrorTimestamp,
+          adGenVectorPhyStatusVectoringErrorDateTime    DisplayString
+          }
+
+adGenVectorPhyStatusPhyIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the physical link. IANA type is propVirtual(53)."
+          ::= { adGenVectorPhyStatusEntry 1 }
+
+adGenVectorPhyStatusGroupIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the Group of which this
+            physical link belongs. A value of '0' indicates
+            that the link is currently not mapped to any
+            Group.  IANA type is linegroup(210)."
+          ::= { adGenVectorPhyStatusEntry 2 }
+
+adGenVectorPhyStatusGroupType    OBJECT-TYPE
+          SYNTAX         AdGenVectorMode
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Indicates this physical port's vectoring group type, if any."
+          ::= { adGenVectorPhyStatusEntry 3}
+
+adGenVectorPhyStatusPortLineState OBJECT-TYPE
+          SYNTAX         AdGenVectorPhyLineState
+          MAX-ACCESS     read-only
+          STATUS         deprecated
+          DESCRIPTION
+           "The line state of the physical port."
+          ::= { adGenVectorPhyStatusEntry 4 }
+          
+adGenVectorPhyStatusPortVectoringState OBJECT-TYPE
+          SYNTAX         AdGenVectorPhyPortVectoringState
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The vectoring state of a physical port. The ff
+            suffix designates vectoring friendly states."
+          ::= { adGenVectorPhyStatusEntry 5 }
+      
+adGenVectorPhyStatusVectoringError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The last error received in relation to the physical port."
+          ::= { adGenVectorPhyStatusEntry 6 }
+      
+adGenVectorPhyStatusVectoringErrorTimestamp OBJECT-TYPE
+          SYNTAX         AdGenVectorPhyPortErrorTimestamp
+          UNITS          "seconds" 
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The card uptime when the last physical port error occurred.
+            If no error has occurred, this value will be zero."
+          ::= { adGenVectorPhyStatusEntry 7 }      
+          
+adGenVectorPhyStatusVectoringErrorDateTime OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Date/time string in format yyyy.MM.dd HH:mm of the last
+            physical port error. If no error has occurred, the value will be N/A."
+          ::= { adGenVectorPhyStatusEntry 8 }           
+          
+-- **********************************************************************
+-- Alarms
+-- **********************************************************************		  
+
+adGenVectorAlarmsPrefix  OBJECT IDENTIFIER ::= { adGenVectorMIBObjects 8 }
+adGenVectorAlarms        OBJECT IDENTIFIER ::= { adGenVectorAlarmsPrefix 0 }
+
+adGenVectorAlarmsForcedFallbackClr   NOTIFICATION-TYPE
+          OBJECTS        {
+                         adTrapInformSeqNum,
+                         sysName,
+                         adGenSlotInfoIndex,
+                         adTAeSCUTrapAlarmLevel
+                         }
+          STATUS         current
+          DESCRIPTION    "Forced Fallback - Cleared. All ports on this slot have
+                          resumed the non-forced fallback provisioning state."
+          --#TYPE        "Status - Alarm"
+          --#SUMMARY     "Vectoring Forced Fallback - Cleared"
+          --#SUMMARY     "cleared at shelf: %s, slot: %d"
+          --#ARGUMENTS   {1,2}
+          --#SEVERITY    MAJOR
+          ::= {adGenVectorAlarms 2}
+
+adGenVectorAlarmsForcedFallbackAct   NOTIFICATION-TYPE
+          OBJECTS        {
+                         adTrapInformSeqNum,
+                         sysName,
+                         adGenSlotInfoIndex,
+                         adTAeSCUTrapAlarmLevel
+                         }
+          STATUS         current
+          DESCRIPTION    "Forced Fallback - Active. All ports on this slot have
+                          been placed in the forced fallback provisioning state
+                          set by adGenVectorGroupFallbackMode. "
+          --#TYPE        "Status - Alarm"
+          --#SUMMARY     "Vectoring Forced Fallback - Active"
+          --#SUMMARY     "detected at shelf: %s, slot: %d"
+          --#ARGUMENTS   {1,2}
+          --#SEVERITY     MAJOR
+          ::= {adGenVectorAlarms 3 }
+
+
+-- **********************************************************************
+-- Slot Based Vectoring Configuration Items
+-- **********************************************************************		  
+
+
+adGenVectorSlotConfTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorSlotConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Table contains slot based vectoring configuration items"
+          ::= { adGenVectorMIBObjects 9 }
+
+adGenVectorSlotConfEntry OBJECT-TYPE
+          SYNTAX         AdGenVectorSlotConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Each entry can be applied per vectored slot."
+          INDEX  {adGenSlotInfoIndex}
+          ::= { adGenVectorSlotConfTable 1 }
+
+AdGenVectorSlotConfEntry ::= SEQUENCE {                
+       	  adGenVectorSlotConfForceFallback        INTEGER
+       }
+
+adGenVectorSlotConfForceFallback OBJECT-TYPE
+          SYNTAX      INTEGER
+          {
+          forceSlotFallback (1),
+          allowVectoring (2)
+          }
+          MAX-ACCESS  read-write
+          STATUS         current
+          DESCRIPTION
+           "Used to manually force slot into or out of vectoring fallback mode.
+            A read will always return allowVectoring (2) "
+          DEFVAL { allowVectoring }     
+          ::= { adGenVectorSlotConfEntry 1 }
+
+-- **********************************************************************
+-- Slot Based Vectoring Status Items
+-- **********************************************************************		  
+
+adGenVectorSlotStatusTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorSlotStatusEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Table contains slot based vectoring status items"
+          ::= { adGenVectorMIBObjects 10 }
+
+adGenVectorSlotStatusEntry OBJECT-TYPE
+          SYNTAX         AdGenVectorSlotStatusEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Each entry can be read per vectored slot"
+          INDEX  {adGenSlotInfoIndex}
+          ::= { adGenVectorSlotStatusTable 1 }
+
+AdGenVectorSlotStatusEntry ::= SEQUENCE {                
+       	  adGenVectorSlotStatusFallbackState        INTEGER
+       }
+
+adGenVectorSlotStatusFallbackState OBJECT-TYPE
+          SYNTAX      INTEGER
+          {
+               fallbackActive  (1),
+               fallbackInactive (2)
+          }
+          MAX-ACCESS  read-only
+          STATUS         current
+          DESCRIPTION
+           "Used to query the slot fallback state."
+          ::= { adGenVectorSlotStatusEntry 1 }
+
+
+-- **********************************************************************
+-- Vector Group Reserve TLV Instance
+-- **********************************************************************
+          
+adGenVectorBulkInstanceTable        OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorBulkInstanceEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Table contains instances that are created when there is a request to reserve a bulk vector instance"
+          ::= { adGenVectorBulk 1}
+
+adGenVectorBulkInstanceEntry         OBJECT-TYPE
+          SYNTAX         AdGenVectorBulkInstanceEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Index is the slot number."
+          INDEX  {adGenSlotInfoIndex}
+          ::= { adGenVectorBulkInstanceTable  1}
+
+AdGenVectorBulkInstanceEntry    ::= SEQUENCE  {
+          adGenVectorBulkReserveSlotInstance                  Integer32
+}
+
+adGenVectorBulkReserveSlotInstance      OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "Used to index the TLV table; Each time this is called by slot it
+            creates an instance for that viewer. Once an instance is created, it may
+            be found by doing a get on adTa5kTlvBySlotInstance with the instance 
+            number"
+          ::= { adGenVectorBulkInstanceEntry 1 }
+
+-- **********************************************************************
+-- Vector Group TLV Table
+-- **********************************************************************
+
+adGenVectorBulkFilterTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenVectorBulkFilterEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Table contains filters that can be applied on the requested instance"
+          ::= { adGenVectorBulk 2 }
+
+adGenVectorBulkFilterEntry OBJECT-TYPE
+          SYNTAX         AdGenVectorBulkFilterEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Indexes are the vector group status index and instance number"
+          INDEX { adGenVectorGroupStatusIfIndex, adGenVectorBulkFilterInstance }
+          ::= { adGenVectorBulkFilterTable 1 }
+
+AdGenVectorBulkFilterEntry ::= SEQUENCE {                
+       	  adGenVectorBulkFilterInstance       Integer32,
+       	  adGenVectorBulkFilterInterface      InterfaceIndex,
+          adGenVectorBulkFilterSlot           Integer32,
+       	  adGenVectorBulkFilterDirection      INTEGER,
+          adGenVectorBulkFilterType           INTEGER,
+       	  adGenVectorBulkSlotCreate           INTEGER
+       }
+
+adGenVectorBulkFilterInstance OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "Used to index the table by TLV Instance number."
+          ::= { adGenVectorBulkFilterEntry 1 }
+
+adGenVectorBulkFilterInterface OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+            "Used to set the vector group filter for a specific bulk vector instance of the Tlv table.
+             The interface ID passed here will be the SNMP interface ID."
+          ::= { adGenVectorBulkFilterEntry 2 }
+
+adGenVectorBulkFilterSlot OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+            "Used to set the slot of bulk vector info to return in the bulk vector instance"
+          ::= { adGenVectorBulkFilterEntry 3 }
+
+adGenVectorBulkFilterDirection OBJECT-TYPE
+          SYNTAX         INTEGER {	                                                
+                            upstream(1),
+                            downstream(2)
+                         }
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+            "Used to set the direction of bulk vector info to return in the bulk vector instance:
+             1 - Upstream Direction, 2 - Downstream direction"
+          DEFVAL { upstream }     
+          ::= { adGenVectorBulkFilterEntry 4 }
+
+adGenVectorBulkFilterType OBJECT-TYPE
+          SYNTAX         INTEGER {	                                                
+                            weights(1)
+                         }
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "Used to set the type of bulk vector info to return in the bulk vector instance:
+            1 - weights"
+          DEFVAL { weights }     
+          ::= { adGenVectorBulkFilterEntry 5 }
+
+adGenVectorBulkSlotCreate OBJECT-TYPE
+          SYNTAX         INTEGER {
+                            updateinstance(1)
+                         }
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "Set this OID to 1 to update the instance with bulk vector info depending on filters.
+            A get on this OID always returns a 1."
+          ::= { adGenVectorBulkFilterEntry 6 }
+
+END

@@ -1,0 +1,526 @@
+ADTRAN-GENDS1TEST-MIB     DEFINITIONS ::= BEGIN
+
+-- TITLE:     Generic DS1 TEST MIB
+-- PRODUCT:   All ADTRAN DS1 PRODUCTS
+-- VERSION:   1.0
+-- DATE:      8/27/2008
+-- AUTHOR:    Albert Sue
+-- STATUS:    PRELIMINARY
+-- MIB ARC:   adtran.adShared.adGenDS1Test
+-- HISTORY:   DO NOT MAKE HISTORY COMMENTS HERE!!!! Revision history now in REVISION/DESCRIPTION clauses below
+-- 08/27/08 Albert Sue - Created
+-- ******************************************************************************************
+
+    IMPORTS
+        Gauge32,
+        TimeTicks,
+        Unsigned32,
+	Integer32,
+        OBJECT-TYPE,
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE        FROM SNMPv2-SMI
+	OBJECT-GROUP,
+        NOTIFICATION-GROUP       FROM SNMPv2-CONF
+        sysName                  FROM SNMPv2-MIB
+        DisplayString            FROM SNMPv2-TC
+        ifIndex                  FROM IF-MIB
+        adTrapInformSeqNum       FROM ADTRAN-GENTRAPINFORM-MIB
+        adGenSlotInfoIndex       FROM ADTRAN-GENSLOT-MIB
+       	adGenPortTrapIdentifier  FROM ADTRAN-GENPORT-MIB
+        adDS1,
+        adGenDS1TestID           FROM ADTRAN-SHARED-DS1-MIB
+        adShared                 FROM ADTRAN-MIB
+        ;
+
+  -- DS1 Test Group
+adGenDS1TestIdentity MODULE-IDENTITY
+   LAST-UPDATED "201405060000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO "http://www.adtran.com"
+   DESCRIPTION
+      "The MIB module describing generic objects used for DS1 testing for any
+	DS1 product developed by ADTRAN, Inc."
+
+   REVISION "201405060000Z"
+   DESCRIPTION 
+      "Updated adGenDS1TestFarEndLpbkType, and adGenDS1TestStatus
+       to support additional far-end tests."
+   
+   REVISION "201108220000Z"
+   DESCRIPTION 
+      "Added to 2to15, 2to20, 2to23, 511, twoInEight and threeInTwentyFour to
+        adGenDS1TestStatus."
+
+   REVISION "201107120000Z"
+   DESCRIPTION 
+      "Added OIDs to support detection of inward loopback patterns.
+        Added support to enable disable inward loopback.  Added support for
+        retreiving inward loopback status."
+
+   REVISION "201103240000Z"
+   DESCRIPTION "Added threeInTwentyFour and twoInEight to adGenDS1TestPatternType"
+
+   REVISION "200809180000Z"
+   DESCRIPTION "Created"
+::= { adGenDS1TestID 1 }
+
+-- OBJECT IDENTIFIERS
+
+adGenDS1Test                    OBJECT IDENTIFIER ::= {adDS1 1}
+adGenDS1TestCommand             OBJECT IDENTIFIER ::= {adGenDS1Test 1}
+adGenDS1TestNearEndLoopback     OBJECT IDENTIFIER ::= {adGenDS1Test 2}
+adGenDS1TestFarEndLoopback      OBJECT IDENTIFIER ::= {adGenDS1Test 3}
+adGenDS1TestPattern             OBJECT IDENTIFIER ::= {adGenDS1Test 4}
+adGenDS1TestMibConformance      OBJECT IDENTIFIER ::= {adGenDS1Test 5}
+adGenDS1TestMibGroups           OBJECT IDENTIFIER ::= {adGenDS1TestMibConformance 1 }
+
+-- ******************************************************************************************
+-- DS1 Test Command Table
+-- ******************************************************************************************
+
+adGenDS1TestCommandTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS1TestCommandEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS1 test command parameters."
+   ::= { adGenDS1TestCommand 1 }
+
+adGenDS1TestCommandEntry OBJECT-TYPE
+   SYNTAX      AdGenDS1TestCommandEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS1TestCommandTable."
+   INDEX { ifIndex }
+   ::= { adGenDS1TestCommandTable 1 }
+
+AdGenDS1TestCommandEntry ::=
+   SEQUENCE
+   {
+        adGenDS1TestTimeout                  Integer32,
+        adGenDS1TestStartStop                INTEGER,
+        adGenDS1TestStatus                   INTEGER,
+        adGenDS1TestTimeRemaining            Unsigned32,
+        adGenDS1TestTimeElapsed              Unsigned32
+   }
+
+adGenDS1TestTimeout OBJECT-TYPE
+   SYNTAX      	Integer32
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- This object defines the number of minutes that any near end or any far end test will
+        be run.
+      - Any locally initiated loopback or BERT, any local response to a remotely requested
+        loopback, and any local request for a far end loopback are all considered tests.
+      - Unless a customer requires otherwise, this value will be programmed from 0 to
+        9999 minutes.  This allows a reasonable 6+ days for a test and reasonably limits
+        the required display space on GUIs.
+      - A value of 0 disables the timeout so that a test will run indefinitely, if not
+        manually stopped."
+   ::= { adGenDS1TestCommandEntry 1 }
+
+ adGenDS1TestStartStop  OBJECT-TYPE
+   SYNTAX               INTEGER
+                        {
+                                nearEndStart(1),
+                                farEndStart(2),
+                                allStop(3)
+                        }
+
+   MAX-ACCESS	read-write
+   STATUS	current
+   DESCRIPTION
+            "
+            nearEndStart - INITIALIZES and starts any near end test and counters
+            farEndStart  - INITIALIZES and starts any far end test and counters
+            allStop      - terminates all tests and freezes status counters of all tests."
+
+   ::= { adGenDS1TestCommandEntry 2 }
+
+adGenDS1TestStatus OBJECT-TYPE
+   SYNTAX       INTEGER
+                {
+                        none(1),
+                        nearEndLine(2),
+                        nearEndPayload(3),
+                        nearEndCsu(4),
+                        nearEndFdlPayload(5),
+                        nearEndFeacLine(6),
+                        pattQrss(7),
+                        pattOneInEight(8),
+                        pattAllOnes(9),
+                        pattAllZeros(10),
+                        farEndPattQrssCsu(11),
+                        farEndPattOneInEightCsu(12),
+                        farEndPattAllOnesCsu(13),
+                        farEndPattAllZerosCsu(14),
+                        farEndPattQrssFdlPayload(15),
+                        farEndPattOneInEightFdlPayload(16),
+                        farEndPattAllOnesFdlPayload(17),
+                        farEndPattAllZerosFdlPayload(18),
+                        farEndPattQrssFac2niu(19),
+                        farEndPattOneInEightFac2niu(20),
+                        farEndPattAllOnesFac2niu(21),
+                        farEndPattAllZerosFac2niu(22),
+                        farEndPattQrssFeac(23),
+                        farEndPattOneInEightFeac(24),
+                        farEndPattAllOnesFeac(25),
+                        farEndPattAllZerosFeac(26),
+                        nearEndFac2niu(27),
+                        farEndCsu(28),
+                        farEndFdlPayload(29),
+                        farEndFac2Niu(30),
+                        farEndFeac(31),
+                        nearEndInward(32),
+                        nearEndCsuInward(33),
+                        nearEndFac2niuInward(34),
+                        pattTwoInEight(35),
+                        pattThreeInTwentyFour(36),
+                        patt2to23(37),
+                        patt2to15(38),
+                        patt2to20(39),
+                        patt511(40),
+                        farEndPattTwoInEightCsu(41),
+                        farEndPattTwoInEightFdlPayload(42),
+                        farEndPattTwoInEightFac2Niu(43),
+                        farEndPattTwoInEightFeac(44),
+                        farEndPattThreeInTwentyFourCsu(45),
+                        farEndPattThreeInTwentyFourFdlPayload(46),
+                        farEndPattThreeInTwentyFourFac2Niu(47),
+                        farEndPattThreeInTwentyFourFeac(48),
+                        farEndFdlLine(49),
+                        farEndNiuInband(50)
+                }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+        "DS1 Test Status:
+         - TBD"
+   ::= { adGenDS1TestCommandEntry 3 }
+
+adGenDS1TestTimeRemaining OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS  	read-only
+   STATUS       current
+   DESCRIPTION
+     "Initialized to adGenDS1TestTimeout upon reception of a Start object.
+      0  = occurs when near end test has ended.
+      0  = occurs when near end test is in progress, but timeout has been disabled.
+      >0 = occurs when near end test is in progress, but timeout has not been disabled."
+   ::= { adGenDS1TestCommandEntry 4 }
+
+adGenDS1TestTimeElapsed OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS  	read-only
+   STATUS       current
+   DESCRIPTION
+     "0  = initialization value at instance a test starts.
+      >0 = occurs when near end test is in progress or just ended."
+   ::= { adGenDS1TestCommandEntry 5 }
+
+-- ******************************************************************************************
+-- DS1 Test Near End Loopback Table
+-- ******************************************************************************************
+
+adGenDS1TestNearEndLoopbackTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS1TestNearEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS1 Test Near End Loopback parameters."
+   ::= { adGenDS1TestNearEndLoopback 1 }
+
+adGenDS1TestNearEndLoopbackEntry OBJECT-TYPE
+   SYNTAX      AdGenDS1TestNearEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS1TestNearEndLoopbackTable."
+   INDEX { ifIndex }
+   ::= { adGenDS1TestNearEndLoopbackTable 1 }
+
+AdGenDS1TestNearEndLoopbackEntry ::=
+   SEQUENCE
+   {
+        adGenDS1TestNearEndLoopbackType          INTEGER
+   }
+
+adGenDS1TestNearEndLoopbackType OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        line(1),
+                        payload(2),
+                        inward(3)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- This object selects the near end loopback that will be executed upon recognition of
+        a start test. "
+   ::= { adGenDS1TestNearEndLoopbackEntry 1 }
+
+-- ******************************************************************************************
+-- DS1 Test Far End Loopback Table
+-- ******************************************************************************************
+
+adGenDS1TestFarEndLoopbackTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS1TestFarEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS1 Test Far End Loopback parameters."
+   ::= { adGenDS1TestFarEndLoopback 1 }
+
+adGenDS1TestFarEndLoopbackEntry OBJECT-TYPE
+   SYNTAX      AdGenDS1TestFarEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS1TestFarEndLoopbackTable."
+   INDEX { ifIndex }
+   ::= { adGenDS1TestFarEndLoopbackTable 1 }
+
+AdGenDS1TestFarEndLoopbackEntry ::=
+   SEQUENCE
+   {
+        adGenDS1TestFarEndLpbkType              INTEGER,
+        adGenDS1TestFarEndCSURequest            INTEGER,
+        adGenDS1TestFarEndFDLRequest            INTEGER,
+        adGenDS1TestFarEndFEACRequest           INTEGER,
+        adGenDS1TestFarEndFAC2NIURequest        INTEGER,
+        adGenDS1TestFarEndCSUInwardRequest      INTEGER,
+        adGenDS1TestFarEndFAC2NIUInwardRequest  INTEGER        
+   }
+
+adGenDS1TestFarEndLpbkType OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        none(1),
+                        csu(2),
+                        fdlPayload(3),
+                        fac2niu(4),
+                        feac(5),
+                        fdlLine(6),
+                        niuInband(7)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- This object selects the far end loopback that will be executed upon recognition of
+        the adGenDS1TestFarEndStart object."
+        
+   ::= { adGenDS1TestFarEndLoopbackEntry 1 }
+
+adGenDS1TestFarEndCSURequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     " Enable/Disable Respond to incoming CSU Loop Up request."
+   ::= { adGenDS1TestFarEndLoopbackEntry 2 }
+
+adGenDS1TestFarEndFDLRequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     " Enable/Disable Respond to incoming FDL Payload Loop Up request."
+   ::= { adGenDS1TestFarEndLoopbackEntry 3 }
+
+adGenDS1TestFarEndFEACRequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     " Enable/Disable Respond to incoming FEAC DS1 Line Port Loop Up request."
+   ::= { adGenDS1TestFarEndLoopbackEntry 4 }
+
+adGenDS1TestFarEndFAC2NIURequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     " Enable/Disable Respond to incoming FAC2 NIU Loop Up request."
+   ::= { adGenDS1TestFarEndLoopbackEntry 5 }
+   
+   adGenDS1TestFarEndCSUInwardRequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     " Enable/Disable Response to incoming CSU-Inward Loop Up request."
+   ::= { adGenDS1TestFarEndLoopbackEntry 6 }
+
+adGenDS1TestFarEndFAC2NIUInwardRequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     " Enable/Disable Response to incoming FAC2 NIU-Inward Loop Up request."
+   ::= { adGenDS1TestFarEndLoopbackEntry 7 }
+
+-- ******************************************************************************************
+-- DS1 Test Pattern Table
+-- ******************************************************************************************
+
+adGenDS1TestPatternTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS1TestPatternEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS1 Test Pattern parameters."
+   ::= { adGenDS1TestPattern 1 }
+
+adGenDS1TestPatternEntry OBJECT-TYPE
+   SYNTAX      AdGenDS1TestPatternEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS1TestPatternTable."
+   INDEX { ifIndex }
+   ::= { adGenDS1TestPatternTable 1 }
+
+AdGenDS1TestPatternEntry ::=
+   SEQUENCE
+   {
+        adGenDS1TestPatternType           INTEGER,
+        adGenDS1TestPatternSync           INTEGER,
+        adGenDS1TestPatternErrorsRcvd     Gauge32,
+        adGenDS1TestPatternInsertError    INTEGER,
+        adGenDS1TestPatternResetCount     INTEGER
+   }
+
+adGenDS1TestPatternType OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        notUsed1(1),
+                        qrss(2),
+                        notUsed3(3),
+                        allOnes(4),
+                        allZeros(5),
+                        notUsed6(6),
+                        notUsed7(7),
+                        notUsed8(8),
+                        notUsed9(9),
+                        oneInEight(10),
+                        twoInEight(11),
+                        threeInTwentyFour(12)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "  This object selects the DS1 BERT that will be generated and detected upon
+        recognition of a start command.
+        Note:  notUsed# should not be selected!"
+   ::= { adGenDS1TestPatternEntry 1 }
+
+adGenDS1TestPatternSync OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        true(1),
+                        false(2)
+                }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "  true  = pattern test is in progress and incoming test pattern is in sync;
+                pattern test ended while incoming test pattern was in sync.
+        false = pattern test is in progress and incoming test pattern is out of sync;
+                pattern test ended while incoming test pattern was out of sync;
+                default if no test has ever been run."
+   ::= { adGenDS1TestPatternEntry 2 }
+
+adGenDS1TestPatternErrorsRcvd OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "0  = initialization value when pattern test starts.
+      >0 = increments for each logic error that occurs when pattern test is in
+           progress AND while incoming test pattern is in sync;
+           maintains value when pattern test ends."
+   ::= { adGenDS1TestPatternEntry 3 }
+
+adGenDS1TestPatternInsertError OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        insert(1)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- Upon each reception of this object, 1 logic error is injected into DS1 payload
+        if a pattern test is in progress.
+      - The logic error is injected PRIOR to parity calculation."
+   ::= { adGenDS1TestPatternEntry 4 }
+
+adGenDS1TestPatternResetCount OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        reset(1)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- Upon each reception of this object, the pattern error counter is reset to 0 if a
+        far end pattern test is in progress."
+   ::= { adGenDS1TestPatternEntry 5 }
+
+-- ******************************************************************************************
+-- MIB Groups
+-- ******************************************************************************************
+adGenDS1TestGroup OBJECT-GROUP
+   OBJECTS
+   {
+        adGenDS1TestTimeout,
+        adGenDS1TestStartStop,
+        adGenDS1TestStatus,
+        adGenDS1TestTimeRemaining,
+        adGenDS1TestTimeElapsed,
+        adGenDS1TestNearEndLoopbackType,
+        adGenDS1TestFarEndLpbkType,
+        adGenDS1TestFarEndCSURequest,
+        adGenDS1TestFarEndFDLRequest,
+        adGenDS1TestFarEndFEACRequest,
+        adGenDS1TestFarEndFAC2NIURequest,
+        adGenDS1TestFarEndCSUInwardRequest,
+        adGenDS1TestFarEndFAC2NIUInwardRequest,
+        adGenDS1TestPatternType,
+        adGenDS1TestPatternSync,
+        adGenDS1TestPatternErrorsRcvd,
+        adGenDS1TestPatternInsertError,
+        adGenDS1TestPatternResetCount
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DS1 test procedures."
+   ::= { adGenDS1TestMibGroups 1 }
+
+
+END

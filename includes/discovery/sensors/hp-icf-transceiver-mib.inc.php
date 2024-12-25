@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -75,7 +75,7 @@ foreach ($oids as $ifIndex => $lanes) {
         ];
         $limits     = entity_limits_definition($device, $limits_def, $entry, $scale);
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
         // Tx Power
         $descr    = $name . ' Tx Power (' . $entry['hpicfXcvrModel'] . ' ' . $entry['hpicfXcvrType'] . ', ' . $entry['hpicfXcvrWavelength'] . ')';
@@ -102,7 +102,7 @@ foreach ($oids as $ifIndex => $lanes) {
 
         $limits = entity_limits_definition($device, $limits_def, $entry, $scale);
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
         // Rx Power
         $descr    = $name . ' Rx Power (' . $entry['hpicfXcvrModel'] . ' ' . $entry['hpicfXcvrType'] . ', ' . $entry['hpicfXcvrWavelength'] . ')';
@@ -124,7 +124,7 @@ foreach ($oids as $ifIndex => $lanes) {
         ];
         $limits     = entity_limits_definition($device, $limits_def, $entry, $scale);
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 }
 

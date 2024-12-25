@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -21,10 +20,10 @@ $numeric_oids = [
 
 foreach ($numeric_oids as $entry) {
     $value   = snmp_get_oid($device, $entry['oid_num']);
-    $scale   = isset($entry['scale']) ? $entry['scale'] : 1;
-    $options = [];
+    $scale   = $entry['scale'] ?? 1;
+    $options = [ 'sensor_type' => $entry['type'] ];
     if ($value > 0 && $value != 32767) {
-        discover_sensor_ng($device, $entry['class'], NULL, NULL, $entry['oid_num'], 0, $entry['type'], $entry['descr'], $scale, $value, $options);
+        discover_sensor_ng($device, $entry['class'], NULL, NULL, $entry['oid_num'], 0, $entry['descr'], $scale, $value, $options);
     }
 }
 

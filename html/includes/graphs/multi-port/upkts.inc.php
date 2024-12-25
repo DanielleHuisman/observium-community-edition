@@ -7,7 +7,7 @@
  *
  * @package        observium
  * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -34,8 +34,8 @@ foreach ($vars['id'] as $ifid) {
         $ifid             = str_replace("!", "", $ifid);
     }
 
-    $port = dbFetchRow("SELECT * FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", [$ifid]);
-    humanize_port($port);
+    $port = dbFetchRow("SELECT `ports`.*, `devices`.`hostname` FROM `ports` LEFT JOIN `devices` USING(`device_id`) WHERE `ports`.`port_id` = ?", [ $ifid ]);
+    //humanize_port($port);
     $rrd_file = get_port_rrdfilename($port, NULL, TRUE);
     if (rrd_is_file($rrd_file)) {
         $rrd_list[$i]['filename']  = $rrd_file;

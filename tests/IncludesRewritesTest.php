@@ -427,85 +427,84 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-   * @dataProvider providerProcessPortLabel
-   * @group process
-   */
-  public function testProcessPortLabel($os, $array, $result)
-  {
-    // Port array template
-    $port = array(
-      'ifIndex' => '5',
-      //'ifDescr' => 'GigabitEthernet0/1',
-      'ifType' => 'ethernetCsmacd',
-      'ifMtu' => '1500',
-      'ifSpeed' => '1000000000',
-      'ifPhysAddress' => '4c:4e:35:fb:c7:20',
-      'ifAdminStatus' => 'up',
-      'ifOperStatus' => 'up',
-      'ifLastChange' => '0:0:01:03.68',
-      'ifInOctets' => '2336423782',
-      'ifInUcastPkts' => '56523160',
-      'ifInDiscards' => '0',
-      'ifInErrors' => '195562',
-      'ifInUnknownProtos' => '0',
-      'ifOutOctets' => '2769871040',
-      'ifOutUcastPkts' => '83292747',
-      'ifOutDiscards' => '0',
-      'ifOutErrors' => '0',
-      //'ifName' => 'Gi0/1',
-      'ifInMulticastPkts' => '1',
-      'ifInBroadcastPkts' => '21',
-      'ifOutMulticastPkts' => '16933',
-      'ifOutBroadcastPkts' => '2434835',
-      'ifHCInOctets' => '10926358374',
-      'ifHCInUcastPkts' => '56523160',
-      'ifHCInMulticastPkts' => '1',
-      'ifHCInBroadcastPkts' => '21',
-      'ifHCOutOctets' => '75784315072',
-      'ifHCOutUcastPkts' => '83292747',
-      'ifHCOutMulticastPkts' => '16933',
-      'ifHCOutBroadcastPkts' => '2434835',
-      'ifLinkUpDownTrapEnable' => 'enabled',
-      'ifHighSpeed' => '1000',
-      'ifPromiscuousMode' => 'false',
-      'ifConnectorPresent' => 'true',
-      //'ifAlias' => 'Po1#2',
-      'ifCounterDiscontinuityTime' => '0:0:00:32.81',
-      'dot3StatsDuplexStatus' => 'fullDuplex',
-    );
-    foreach ($array as $oid => $value)
-    {
-      $port[$oid] = $value;
+    /**
+     * @dataProvider providerProcessPortLabel
+     * @group process
+     */
+    public function testProcessPortLabel($os, $array, $result) {
+
+        // Port array template
+        $port = [
+            'ifIndex' => '5',
+            //'ifDescr' => 'GigabitEthernet0/1',
+            'ifType' => 'ethernetCsmacd',
+            'ifMtu' => '1500',
+            'ifSpeed' => '1000000000',
+            'ifPhysAddress' => '4c:4e:35:fb:c7:20',
+            'ifAdminStatus' => 'up',
+            'ifOperStatus' => 'up',
+            'ifLastChange' => '0:0:01:03.68',
+            'ifInOctets' => '2336423782',
+            'ifInUcastPkts' => '56523160',
+            'ifInDiscards' => '0',
+            'ifInErrors' => '195562',
+            'ifInUnknownProtos' => '0',
+            'ifOutOctets' => '2769871040',
+            'ifOutUcastPkts' => '83292747',
+            'ifOutDiscards' => '0',
+            'ifOutErrors' => '0',
+            //'ifName' => 'Gi0/1',
+            'ifInMulticastPkts' => '1',
+            'ifInBroadcastPkts' => '21',
+            'ifOutMulticastPkts' => '16933',
+            'ifOutBroadcastPkts' => '2434835',
+            'ifHCInOctets' => '10926358374',
+            'ifHCInUcastPkts' => '56523160',
+            'ifHCInMulticastPkts' => '1',
+            'ifHCInBroadcastPkts' => '21',
+            'ifHCOutOctets' => '75784315072',
+            'ifHCOutUcastPkts' => '83292747',
+            'ifHCOutMulticastPkts' => '16933',
+            'ifHCOutBroadcastPkts' => '2434835',
+            'ifLinkUpDownTrapEnable' => 'enabled',
+            'ifHighSpeed' => '1000',
+            'ifPromiscuousMode' => 'false',
+            'ifConnectorPresent' => 'true',
+            //'ifAlias' => 'Po1#2',
+            'ifCounterDiscontinuityTime' => '0:0:00:32.81',
+            'dot3StatsDuplexStatus' => 'fullDuplex',
+        ];
+        foreach ($array as $oid => $value) {
+            $port[$oid] = $value;
+        }
+
+        // Device array template
+        $device = [
+            'device_id' => 99999999,
+            'os' => $os,
+        ];
+
+        // Process $port array
+        process_port_label($port, $device);
+        //var_dump($port);
+
+        // Select specific entries for validate
+        $test_array = [];
+        foreach ([ 'port_label', 'port_label_num', 'port_label_base', 'port_label_short' ] as $oid) {
+            $test_array[$oid] = $port[$oid];
+        }
+
+        // Additionally, test processing ifAlias on some entries
+        if (isset($result['ifAlias'])) {
+            $test_array['ifAlias'] = $port['ifAlias'];
+        }
+
+        $this->assertEquals($result, $test_array);
     }
 
-    // Device array template
-    $device = array(
-      'device_id' => 99999999,
-      'os' => $os,
-    );
-    // Process $port array
-    process_port_label($port, $device);
-    //var_dump($port);
+    public function providerProcessPortLabel() {
 
-    // Select specific entries for validate
-    $test_array = array();
-    foreach (array('port_label', 'port_label_num', 'port_label_base', 'port_label_short') as $oid)
-    {
-      $test_array[$oid] = $port[$oid];
-    }
-    // Additionally test processing ifAlias on some entries
-    if (isset($result['ifAlias']))
-    {
-      $test_array['ifAlias'] = $port['ifAlias'];
-    }
-
-    $this->assertEquals($result, $test_array);
-  }
-
-  public function providerProcessPortLabel()
-  {
-    return array(
+        return [
       array('ios',          array('ifDescr' => 'GigabitEthernet0/1', 'ifName' => 'Gi0/1', 'ifAlias' => 'Po1#2'),
                             array('port_label' => 'GigabitEthernet0/1', 'port_label_num' => '0/1', 'port_label_base' => 'GigabitEthernet', 'port_label_short' => 'Gi0/1')),
       array('ios',          array('ifDescr' => 'FastEthernet0/1/1', 'ifName' => 'Fa0/1/1', 'ifAlias' => 'COMSTAR BGP link'),
@@ -640,6 +639,12 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('ekinops-360',  array('ifDescr' => 'EKINOPS/C200/1/MGNT/GbE_RJ45#1', 'ifName' => 'EKINOPS/C200/1/MGNT/GbE_RJ45#1', 'ifAlias' => ''),
                             array('port_label' => '1/MGNT/GbE_RJ45#1', 'port_label_num' => '1', 'port_label_base' => '1/MGNT/GbE_RJ45#', 'port_label_short' => '1/MGNT/GbE_RJ45#1', 'ifAlias' => '')),
 
+      // os definition, multiple label_num
+      [ 'adtran-ta',        [ 'ifDescr' => 'Shelf: 1, Slot: 11, Pon: 1, ONT: 1, ONT Serial No: ADTN21296399, ONT Reg ID:', 'ifName' => '', 'ifAlias' => 'Serial No: ADTN21296399' ],
+                            [ 'port_label' => 'ONT 1/11/1/1', 'port_label_num' => '1/11/1/1', 'port_label_base' => 'ONT', 'port_label_short' => 'ONT 1/11/1/1' ] ],
+      [ 'adtran-ta',        [ 'ifDescr' => 'PON-4, Splitter #1 Washington St', 'ifName' => '', 'ifAlias' => 'Splitter #1 Washington St' ],
+                            [ 'port_label' => 'PON-4', 'port_label_num' => '4', 'port_label_base' => 'PON-', 'port_label_short' => 'PON-4' ] ],
+
       // ifType_ifDescr
       array('liebert',      array('ifDescr' => '', 'ifType' => 'softwareLoopback'), // ++ ifType, ifIndex
                             array('port_label' => 'Loopback 5', 'port_label_num' => '5', 'port_label_base' => 'Loopback ', 'port_label_short' => 'Lo 5')),
@@ -758,8 +763,8 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       //array('generic',      array('ifDescr' => 'microsens'),
       //                      array('port_label' => 'microsens', 'port_label_num' => 'microsens', 'port_label_base' => '', 'port_label_short' => 'microsens')),
 
-    );
-  }
+        ];
+    }
 }
 
 // EOF

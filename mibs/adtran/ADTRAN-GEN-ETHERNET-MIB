@@ -1,0 +1,1321 @@
+ADTRAN-GEN-ETHERNET-MIB
+
+-- TITLE:     The ADTRAN ETHERNET CROSSCONNECT MIB
+-- PRODUCT:   ADTRAN ETHERNET PRODUCTS
+-- VERSION:   1.0
+-- DATE:      02/01/2007
+-- AUTHOR:    Peter Som de Cerff
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN ETHERNET CROSSCONNECT MIB objects
+--
+-- The Ethernet cross-connect model is very closely based on the RFC 2515
+-- ATM model, including most of the significant virtual path and circuit concept.
+-- In general, this MIB equates S-tag VLANs where RFC 2515 references VPIs,
+-- and C-tag VLANs for VCIs, termed evpl and evcls, respectively.
+-- The intent is for this MIB to augment, but not in any way replace, the existing
+-- RFC 2515 MIB.
+--
+-- This MIB defines the following entities:
+-- (1) Ethernet Interface VPL configuration table
+-- (2) Ethernet Interface VCL configuration table
+-- (3) Ethernet/ATM VP Cross Connect table (for Ethernet and ATM VPs)
+-- (4) Ethernet/ATM VC Cross Connect table (for Ethernet and ATM VCs)
+-- (5) Ethernet VP Cross Connect table (for Ethernet only VPs)
+-- (6) Ethernet VC Cross Connect table (for Ethernet only VCs)
+
+-- HISTORY:
+-- 02/01/07 pcs STATUS: PRELIMINARY.
+-- 02/02/07 pcs After initial review, added cross-connect type fields for VP and VC xcons,
+--              Added name strings for all entities, error string objects for all, and get-next objects
+--              for enumerated tables.  Added xcon failure counter object.
+--              Still need to add stats, unassigned vcl list.
+-- 02/27/07 djb Changed "Vpi" to "STAG" and "Vci" to "CTAG" for ethernet endpoints. Fixed a few
+--              numbering and naming errors.
+-- 02/28/07 djb Added Evcl cross connect table
+-- 03/01/07 djb Changed CrossConnectTypes to use an enumeration.
+--              Removed all AdminStatus objects. This functionality should be handled by
+--              rowStatus.
+--              Remove the flow descriptor table and added an object to the EVCL and EVPL
+--              tables that indicates encapsulation mode.
+--              Changed "High" and "Low" names on the Evcl cross connect table to "1" and
+--              "2" to help eliminate confusion.
+--              Added a textual conventions section.
+--              Cleaned up comments with respect to how the cross-connect identifier and
+--              cross-connect type objects are created for EVCLs and EVPLs.
+--              Added EVPL cross-connect table.
+-- 03/08/07 djb Removed Ethernet Traffic Descriptor table and any references to it. Added
+--              module identity clause and SNMP version 2 references.
+-- 03/13/07 djb Added the module level configuration table.
+-- 03/14/07 aed Changed MIB name to ADTRAN-GEN-ETHERNET-MIB
+-- 03/16/07 aed Changed VplEvplCrossConnectEthVp to VplEvplCrossConnectEthStag
+-- 03/22/07 aed Changed the AdGenEthernetOperStatus textual convention to match other
+--              operStatus enums (added "testing").
+-- 03/22/07 aed Added the stag membership table.
+-- 03/27/07 aed Corrected module identity definition, and placed this MIB under genTa5k.
+--              Changed INTEGER definitions to Integer32 for next available and failure count.
+--              Corrected compiler warnings about mixing read-write and read-create columns
+--              in the same table.
+-- 03/29/07 aed Removed references to encapsulation mode.
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+    IMPORTS
+
+        MODULE-IDENTITY, OBJECT-TYPE,
+        TimeTicks, Counter32, Integer32
+            FROM SNMPv2-SMI
+        DisplayString, RowStatus, TEXTUAL-CONVENTION, TruthValue
+            FROM SNMPv2-TC
+        InterfaceIndex, ifIndex
+            FROM IF-MIB
+        AtmVpIdentifier, AtmVcIdentifier
+            FROM ATM-TC-MIB
+        adGenEthernet, adGenEthernetID
+            FROM ADTRAN-GENTA5K-MIB
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB;
+
+    adGenEthernetMIB MODULE-IDENTITY
+        LAST-UPDATED "201110100000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Ethernet Cross Connects MIB"  
+            
+        REVISION "201110100000Z"
+        DESCRIPTION  "Added OIDs adGenEthernetVclEvclCrossConnectOption82Insert and adGenEthernetVplEvplCrossConnectOption82Insert
+        to enable/disable Option-82 insertion in the crossconnect table"            		        
+            
+        ::= { adGenEthernetID 1 }
+
+-- OBJECT IDENTIFIERS
+adGenEthernetMIBObjects  OBJECT IDENTIFIER ::= {adGenEthernet 1}
+
+-- **********************************************************************
+-- Textual Conventions
+-- **********************************************************************
+AdGenEthernetCtag ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The C-tag value for an EVCL. A value of 4095
+            indicates that the EVCL does not use a C-tag."
+        SYNTAX    INTEGER (0..4095)
+
+AdGenEthernetCrossConnectType ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Specifies the cross-connect table in which an endpoint
+             is used."
+        SYNTAX   INTEGER {
+                   none(1),
+                   vplCrossConnect(2),
+                   vclCrossConnect(3),
+                   evplCrossConnect(4),
+                   evclCrossConnect(5),
+                   vplEvplCrossConnect(6),
+                   vclEvclCrossConnect(7)
+          }
+
+AdGenEthernetLastChange ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The value of MIB II's sysUpTime at the time a
+            virtual link or cross-connect entered its current
+            operational state. If the current state was
+            entered prior to the last re-initialization of the
+            agent then this object contains a zero value."
+        SYNTAX   TimeTicks
+
+AdGenEthernetOperStatus ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The value determines the operational status of a
+            virtual link or cross-connect. The up and down
+            states indicate that the traffic flow is enabled
+            or disabled respectively on the virtual link or
+            cross-connect. The unknown state indicates that
+            the state of it cannot be determined. "
+        SYNTAX   INTEGER {
+           up(1),
+           down(2),
+           testing(3),
+           unknown(4)
+           }
+
+AdGenEthernetStag ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The S-tag value for an EVPL or EVCL. A value of 4095
+            indicates that the EVCL or EVPL does not use an S-tag."
+        SYNTAX    INTEGER (0..4095)
+
+-- **********************************************************************
+-- Configuration
+-- **********************************************************************
+--  This section could provide tables for defining max values of all the Ethernet interface
+--  paramaters, table sizes, mgmt ports, etc.  Much of this is included for ATM interfaces in RFC 2515.
+--  These parameters will be used primarily for provisioning error checking.
+--  For example, suppose an IfIndex only allows a maxmimum of 8 Vcls. If
+--  an attempt to create the 9th evcl on that IfIndex is made, it will fail.
+
+-- Module configuration
+adGenEthernetModuleConfTable  OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetModuleConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This table contains Ethernet local Module
+            configuration parameters, one entry per Ethernet
+            Module port."
+          ::= { adGenEthernetMIBObjects 1 }
+
+adGenEthernetModuleConfEntry    OBJECT-TYPE
+          SYNTAX         AdGenEthernetModuleConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This list contains Ethernet Module configuration
+            parameters and state variables and is indexed
+            by the module's slot index."
+          INDEX { adGenSlotInfoIndex }
+          ::= { adGenEthernetModuleConfTable  1}
+
+AdGenEthernetModuleConfEntry    ::= SEQUENCE  {
+          adGenEthernetModuleMaxEvpls        INTEGER,
+          adGenEthernetModuleMaxEvcls        INTEGER,
+          adGenEthernetModuleConfEvpls       INTEGER,
+          adGenEthernetModuleConfEvcls       INTEGER
+          }
+
+adGenEthernetModuleMaxEvpls OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of EVPLs supported
+            by this module. "
+          ::= { adGenEthernetModuleConfEntry 1}
+
+adGenEthernetModuleMaxEvcls OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of EVCLs supported
+            by this module."
+          ::= { adGenEthernetModuleConfEntry 2}
+
+adGenEthernetModuleConfEvpls  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of EVPLs currently in use by this module."
+          ::= { adGenEthernetModuleConfEntry 3}
+
+adGenEthernetModuleConfEvcls  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of EVCLs currently in use by this module."
+          ::= { adGenEthernetModuleConfEntry 4}
+
+-- Ethernet interface configuration
+adGenEthernetInterfaceConfTable  OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetInterfaceConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This table contains Ethernet local interface
+            configuration parameters, one entry per Ethernet
+            interface port."
+          ::= { adGenEthernetMIBObjects 2 }
+
+adGenEthernetInterfaceConfEntry    OBJECT-TYPE
+          SYNTAX         AdGenEthernetInterfaceConfEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "This list contains Ethernet interface configuration
+            parameters and state variables and is indexed
+            by an ethernet IfIndex."
+          INDEX { ifIndex }
+          ::= { adGenEthernetInterfaceConfTable  1}
+
+AdGenEthernetInterfaceConfEntry    ::= SEQUENCE  {
+          adGenEthernetInterfaceMaxEvpls        INTEGER,
+          adGenEthernetInterfaceMaxEvcls        INTEGER,
+          adGenEthernetInterfaceConfEvpls       INTEGER,
+          adGenEthernetInterfaceConfEvcls       INTEGER
+          }
+
+adGenEthernetInterfaceMaxEvpls OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of EVPLs supported
+            at this Ethernet interface. "
+          ::= { adGenEthernetInterfaceConfEntry 1}
+
+adGenEthernetInterfaceMaxEvcls OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+           "The maximum number of EVCCs supported
+            at this Ethernet interface. The maximum number of EVCLs
+            ranges from 0 to ??? only."
+          ::= { adGenEthernetInterfaceConfEntry 2}
+
+adGenEthernetInterfaceConfEvpls  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of EVPLs currently in use at this
+            Ethernet interface."
+          ::= { adGenEthernetInterfaceConfEntry 3}
+
+adGenEthernetInterfaceConfEvcls  OBJECT-TYPE
+          SYNTAX         INTEGER  (0..4096)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The number of EVCLs currently in use at this
+            Ethernet interface."
+          ::= { adGenEthernetInterfaceConfEntry 4}
+
+
+-- **********************************************************************
+-- Provisioning
+-- **********************************************************************
+
+-- Ethernet VPL - assigning S-tags to interfaces
+
+
+adGenEthernetVplStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "This status string contains the last error
+              that occured when an operation on the adGenEthernetVplTable
+              failed."
+         ::= { adGenEthernetMIBObjects 3 }
+
+adGenEthernetVplTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetVplEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Ethernet Virtual Path Link (EVPL) table.  A
+            bi-directional EVPL is modeled as one entry
+            in this table. This table can be used for
+            EVPL end-points for cross-connects and bridge
+            associations. In general, evp-evp cross-connects are needed
+            ONLY if tag translation is required, as direct-mapping is inherent."
+          ::= { adGenEthernetMIBObjects 4}
+
+adGenEthernetVplEntry         OBJECT-TYPE
+          SYNTAX         AdGenEthernetVplEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the EVPL table.  This entry is
+            used to model a bi-directional EVPL."
+          INDEX  {ifIndex, adGenEthernetVplStag }
+          ::= { adGenEthernetVplTable  1}
+
+
+AdGenEthernetVplEntry    ::= SEQUENCE  {
+          adGenEthernetVplStag                          AdGenEthernetStag,
+          adGenEthernetVplName                          DisplayString,
+          adGenEthernetVplOperStatus                    AdGenEthernetOperStatus,
+          adGenEthernetVplLastChange                    AdGenEthernetLastChange,
+          adGenEthernetVplCrossConnectType              AdGenEthernetCrossConnectType,
+          adGenEthernetVplCrossConnectIdentifier        INTEGER,
+          adGenEthernetVplLastError                     DisplayString,
+          adGenEthernetVplRowStatus                     RowStatus
+           }
+
+adGenEthernetVplStag           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The S-tag value of the EVPL."
+          ::= { adGenEthernetVplEntry 1}
+
+adGenEthernetVplName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this Ethernet VPL."
+          ::= { adGenEthernetVplEntry 2 }
+
+     adGenEthernetVplOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenEthernetOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the EVPL."
+          ::= { adGenEthernetVplEntry 3}
+
+     adGenEthernetVplLastChange    OBJECT-TYPE
+          SYNTAX         AdGenEthernetLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            EVPL entered its current operational state."
+          ::= { adGenEthernetVplEntry 4 }
+
+     adGenEthernetVplCrossConnectType OBJECT-TYPE
+          SYNTAX         AdGenEthernetCrossConnectType
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This object is instantiated only for an EVPL
+            which is cross-connected to other entities.
+            The value of this object is initialized by the
+            agent after the associated entries in a cross connect
+            table have been created. This value identifies the
+            cross connect table in which this EVPL is used."
+           ::= { adGenEthernetVplEntry 5}
+
+adGenEthernetVplCrossConnectIdentifier   OBJECT-TYPE
+          SYNTAX         INTEGER (0..2147483647)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This object is instantiated only for an EVPL
+            which is cross-connected to other entities.
+            The value of this object is initialized by the
+            agent after the associated entries in a
+            cross-connect table have been created."
+          ::= {adGenEthernetVplEntry 6}
+
+adGenEthernetVplLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced
+            for this particular entry in the table."
+          ::= { adGenEthernetVplEntry 7 }
+
+adGenEthernetVplRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create
+            a new row or modify or delete an
+            existing row in this table."
+          DEFVAL  { active }
+          ::= {adGenEthernetVplEntry 8}
+
+
+
+-- Ethernet Vcl (EVCL)
+
+     adGenEthernetVclStatus OBJECT-TYPE
+         SYNTAX              DisplayString
+         MAX-ACCESS          read-only
+         STATUS              current
+         DESCRIPTION
+             "This status string contains the last error
+              that occured when an operation on the adGenEthernetVplTable
+              failed."
+         ::= { adGenEthernetMIBObjects 5 }
+
+      adGenEthernetVclTable         OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetVclEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Ethernet Virtual Circuit Link (EVCL) table.  A
+            bi-directional EVCL is modeled as one entry
+            in this table. This table can be used for
+            EVCL end-points for cross-connects to other endpoints
+            including, EVCLs, VCLs, bridges, etc."
+          ::= { adGenEthernetMIBObjects 6}
+
+     adGenEthernetVclEntry         OBJECT-TYPE
+          SYNTAX         AdGenEthernetVclEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "An entry in the EVCL table.  This entry is
+            used to model a bi-directional EVCL."
+
+          INDEX  {ifIndex, adGenEthernetVclStag, adGenEthernetVclCtag }
+          ::= { adGenEthernetVclTable  1}
+
+
+     AdGenEthernetVclEntry    ::= SEQUENCE  {
+          adGenEthernetVclStag                          AdGenEthernetStag,
+          adGenEthernetVclCtag                          AdGenEthernetCtag,
+          adGenEthernetVclName                          DisplayString,
+          adGenEthernetVclOperStatus                    AdGenEthernetOperStatus,
+          adGenEthernetVclLastChange                    AdGenEthernetLastChange,
+          adGenEthernetVclCrossConnectType              AdGenEthernetCrossConnectType,
+          adGenEthernetVclCrossConnectIdentifier        INTEGER,
+          adGenEthernetVclLastError                     DisplayString,
+          adGenEthernetVclRowStatus                     RowStatus
+             }
+
+adGenEthernetVclStag           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The S-tag value of the EVCL."
+          ::= { adGenEthernetVclEntry 1}
+
+adGenEthernetVclCtag           OBJECT-TYPE
+          SYNTAX         AdGenEthernetCtag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The C-tag value of the EVCL."
+          ::= { adGenEthernetVclEntry 2}
+
+adGenEthernetVclName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this Ethernet VCL."
+          ::= { adGenEthernetVclEntry 3 }
+
+     adGenEthernetVclOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenEthernetOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the EVCL."
+          ::= { adGenEthernetVclEntry 4}
+
+
+     adGenEthernetVclLastChange    OBJECT-TYPE
+          SYNTAX         AdGenEthernetLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            EVCL entered its current operational state."
+          ::= { adGenEthernetVclEntry 5 }
+
+     adGenEthernetVclCrossConnectType OBJECT-TYPE
+          SYNTAX         AdGenEthernetCrossConnectType
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This object is instantiated only for an EVCL
+            which is cross-connected to other entities.
+            The value of this object is initialized by the
+            agent after the associated entries in a cross connect
+            table have been created. This value identifies the
+            cross-connect table in which this EVCL is used."
+           ::= { adGenEthernetVclEntry 6}
+
+adGenEthernetVclCrossConnectIdentifier   OBJECT-TYPE
+          SYNTAX         INTEGER (0..2147483647)
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "This object is instantiated only for an EVCL
+            which is cross-connected to other entities.
+            The value of this object is initialized by the
+            agent after the associated entries in a
+            cross connect table have been created."
+          ::= {adGenEthernetVclEntry 7}
+
+adGenEthernetVclLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenEthernetVclEntry 8 }
+
+adGenEthernetVclRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create
+            a new row or modify or delete an
+            existing row in this table."
+          DEFVAL  { active }
+          ::= {adGenEthernetVclEntry 9}
+
+--  Atm vcl to Ethernet evcl cross-connects
+
+adGenEthernetVclEvclCrossConnectNumberNext OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the next available VC cross-connect number."
+      ::= { adGenEthernetMIBObjects 7 }
+
+adGenEthernetVclEvclCrossConnectFailureCounter OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the number of failed VC cross-connects."
+      ::= { adGenEthernetMIBObjects 8 }
+
+adGenEthernetVclEvclCrossConnectStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Ethernet VC Cross-Connects."
+         ::= { adGenEthernetMIBObjects 9 }
+
+adGenEthernetVclEvclCrossConnectTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetVclEvclCrossConnectEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VCL Cross Connect table for ATM vcl to Ethernet EVCL endpoints.
+            Endpoints are defined against interfaces, which may equate to physical
+            (Ethernet, DSL) or logical (bridge) entities.
+            An entry in this table models a
+            cross-connected vcl to evcl pair.  RFC 2515 covers vcl to vcl cross-
+            connects, while evcl to evcl is supported in a subsequent table.
+            This cross-connect type implies interworking from VPI/VCI to S-tag/C-tag).
+            Each vcl/evcl must have its vclCrossConnect set to point to the associated
+            cross-connect table and index."
+          ::= { adGenEthernetMIBObjects 10 }
+
+
+     adGenEthernetVclEvclCrossConnectEntry OBJECT-TYPE
+          SYNTAX       AdGenEthernetVclEvclCrossConnectEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the VCL to EVCL Cross Connect table.
+            This entry is used to model a bi-directional ATM to Ethernet
+            VCL cross-connect between two end points."
+
+INDEX { adGenEthernetVclEvclCrossConnectIndex,
+                adGenEthernetVclEvclCrossConnectAtmIfIndex,
+                adGenEthernetVclEvclCrossConnectAtmVpi,
+                adGenEthernetVclEvclCrossConnectAtmVci,
+                adGenEthernetVclEvclCrossConnectEthIfIndex,
+                adGenEthernetVclEvclCrossConnectEthStag,
+                adGenEthernetVclEvclCrossConnectEthCtag }
+          ::= { adGenEthernetVclEvclCrossConnectTable 1 }
+
+     AdGenEthernetVclEvclCrossConnectEntry ::= SEQUENCE {
+          adGenEthernetVclEvclCrossConnectIndex          		INTEGER,
+          adGenEthernetVclEvclCrossConnectAtmIfIndex     		InterfaceIndex,
+          adGenEthernetVclEvclCrossConnectAtmVpi                AtmVpIdentifier,
+          adGenEthernetVclEvclCrossConnectAtmVci                AtmVcIdentifier,
+          adGenEthernetVclEvclCrossConnectEthIfIndex    		InterfaceIndex,
+          adGenEthernetVclEvclCrossConnectEthStag               AdGenEthernetStag,
+          adGenEthernetVclEvclCrossConnectEthCtag               AdGenEthernetCtag,
+          adGenEthernetVclEvclCrossConnectName                  DisplayString,
+          adGenEthernetVclEvclCrossConnectOperStatus            AdGenEthernetOperStatus,
+          adGenEthernetVclEvclCrossConnectLastChange            AdGenEthernetLastChange,
+          adGenEthernetVclEvclCrossConnectLastError             DisplayString,
+          adGenEthernetVclEvclCrossConnectRowStatus      		RowStatus,
+		  adGenEthernetVclEvclCrossConnectOption82Insert		TruthValue
+          }
+
+     adGenEthernetVclEvclCrossConnectIndex OBJECT-TYPE
+          SYNTAX         INTEGER (1..2147483647)
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "A unique value to identify this VCL-EVCL cross-connect.
+            For each EVCL/VCL associated with this cross-connect,
+            the agent reports this cross-connect index value
+            in the CrossConnectIdentifier attribute and
+            adGenEthernetVclEvlCrossConnect type in CrossConnectType
+            attribute of the corresponding entry."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 1 }
+
+adGenEthernetVclEvclCrossConnectAtmIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the ATM interface for
+            this cross-connect."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 2 }
+
+adGenEthernetVclEvclCrossConnectAtmVpi           OBJECT-TYPE
+          SYNTAX         AtmVpIdentifier
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VPI value of the Atm VCL."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 3}
+
+adGenEthernetVclEvclCrossConnectAtmVci           OBJECT-TYPE
+          SYNTAX         AtmVcIdentifier
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VCI value of the Atm VCL."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 4}
+
+adGenEthernetVclEvclCrossConnectEthIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the Ethernet interface for
+            this cross-connect."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 5 }
+
+adGenEthernetVclEvclCrossConnectEthStag           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The S-tag value of the EVCL."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 6}
+
+adGenEthernetVclEvclCrossConnectEthCtag           OBJECT-TYPE
+          SYNTAX         AdGenEthernetCtag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The C-tag value of the EVCL."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 7}
+
+adGenEthernetVclEvclCrossConnectName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this cross-connect."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 8 }
+
+     adGenEthernetVclEvclCrossConnectOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenEthernetOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the EVCL cross-connect."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 9}
+
+
+     adGenEthernetVclEvclCrossConnectLastChange    OBJECT-TYPE
+          SYNTAX         AdGenEthernetLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            EVCL cross-connect entered its current operational state."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 10 }
+
+
+adGenEthernetVclEvclCrossConnectLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenEthernetVclEvclCrossConnectEntry 11 }
+
+
+adGenEthernetVclEvclCrossConnectRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create
+            a new row or modify or delete an
+            existing row in this table."
+          DEFVAL  { active }
+          ::= {adGenEthernetVclEvclCrossConnectEntry 12}     
+          
+adGenEthernetVclEvclCrossConnectOption82Insert OBJECT-TYPE
+	    SYNTAX 			TruthValue
+	    MAX-ACCESS 		read-create
+	    STATUS 			current
+       	DESCRIPTION
+           "Enable/disable Option 82 Insertion."
+        ::= { adGenEthernetVclEvclCrossConnectEntry 13}
+                    
+--  ATM VPI to Ethernet S-tag cross-connect
+
+adGenEthernetVplEvplCrossConnectNumberNext OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the next available VP cross-connect number."
+      ::= { adGenEthernetMIBObjects 11 }
+
+adGenEthernetVplEvplCrossConnectFailureCounter OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the number of failed VP cross-connects."
+      ::= { adGenEthernetMIBObjects 12 }
+
+adGenEthernetVplEvplCrossConnectStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Ethernet VP Cross-Connects."
+         ::= { adGenEthernetMIBObjects 13 }
+
+adGenEthernetVplEvplCrossConnectTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetVplEvplCrossConnectEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VP Cross Connect table for ATM vp and Ethernet evp endpoints.
+            An entry in this table models cross-connects between ATM vpl
+            and Ethernet evpls (interworking from VPI to S-tag). Each vpl/evpl
+            must have its vplCrossConnectIdentifier set to point to the
+            associated cross-connect index and vplCrossConnectType set to the
+            adGenEthernetVplEvplCrossConnectTable type."
+          ::= { adGenEthernetMIBObjects 14 }
+
+
+adGenEthernetVplEvplCrossConnectEntry OBJECT-TYPE
+          SYNTAX       AdGenEthernetVplEvplCrossConnectEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the VP Cross Connect table.
+            This entry is used to model a bi-directional ATM to Ethernet mixed
+            VP cross-connect cross-connecting two end points."
+
+INDEX { adGenEthernetVplEvplCrossConnectIndex,
+                adGenEthernetVplEvplCrossConnectAtmIfIndex,
+                adGenEthernetVplEvplCrossConnectAtmVp,
+                adGenEthernetVplEvplCrossConnectEthIfIndex,
+                adGenEthernetVplEvplCrossConnectEthStag }
+          ::= { adGenEthernetVplEvplCrossConnectTable 1 }
+
+     AdGenEthernetVplEvplCrossConnectEntry ::= SEQUENCE {
+          adGenEthernetVplEvplCrossConnectIndex                 INTEGER,
+          adGenEthernetVplEvplCrossConnectAtmIfIndex            InterfaceIndex,
+          adGenEthernetVplEvplCrossConnectAtmVp                 AtmVpIdentifier,
+          adGenEthernetVplEvplCrossConnectEthIfIndex            InterfaceIndex,
+          adGenEthernetVplEvplCrossConnectEthStag               AdGenEthernetStag,
+          adGenEthernetVplEvplCrossConnectName                  DisplayString,
+          adGenEthernetVplEvplCrossConnectOperStatus  			AdGenEthernetOperStatus,
+          adGenEthernetVplEvplCrossConnectLastChange  			AdGenEthernetLastChange,
+          adGenEthernetVplEvplCrossConnectLastError             DisplayString,
+          adGenEthernetVplEvplCrossConnectRowStatus             RowStatus,
+		  adGenEthernetVplEvplCrossConnectOption82Insert		TruthValue          
+	}
+
+     adGenEthernetVplEvplCrossConnectIndex OBJECT-TYPE
+          SYNTAX         INTEGER (1..2147483647)
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "A unique value to identify this VPL-EVPL cross-connect.
+            For each EVPL/VPL associated with this cross-connect,
+            the agent reports this cross-connect index value
+            in the CrossConnectIdentifier attribute and
+            adGenEthernetVplEvplCrossConnect type in CrossConnectType
+            attribute of the corresponding entry."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 1 }
+
+adGenEthernetVplEvplCrossConnectAtmIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the ATM interface for
+            this cross-connect."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 2 }
+
+adGenEthernetVplEvplCrossConnectAtmVp           OBJECT-TYPE
+          SYNTAX         AtmVpIdentifier
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VPI value of the VP."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 3}
+
+adGenEthernetVplEvplCrossConnectEthIfIndex OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of the Ethernet interface for
+            this cross-connect."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 4 }
+
+adGenEthernetVplEvplCrossConnectEthStag           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The S-tag value of the EVPL."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 5}
+
+adGenEthernetVplEvplCrossConnectName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this cross-connect."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 6 }
+
+     adGenEthernetVplEvplCrossConnectOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenEthernetOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the EVCL cross-connect."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 7}
+
+
+     adGenEthernetVplEvplCrossConnectLastChange    OBJECT-TYPE
+          SYNTAX         AdGenEthernetLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            EVCL cross-connect entered its current operational state."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 8 }
+
+
+adGenEthernetVplEvplCrossConnectLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenEthernetVplEvplCrossConnectEntry 9 }
+
+
+     adGenEthernetVplEvplCrossConnectRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create
+            a new row or modify or delete an
+            existing row in this table."
+          DEFVAL  { active }
+          ::= {adGenEthernetVplEvplCrossConnectEntry 10}     
+          
+          
+	adGenEthernetVplEvplCrossConnectOption82Insert OBJECT-TYPE
+	    SYNTAX 			TruthValue
+	    MAX-ACCESS 		read-create
+	    STATUS 			current
+       	DESCRIPTION
+           "Enable/disable Option 82 Insertion."
+        ::= { adGenEthernetVplEvplCrossConnectEntry 11}
+          
+
+--  Ethernet evpl to Ethernet evpl cross-connects
+
+adGenEthernetEvplCrossConnectNumberNext OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the next available Ethernet VP cross-connect number."
+      ::= { adGenEthernetMIBObjects 15 }
+
+adGenEthernetEvplCrossConnectFailureCounter OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the number of failed Ethernet VP cross-connects."
+      ::= { adGenEthernetMIBObjects 16 }
+
+adGenEthernetEvplCrossConnectStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Ethernet VP Cross-Connects."
+         ::= { adGenEthernetMIBObjects 17 }
+
+adGenEthernetEvplCrossConnectTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetEvplCrossConnectEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VPL Cross Connect table for Ethernet Evpl endpoints.
+            Endpoints are defined against interfaces, which may equate to physical
+            (Ethernet) or logical (bridge) entities.
+            An entry in this table models a cross-connected Evpl pair.
+            Each Evpl must have its vclCrossConnect set to point to the associated
+            cross-connect table and index."
+          ::= { adGenEthernetMIBObjects 18 }
+
+
+     adGenEthernetEvplCrossConnectEntry OBJECT-TYPE
+          SYNTAX       AdGenEthernetEvplCrossConnectEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the Evpl Cross Connect table.
+            This entry is used to model a bi-directional Ethernet
+            VPL cross-connect between two end points."
+
+INDEX { adGenEthernetEvplCrossConnectIndex,
+                adGenEthernetEvplCrossConnectIfIndex1,
+                adGenEthernetEvplCrossConnectStag1,
+                adGenEthernetEvplCrossConnectIfIndex2,
+                adGenEthernetEvplCrossConnectStag2}
+          ::= { adGenEthernetEvplCrossConnectTable 1 }
+
+     AdGenEthernetEvplCrossConnectEntry ::= SEQUENCE {
+          adGenEthernetEvplCrossConnectIndex            INTEGER,
+          adGenEthernetEvplCrossConnectIfIndex1         InterfaceIndex,
+          adGenEthernetEvplCrossConnectStag1            AdGenEthernetStag,
+          adGenEthernetEvplCrossConnectIfIndex2         InterfaceIndex,
+          adGenEthernetEvplCrossConnectStag2            AdGenEthernetStag,
+          adGenEthernetEvplCrossConnectName             DisplayString,
+          adGenEthernetEvplCrossConnectOperStatus       AdGenEthernetOperStatus,
+          adGenEthernetEvplCrossConnectLastChange       AdGenEthernetLastChange,
+          adGenEthernetEvplCrossConnectLastError        DisplayString,
+          adGenEthernetEvplCrossConnectRowStatus        RowStatus
+                  }
+
+     adGenEthernetEvplCrossConnectIndex OBJECT-TYPE
+          SYNTAX         INTEGER (1..2147483647)
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "A unique value to identify this Evpl cross-connect.
+            For each Evpl associated with this cross-connect,
+            the agent reports this cross-connect index value
+            in the CrossConnectIdentifier attribute and
+            adGenEthernetEvplCrossConnect type in CrossConnectType
+            attribute of the corresponding entry."
+          ::= { adGenEthernetEvplCrossConnectEntry 1 }
+
+adGenEthernetEvplCrossConnectIfIndex1 OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of an Ethernet/Logical interface for
+            this EVP cross-connect."
+          ::= { adGenEthernetEvplCrossConnectEntry 2 }
+
+adGenEthernetEvplCrossConnectStag1           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Stag value of an Evpl."
+          ::= { adGenEthernetEvplCrossConnectEntry 3}
+
+adGenEthernetEvplCrossConnectIfIndex2 OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of an Ethernet/Logical interface for
+            this EVP cross-connect."
+          ::= { adGenEthernetEvplCrossConnectEntry 4 }
+
+adGenEthernetEvplCrossConnectStag2           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The S-tag value of an Evpl."
+          ::= { adGenEthernetEvplCrossConnectEntry 5}
+
+adGenEthernetEvplCrossConnectName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this cross-connect."
+          ::= { adGenEthernetEvplCrossConnectEntry 6 }
+
+     adGenEthernetEvplCrossConnectOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenEthernetOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the Evpl cross-connect."
+          ::= { adGenEthernetEvplCrossConnectEntry 7}
+
+
+     adGenEthernetEvplCrossConnectLastChange    OBJECT-TYPE
+          SYNTAX         AdGenEthernetLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            Evpl cross-connect entered its current operational state."
+          ::= { adGenEthernetEvplCrossConnectEntry 8 }
+
+
+adGenEthernetEvplCrossConnectLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenEthernetEvplCrossConnectEntry 9 }
+
+
+adGenEthernetEvplCrossConnectRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create
+            a new row or modify or delete an
+            existing row in this table."
+          DEFVAL  { active }
+          ::= {adGenEthernetEvplCrossConnectEntry 10}
+
+--  Ethernet evcl to Ethernet evcl cross-connects
+
+adGenEthernetEvclCrossConnectNumberNext OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the next available Ethernet VC cross-connect number."
+      ::= { adGenEthernetMIBObjects 19 }
+
+adGenEthernetEvclCrossConnectFailureCounter OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the number of failed Ethernet VC cross-connects."
+      ::= { adGenEthernetMIBObjects 20 }
+
+adGenEthernetEvclCrossConnectStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Error status messages for Ethernet VC Cross-Connects."
+         ::= { adGenEthernetMIBObjects 21 }
+
+adGenEthernetEvclCrossConnectTable OBJECT-TYPE
+          SYNTAX         SEQUENCE OF AdGenEthernetEvclCrossConnectEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The VCL Cross Connect table for Ethernet EVCL endpoints.
+            Endpoints are defined against interfaces, which may equate to physical
+            (Ethernet) or logical (bridge) entities.
+            An entry in this table models a cross-connected evcl pair.
+            Each evcl must have its vclCrossConnect set to point to the associated
+            cross-connect table and index."
+          ::= { adGenEthernetMIBObjects 22 }
+
+
+     adGenEthernetEvclCrossConnectEntry OBJECT-TYPE
+          SYNTAX       AdGenEthernetEvclCrossConnectEntry
+          MAX-ACCESS   not-accessible
+          STATUS       current
+          DESCRIPTION
+           "An entry in the EVCL Cross Connect table.
+            This entry is used to model a bi-directional Ethernet
+            VCL cross-connect between two end points."
+
+INDEX { adGenEthernetEvclCrossConnectIndex,
+                adGenEthernetEvclCrossConnectIfIndex1,
+                adGenEthernetEvclCrossConnectStag1,
+                adGenEthernetEvclCrossConnectCtag1,
+                adGenEthernetEvclCrossConnectIfIndex2,
+                adGenEthernetEvclCrossConnectStag2,
+                adGenEthernetEvclCrossConnectCtag2}
+          ::= { adGenEthernetEvclCrossConnectTable 1 }
+
+     AdGenEthernetEvclCrossConnectEntry ::= SEQUENCE {
+          adGenEthernetEvclCrossConnectIndex            INTEGER,
+          adGenEthernetEvclCrossConnectIfIndex1         InterfaceIndex,
+          adGenEthernetEvclCrossConnectStag1            AdGenEthernetStag,
+          adGenEthernetEvclCrossConnectCtag1            AdGenEthernetCtag,
+          adGenEthernetEvclCrossConnectIfIndex2         InterfaceIndex,
+          adGenEthernetEvclCrossConnectStag2            AdGenEthernetStag,
+          adGenEthernetEvclCrossConnectCtag2            AdGenEthernetCtag,
+          adGenEthernetEvclCrossConnectName             DisplayString,
+          adGenEthernetEvclCrossConnectOperStatus       AdGenEthernetOperStatus,
+          adGenEthernetEvclCrossConnectLastChange       AdGenEthernetLastChange,
+          adGenEthernetEvclCrossConnectLastError        DisplayString,
+          adGenEthernetEvclCrossConnectRowStatus        RowStatus
+                  }
+
+     adGenEthernetEvclCrossConnectIndex OBJECT-TYPE
+          SYNTAX         INTEGER (1..2147483647)
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "A unique value to identify this EVCL cross-connect.
+            For each EVCL associated with this cross-connect,
+            the agent reports this cross-connect index value
+            in the CrossConnectIdentifier attribute and
+            adGenEthernetEvclCrossConnect type in CrossConnectType
+            attribute of the corresponding entry."
+          ::= { adGenEthernetEvclCrossConnectEntry 1 }
+
+adGenEthernetEvclCrossConnectIfIndex1 OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of an Ethernet/Logical interface for
+            this EVC cross-connect."
+          ::= { adGenEthernetEvclCrossConnectEntry 2 }
+
+adGenEthernetEvclCrossConnectStag1           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Stag value of an EVCL."
+          ::= { adGenEthernetEvclCrossConnectEntry 3}
+
+adGenEthernetEvclCrossConnectCtag1           OBJECT-TYPE
+          SYNTAX         AdGenEthernetCtag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The Ctag value of an EVCL."
+          ::= { adGenEthernetEvclCrossConnectEntry 4}
+
+adGenEthernetEvclCrossConnectIfIndex2 OBJECT-TYPE
+          SYNTAX         InterfaceIndex
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The ifIndex value of an Ethernet/Logical interface for
+            this EVC cross-connect."
+          ::= { adGenEthernetEvclCrossConnectEntry 5 }
+
+adGenEthernetEvclCrossConnectStag2           OBJECT-TYPE
+          SYNTAX         AdGenEthernetStag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The S-tag value of an EVCL."
+          ::= { adGenEthernetEvclCrossConnectEntry 6}
+
+adGenEthernetEvclCrossConnectCtag2           OBJECT-TYPE
+          SYNTAX         AdGenEthernetCtag
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+           "The C-tag value of an EVCL."
+          ::= { adGenEthernetEvclCrossConnectEntry 7}
+
+adGenEthernetEvclCrossConnectName OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "The textual name given to this cross-connect."
+          ::= { adGenEthernetEvclCrossConnectEntry 8 }
+
+     adGenEthernetEvclCrossConnectOperStatus    OBJECT-TYPE
+          SYNTAX         AdGenEthernetOperStatus
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The current operational status of the EVCL cross-connect."
+          ::= { adGenEthernetEvclCrossConnectEntry 9}
+
+
+     adGenEthernetEvclCrossConnectLastChange    OBJECT-TYPE
+          SYNTAX         AdGenEthernetLastChange
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The value of sysUpTime at the time this
+            EVCL cross-connect entered its current operational state."
+          ::= { adGenEthernetEvclCrossConnectEntry 10 }
+
+
+adGenEthernetEvclCrossConnectLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+           "The string describing the last error experienced."
+          ::= { adGenEthernetEvclCrossConnectEntry 11 }
+
+
+adGenEthernetEvclCrossConnectRowStatus  OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create
+            a new row or modify or delete an
+            existing row in this table."
+          DEFVAL  { active }
+          ::= {adGenEthernetEvclCrossConnectEntry 12}
+
+-- Membership table for Stags
+
+adGenEthernetStagMembershipTable OBJECT-TYPE
+          SYNTAX      SEQUENCE OF AdGenEthernetStagMembershipEntry
+          MAX-ACCESS  not-accessible
+          STATUS      current
+          DESCRIPTION
+           "This table contains status information for S-tag membership."
+       ::= { adGenEthernetMIBObjects 23 }
+
+adGenEthernetStagMembershipEntry OBJECT-TYPE
+       SYNTAX      AdGenEthernetStagMembershipEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenEthernetVplStag, ifIndex }
+       ::= { adGenEthernetStagMembershipTable 1 }
+
+AdGenEthernetStagMembershipEntry ::=
+       SEQUENCE {
+           adGenEthernetStagMembershipCount         Counter32
+       }
+
+adGenEthernetStagMembershipCount    OBJECT-TYPE
+       SYNTAX          Counter32
+       MAX-ACCESS      read-only
+       STATUS          current
+       DESCRIPTION
+           "This variable returns a count of the number
+            of items that are connected to this EVPL.
+            The count is incremented, for example, when
+            a VclEvclCrossConnect is created.  The value
+            is decremented when the cross-connect is deleted.
+            This variable may be used to police the removal
+            of EVPL mappings."
+         ::= { adGenEthernetStagMembershipEntry 1 }
+
+END

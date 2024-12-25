@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -105,18 +105,20 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
     return TRUE;
 }
 
-function poll_device($device, $options)
-{
-    global $config, $device, $polled_devices, $db_stats, $exec_status, $alert_rules, $alert_table, $graphs, $attribs;
+function poll_device($device, $options) {
+    global $config, $device, $alert_rules, $alert_table, $graphs, $attribs,
+           $polled_devices, $db_stats, $exec_status;
 
     $device_start = utime();  // Start counting device poll time
 
     $alert_metrics = [];
     $oid_cache     = [];
     $device_state  = [];
+
     //$old_device_state = safe_unserialize($device['device_state']);
-    $attribs = get_entity_attribs('device', $device['device_id']);
-    $model   = get_model_array($device);
+    $attribs           = get_entity_attribs('device', $device['device_id']);
+    $device['attribs'] = $attribs; // better here for access inside functions.
+    $model             = get_model_array($device);
 
     print_debug_vars($device, 1);
     print_debug_vars($attribs, 1);
@@ -165,8 +167,7 @@ function poll_device($device, $options)
     print_cli_data("Device status", $device_status['message'], 1);
 
     // device cached dns ip
-    if (isset_status_var('dns_ip') &&
-        $dns_ip = get_status_var('dns_ip')) {
+    if ($dns_ip = is_pingable_cache_dns($device['hostname'])) {
         // Store not empty dns ip
         if ($device['ip'] != $dns_ip) {
             $device['ip']       = $dns_ip;
@@ -485,16 +486,6 @@ function poll_device($device, $options)
 
     // Multi insert/update all checked entities by check_entity()
     dbProcessMulti('alert_table');
-    /* CLEANME
-    print_debug_vars($GLOBALS['cache_db']);
-    if (isset($GLOBALS['cache_db']['alert_table']['update'])) {
-      dbUpdateMulti($GLOBALS['cache_db']['alert_table']['update'], 'alert_table');
-
-      //print_debug("Full update of 'alert_table' count: ".count($GLOBALS['cache_db']['alert_table'])." vs changed count: ".safe_count($GLOBALS['cache_db']['alert_table_test']));
-      // Clean
-      unset($GLOBALS['cache_db']['alert_table']['update']);
-    }
-    */
 
     echo(PHP_EOL);
 

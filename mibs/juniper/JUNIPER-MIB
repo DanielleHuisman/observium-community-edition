@@ -16,12 +16,13 @@ IMPORTS
         FROM SNMPv2-SMI
     DisplayString, TimeStamp, TimeInterval, TEXTUAL-CONVENTION, DateAndTime
         FROM SNMPv2-TC
-    jnxMibs, jnxChassisTraps, jnxChassisOKTraps, jnxAsicExtMemTraps, jnxAsicExtMemOKTraps
+    jnxMibs, jnxChassisTraps, jnxChassisOKTraps, jnxAsicExtMemTraps,
+    jnxAsicExtMemOKTraps, jnxPoeTraps, jnxPoeOKTraps
         FROM JUNIPER-SMI;
 
 jnxBoxAnatomy MODULE-IDENTITY
 
-    LAST-UPDATED "202012090000Z"    -- Dec 09, 2020
+    LAST-UPDATED "202402060000Z"    -- Feb 06, 2024
     ORGANIZATION "Juniper Networks, Inc."
     CONTACT-INFO
             "        Juniper Technical Assistance Center
@@ -227,6 +228,33 @@ jnxBoxAnatomy MODULE-IDENTITY
     DESCRIPTION
                "Added new FRU type Timing Interface Board."
 
+    REVISION     "202310060000Z"    -- Oct 06, 2023
+    DESCRIPTION
+               "Added new trap : jnxDyingGasp."
+
+    REVISION     "202310020000Z"    -- Oct 22, 2023
+    DESCRIPTION
+               "Added new offline reasons fpcDeprecated and
+                fabricDeprecated"
+
+    REVISION     "202311060000Z"    -- Nov 06, 2023
+    DESCRIPTION
+               "Added new offline reasons fabric asic fault and
+                fpc asic init failure"
+
+    REVISION     "202312270000Z"    -- Dec 27, 2023
+    DESCRIPTION
+               "Added new offline reasons reDeprecated"
+
+    REVISION     "202402060000Z"    -- Feb 06, 2024
+    DESCRIPTION
+               "Changed data type for jnxOperatingTemp from Gauge32 to
+                Integer32"
+
+    REVISION     "202404020000Z"    -- Apr 02, 2024
+    DESCRIPTION
+               "Added new trap: jnxPsePoePdDeviceMgrFault.
+                Added new trap: jnxPsePoePdDeviceMgrOK."
     ::= { jnxMibs 1 }
 
 --
@@ -1009,7 +1037,7 @@ JnxChassisId ::= TEXTUAL-CONVENTION
 	    jnxOperatingL3Index         Integer32,
 	    jnxOperatingDescr           DisplayString,
 	    jnxOperatingState	    	INTEGER,
-	    jnxOperatingTemp            Gauge32,
+	    jnxOperatingTemp            Integer32,
 	    jnxOperatingCPU		Gauge32,
 	    jnxOperatingISR             Gauge32,
 	    jnxOperatingDRAMSize        Integer32,
@@ -1031,7 +1059,8 @@ JnxChassisId ::= TEXTUAL-CONVENTION
         jnxOperatingFRUPower        Gauge32,
              jnxOperatingBufferCP        Gauge32,
              jnxOperatingMemoryCP        Integer32,
-        jnxOperatingBufferExt      Gauge32
+        jnxOperatingBufferExt      Gauge32,
+        jnxOperatingTemperature    Integer32
     }
 
     jnxOperatingContentsIndex OBJECT-TYPE
@@ -1097,7 +1126,7 @@ JnxChassisId ::= TEXTUAL-CONVENTION
 	::= { jnxOperatingEntry 6 }
 
     jnxOperatingTemp OBJECT-TYPE
-	SYNTAX		Gauge32
+	SYNTAX		Integer32
 	MAX-ACCESS	read-only
 	STATUS		current
 	DESCRIPTION
@@ -1330,6 +1359,15 @@ JnxChassisId ::= TEXTUAL-CONVENTION
                          inapplicable. does not include inactive memory
                          as free memory."
             ::= { jnxOperatingEntry 29 }
+
+    jnxOperatingTemperature OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The temperature in Celsius (degrees C) of this 
+                subject.  Zero if unavailable or inapplicable."
+        ::= { jnxOperatingEntry 30 }
 
 --
 -- Box Redundancy Information Table
@@ -1832,7 +1870,12 @@ JnxChassisId ::= TEXTUAL-CONVENTION
                 flowdCoreStart(118),             -- Flowd core start
                 fruFpcSlcMisconfig(119),         -- FPC SLC misconfig
                 fruSfbFanTrayIncompatible(120),  -- SFB incompatible with Fan-Tray
-                fruSfbPEMIncompatible(121)       -- SFB incompatible with PEM
+                fruSfbPEMIncompatible(121),       -- SFB incompatible with PEM
+                fabricAsicFault2(122),           -- Fabric asic fault 2
+                fpcAsicInitFail(123),            -- Asic init fail
+                fpcDeprecated(124),              -- FPC is Deprecated
+                fabricDeprecated(125),           -- Fabric is Deprecated
+                reDeprecated(126)                -- RE is Deprecated
 
 	}
 	MAX-ACCESS	read-only
@@ -1986,7 +2029,8 @@ JnxChassisId ::= TEXTUAL-CONVENTION
 			  jnxContentsL2Index,
 			  jnxContentsL3Index,
 			  jnxContentsDescr,
-			  jnxOperatingTemp }
+			  jnxOperatingTemp,
+                          jnxOperatingTemperature }
 	STATUS		current
 	DESCRIPTION
 		"A jnxOverTemperature trap signifies that the 
@@ -2409,6 +2453,27 @@ JnxChassisId ::= TEXTUAL-CONVENTION
                 errors."
         ::= { jnxChassisTraps 28 }
 
+    jnxUnsupportedFru NOTIFICATION-TYPE
+        OBJECTS         { jnxFruContentsIndex,
+                          jnxFruL1Index,
+                          jnxFruL2Index,
+                          jnxFruL3Index,
+                          jnxFruName,
+                          jnxFruType,
+                          jnxFruSlot }
+        STATUS          current
+        DESCRIPTION
+                "A jnxUnsupportedFru trap signifies that the SNMP
+                entity, acting in an agent role, has detected that
+                the Unsupported Fru has been inserted in the chassis"
+        ::= { jnxChassisTraps 29 }
+
+    jnxDyingGasp NOTIFICATION-TYPE
+       STATUS  current
+       DESCRIPTION
+               "jnxDyingGasp trap signifies that system is going down due to power failure."
+        ::= { jnxChassisTraps 30 }
+
     -- Traps for chassis alarm cleared conditions
 
     jnxPowerSupplyOK NOTIFICATION-TYPE
@@ -2448,7 +2513,8 @@ JnxChassisId ::= TEXTUAL-CONVENTION
 			  jnxContentsL2Index,
 			  jnxContentsL3Index,
 			  jnxContentsDescr,
-			  jnxOperatingTemp }
+			  jnxOperatingTemp,
+                          jnxOperatingTemperature }
 	STATUS		current
 	DESCRIPTION
 		"A jnxTemperatureOK trap signifies that the 
@@ -2559,5 +2625,37 @@ JnxChassisId ::= TEXTUAL-CONVENTION
                 has recovered from the failure (Fatal error) condition."
         ::= { jnxAsicExtMemOKTraps 1 }
 
+--
+-- definition of jnx PoE traps
+--
+    -- Traps for alarm conditions
+
+    jnxPsePoePdDeviceMgrFault NOTIFICATION-TYPE
+        OBJECTS         { jnxContentsContainerIndex,
+                          jnxContentsL1Index,
+                          jnxContentsL2Index,
+                          jnxContentsL3Index,
+                          jnxContentsDescr }
+        STATUS          current
+        DESCRIPTION
+                "A jnxPsePoePdDeviceMgrFault trap signifies that
+                 the SNMP entity, acting in an agent role, has
+                 detected PD device manager fault."
+        ::= { jnxPoeTraps 1 }
+
+    -- Traps for alarm cleared conditions
+
+    jnxPsePoePdDeviceMgrOK NOTIFICATION-TYPE
+        OBJECTS         { jnxContentsContainerIndex,
+                          jnxContentsL1Index,
+                          jnxContentsL2Index,
+                          jnxContentsL3Index,
+                          jnxContentsDescr }
+        STATUS          current
+        DESCRIPTION
+                "A jnxPsePoePdDeviceMgrOK trap signifies that
+                 the SNMP entity, acting in an agent role,
+                 has recovered from the PD device manager fault state"
+        ::= { jnxPoeOKTraps 1 }
 
 END

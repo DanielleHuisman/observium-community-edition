@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -28,7 +28,7 @@ require_once($config['install_dir'] . "/includes/polyfill.inc.php");
 require_once($config['install_dir'] . "/includes/autoloader.inc.php");
 require_once($config['install_dir'] . "/includes/debugging.inc.php");
 
-// Include necessary supporting files
+// Include the necessary supporting files
 require_once($config['install_dir'] . "/includes/common.inc.php");
 
 // Die if exec/proc_open functions disabled in php.ini. This configuration is not capable of running Observium.
@@ -36,11 +36,20 @@ if (!is_exec_available()) {
     die;
 }
 
+// Always set CLI locale to EN, because we use parsing strings
+setlocale(LC_ALL, 'C');
+putenv('LC_ALL=C');
+
+// Use default charset UTF-8
+ini_set('default_charset', 'UTF-8');
+// Always use "enhanced algorithm" for rounding float numbers in JSON/serialize
+ini_set('serialize_precision', -1);
+
 if (PHP_VERSION_ID < 80100) {
     try {
         new DateTime('now');
     } catch (Exception $e) {
-        if (strpos($e -> getMessage(), 'date.timezone') !== FALSE) {
+        if (str_contains($e->getMessage(), 'date.timezone')) {
             // Fix incorrect timezone setting and prevent fatal exception in DateTime
             ini_set('date.timezone', date_default_timezone_get());
         }
@@ -77,7 +86,7 @@ if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
     }
 } elseif (!(isset($options['u']) || isset($options['V'])) && !get_db_version()) {
     if (!dbQuery('SELECT 1 FROM `devices` LIMIT 1;')) {
-        // DB schema not installed, install first
+        // DB schema isn't installed, install first
         print_error("DB schema not installed, first install it.");
         die;
     }
@@ -87,8 +96,8 @@ if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
     //SQL WARNINGS[
     //  3135: 'NO_ZERO_DATE', 'NO_ZERO_IN_DATE' and 'ERROR_FOR_DIVISION_BY_ZERO' sql modes should be used with strict mode. They will be merged with strict mode in a future release.
     //]
-    $db_modes_exclude = ['STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'ONLY_FULL_GROUP_BY',
-                         'NO_ZERO_DATE', 'NO_ZERO_IN_DATE', 'ERROR_FOR_DIVISION_BY_ZERO'];
+    $db_modes_exclude = [ 'STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'ONLY_FULL_GROUP_BY',
+                          'NO_ZERO_DATE', 'NO_ZERO_IN_DATE', 'ERROR_FOR_DIVISION_BY_ZERO' ];
     $db_modes_update  = [];
     foreach ($db_modes_exclude as $db_mode_exclude) {
         if (in_array($db_mode_exclude, $db_modes)) {
@@ -97,7 +106,7 @@ if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
     }
     if (count($db_modes_update)) {
         $db_modes = array_diff($db_modes, $db_modes_update);
-        dbQuery('SET SESSION `sql_mode` = ?', [implode(',', $db_modes)]);
+        dbQuery('SET SESSION `sql_mode` = ?', [ implode(',', $db_modes) ]);
         print_debug('DB mode(s) disabled: ' . implode(', ', $db_modes_update));
     }
     //register_shutdown_function('dbClose');
@@ -129,8 +138,24 @@ if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
 // Load SQL configuration into $config variable
 load_sqlconfig($config);
 
-// Init RRDcached
+// Set php memory limit not less than a requested minimum (512M)
+if (isset($config['php_memory_limit_min']) &&
+    $php_memory_limit_min = unit_string_to_numeric($config['php_memory_limit_min'])) {
 
+    $php_memory_limit = ini_get('memory_limit');
+    $php_memory_debug = "PHP Memory Limit increased to minimum ({$config['php_memory_limit_min']}) instead of php.ini (".$php_memory_limit.")";
+    $php_memory_limit = unit_string_to_numeric($php_memory_limit);
+    if (is_numeric($php_memory_limit) && is_numeric($php_memory_limit_min) && $php_memory_limit > 0 &&
+        $php_memory_limit < $php_memory_limit_min) {
+        if (OBS_DEBUG) {
+            print_cli($php_memory_debug);
+        }
+        ini_set('memory_limit', $config['php_memory_limit_min']);
+    }
+    unset($php_memory_limit_min, $php_memory_limit, $php_memory_debug);
+}
+
+// Init RRDcached
 if (isset($config['rrdcached']) && !preg_match('!^\s*(unix:)?/!i', $config['rrdcached'])) {
     // RRD files located on remote server
     define('OBS_RRD_NOLOCAL', TRUE);
@@ -139,16 +164,15 @@ if (isset($config['rrdcached']) && !preg_match('!^\s*(unix:)?/!i', $config['rrdc
 }
 
 // Init StatsD
-
 if ($config['statsd']['enable'] && class_exists('StatsD')) {
     //$statsd = new StatsD(array('host' => $config['statsd']['host'], 'port' => $config['statsd']['port']));
     StatsD::$config = [
-      'host' => $config['statsd']['host'],
-      'port' => $config['statsd']['port'],
+        'host' => $config['statsd']['host'],
+        'port' => $config['statsd']['port'],
     ];
 }
 
-/* Start fixate config options */
+/* Start to fixate config options */
 
 // never store this option(s) in memory! Use get_defined_settings($key)
 foreach ($config['hide_config'] as $opt) {
@@ -159,10 +183,9 @@ foreach ($config['hide_config'] as $opt) {
 
 // Escape all cmd paths
 //FIXME, move all cmd config into $config['cmd'][path]
-$cmds = [ 'rrdtool', 'fping', 'fping6', 'snmpwalk', 'snmpget', 'snmpbulkget', 'snmpbulkwalk', 'snmptranslate', 'whois',
-          'mtr', 'nmap', 'ipmitool', 'virsh', 'dot', 'unflatten', 'neato', 'sfdp', 'svn', 'git', 'wmic', 'file', 'wc',
-         'sudo', 'tail', 'cut', 'tr' ];
-
+$cmds = [ 'rrdtool', 'fping', 'fping6', 'snmpwalk', 'snmpget', 'snmpbulkget', 'snmpbulkwalk', 'snmptranslate',
+          'whois', 'mtr', 'ipmitool', 'virsh', 'svn', 'git', 'wmic', 'dot',
+          /* 'nmap', 'unflatten', 'neato', 'sfdp', 'file', 'wc', 'sudo', 'tail', 'cut', 'tr' */ ];
 foreach ($cmds as $path) {
     if (isset($config[$path])) {
         $config[$path] = escapeshellcmd($config[$path]);
@@ -276,9 +299,49 @@ if (isset($config['bad_xdp_platform'])) {
     $config['xdp']['ignore_platform'] = array_merge((array)$config['xdp']['ignore_platform'], (array)$config['bad_xdp_platform']);
 }
 
+// Compat for non-default alerts interval
+if (isset($config['alerts']['interval']) && $config['alerts']['interval'] != 86400 &&
+    $config['alerts']['critical']['interval'] == 86400) {
+    $config['alerts']['critical']['interval'] = $config['alerts']['interval'];
+    unset($config['alerts']['interval']);
+}
+
 // Compat for adama ;)
 if (isset($config['sensors_limits_events'])) {
     $config['sensors']['limits_events'] = $config['sensors_limits_events'];
+    unset($config['sensors_limits_events']);
+}
+
+// Compat with old int_group config
+// $config['int_customers']        = 1;  // Enable Customer Port Parsing
+// $config['int_customers_graphs'] = 1;  // Enable Customer Port List Graphs
+// $config['int_transit']          = 1;  // Enable Transit Types
+// $config['int_peering']          = 1;  // Enable Peering Types
+// $config['int_core']             = 1;  // Enable Core Port Types
+// $config['int_l2tp']             = 0;  // Enable L2TP Port Types
+if (isset($config['int_customers'])) {
+    $config['ports']['descr_groups']['cust']['enable']    = (bool)$config['int_customers'];
+    unset($config['int_customers']);
+}
+if (isset($config['int_customers_graphs'])) {
+    $config['ports']['descr_groups']['cust']['graphs']    = (bool)$config['int_customers_graphs'];
+    unset($config['int_customers_graphs']);
+}
+if (isset($config['int_transit'])) {
+    $config['ports']['descr_groups']['transit']['enable'] = (bool)$config['int_transit'];
+    unset($config['int_transit']);
+}
+if (isset($config['int_peering'])) {
+    $config['ports']['descr_groups']['peering']['enable'] = (bool)$config['int_peering'];
+    unset($config['int_peering']);
+}
+if (isset($config['int_core'])) {
+    $config['ports']['descr_groups']['core']['enable']    = (bool)$config['int_core'];
+    unset($config['int_core']);
+}
+if (isset($config['int_l2tp'])) {
+    $config['ports']['descr_groups']['l2tp']['enable']    = (bool)$config['int_l2tp'];
+    unset($config['int_l2tp']);
 }
 
 // Security fallback check

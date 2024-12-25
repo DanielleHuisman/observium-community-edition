@@ -81,11 +81,14 @@ $conn = DBI->connect ("DBI:$drvName:dbname=$dbName;host=$hostName;", $dbUser, $d
 # select version();
 $cmd="select version()";
 $all = sqlArray($cmd);
-$all =~ /\w+ (\d\.\d)/;
+$all =~ /\w+ (\d+\.\d)/;
 $version=$1;
 
 # get the stats
-if ($version =~ /^[89]\.\d$/) {
+if ($version =~ /^15\.\d+$/) {
+    $cmd="select datname, usename, client_addr, query as current_query from pg_stat_activity";
+}
+elsif ($version =~ /^[89]\.\d$/) {
     $cmd="select datname, usename, client_addr, current_query from pg_stat_activity";
 }
 
@@ -131,7 +134,13 @@ for (; $all=$query->fetchrow_hashref() ;) {
 # (subtracting previous value from the current one would give you number of commits finished in N minutes).
 
 # postgresql version 8.x have fewer stats (no tuples)
-if ($version =~ /^8\.[34]|9\.\d$/) {
+if ($version =~ /^15\.\d+$/) {
+    $cmd="SELECT SUM(xact_commit) as xact_commit, SUM(xact_rollback) as xact_rollback, SUM(blks_read) as blks_read, 
+  SUM(blks_hit) as blks_hit, SUM(tup_returned) as tup_returned, SUM(tup_fetched) as tup_fetched, 
+  SUM(tup_inserted) as tup_inserted, SUM(tup_updated) as tup_updated, SUM(tup_deleted) as tup_deleted 
+  FROM pg_stat_database";
+}
+elsif ($version =~ /^8\.[34]|9\.\d$/) {
     $cmd="SELECT SUM(xact_commit) as xact_commit, SUM(xact_rollback) as xact_rollback, SUM(blks_read) as blks_read, 
   SUM(blks_hit) as blks_hit, SUM(tup_returned) as tup_returned, SUM(tup_fetched) as tup_fetched, 
   SUM(tup_inserted) as tup_inserted, SUM(tup_updated) as tup_updated, SUM(tup_deleted) as tup_deleted 

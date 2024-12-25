@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -41,7 +41,8 @@ foreach ($cache['readynas-mib']['diskTable'] as $index => $entry) {
     $value = $entry['diskTemperature'];
 
     if ($value != '') {
-        discover_sensor_ng($device, 'temperature', $mib, 'diskTemperature', $oid, 'diskTemperature.' . $index, 'readynas-mib_diskTemperature', $descr, 1, $value, ['entPhysicalClass' => 'storage']);
+        $options = [ 'rename_rrd' => 'readynas-mib_diskTemperature-diskTemperature.' . $index ];
+        discover_sensor_ng($device, 'temperature', $mib, 'diskTemperature', $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.4526.18.3.1.4.$index";
@@ -66,7 +67,8 @@ foreach ($cache['readynas-mib']['fanTable'] as $index => $entry) {
     $value = $entry['fanRPM'];
 
     if ($value != '') {
-        discover_sensor_ng($device, 'fanspeed', $mib, 'fanRPM', $oid, 'fanRPM.' . $index, 'readynas-mib_fanRPM', $descr, 1, $value, ['entPhysicalClass' => 'device']);
+        $options = [ 'rename_rrd' => 'readynas-mib_fanRPM-fanRPM.' . $index ];
+        discover_sensor_ng($device, 'fanspeed', $mib, 'fanRPM', $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.4526.22.4.1.3.$index";
@@ -92,7 +94,8 @@ foreach ($cache['readynas-mib']['temperatureTable'] as $index => $entry) {
     $value = $entry['temperatureValue'];
 
     if ($value != '') {
-        discover_sensor_ng($device, 'temperature', $mib, 'temperatureValue', $oid, 'temperatureValue.' . $index, 'readynas-mib_temperatureValue', $descr, 1, $value, ['entPhysicalClass' => 'device']);
+        $options = [ 'rename_rrd' => 'readynas-mib_temperatureValue-temperatureValue.' . $index ];
+        discover_sensor_ng($device, 'temperature', $mib, 'temperatureValue', $oid, $index, $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.4526.22.5.1.3.$index";

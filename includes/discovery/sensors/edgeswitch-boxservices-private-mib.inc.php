@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -58,7 +58,7 @@ foreach ($oids as $index => $entry) {
 
     if ($value != 0) {
         $options['rename_rrd'] = "edgeswitch-boxservices-private-mib-boxServicesTempSensorTemperature.$index";
-        discover_sensor_ng($device, 'temperature', $mib, 'boxServicesTempSensorTemperature', $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'boxServicesTempSensorTemperature', $oid, $index, $descr, 1, $value, $options);
     }
 }
 
@@ -109,7 +109,7 @@ foreach ($oids as $index => $entry) {
     $value    = $entry[$oid_name];
 
     if ($value != 0) {
-        discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
         $oid_name = 'boxServicesFanDutyLevel';
         $oid_num  = ".1.3.6.1.4.1.4413.1.1.43.1.6.1.5.{$index}";
@@ -117,7 +117,7 @@ foreach ($oids as $index => $entry) {
         $scale    = 1;
         $value    = $entry[$oid_name];
 
-        discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
     }
 
     $oid_name = 'boxServicesFanItemState';

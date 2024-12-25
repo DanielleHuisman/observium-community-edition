@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -122,7 +122,7 @@ foreach ($entity_array as $index => $entry) {
         $entry['entPhySensorOperStatus'] !== 'nonoperational') {
 
         $ok      = TRUE;
-        $options = ['entPhysicalIndex' => $index];
+        $options = [ 'entPhysicalIndex' => $index ];
 
         $oid = ".1.3.6.1.2.1.99.1.1.1.4.$index";
         //$type  = $entitysensor[$entry['entPhySensorType']];
@@ -200,16 +200,28 @@ foreach ($entity_array as $index => $entry) {
 
                 // Append port label for Extreme XOS, while it not have port information in descr
                 if ($device['os_group'] === 'extremeware' &&
-                    !str_contains_array($descr, [$port['port_label'], $port['port_label_short']])) {
+                    !str_contains_array($descr, [ $port['port_label'], $port['port_label_short'] ])) {
                     $descr = $port['port_label'] . ' ' . $descr;
                 } elseif (isset($port['sensor_multilane']) && $port['sensor_multilane']) {
                     // Multilane sensors, some rewrites
-                    [$match] = explode('/', $port['ifDescr']); // Ethernet56/1 -> Ethernet56
+                    $match = explode('/', $port['ifDescr'])[0]; // Ethernet56/1 -> Ethernet56
                     if (preg_match("! $match(\/(?<lane>\d))?!", $descr, $matches)) {
                         $descr = str_replace($matches[0], '', $descr);
                         $descr = $port['port_label'] . (isset($matches['lane']) ? ' Lane ' . $matches['lane'] : '') . ' ' . $descr;
+                    } elseif (preg_match("! Eth\d+.+\)\/(?<lane>[1234])$!", $descr, $matches)) {
+                        // SONiC OS
+                        print_debug("Multi-lane matched lane " . $matches['lane']);
+                        $descr = $port['port_label'] . (isset($matches['lane']) ? ' Lane ' . $matches['lane'] : '') . ' ' . $descr;
                     }
                 }
+            }
+        }
+
+        // Some other measure entities
+        if ($ok && !isset($options['measured_class'])) {
+            if (preg_match('/^(Voltage|Power|Current|Temperature|Temp)( for)? (?<psu>PSU ?\d+)$/', $descr, $matches)) {
+                $options['measured_class'] = 'powersupply';
+                $options['measured_entity_label'] = $matches['psu'];
             }
         }
 
@@ -328,7 +340,7 @@ foreach ($entity_array as $index => $entry) {
                 discover_status_ng($device, $mib, 'entPhySensorValue', $oid, $index, 'entity-truthvalue', $descr, $value, $options);
             } else {
                 $options['rename_rrd'] = 'entity-sensor-' . $index;
-                discover_sensor_ng($device, $type, $mib, 'entPhySensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
+                discover_sensor_ng($device, $type, $mib, 'entPhySensorValue', $oid, $index, $descr, $scale, $value, $options);
             }
         }
     } else {

@@ -1,6 +1,6 @@
 DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 
--- Copyright 2016 Broadcom.
+-- Copyright 2016-2020 Broadcom.
 -- This SNMP Management Information Specification
 -- embodies Broadcom's confidential and proprietary
 -- intellectual property.  Broadcom retains all title
@@ -12,7 +12,7 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 -- Specification.
     
     IMPORTS
-      MODULE-IDENTITY, OBJECT-TYPE, Gauge32                  FROM SNMPv2-SMI
+      MODULE-IDENTITY, OBJECT-TYPE, Integer32, Gauge32       FROM SNMPv2-SMI
       TruthValue                                             FROM SNMPv2-TC
       dnOS                                               FROM DELL-REF-MIB
       DisplayString                                          FROM RFC1213-MIB
@@ -20,8 +20,8 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
     
 
     fastPathpowerEthernetMIB MODULE-IDENTITY
-    LAST-UPDATED "201503130000Z" -- 13 Mar 2015 12:00:00 GMT
-    ORGANIZATION "Dell EMC"
+    LAST-UPDATED "202005110000Z" -- 11 May 2020 12:00:00 GMT
+    ORGANIZATION "Dell"
     CONTACT-INFO ""
 
     DESCRIPTION
@@ -32,6 +32,29 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
          on this platform which are not represented in the draft MIB."
          
       -- Revision history.
+   REVISION
+        "202005110000Z" -- 11 May 2020 12:00:00 GMT
+   DESCRIPTION
+        "pre-dot3bt, type3 and dot3bt support added in object 
+         agentPethHighPowerMode to support 802.3bt feature.
+         dot3btonly(4) and dot3btandlegacy(5) options are added to
+         agentPethPowerDetectionType to support 802.3bt feature.
+         Added agentPethPowerClassifications object to get the Class 
+         in agentPethPsePortTable."
+   REVISION
+        "201803020000Z" -- 02 Mar 2018 12:00:00 GMT
+   DESCRIPTION
+        "Deprecated agentPethPoeMainPseThresholdPower and 
+         agentPethPoeMainPseUsageThreshold objects from 
+         agentPethPoeMainPseObjects group as threshold 
+         should be maintained for unit (system) instead of per slot. 
+         Threshold Power is not present in agentPethPseTable, hence 
+         added agentPethPseThresholdPower in agentPethPseTable."
+   REVISION
+        "201801250000Z" -- 25 Jan 2018 12:00:00 GMT
+   DESCRIPTION
+        "agentPethPoeMainPseObjects Group is added to get/set the 
+         PoE System Data for all slots in a unit."
    REVISION
         "201503130000Z" -- 13 Mar 2015 12:00:00 GMT
    DESCRIPTION
@@ -104,7 +127,9 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
           agentPethPowerLimitMin
              Gauge32,
           agentPethPowerLimitMax
-             Gauge32
+             Gauge32,
+          agentPethPowerClassifications
+            INTEGER
           }
              
     agentPethPowerLimit OBJECT-TYPE
@@ -191,7 +216,9 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
     SYNTAX INTEGER   {
                none(0),
                dot3atonly(2),
-               dot3atandlegacy(3)
+               dot3atandlegacy(3),
+               dot3btonly(4),
+               dot3btandlegacy(5)
      }
     MAX-ACCESS read-write
     STATUS current
@@ -200,6 +227,10 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
          A value of none(0) means no detection is done.
          A value of dot3atonly(2) means that IEEE 802.3at detection scheme is used.
          A value of dot3atandlegacy(3) means that IEEE 802.3at detection scheme
+         is used and when that fails to detect a connected PD, legacity capacitive detection
+         is used.
+         A value of dot3btonly(4) means that IEEE 802.3bt detection scheme is used.
+         A value of dot3btandlegacy(5) means that IEEE 802.3bt detection scheme
          is used and when that fails to detect a connected PD, legacity capacitive detection
          is used.
          The value 'none' can not be forcibly set by the administrator."
@@ -271,7 +302,37 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
           DESCRIPTION
              "The maximum power this port can be configured to provide, measured in Milliwatts."
     ::= { agentPethPsePortEntry 12 }
-    
+
+
+    agentPethPowerClassifications OBJECT-TYPE
+          SYNTAX  INTEGER   {
+                  invalid(0),
+                  class0(1),
+                  class1(2),
+                  class2(3),
+                  class3(4),
+                  class4(5),
+                  class5(6),
+                  class6(7),
+                  class7(8),
+                  class8(9)
+          }
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+            "Classification is a way to tag different terminals on the
+             Power over LAN network according to their power consumption.
+             Devices such as IP telephones, WLAN access points and others,
+             will be classified according to their power requirements.
+
+             The meaning of the classification labels is defined in the
+             IEEE specification.
+
+             This variable is valid only while a PD is being powered,
+             that is, while the attribute pethPsePortDetectionStatus
+             is reporting the enumeration deliveringPower."
+    ::= { agentPethPsePortEntry 13 }
+
 
 -- Main objects
     agentPethMainPseObjects       OBJECT IDENTIFIER ::= { agentPethObjects 2 }
@@ -337,6 +398,9 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
           agentPethPsePowerManagementMode
 
             INTEGER
+          ,
+          agentPethPseThresholdPower
+            Gauge32
           }
 
     agentPethPsePowerManagementMode OBJECT-TYPE
@@ -358,6 +422,15 @@ DELL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
       "Broadcom 5910X programmers guide"
 
     ::= { agentPethPseEntry 1 }
+
+    agentPethPseThresholdPower OBJECT-TYPE
+      SYNTAX      Gauge32
+      UNITS       "Watts"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "Measured usage power expressed in Watts."
+    ::= { agentPethPseEntry 6 }         
 
 
 END

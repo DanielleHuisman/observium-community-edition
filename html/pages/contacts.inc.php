@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -114,19 +114,19 @@ include($config['html_dir'] . '/includes/contacts-navbar.inc.php');
                         $transport = $contact['contact_method'];
                         if (isset($config['transports'][$transport]['identifiers'])) {
                             // Decode JSON for use below
-                            $contact['endpoint_variables'] = json_decode($contact['contact_endpoint'], TRUE);
+                            $contact['endpoint_variables'] = safe_json_decode($contact['contact_endpoint']);
 
                             // Add all identifier strings to an array and implode them into the description variable
                             // We can't just foreach the identifiers array as we don't know what section the variable is in
                             foreach ($config['transports'][$contact['contact_method']]['identifiers'] as $key) {
                                 foreach ($config['transports'][$contact['contact_method']]['parameters'] as $section => $parameters) {
-                                    if (isset($parameters[$key]) && isset($contact['endpoint_variables'][$key])) {
+                                    if (isset($parameters[$key], $contact['endpoint_variables'][$key])) {
                                         $contact['endpoint_identifiers'][] = escape_html($parameters[$key]['description'] . ': ' . $contact['endpoint_variables'][$key]);
                                     }
                                 }
                             }
 
-                            $contact['endpoint_descr'] = implode('<br />', $contact['endpoint_identifiers']);
+                            $contact['endpoint_descr'] = implode('<br />', (array)$contact['endpoint_identifiers']);
                         } else {
                             $contact['endpoint_descr'] = escape_html($contact['contact_endpoint']);
                         }

@@ -1,0 +1,570 @@
+ADTRAN-GEN-DSL-PROXY-MIB
+
+-- TITLE:     The ADTRAN Generic DSL Proxy MIB
+-- PRODUCT:   ADTRAN products which provide a proxy interface to a remote DSL unit
+-- VERSION:   1.0
+-- DATE:      06/08/09
+-- AUTHOR:    Dennis Cox
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN Generic DSL Proxy MIB objects
+
+-- Some Adtran devices are capable of providing a proxy interface on behalf
+--   of a remote DSL unit.  This allows a unit in a managed system to provide
+--   management of a remote unit (potentially in an unmanaged system).  The
+--   possiblities for managing the remote unit could include provisioning,
+--   retrieving status and alarms, intiating tests, or retrieving performance
+--   statistics and other data.
+
+-- A specific example of DSL proxy is TSCAN FDL.  TSCAN FDL is a generic term
+--   refering to a T1 communications channel that can be used to manage remote 
+--   Adtran HDSLx units.  It can be particularly useful for initiating  various
+--   test features on the HDSLx span and retrieving the results.
+
+-- This MIB controls features that are available using TSCAN FDL or other DSL
+--   proxy protocols.  However, some aspects may actually be supported in other
+--   MIBs.  For example, the TSCAN feature itself is actually managed using
+--   the TSCAN MIB (ADTRAN-GENTSCAN-MIB). Some of the tables in the
+--   ADTRAN-SHDSL-MIB are also used to retrieve information gathered via TSCAN FDL.
+--   In particular, the following tables from other MIBs may be supported,
+--   at least in part:
+--     adGenTSCANProvTable
+--     adEShdslSpliceDetectionTable
+
+-- Throughout, the ifIndex used in this MIB is the ifIndex of the interface 
+--   providing the proxy interface.  For TSCAN FDL, this would be the T1/DS1
+--   interface.  In addition, references to T1 apply equally to DS1 and DSX1,
+--   as applicable.
+
+-- HISTORY:
+-- 06/08/09 dcc STATUS: PRELIMINARY.
+-- 08/17/09 dcc changed adGenDslProxyFrameGroundResult MAX-ACCESS to read-only
+
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        Integer32,
+        TimeTicks,
+        OBJECT-TYPE,
+        MODULE-IDENTITY
+            FROM SNMPv2-SMI
+        OBJECT-GROUP
+            FROM SNMPv2-CONF
+        DisplayString
+            FROM SNMPv2-TC
+        ifIndex
+            FROM IF-MIB
+        adEShdslInvIndex
+--        adEShdslSideIndex,
+--        adEShdslWirePairIndex
+            FROM ADTRAN-SHDSL-MIB
+        adGenDslProxy,
+        adGenDslProxyID
+            FROM ADTRAN-SHARED-SHDSL-MIB
+        ;
+
+adGenDslProxyMIB MODULE-IDENTITY
+   LAST-UPDATED "200906080000Z"
+   ORGANIZATION "Adtran, Inc."
+    CONTACT-INFO
+        "CND Tech Support
+           Postal: ADTRAN, Inc.
+                   901 Explorer Blvd.
+                   Huntsville, AL  35806
+                   Tel: +1 800 726-8663
+                   Fax: +1 256 963 6217
+                   E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the Generic DSL Proxy MIB."
+   REVISION "200906080000Z"
+   DESCRIPTION "Created"
+::= { adGenDslProxyID 1 }
+
+-- OBJECT IDENTIFIERS
+
+adGenDslProxyCommands           OBJECT IDENTIFIER ::= {adGenDslProxy 1}
+adGenDslProxyResults            OBJECT IDENTIFIER ::= {adGenDslProxy 2}
+
+adGenDslProxyMibConformance     OBJECT IDENTIFIER ::= {adGenDslProxy 10 }
+adGenDslProxyMibGroups          OBJECT IDENTIFIER ::= {adGenDslProxyMibConformance 1 }
+
+-- ******************************************************************************************
+
+-- Textual Conventions used in this MIB
+
+--   This enumeration is used to initiate a DSL Proxy operation.  These OIDs
+--     are 'write-only'.  Get has no meaning and will always return 1.
+AdGenDslProxyInitiate ::=  INTEGER
+       {
+           initiate(1)       -- initiate the command sequence on this port
+       }
+
+--   This enumeration is used to provide the status of the progess
+--     of a DSL Proxy operation.
+AdGenDslProxyStatus ::=  INTEGER
+       {
+           neverActivated(1),       -- command has never been initiated on this port
+           inProgress(2),           -- command sequence in progress
+           resultsValid(3),         -- command sequence complete and results valid
+           error(4)                 -- error occurred during command sequence
+       }
+
+--   This represents a timestamp of sysUpTime for the last time this
+--     DSL Proxy command sequence completed successfully on the port.
+AdGenDslProxyLastTime ::=  TimeTicks
+
+
+-- ******************************************************************************************
+
+-- DSL Proxy Command Table
+--
+
+-- DSL Proxy operations may be on-demand.  This is required for TSCAN
+--   FDL which is described below.  Other DSL proxy protocols that may
+--   be developed may operate in a similar manner.  Where a DSL proxy
+--   protocol differs from TSCAN FDL, this should be identified here.
+
+-- TSCAN FDL provides a means of managing and communicating with the
+--   elements of an HDSLx span at the remote end of a T1.  The T1
+--   module sends messages over the T1 ESF Facility Data Link (FDL)
+--   to the remote unit.  If the remote unit is an Adtran HDSLx LTU
+--   that supports TSCAN FDL, it will respond appropriately and/or
+--   send back requested information.
+
+-- TSCAN FDL is only active on-demand.  The user must initiate a
+--   TSCAN FDL command with this MIB table.  For each TSCAN FDL
+--   command, an XxxInitiate OID is provided.  Setting this OID
+--   causes one or more TSCAN FDL commands to be sent to the remote
+--   unit.  In some cases it can take a long time (over a minute) for
+--   the results to be available.  Therefore, for each command,
+--   there is another OID XxxStatus that indicates whether a command
+--   is currently active or completed, or if an error occurred.
+--   If the XxxStatus OID indicates that the command completed
+--   successfully, the table which holds the results of the
+--   command will now have valid data.  Finally, for each command
+--   another OID XxxLastTime provides a timestamp of sysUpTime
+--   for the last time the command sequence completed successfully
+--   on the T1 port.
+
+-- TSCAN FDL commands are issued on a T1 port basis.  When a command
+--   to gather information from the HDSLx span is intitiated, the
+--   T1 port will send all necessary TSCAN FDL messages to gather
+--   all related information from all units in the span.  Therefore,
+--   the command table is indexed only by T1 port index, but the
+--   results of the command may be stored in tables with more indices
+--   (for example, port.unit.side.wire indexing is common).  In these
+--   cases, several rows of a MIB table may hold the results from
+--   a single command.
+
+adGenDslProxyCommandTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF AdGenDslProxyCommandEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+     "This table controls intitiating DSL proxy commands and
+      determining the status of those commands."
+   ::= { adGenDslProxyCommands 1 }
+
+adGenDslProxyCommandEntry OBJECT-TYPE
+   SYNTAX      AdGenDslProxyCommandEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDslProxyCommandTable.  Each entry
+      is indexed by the ifIndex of the T1 interface to which
+      the remote HDSL span is attached."
+   INDEX { ifIndex }
+   ::= { adGenDslProxyCommandTable 1 }
+
+AdGenDslProxyCommandEntry ::=
+   SEQUENCE
+   {
+      adGenDslProxySystemTypeInitiate          AdGenDslProxyInitiate,
+      adGenDslProxySystemTypeStatus            AdGenDslProxyStatus,
+      adGenDslProxySystemTypeLastTime          AdGenDslProxyLastTime,
+      adGenDslProxyLoopbackStatusInitiate      AdGenDslProxyInitiate,
+      adGenDslProxyLoopbackStatusStatus        AdGenDslProxyStatus,
+      adGenDslProxyLoopbackStatusLastTime      AdGenDslProxyLastTime,
+      adGenDslProxySpliceDetectInitiate        AdGenDslProxyInitiate,
+      adGenDslProxySpliceDetectStatus          AdGenDslProxyStatus,
+      adGenDslProxySpliceDetectLastTime        AdGenDslProxyLastTime,
+      adGenDslProxyFrameGroundInitiate         AdGenDslProxyInitiate,
+      adGenDslProxyFrameGroundStatus           AdGenDslProxyStatus,
+      adGenDslProxyFrameGroundLastTime         AdGenDslProxyLastTime
+   }
+
+adGenDslProxySystemTypeInitiate OBJECT-TYPE
+   SYNTAX      AdGenDslProxyInitiate
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Discover whether an Adtran HDSLx LTU is at the other end of
+      the T1 line, and if so report information about the span."
+   ::= { adGenDslProxyCommandEntry 1 }
+
+adGenDslProxySystemTypeStatus OBJECT-TYPE
+   SYNTAX      AdGenDslProxyStatus
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Status of Retrieve System Type command.  When the results
+      are available, they may be retrieved from adGenDslProxySystemTable."
+   ::= { adGenDslProxyCommandEntry 2 }
+
+adGenDslProxySystemTypeLastTime OBJECT-TYPE
+   SYNTAX      AdGenDslProxyLastTime
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Timestamp of last valid results for Retrieve System Type command."
+   ::= { adGenDslProxyCommandEntry 3 }
+
+adGenDslProxyLoopbackStatusInitiate OBJECT-TYPE
+   SYNTAX      AdGenDslProxyInitiate
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Retrieve the loopback status of all units in the span."
+   ::= { adGenDslProxyCommandEntry 4 }
+
+adGenDslProxyLoopbackStatusStatus OBJECT-TYPE
+   SYNTAX      AdGenDslProxyStatus
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Status of Retrieve Loopback Status command.  When the results
+      are available, they may be retrieved from adGenDslProxyLoopbackTable."
+   ::= { adGenDslProxyCommandEntry 5 }
+
+adGenDslProxyLoopbackStatusLastTime OBJECT-TYPE
+   SYNTAX      AdGenDslProxyLastTime
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Timestamp of last valid results for Retrieve Loopback Status command."
+   ::= { adGenDslProxyCommandEntry 6 }
+
+adGenDslProxySpliceDetectInitiate OBJECT-TYPE
+   SYNTAX      AdGenDslProxyInitiate
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Retrieve splice detection data from all units in the span."
+   ::= { adGenDslProxyCommandEntry 7 }
+
+adGenDslProxySpliceDetectStatus OBJECT-TYPE
+   SYNTAX      AdGenDslProxyStatus
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Status of Retrieve Splice Detection command.  When the results
+      are available, they may be retrieved from adEShdslSpliceDetectionTable."
+   ::= { adGenDslProxyCommandEntry 8 }
+
+adGenDslProxySpliceDetectLastTime OBJECT-TYPE
+   SYNTAX      AdGenDslProxyLastTime
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Timestamp of last valid results for Retrieve Splice Detection command."
+   ::= { adGenDslProxyCommandEntry 9 }
+
+adGenDslProxyFrameGroundInitiate OBJECT-TYPE
+   SYNTAX      AdGenDslProxyInitiate
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Activate Frame Ground Detection Test on the remote LTU and
+      retrieve results."
+   ::= { adGenDslProxyCommandEntry 10 }
+
+adGenDslProxyFrameGroundStatus OBJECT-TYPE
+   SYNTAX      AdGenDslProxyStatus
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Status of Frame Ground Detection command.  When the results
+      are available, they may be retrieved from adGenDslProxyFrameGroundTable."
+   ::= { adGenDslProxyCommandEntry 11 }
+
+adGenDslProxyFrameGroundLastTime OBJECT-TYPE
+   SYNTAX      AdGenDslProxyLastTime
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Timestamp of last valid results for Frame Ground Detection command."
+   ::= { adGenDslProxyCommandEntry 12 }
+
+
+-- ******************************************************************************************
+
+-- System Table
+--
+
+adGenDslProxySystemTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF AdGenDslProxySystemEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+     "This table indicates the type of HDSL system detected
+      at the other end of the T1 line.
+
+      Entries in this table represent the most recent information
+      acquired for this T1 interface.  It is updated on demand by
+      adGenDslProxySystemTypeInitiate.  It may also be updated when
+      other commands are requested."
+   ::= { adGenDslProxyResults 1 }
+
+adGenDslProxySystemEntry OBJECT-TYPE
+   SYNTAX      AdGenDslProxySystemEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDslProxySystemTable.  Each entry
+      is indexed by the ifIndex of the T1 interface to which
+      the remote HDSL span is attached."
+   INDEX { ifIndex }
+   ::= { adGenDslProxySystemTable 1 }
+
+AdGenDslProxySystemEntry ::=
+   SEQUENCE
+   {
+      adGenDslProxySystemValid           INTEGER,
+      adGenDslProxySystemLastError       DisplayString,
+      adGenDslProxySystemType            INTEGER,
+      adGenDslProxyNumRepeaters          Integer32
+   }
+
+adGenDslProxySystemValid OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+                  unknown(1),
+                  valid(2),
+                  invalid(3)
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Indicates whether a valid support-capable HDSL LTU was
+      detected, based on the last time this system was discovered."
+   ::= { adGenDslProxySystemEntry 1 }
+
+adGenDslProxySystemLastError OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "If the system is invalid, provides the best available
+      reason discovery failed."
+   ::= { adGenDslProxySystemEntry 2 }
+
+adGenDslProxySystemType OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+                  twoWire(1),
+                  fourWire(2)
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Basic type of the detected HDSL system."
+   ::= { adGenDslProxySystemEntry 3 }
+
+adGenDslProxyNumRepeaters OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Number of repeaters in the HDSL span."
+   ::= { adGenDslProxySystemEntry 4 }
+
+
+-- ******************************************************************************************
+
+-- Loopback Table
+--
+
+adGenDslProxyLoopbackTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF AdGenDslProxyLoopbackEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+     "This table can be used to manage loopbacks on the units.
+      in the HDSL span.
+
+      Entries in this table are dynamically populated based on
+      system information discoverd from the remote LTU.  To
+      populate rows in this table for an HDSL span, use
+      adGenDslProxySystemTypeInitiate.  To update the information
+      in this table use adGenDslProxyLoopbackStatusInitiate."
+   ::= { adGenDslProxyResults 2 }
+
+adGenDslProxyLoopbackEntry OBJECT-TYPE
+   SYNTAX      AdGenDslProxyLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDslProxyLoopbackTable.  Each entry
+      is indexed by the ifIndex of the T1 interface to which
+      the remote HDSL span is attached and the unit in the span."
+   INDEX { ifIndex, adEShdslInvIndex }
+   ::= { adGenDslProxyLoopbackTable 1 }
+
+AdGenDslProxyLoopbackEntry ::=
+   SEQUENCE
+   {
+      adGenDslProxySetLoopback           INTEGER,
+      adGenDslProxyLoopbackStatus        INTEGER
+   }
+
+adGenDslProxySetLoopback OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+                  none(1),
+                  network(2),
+                  customer(3),
+                  bilateral(4)
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Initiate or clear a loopback on a unit in the span.  The
+      directon of the loopback is indicated - network-facing,
+      customer-facing, or both.  This OID is effectively
+      write-only.  A GET on this OID has no meaning.  To
+      determine the current state of loopbacks on a unit,
+      use adGenDslProxyLoopbackStatus."
+   ::= { adGenDslProxyLoopbackEntry 1 }
+
+adGenDslProxyLoopbackStatus OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+                  none(1),
+                  network(2),
+                  customer(3),
+                  bilateral(4)
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The current state of loopbacks on the unit.  This
+      value is refreshed using adGenDslProxyLoopbackStatusInitiate."
+   ::= { adGenDslProxyLoopbackEntry 2 }
+
+
+-- ******************************************************************************************
+
+-- Frame Ground Table
+--
+
+adGenDslProxyFrameGroundTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF AdGenDslProxyFrameGroundEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+     "This table can be used to determine the results of a
+      Frame Ground Detection test on the remote LTU.
+
+      Entries in this table are dynamically populated based on
+      system information discoverd from the remote LTU.  To
+      populate rows in this table for an HDSL span, use
+      adGenDslProxySystemTypeInitiate.  To update the information
+      in this table use adGenDslProxyFrameGroundInitiate."
+   ::= { adGenDslProxyResults 3 }
+
+adGenDslProxyFrameGroundEntry OBJECT-TYPE
+   SYNTAX      AdGenDslProxyFrameGroundEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDslProxyFrameGroundTable.  Each entry
+      is indexed by the ifIndex of the T1 interface to which
+      the remote HDSL span is attached."
+   INDEX { ifIndex }
+   ::= { adGenDslProxyFrameGroundTable 1 }
+
+AdGenDslProxyFrameGroundEntry ::=
+   SEQUENCE
+   {
+      adGenDslProxyFrameGroundResult        INTEGER
+   }
+
+adGenDslProxyFrameGroundResult OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+                  goodGround(1),
+                  badGround(2)
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The result of the Frame Ground Detection test on the remote
+      LTU.  This value is refreshed using
+      adGenDslProxyFrameGroundInitiate."
+   ::= { adGenDslProxyFrameGroundEntry 1 }
+
+
+-- ******************************************************************************************
+-- MIB Groups
+-- ******************************************************************************************
+adGenDslProxyCommandGroup OBJECT-GROUP
+   OBJECTS
+   {
+      adGenDslProxySystemTypeInitiate,
+      adGenDslProxySystemTypeStatus,
+      adGenDslProxySystemTypeLastTime,
+      adGenDslProxyLoopbackStatusInitiate,
+      adGenDslProxyLoopbackStatusStatus,
+      adGenDslProxyLoopbackStatusLastTime,
+      adGenDslProxySpliceDetectInitiate,
+      adGenDslProxySpliceDetectStatus,
+      adGenDslProxySpliceDetectLastTime,
+      adGenDslProxyFrameGroundInitiate,
+      adGenDslProxyFrameGroundStatus,
+      adGenDslProxyFrameGroundLastTime
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DSL Proxy Commands."
+   ::= { adGenDslProxyMibGroups 1 }
+
+adGenDslProxySystemGroup OBJECT-GROUP
+   OBJECTS
+   {
+      adGenDslProxySystemValid,
+      adGenDslProxySystemLastError,
+      adGenDslProxySystemType,
+      adGenDslProxyNumRepeaters
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for HDSL system retrieval."
+   ::= { adGenDslProxyMibGroups 2 }
+
+adGenDslProxyLoopbackGroup OBJECT-GROUP
+   OBJECTS
+   {
+        adGenDslProxySetLoopback,
+        adGenDslProxyLoopbackStatus
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for HDSL loopbacks."
+   ::= { adGenDslProxyMibGroups 3 }
+
+adGenDslProxyFrameGroundGroup OBJECT-GROUP
+   OBJECTS
+   {
+        adGenDslProxyFrameGroundStatus
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for HDSL Frame Ground Detection."
+   ::= { adGenDslProxyMibGroups 4 }
+
+END
+
+

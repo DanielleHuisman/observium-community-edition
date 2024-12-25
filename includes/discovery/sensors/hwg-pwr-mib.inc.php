@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -30,7 +30,6 @@ foreach ($oids as $meter => $entry1) {
 
         $oid_name = 'mtvalMbusValue';
         $oid_num  = ".1.3.6.1.4.1.21796.4.6.1.3.1.6.{$index}";
-        $type     = $mib . '-' . $oid_name;
         $scale    = si_to_scale($entry['mtvalExp']);
         $value    = $entry[$oid_name];
 
@@ -38,46 +37,45 @@ foreach ($oids as $meter => $entry1) {
             continue;
         } // Skip invalid empty entries
 
-        $sensor_type = FALSE;
+        $sensor_class = FALSE;
         switch (strtolower($entry['mtvalUnit'])) {
             case 'm3':
                 $scale = si_to_scale($entry['mtvalExp'] + 3); // Convert to L
             // not break here
             case 'l':
-                $sensor_type = 'volume';
+                $sensor_class = 'volume';
                 break;
             case 'kwh':
                 $scale = si_to_scale($entry['mtvalExp'] + 3); // Convert to Wh
             // not break here
             case 'wh':
-                $sensor_type = 'energy';
+                $sensor_class = 'energy';
                 break;
             case 'kw':
                 $scale = si_to_scale($entry['mtvalExp'] + 3); // Convert to W
             // not break here
             case 'w':
-                $sensor_type = 'power';
+                $sensor_class = 'power';
                 break;
             case 'v':
-                $sensor_type = 'voltage';
+                $sensor_class = 'voltage';
                 break;
             case 'a':
-                $sensor_type = 'current';
+                $sensor_class = 'current';
                 break;
             case '':
                 if (str_icontains_array($entry['mtvalName'], 'Power factor')) {
-                    $sensor_type = 'powerfactor';
+                    $sensor_class = 'powerfactor';
                 } elseif (str_icontains_array($entry['mtvalName'], 'counter')) {
-                    $sensor_type = 'counter';
+                    $sensor_class = 'counter';
                 }
                 break;
         }
-        if (in_array($sensor_type, ['counter', 'energy'])) {
+        if (in_array($sensor_class, [ 'counter', 'energy' ])) {
             // Counters
-            discover_counter($device, $sensor_type, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
-        } elseif ($sensor_type) {
-            // FIXME convert to discover_sensor_ng()
-            discover_sensor($sensor_type, $device, $oid_num, $index, $type, $descr, $scale, $value);
+            discover_counter($device, $sensor_class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
+        } elseif ($sensor_class) {
+            discover_sensor_ng($device, $sensor_class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
         }
 
         $oid_name = 'mtvalAlarmState';

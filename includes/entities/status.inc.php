@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -315,7 +315,8 @@ function discover_status_definition($device, $mib, $entry)
             continue; // trigger for exclude statuses
         }
         if (empty($class)) {
-            $class = $entry['measured'];
+            //print_debug_vars($status);
+            $class = array_tag_replace($status, $entry['measured']);
         }
 
         // Generate specific keys used during rewrites

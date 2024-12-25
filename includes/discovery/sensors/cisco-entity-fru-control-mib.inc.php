@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -111,7 +111,7 @@ if (!safe_empty($entity_array)) {
                 }
                 $options['limit_high_warn'] = $options['limit_high'] * 0.8; // 80%
             }
-            discover_sensor_ng($device, 'current', $mib, 'cefcTotalDrawnCurrent', $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, 'cefcTotalDrawnCurrent', $oid_num, $index, $descr, $scale, $value, $options);
         }
 
         $oid_name = 'cefcPowerRedundancyOperMode';
@@ -172,7 +172,7 @@ if (!safe_empty($entity_array)) {
             $oid_name = 'cefcFanSpeed';
             $oid_num  = '.1.3.6.1.4.1.9.9.117.1.4.2.1.1.' . $index;
             $value    = $entry[$oid_name];
-            discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
 
         // Modules

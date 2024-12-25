@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -41,7 +41,7 @@ foreach ($oids as $unit => $entries) {
           'limit_high'      => $entry['switchThermalActionRisingThreshold'],
           'limit_high_warn' => $entry['switchThermalActionFallingThreshold']
         ];
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $limits);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $limits);
     }
 }
 // EOF

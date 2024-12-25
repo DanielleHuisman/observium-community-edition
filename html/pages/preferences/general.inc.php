@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -197,8 +197,8 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
                         $bill = get_bill_by_id($bill_id);
 
                         echo('<tr><td style="width: 1px;"></td>
-                  <td style="overflow: hidden;"><i class="' . $config['entities']['bill']['icon'] . '"></i> ' . $bill['bill_name'] . '
-                  <small>' . $bill['bill_type'] . '</small></td>
+                  <td style="overflow: hidden;">' . get_icon($config['entities']['bill']['icon']) . ' ' . escape_html($bill['bill_name']) . '
+                  <small>' . escape_html($bill['bill_type']) . '</small></td>
                 </tr>');
                     }
                     echo('</table>' . PHP_EOL);
@@ -224,7 +224,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
 
                             echo('<tr><td style="width: 1px;"></td>
                   <td style="overflow: hidden;"><i class="' . $config['entities'][$group['entity_type']]['icon'] . '"></i> ' . generate_entity_link('group', $group) . '
-                  <small>' . $group['group_descr'] . '</small></td>
+                  <small>' . escape_html($group['group_descr']) . '</small></td>
               </tr>' . PHP_EOL);
                         }
                         echo('</table>' . PHP_EOL);
@@ -248,7 +248,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
 
                         echo('<tr><td style="width: 1px;"></td>
                 <td style="overflow: hidden;"><i class="' . $config['entities']['device']['icon'] . '"></i> ' . generate_device_link($device) . '
-                <small>' . $device['location'] . '</small></td>
+                <small>' . escape_html($device['location']) . '</small></td>
               </tr>');
                     }
                     echo('</table>' . PHP_EOL);
@@ -273,7 +273,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
                         echo('<tr><td style="width: 1px;"></td>
                 <td style="width: 200px; overflow: hidden;"><i class="' . $config['entities']['device']['icon'] . '"></i> ' . generate_entity_link('device', $device) . '</td>
                 <td style="overflow: hidden;"><i class="' . $config['entities']['port']['icon'] . '"></i> ' . generate_entity_link('port', $port) . '
-                <small>' . $port['ifDescr'] . '</small></td>
+                <small>' . escape_html($port['ifDescr']) . '</small></td>
               </tr>');
                     }
                     echo('</table>' . PHP_EOL);

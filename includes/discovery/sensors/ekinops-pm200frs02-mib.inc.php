@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -47,7 +47,7 @@ if ($oid_descr && !str_contains($oid_descr, 'NOT EQUIPPED')) {
     $oid_num  = '.1.3.6.1.4.1.20044.90.3.1.252.' . $index;
     $scale    = 0.00390625; // value/256
     $value    = snmp_get_oid($device, $oid_name . '.' . $index, 'EKINOPS-Pm200frs02-MIB');
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     $descr    = "Client Trscv Voltage ($ifAlias)";
     $class    = 'voltage';
@@ -55,7 +55,7 @@ if ($oid_descr && !str_contains($oid_descr, 'NOT EQUIPPED')) {
     $oid_num  = '.1.3.6.1.4.1.20044.90.3.1.254.' . $index;
     $scale    = 0.0001; // value/10000
     $value    = snmp_get_oid($device, $oid_name . '.' . $index, 'EKINOPS-Pm200frs02-MIB');
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 }
 
 // Q2
@@ -77,7 +77,7 @@ if ($oid_descr && !str_contains($oid_descr, 'NOT EQUIPPED')) {
     $oid_num  = '.1.3.6.1.4.1.20044.90.3.1.253.' . $index;
     $scale    = 0.00390625; // value/256
     $value    = snmp_get_oid($device, $oid_name . '.' . $index, 'EKINOPS-Pm200frs02-MIB');
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     $descr    = "Client Trscv Voltage ($ifAlias)";
     $class    = 'voltage';
@@ -85,7 +85,7 @@ if ($oid_descr && !str_contains($oid_descr, 'NOT EQUIPPED')) {
     $oid_num  = '.1.3.6.1.4.1.20044.90.3.1.255.' . $index;
     $scale    = 0.0001; // value/10000
     $value    = snmp_get_oid($device, $oid_name . '.' . $index, 'EKINOPS-Pm200frs02-MIB');
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 }
 
 // EOF

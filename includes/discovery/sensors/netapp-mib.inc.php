@@ -1,12 +1,12 @@
 <?php
-/*
+/**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -76,7 +76,7 @@ foreach ($oids as $index => $entry) {
           'limit_low_warn'            => snmp_fix_numeric($entry['enclTempSensorsUnderTempWarnThr'], $unit),
         ];
 
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
     }
 
     // NETAPP-MIB::enclVoltSensorsMaximum.1 = INTEGER: 4
@@ -119,7 +119,7 @@ foreach ($oids as $index => $entry) {
           'limit_low_warn'            => snmp_fix_numeric($entry['enclVoltSensorsUnderVoltWarnThr'], $unit),
         ];
 
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 0.001, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, 0.001, $value, $options);
     }
 
     // NETAPP-MIB::enclCurSensorsMaximum.1 = INTEGER: 4
@@ -156,7 +156,7 @@ foreach ($oids as $index => $entry) {
           'limit_high_warn'           => snmp_fix_numeric($entry['enclCurSensorsOverCurWarnThr'], $unit),
         ];
 
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, 0.001, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, $descr, 0.001, $value, $options);
     }
 
     // NETAPP-MIB::enclFansMaximum.1 = INTEGER: 4
@@ -188,7 +188,7 @@ foreach ($oids as $index => $entry) {
           'sensor_unit'               => $unit,
         ];
 
-        discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
     }
 }
 

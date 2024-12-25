@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -31,7 +31,7 @@ if (isset($oids[$index]["digital-sen$i-1"])) {
             $scale = 0.01;
         }
 
-        discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, $descr, $scale, $value);
     } elseif (isset($oids[$index]["digital-sen$i-5"])) {
         // Temp/Humidity sensor
         $descr = "$name: Temperature";
@@ -41,25 +41,25 @@ if (isset($oids[$index]["digital-sen$i-1"])) {
             $scale = 0.01;
         }
 
-        discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, $descr, $scale, $value);
 
         $descr = "$name: Heat index";
         $oid   = ".1.3.6.1.4.1.20916.1.12.1.2.$i.5.$index";
         $value = $oids[$index]["digital-sen$i-5"];
 
-        discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-5", $oid, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-5", $oid, $index, $descr, $scale, $value);
 
         $descr = "$name: Humidity";
         $oid   = ".1.3.6.1.4.1.20916.1.12.1.2.$i.3.$index";
         $value = $oids[$index]["digital-sen$i-3"];
 
-        discover_sensor_ng($device, 'humidity', $mib, "digital-sen$i-3", $oid, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'humidity', $mib, "digital-sen$i-3", $oid, $index, $descr, $scale, $value);
 
         $descr = "$name: Dew Point";
         $oid   = ".1.3.6.1.4.1.20916.1.12.1.2.$i.6.$index";
         $value = $oids[$index]["digital-sen$i-6"];
 
-        discover_sensor_ng($device, 'dewpoint', $mib, "digital-sen$i-6", $oid, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'dewpoint', $mib, "digital-sen$i-6", $oid, $index, $descr, $scale, $value);
     } else {
         // Power sensor
         $descr = "Channel $i: Current";

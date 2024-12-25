@@ -1,0 +1,222 @@
+RUGGEDCOM-DIGITAL-INPUTS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-IDENTITY,  
+    OBJECT-TYPE, 
+    Integer32                			FROM SNMPv2-SMI
+    OBJECT-GROUP			       	    FROM SNMPv2-CONF    
+    TEXTUAL-CONVENTION, DisplayString	FROM SNMPv2-TC
+	ruggedcomTraps						FROM RUGGEDCOM-TRAPS-MIB
+	ruggedcomMgmt                   	FROM RUGGEDCOM-MIB;
+	
+rcDigitalInputs MODULE-IDENTITY
+    LAST-UPDATED "201411011000Z"      -- Nov 1, 10:00 EST 2014
+    ORGANIZATION "RuggedCom"
+    CONTACT-INFO
+       "Postal: Siemens Canada Ltd
+                300 Applewood Crescent
+                Concord, Ontario, 
+                L4K 5C7 Canada
+        Tel:    1-905-856-5288
+        E-Mail: support@ruggedcom.com"
+    
+    DESCRIPTION
+        "RuggedCom MIB for Managing Digital Inputs on RuggedCom Devices."
+	
+	REVISION	"201411011000Z"      -- Nov 1, 10:00 EST 2014
+    DESCRIPTION
+        "The initial version of RuggedCom MIB for Managing Digital Inputs."
+
+    ::= { ruggedcomMgmt 8 }
+ 
+-- ---------------------------------------------------------------------- --
+-- Textual Conventions - To be moved to some common module
+-- ---------------------------------------------------------------------- --
+
+-- Copied from P-BRIDGE-MIB to avoid compilation of that mib
+-- as ROS does not support P-BRIDGE-MIB 
+
+EnabledStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A simple status value for the object."
+    SYNTAX	INTEGER {
+    			enabled(1), 
+    			disabled(2) 
+    		}
+
+RcLowOrHigh ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A state of signal."
+    SYNTAX	INTEGER {
+    			low(1), 
+    			high(2) 
+    		}
+
+RcActiveOrInactive ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Activity status."
+    SYNTAX	INTEGER {
+    			active(1), 
+    			inactive(2) 
+    		}
+
+-- ---------------------------------------------------------------------- --
+rcDigitalInputsParams	OBJECT IDENTIFIER ::= { rcDigitalInputs 1 }
+rcDigitalInputsConformance	OBJECT IDENTIFIER ::= { rcDigitalInputs 2 }
+-- rcrcDigitalInputsCompliances  OBJECT IDENTIFIER ::= { rcDigitalInputsConformance 1 }
+rcDigitalInputsGroups	OBJECT IDENTIFIER ::= { rcDigitalInputsConformance 2 }
+-- ---------------------------------------------------------------------- --
+
+-- ---------------------------------------------------------------------- --
+-- Digital Inputs configuration and status
+-- ---------------------------------------------------------------------- --
+
+rcDigitalInputsTable 	OBJECT-TYPE
+	SYNTAX SEQUENCE OF RcDigitalInputsEntry
+	MAX-ACCESS			not-accessible
+	STATUS				current
+	DESCRIPTION
+	    "A list of Digital Iputs table entries."
+	::= { rcDigitalInputsParams 1 }
+
+rcDigitalInputsEntry 	OBJECT-TYPE
+	SYNTAX				RcDigitalInputsEntry
+	MAX-ACCESS			not-accessible
+	STATUS				current
+	DESCRIPTION
+	    "Configuration and status parameters for a Digital Input."
+        INDEX {
+                rcDiID
+        }
+	::= { rcDigitalInputsTable 1 }
+
+RcDigitalInputsEntry ::= SEQUENCE {
+		rcDiID				Integer32,
+		rcDiAlarm			EnabledStatus,
+		rcDiActiveState		INTEGER,
+		rcDiDelayOn			Integer32,
+		rcDiDelayOff		Integer32,
+		rcDiDescription		DisplayString,
+		rcDiInputState		RcLowOrHigh,
+		rcDiAlarmStatus		RcActiveOrInactive
+	}
+
+rcDiID	 			OBJECT-TYPE 
+	SYNTAX			Integer32 (1..65535)
+    MAX-ACCESS  	not-accessible
+    STATUS      	current
+    DESCRIPTION
+		"The physical Digital Input ID of the device  for which this Entry
+		contains configuration settings."
+	::= { rcDigitalInputsEntry 1 }
+
+rcDiAlarm			OBJECT-TYPE 
+	SYNTAX			EnabledStatus
+    MAX-ACCESS  	read-write
+    STATUS      	current
+    DESCRIPTION
+		"Enable or disable alarm for this sigital input."
+	::= { rcDigitalInputsEntry 2 }
+
+rcDiActiveState		OBJECT-TYPE 
+	SYNTAX			RcLowOrHigh
+    MAX-ACCESS  	read-write
+    STATUS      	current
+    DESCRIPTION
+		"A state that would activate alarm for this digital input."
+	::= { rcDigitalInputsEntry 3 }
+
+rcDiDelayOn			OBJECT-TYPE 
+	SYNTAX			Integer32(0 | 10..3600)
+    MAX-ACCESS  	read-write
+    STATUS      	current
+    DESCRIPTION
+		"A time for which the input must be active before the alarm
+		is activated."
+	::= { rcDigitalInputsEntry 4 }
+
+rcDiDelayOff		OBJECT-TYPE 
+	SYNTAX			Integer32(0 | 10..3600)
+    MAX-ACCESS  	read-write
+    STATUS      	current
+    DESCRIPTION
+		"A time for which the input must be inactive before the alarm
+		is deactivated."
+	::= { rcDigitalInputsEntry 5 }
+
+rcDiDescription		OBJECT-TYPE 
+	SYNTAX			DisplayString (SIZE(0..24))
+    MAX-ACCESS  	read-write
+    STATUS      	current
+    DESCRIPTION
+		"Current digital input state read from hardware."
+	::= { rcDigitalInputsEntry 6 }
+
+rcDiInputState		OBJECT-TYPE 
+	SYNTAX			RcLowOrHigh
+    MAX-ACCESS  	read-only
+    STATUS      	current
+    DESCRIPTION
+		"Current digital input state read from hardware."
+	::= { rcDigitalInputsEntry 7 }
+
+rcDiAlarmStatus		OBJECT-TYPE 
+	SYNTAX			RcActiveOrInactive
+	MAX-ACCESS  	read-only
+    STATUS      	current
+    DESCRIPTION
+		"Current alarm status for this digital input. Change of
+		the value of this object will result in sending notification
+		(trap) digitalInputTrap."
+	::= { rcDigitalInputsEntry 8 }
+
+    
+-- ---------------------------------------------------------------------- --
+--  Definition of boot version mismatch trap
+-- ---------------------------------------------------------------------- --
+
+digitalInputTrap NOTIFICATION-TYPE
+    OBJECTS     {
+                    rcDiID,
+                    rcDiDescription,
+                    rcDiAlarmStatus
+                }
+    STATUS      current
+    DESCRIPTION
+        "Indication that state of digital input changed to the state indicated
+        by the value of object rcDiAlarmState."
+    ::= { ruggedcomTraps 18 }
+
+                                                                               
+-- ---------------------------------------------------------------------- --
+-- Conformance Groups
+-- ---------------------------------------------------------------------- --      		                                     
+rcDigitalInputsTableGroup OBJECT-GROUP
+	OBJECTS	{   
+		rcDiID,
+		rcDiAlarm,
+		rcDiActiveState,
+		rcDiDelayOn,
+		rcDiDelayOff,
+		rcDiDescription,
+		rcDiInputState,
+		rcDiAlarmStatus
+	}
+	STATUS      current
+    DESCRIPTION 
+		"Group objects related to Digital Alarms configuration and status."
+    ::= { rcDigitalInputsGroups 1 }  
+
+rcDigitalInputsNotifyGroup OBJECT-GROUP
+    OBJECTS     {
+                    rcRstpNewTopology
+                }
+    STATUS      current
+    DESCRIPTION
+        "A group of objects that define New Topology trap."
+    ::= { rcDigitalInputsGroups 2 }
+
+END

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -14,7 +14,7 @@ if (!safe_empty($hardware)) {
     return;
 }
 
-// Printers hardware
+// Printer hardware
 
 if ($printer = snmp_get_oid($device, 'hrDeviceDescr.1', 'HOST-RESOURCES-MIB')) {
     $hardware = explode(';', $printer)[0];
@@ -23,8 +23,8 @@ if ($printer = snmp_get_oid($device, 'hrDeviceDescr.1', 'HOST-RESOURCES-MIB')) {
     // MFG:Hewlett-Packard;CMD:PJL,MLC,BIDI-ECP,PCL,POSTSCRIPT,PCLXL;MDL:hp LaserJet 1320 series;CLS:PRINTER;DES:Hewlett-Packard LaserJet 1320 series;MEM:9MB;COMMENT:RES=1200x1;
     // MFG:HP;MDL:Officejet Pro K5400;CMD:MLC,PCL,PML,DW-PCL,DESKJET,DYN;1284.4DL:4d,4e,1;CLS:PRINTER;DES:C8185A;SN:MY82E680JG;S:038000ec840010210068eb800008fb8000041c8003844c8004445c8004d46c8003b;Z:0102,05000009000009029cc1016a81017a21025e41,0600,070000000000000
     // MFG:HP;CMD:PJL,DW-PCL,POSTSCRIPT,HP-GL/2,RTL,JPEG,TIFF,PDF,CALSRASTER,ASCII,URF;MDL:HP DesignJet T1600 PostScript Printer;CLS:PRINTER;LEDMDIS:USB#FF#CC#00;MCT:PR;MCL:DJA;MCV:3.0;DES:HP DesignJet T1600 PostScript Printer;SN:CN9541H01M;FW:CYCLOPSNEPTUNE_03_19_48.1;CID:HPDJPST;
-    $jdinfo = snmp_get_oid($device, 'gdStatusId.0', 'HP-LASERJET-COMMON-MIB');
-    if (preg_match('/(?:MDL|MODEL|DESCRIPTION):([^;]+);/', $jdinfo, $matches)) {
+    $printer = snmp_get_oid($device, 'gdStatusId.0', 'HP-LASERJET-COMMON-MIB');
+    if (preg_match('/(?:MDL|MODEL|DESCRIPTION):([^;]+);/', $printer, $matches)) {
         $hardware = $matches[1];
     }
 }

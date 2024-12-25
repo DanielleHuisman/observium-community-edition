@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -49,7 +49,7 @@ foreach ($jnx as $index => $entry) {
     $limits   = ['limit_high' => $entry['jnxModuleTempHighThresh'] * $scale,
                  'limit_low'  => $entry['jnxModuleTempLowThresh'] * $scale];
     if ($value != 0 && $value != -32768) {
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 
     if (($entry['jnxPMCurTxOutputPower'] == 0 || $entry['jnxPMCurTxOutputPower'] == -32768) &&
@@ -69,7 +69,7 @@ foreach ($jnx as $index => $entry) {
     $limits   = ['limit_high' => $entry['jnxTxPowerHighThresh'] * $scale,
                  'limit_low'  => $entry['jnxTxPowerLowThresh'] * $scale];
 
-    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // jnxPMCurRxInputPower
     $descr    = $entry['ifDescr'] . ' RX Power';
@@ -79,7 +79,7 @@ foreach ($jnx as $index => $entry) {
     $value    = $entry[$oid_name];
     $limits   = ['limit_high' => $entry['jnxRxPowerHighThresh'] * $scale,
                  'limit_low'  => $entry['jnxRxPowerLowThresh'] * $scale];
-    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // jnxPMCurTxLaserBiasCurrent
     $descr    = $entry['ifDescr'] . ' TX Bias';
@@ -87,7 +87,7 @@ foreach ($jnx as $index => $entry) {
     $oid_num  = ".1.3.6.1.4.1.2636.3.71.1.2.1.1.35.{$index}";
     $scale    = 0.0001;
     $value    = $entry[$oid_name];
-    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // jnxPMCurRxLaserBiasCurrent
     $descr    = $entry['ifDescr'] . ' RX Bias';
@@ -95,7 +95,7 @@ foreach ($jnx as $index => $entry) {
     $oid_num  = ".1.3.6.1.4.1.2636.3.71.1.2.1.1.47.{$index}";
     $scale    = 0.0001;
     $value    = $entry[$oid_name];
-    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // FIXME. Not added or unsupported now
     // jnxPMCurChromaticDispersion

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -136,10 +136,14 @@ foreach ($mtxr_array as $key => $entry) {
                 case 'interfaceName':
                     // Try lldpRemPortId
                     $query          = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ?';
-                    $remote_port_id = dbFetchCell($query, [$id, $id, $id, $remote_device_id]);
+                    $remote_port_id = dbFetchCell($query, [ $id, $id, $id, $remote_device_id]);
                     if (!$remote_port_id && str_contains($id, '/')) {
-                        $id = explode('/', $id, 2)[1]; // bridge/ether1 -> ether1
-                        $remote_port_id = dbFetchCell($query, [$id, $id, $id, $remote_device_id]);
+                        // bridge/ether1 -> ether1
+                        // bridge/uplink-bond/sfp-sfpplus3 -> sfp-sfpplus3
+                        // bridge/peerlink/sfp-sfpplus23 -> sfp-sfpplus23
+                        // bridge/mlag-bond-20/sfp-sfpplus20 -> sfp-sfpplus20
+                        $id = end(explode('/', $id));
+                        $remote_port_id = dbFetchCell($query, [ $id, $id, $id, $remote_device_id ]);
                     }
                     break;
                 case 'macAddress':

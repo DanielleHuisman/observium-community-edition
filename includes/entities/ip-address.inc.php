@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -312,10 +312,12 @@ function get_ip_prefix($entry) {
         case 4:
             if (!safe_empty($entry['prefix']) && $entry['prefix'] !== 'zeroDotZero') {
                 $prefix = netmask2cidr($entry['prefix']);
-            } else { //if (!safe_empty($entry['mask']) && $entry['mask'] !== 'zeroDotZero') {
+            } elseif (!safe_empty($entry['mask']) && $entry['mask'] !== 'zeroDotZero') {
                 $prefix = netmask2cidr($entry['mask']);
             }
+
             if (!is_intnum($prefix)) {
+                // When gateway not exists, return 32
                 $prefix = gateway2prefix($entry['ip'], $entry['gateway']);
             }
             return (int)$prefix;
@@ -346,8 +348,7 @@ function get_ip_prefix($entry) {
  *
  * @return integer|false IP version or FALSE if passed incorrect address
  */
-function get_ip_version($address)
-{
+function get_ip_version($address) {
 
     if (str_contains($address, '/')) {
         // Dump condition,
@@ -434,27 +435,29 @@ function ip_uncompress($address, $leading_zeros = TRUE) {
  *
  * @return string Return compressed IP address or __ if IP is empty
  */
-function safe_ip_hostname_key(&$hostname, &$ip = NULL) {
+function safe_ip_hostname(&$hostname, &$ip = NULL) {
     $hostname = strtolower($hostname);
 
+    // Valid IPs not empty and not IPv4 0.0.0.0 or IPv6 ::
+    $ip_type = get_ip_type($ip);
+    $ip_valid = $ip_type && $ip_type !== 'unspecified';
+
     // Hostname is IP address
-    if ($hostname_ip_version = get_ip_version($hostname)) {
+    if (get_ip_version($hostname)) {
         $hostname = ip_compress($hostname);
-        if (empty($ip)) {
+        if (!$ip_valid) {
             // If hostname is IP, set remote_ip same
             $ip = $hostname;
+            return $ip;
         }
     }
 
-    $ip_type = get_ip_type($ip);
-    if ($ip_type && $ip_type !== 'unspecified') {
-        $ip     = ip_compress($ip);
-        $ip_key = $ip;
-    } else {
-        $ip_key = '__';
+    if ($ip_valid) {
+        return ip_compress($ip);
     }
+    $ip = !empty($ip) ? '0.0.0.0' : NULL; // reset ip to 0.0.0.0 also for IPv6, for simplify queries and arrays
 
-    return $ip_key;
+    return '0.0.0.0'; // Set zero IP key for simple array & db keys
 }
 
 /**

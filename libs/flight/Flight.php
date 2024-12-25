@@ -1,96 +1,149 @@
 <?php
-/**
- * Flight: An extensible micro-framework.
- *
- * @copyright   Copyright (c) 2011, Mike Cao <mike@mikecao.com>
- * @license     MIT, http://flightphp.com/license
- */
+
+declare(strict_types=1);
+
+use flight\Engine;
+use flight\net\Request;
+use flight\net\Response;
+use flight\net\Router;
+use flight\template\View;
+use flight\net\Route;
+
+require_once __DIR__ . '/autoload.php';
 
 /**
  * The Flight class is a static representation of the framework.
  *
- * Core.
- * @method  static void start() Starts the framework.
- * @method  static void path($path) Adds a path for autoloading classes.
- * @method  static void stop() Stops the framework and sends a response.
- * @method  static void halt($code = 200, $message = '') Stop the framework with an optional status code and message.
+ * @license MIT, http://flightphp.com/license
+ * @copyright Copyright (c) 2011, Mike Cao <mike@mikecao.com>
  *
- * Routing.
- * @method  static void route($pattern, $callback) Maps a URL pattern to a callback.
- * @method  static \flight\net\Router router() Returns Router instance.
+ * # Core methods
+ * @method static void start() Starts the framework.
+ * @method static void path(string $path) Adds a path for autoloading classes.
+ * @method static void stop(?int $code = null) Stops the framework and sends a response.
+ * @method static void halt(int $code = 200, string $message = '', bool $actuallyExit = true)
+ * Stop the framework with an optional status code and message.
+ * @method static void register(string $name, string $class, array $params = [], ?callable $callback = null)
+ * Registers a class to a framework method.
+ * @method static void unregister(string $methodName)
+ * Unregisters a class to a framework method.
+ * @method static void registerContainerHandler(callable|object $containerHandler) Registers a container handler.
  *
- * Extending & Overriding.
- * @method  static void map($name, $callback) Creates a custom framework method.
- * @method  static void register($name, $class, array $params = array(), $callback = null) Registers a class to a framework method.
+ * # Routing
+ * @method static Route route(string $pattern, callable|string $callback, bool $pass_route = false, string $alias = '')
+ * Maps a URL pattern to a callback with all applicable methods.
+ * @method static void group(string $pattern, callable $callback, callable[] $group_middlewares = [])
+ * Groups a set of routes together under a common prefix.
+ * @method static Route post(string $pattern, callable|string $callback, bool $pass_route = false, string $alias = '')
+ * Routes a POST URL to a callback function.
+ * @method static Route put(string $pattern, callable|string $callback, bool $pass_route = false, string $alias = '')
+ * Routes a PUT URL to a callback function.
+ * @method static Route patch(string $pattern, callable|string $callback, bool $pass_route = false, string $alias = '')
+ * Routes a PATCH URL to a callback function.
+ * @method static Route delete(string $pattern, callable|string $callback, bool $pass_route = false, string $alias = '')
+ * Routes a DELETE URL to a callback function.
+ * @method static void resource(string $pattern, string $controllerClass, array $methods = [])
+ * Adds standardized RESTful routes for a controller.
+ * @method static Router router() Returns Router instance.
+ * @method static string getUrl(string $alias, array<string, mixed> $params = []) Gets a url from an alias
  *
- * Filtering.
- * @method  static void before($name, $callback) Adds a filter before a framework method.
- * @method  static void after($name, $callback) Adds a filter after a framework method.
+ * @method static void map(string $name, callable $callback) Creates a custom framework method.
  *
- * Variables.
- * @method  static void set($key, $value) Sets a variable.
- * @method  static mixed get($key) Gets a variable.
- * @method  static bool has($key) Checks if a variable is set.
- * @method  static void clear($key = null) Clears a variable.
+ * @method static void before(string $name, Closure(array<int, mixed> &$params, string &$output): (void|false) $callback)
+ * Adds a filter before a framework method.
+ * @method static void after(string $name, Closure(array<int, mixed> &$params, string &$output): (void|false) $callback)
+ * Adds a filter after a framework method.
  *
- * Views.
- * @method  static void render($file, array $data = null, $key = null) Renders a template file.
- * @method  static \flight\template\View view() Returns View instance.
+ * @method static void set(string|iterable<string, mixed> $key, mixed $value) Sets a variable.
+ * @method static mixed get(?string $key) Gets a variable.
+ * @method static bool has(string $key) Checks if a variable is set.
+ * @method static void clear(?string $key = null) Clears a variable.
  *
- * Request & Response.
- * @method  static \flight\net\Request request() Returns Request instance.
- * @method  static \flight\net\Response response() Returns Response instance.
- * @method  static void redirect($url, $code = 303) Redirects to another URL.
- * @method  static void json($data, $code = 200, $encode = true, $charset = "utf8", $encodeOption = 0, $encodeDepth = 512) Sends a JSON response.
- * @method  static void jsonp($data, $param = 'jsonp', $code = 200, $encode = true, $charset = "utf8", $encodeOption = 0, $encodeDepth = 512) Sends a JSONP response.
- * @method  static void error($exception) Sends an HTTP 500 response.
- * @method  static void notFound() Sends an HTTP 404 response.
+ * # Views
+ * @method static void render(string $file, ?array<string, mixed> $data = null, ?string $key = null)
+ * Renders a template file.
+ * @method static View view() Returns View instance.
  *
- * HTTP Caching.
- * @method  static void etag($id, $type = 'strong') Performs ETag HTTP caching.
- * @method  static void lastModified($time) Performs last modified HTTP caching.
+ * # Request-Response
+ * @method static Request request() Returns Request instance.
+ * @method static Response response() Returns Response instance.
+ * @method static void redirect(string $url, int $code = 303) Redirects to another URL.
+ * @method static void json(mixed $data, int $code = 200, bool $encode = true, string $charset = "utf8", int $encodeOption = 0, int $encodeDepth = 512)
+ * Sends a JSON response.
+ * @method static void jsonHalt(mixed $data, int $code = 200, bool $encode = true, string $charset = 'utf-8', int $option = 0)
+ * Sends a JSON response and immediately halts the request.
+ * @method static void jsonp(mixed $data, string $param = 'jsonp', int $code = 200, bool $encode = true, string $charset = "utf8", int $encodeOption = 0, int $encodeDepth = 512)
+ * Sends a JSONP response.
+ * @method static void error(Throwable $exception) Sends an HTTP 500 response.
+ * @method static void notFound() Sends an HTTP 404 response.
+ *
+ * # HTTP methods
+ * @method static void etag(string $id, ('strong'|'weak') $type = 'strong') Performs ETag HTTP caching.
+ * @method static void lastModified(int $time) Performs last modified HTTP caching.
+ * @method static void download(string $filePath) Downloads a file
  */
-class Flight {
-    /**
-     * Framework engine.
-     *
-     * @var \flight\Engine
-     */
-    private static $engine;
+class Flight
+{
+    /** Framework engine. */
+    private static Engine $engine;
 
-    // Don't allow object instantiation
-    private function __construct() {}
-    private function __destruct() {}
-    private function __clone() {}
+    /** Whether or not the app has been initialized. */
+    private static bool $initialized = false;
+
+    /**
+     * Don't allow object instantiation
+     *
+     * @codeCoverageIgnore
+     * @return void
+     */
+    private function __construct()
+    {
+    }
+
+    /**
+     * Forbid cloning the class
+     *
+     * @codeCoverageIgnore
+     * @return void
+     */
+    private function __clone()
+    {
+    }
 
     /**
      * Handles calls to static methods.
      *
      * @param string $name Method name
-     * @param array $params Method parameters
+     * @param array<int, mixed> $params Method parameters
+     *
      * @return mixed Callback results
-     * @throws \Exception
+     * @throws Exception
      */
-    public static function __callStatic($name, $params) {
-        $app = Flight::app();
-
-        return \flight\core\Dispatcher::invokeMethod(array($app, $name), $params);
+    public static function __callStatic(string $name, array $params)
+    {
+        return self::app()->{$name}(...$params);
     }
 
-    /**
-     * @return \flight\Engine Application instance
-     */
-    public static function app() {
-        static $initialized = false;
+    /** @return Engine Application instance */
+    public static function app(): Engine
+    {
+        if (!self::$initialized) {
+            require_once __DIR__ . '/autoload.php';
 
-        if (!$initialized) {
-            require_once __DIR__.'/autoload.php';
-
-            self::$engine = new \flight\Engine();
-
-            $initialized = true;
+            self::setEngine(new Engine());
+            self::$initialized = true;
         }
 
         return self::$engine;
+    }
+
+    /**
+     * Set the engine instance
+     *
+     * @param Engine $engine Vroom vroom!
+     */
+    public static function setEngine(Engine $engine): void
+    {
+        self::$engine = $engine;
     }
 }

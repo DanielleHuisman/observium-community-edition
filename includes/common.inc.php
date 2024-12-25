@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -40,22 +40,6 @@ function set_cache_clear($target = 'wui')
             // Add clear WUI cache attrib
             set_obs_attrib('cache_wui_clear', get_request_id());
     }
-}
-
-function set_status_var($var, $value)
-{
-    $GLOBALS['cache']['status_vars'][$var] = $value;
-    return TRUE;
-}
-
-function isset_status_var($var)
-{
-    return array_key_exists($var, (array)$GLOBALS['cache']['status_vars']);
-}
-
-function get_status_var($var)
-{
-    return $GLOBALS['cache']['status_vars'][$var];
 }
 
 /**
@@ -980,9 +964,10 @@ function get_versions($program = NULL)
  *
  * @return NULL
  */
-function print_versions()
-{
+function print_versions() {
     get_versions();
+
+    $observium_date  = format_unixtime(strtotime(OBSERVIUM_DATE), 'jS F Y');
 
     $os_version      = $GLOBALS['cache']['versions']['os_text'];
     $php_version     = $GLOBALS['cache']['versions']['php_text'];
@@ -1024,6 +1009,18 @@ function print_versions()
         }
 
         echo PHP_EOL;
+        print_cli_heading("Observium");
+        print_cli_data("Version", OBSERVIUM_VERSION);
+        if (OBSERVIUM_EDITION !== 'community') {
+            print_cli_data("Train", OBSERVIUM_TRAIN);
+        }
+        print_cli_data("Released", $observium_date);
+        if (OBSERVIUM_EDITION !== 'community' && OBSERVIUM_USER) {
+            print_cli_data("Subscription User", OBSERVIUM_USER);
+            // FIXME. Need way for get subscription level and date end of subscription.
+        }
+
+        echo PHP_EOL;
         print_cli_heading("Software versions");
         print_cli_data("OS", $os_version);
         print_cli_data("Apache", $http_version);
@@ -1059,16 +1056,22 @@ function print_versions()
         print_cli_data($mysql_name, ($timezone['diff'] !== 0 ? '%r' : '') . $timezone['mysql'], 3);
 
         if (OBS_DISTRIBUTED) {
-            $id = $GLOBALS['config']['poller_id'];
+            $poller_id = $GLOBALS['config']['poller_id'];
+            if ($poller_id !== 0 && empty($GLOBALS['config']['poller_name'])) {
+                // poller name not set by config
+                $poller = get_poller($poller_id);
+                $poller_name = $poller['poller_name'];
+            } else {
+                $poller_name = $poller_id !== 0 ? $GLOBALS['config']['poller_name'] : 'Main';
+            }
             echo PHP_EOL;
             print_cli_heading("Poller info", 3);
-            print_cli_data("ID", $id, 3);
-            print_cli_data("Name", ($id !== 0 ? $GLOBALS['config']['poller_name'] : 'Main'), 3);
+            print_cli_data("ID", $poller_id, 3);
+            print_cli_data("Name", $poller_name, 3);
         }
         echo PHP_EOL;
 
     } else {
-        $observium_date = format_unixtime(strtotime(OBSERVIUM_DATE), 'jS F Y');
 
         if ($php_memory_limit >= 0 && $php_memory_limit < 268435456) {
             $php_memory_limit_text = '<span class="text-danger">' . $php_memory_limit_text . '</span>';
@@ -1128,7 +1131,7 @@ function print_versions()
         echo '
         <table class="table table-striped table-condensed-more">
           <tbody>
-            <tr><td><b>' . escape_html(OBSERVIUM_PRODUCT) . '</b></td><td>' . escape_html(OBSERVIUM_VERSION) . ' (' . escape_html($observium_date) . ')</td></tr>
+            <tr><td><b>' . escape_html(OBSERVIUM_PRODUCT) . '</b></td><td>' . escape_html(OBSERVIUM_VERSION_LONG) . ' (' . escape_html($observium_date) . ')</td></tr>
             <tr><td><b>OS</b></td><td>' . escape_html($os_version) . '</td></tr>
             <tr><td><b>Apache</b></td><td>' . escape_html($http_version) . '</td></tr>
             <tr class="' . $php_class . '"><td><b>PHP</b></td><td>' . $php_version . ' (Memory: ' . $php_memory_limit_text . ')</td></tr>
@@ -1391,8 +1394,7 @@ function format_uptime($uptime, $format = "long") {
  *
  * @return array Timezones info
  */
-function get_timezone($refresh = FALSE)
-{
+function get_timezone($refresh = FALSE) {
     global $cache;
 
     if ($refresh || !isset($cache['timezone'])) {
@@ -1438,52 +1440,54 @@ function get_timezone($refresh = FALSE)
 }
 
 function generate_timezone_list($refresh = FALSE) {
-  global $cache;
+    global $cache;
 
-  if ($refresh || !isset($cache['timezone_list'])) {
-    /*
-    $regions = [
-      DateTimeZone::AFRICA,
-      DateTimeZone::AMERICA,
-      DateTimeZone::ANTARCTICA,
-      DateTimeZone::ASIA,
-      DateTimeZone::ATLANTIC,
-      DateTimeZone::AUSTRALIA,
-      DateTimeZone::EUROPE,
-      DateTimeZone::INDIAN,
-      DateTimeZone::PACIFIC,
-    ];
+    if ($refresh || !isset($cache['timezone_list'])) {
+        /*
+        $regions = [
+            DateTimeZone::AFRICA,
+            DateTimeZone::AMERICA,
+            DateTimeZone::ANTARCTICA,
+            DateTimeZone::ARCTIC,
+            DateTimeZone::ASIA,
+            DateTimeZone::ATLANTIC,
+            DateTimeZone::AUSTRALIA,
+            DateTimeZone::EUROPE,
+            DateTimeZone::INDIAN,
+            DateTimeZone::PACIFIC,
+            DateTimeZone::UTC
+        ];
 
-    $t = [];
-    foreach($regions as $region) {
-      $t[] = DateTimeZone::listIdentifiers($region);
+        $t = [];
+        foreach($regions as $region) {
+          $t[] = DateTimeZone::listIdentifiers($region);
+        }
+        $timezones = array_merge([], ...$t);
+        */
+
+        $timezone_offsets = [];
+        foreach (timezone_identifiers_list() as $timezone) {
+            $tz                          = new DateTimeZone($timezone);
+            $timezone_offsets[$timezone] = $tz->getOffset(new DateTime);
+        }
+
+        // sort timezone by offset
+        asort($timezone_offsets);
+
+        $timezone_list = [];
+        foreach ($timezone_offsets as $timezone => $offset) {
+            $offset_prefix    = $offset < 0 ? '-' : '+';
+            $offset_formatted = gmdate('H:i', abs($offset));
+
+            $pretty_offset = "UTC{$offset_prefix}{$offset_formatted}";
+
+            $timezone_list[$timezone] = [ 'descr' => "({$pretty_offset}) $timezone", 'offset' => $offset ];
+        }
+
+        $cache['timezone_list'] = $timezone_list;
     }
-    $timezones = array_merge([], ...$t);
-    */
 
-    $timezones        = DateTimeZone::listIdentifiers(DateTimeZone::ALL);
-    $timezone_offsets = [];
-    foreach ($timezones as $timezone) {
-      $tz                          = new DateTimeZone($timezone);
-      $timezone_offsets[$timezone] = $tz->getOffset(new DateTime);
-    }
-
-    // sort timezone by offset
-    asort($timezone_offsets);
-
-    $timezone_list = [];
-    foreach ($timezone_offsets as $timezone => $offset) {
-      $offset_prefix    = $offset < 0 ? '-' : '+';
-      $offset_formatted = gmdate('H:i', abs($offset));
-
-      $pretty_offset = "UTC{$offset_prefix}{$offset_formatted}";
-
-      $timezone_list[$timezone] = [ 'descr' => "({$pretty_offset}) $timezone", 'offset' => $offset ];
-    }
-    $cache['timezone_list'] = $timezone_list;
-  }
-
-  return $cache['timezone_list'];
+    return $cache['timezone_list'];
 }
 
 /**
@@ -1493,8 +1497,7 @@ function generate_timezone_list($refresh = FALSE) {
  *
  * @return string      Cleaned MAC string (ie: 00029909e984)
  */
-function mac_zeropad($mac)
-{
+function mac_zeropad($mac) {
     $mac = strtolower(trim($mac));
     if (str_contains($mac, ':')) {
         // STRING: 66:c:9b:1b:62:7e
@@ -1504,13 +1507,30 @@ function mac_zeropad($mac)
             foreach ($mac_parts as $part) {
                 $mac .= zeropad($part);
             }
+        } else {
+            // stringified
+            // 30:30:2d:30:36:2d:33:39:2d:30:41:2d:35:46:2d:36:38 -> STRING: "00-06-39-0A-5F-68"
+            $hex_mac = str_replace(':', ' ', $mac);
+            $str_mac = snmp_hexstring($hex_mac);
+            if ($str_mac && $str_mac !== $hex_mac) {
+                return mac_zeropad($str_mac);
+            }
         }
     } else {
+        if (str_contains($mac, ' ') && strlen($mac) >= 35) { // 12 * 3 - 1
+            // stringified
+            // 30 30 2d 30 36 2d 33 39 2d 30 41 2d 35 46 2d 36 38 -> STRING: "00-06-39-0A-5F-68"
+            $str_mac = snmp_hexstring($mac);
+            if ($str_mac && $str_mac !== $mac) {
+                return mac_zeropad($str_mac);
+            }
+        }
+
         // Hex-STRING: 00 02 99 09 E9 84
         // Cisco MAC:  1234.5678.9abc
         // Other Vendors: 00-0B-DC-00-68-AF
         // Some other: 0x123456789ABC
-        $mac = str_replace([' ', '.', '-', '0x'], '', $mac);
+        $mac = str_replace([ ' ', '.', '-', '0x' ], '', $mac);
     }
 
     if (strlen($mac) === 12 && ctype_xdigit($mac)) {
@@ -1853,8 +1873,7 @@ function external_exec($command, &$exec_status = [], $timeout = NULL, $debug = F
  *
  * @param string $command The command to execute and debug.
  */
-function external_exec_debug_cmd($command)
-{
+function external_exec_debug_cmd($command) {
 
     $debug_command = ($command === '' && isset($GLOBALS['snmp_command'])) ? $GLOBALS['snmp_command'] : $command;
     if (OBS_DEBUG < 2 && $GLOBALS['config']['snmp']['hide_auth'] &&
@@ -1883,8 +1902,8 @@ function external_exec_debug_cmd($command)
  *                           - 'runtime': The time taken to execute the command.
  *                           - 'exitdelay': The delay before the command exited (optional).
  */
-function external_exec_debug($exec_status)
-{
+function external_exec_debug($exec_status) {
+
     print_console("CMD EXITCODE[" . ($exec_status['exitcode'] !== 0 ? '%r' : '%g') . $exec_status['exitcode'] . "%n]");
     print_console("CMD RUNTIME[" . ($exec_status['runtime'] > 7 ? '%r' : '%g') . round($exec_status['runtime'], 4) . "s%n]");
 
@@ -1892,10 +1911,10 @@ function external_exec_debug($exec_status)
         print_console("CMD EXITDELAY[%r" . $exec_status['exitdelay'] . "ms%n]");
     }
 
-    print_message("STDOUT[" . PHP_EOL . $exec_status['stdout'] . PHP_EOL . "]");
+    print_console("STDOUT[" . PHP_EOL . $exec_status['stdout'] . PHP_EOL . "]");
 
     if ($exec_status['exitcode'] && $exec_status['stderr']) {
-        print_message("STDERR[" . PHP_EOL . $exec_status['stderr'] . PHP_EOL . "]");
+        print_console("STDERR[" . PHP_EOL . $exec_status['stderr'] . PHP_EOL . "]");
     }
 }
 
@@ -2191,6 +2210,31 @@ function is_array_numeric($array) {
 }
 
 /**
+ * Detect if a needle exists in an array. Support mixed needle value.
+ *
+ * @param mixed $value Needle
+ * @param array $array Where to find
+ *
+ * @return bool
+ */
+function array_value_exist($value, $array) {
+    if (!is_array($array) || empty($array)) {
+        return FALSE;
+    }
+
+    // Non array needle
+    if (!is_array($value)) {
+        return in_array($value, $array);
+    }
+
+    // Get the intersection of both arrays.
+    $intersect = array_intersect($value, $array);
+
+    // Check if the intersection is not empty.
+    return !empty($intersect);
+}
+
+/**
  * Checks if the given key or index exists in the array.
  * Case-insensitive implementation
  *
@@ -2199,9 +2243,27 @@ function is_array_numeric($array) {
  *
  * @return bool
  */
-function array_key_iexists($key, array $array)
-{
+function array_key_iexists($key, $array) {
+    if (!is_array($array)) {
+        return FALSE;
+    }
     return in_array(strtolower($key), array_map('strtolower', array_keys($array)), TRUE);
+}
+
+/**
+ * Case-insensitive in_array()
+ *
+ * @param string $needle
+ * @param array $array
+ *
+ * @return bool
+ */
+function in_iarray($needle, $array) {
+    if (!is_array($array)) {
+        return FALSE;
+    }
+    // Convert both the needle and haystack elements to lowercase
+    return in_array(strtolower($needle), array_map('strtolower', $array), TRUE);
 }
 
 /**
@@ -2671,8 +2733,7 @@ function print_prompt($text, $default_yes = FALSE)
  * @param string  $text
  * @param boolean $strip Stripe special characters (for web) or html tags (for cli)
  */
-function print_debug($text, $strip = FALSE)
-{
+function print_debug($text, $strip = FALSE) {
     if (defined('OBS_DEBUG') && OBS_DEBUG > 0) {
         print_message($text, 'debug', $strip);
     }
@@ -2684,8 +2745,7 @@ function print_debug($text, $strip = FALSE)
  * @param string  $text
  * @param boolean $strip Stripe special characters (for web) or html tags (for cli)
  */
-function print_error($text, $strip = TRUE)
-{
+function print_error($text, $strip = TRUE) {
     print_message($text, 'error', $strip);
 }
 
@@ -2695,8 +2755,7 @@ function print_error($text, $strip = TRUE)
  * @param string  $text
  * @param boolean $strip Stripe special characters (for web) or html tags (for cli)
  */
-function print_warning($text, $strip = TRUE)
-{
+function print_warning($text, $strip = TRUE) {
     print_message($text, 'warning', $strip);
 }
 
@@ -2706,13 +2765,11 @@ function print_warning($text, $strip = TRUE)
  * @param string  $text
  * @param boolean $strip Stripe special characters (for web) or html tags (for cli)
  */
-function print_success($text, $strip = TRUE)
-{
+function print_success($text, $strip = TRUE) {
     print_message($text, 'success', $strip);
 }
 
-function print_console($text, $strip = TRUE)
-{
+function print_console($text, $strip = FALSE) {
     print_message($text, 'console', $strip);
 }
 
@@ -2723,119 +2780,160 @@ function print_console($text, $strip = TRUE)
  * @param string  $type  Supported types: default, success, warning, error, debug
  * @param boolean $strip Stripe special characters (for web) or html tags (for cli)
  */
-function print_message($text, $type = '', $strip = TRUE)
-{
-    global $config;
+function print_message($text, $type = '', $strip = TRUE) {
 
-    // Do nothing if input text not any string (like NULL, array or other). (Empty string '' still printed).
+    // Do nothing if an input text not any string (like NULL, array or other). (Empty string '' still printed).
     if (!is_string($text) && !is_numeric($text)) {
         return NULL;
     }
 
     $type = strtolower(trim($type));
     switch ($type) {
+        case 'ok':
         case 'success':
             $cli_class = '%g';                  // green
             $cli_color = FALSE;                 // by default cli coloring disabled
             $class     = 'alert alert-success'; // green
-            $icon      = 'oicon-tick-circle';
             break;
+
         case 'warning':
             $cli_class = '%b';                  // blue
             $cli_color = FALSE;                 // by default cli coloring disabled
             $class     = 'alert alert-warning'; // yellow
-            $icon      = 'oicon-bell';
             break;
+
         case 'error':
+        case 'danger':
+        case 'alert':
         case 'debug':
             $cli_class = '%r';                 // red
             $cli_color = FALSE;                // by default cli coloring disabled
             $class     = 'alert alert-danger'; // red
-            $icon      = 'oicon-exclamation-red';
             break;
+
+        case 'suppressed':
+            $cli_class = '%m';                     // magenta
+            $cli_color = FALSE;                    // by default cli coloring disabled
+            $class     = 'alert alert-suppressed'; // magenta
+            break;
+
         case 'color':
             $cli_class = '';                 // none
             $cli_color = TRUE;               // allow using coloring
             $class     = 'alert alert-info'; // blue
-            $icon      = 'oicon-information';
             break;
+
         case 'console':
-            // This is special type used nl2br conversion for display console messages on WUI with correct line breaks
+            // This is a special type used nl2br conversion for display console messages on WUI with correct line breaks
             $cli_class = '';                       // none
             $cli_color = TRUE;                     // allow using coloring
             $class     = 'alert alert-suppressed'; // purple
-            $icon      = 'oicon-information';
             break;
+
+        case 'info':
         default:
             $cli_class = '%W';               // bold
             $cli_color = FALSE;              // by default cli coloring disabled
             $class     = 'alert alert-info'; // blue
-            $icon      = 'oicon-information';
             break;
     }
 
+    // Strip tags from a text, separate for cli/web
+    if ($strip) {
+        $text = message_strip_tags($text, $cli_color);
+    }
+
+    // Store non debug message to global var
+    if ($type !== 'debug') {
+        $GLOBALS['last_message'] = $text;
+    }
+
     if (is_cli()) {
-        if ($strip) {
-            $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');            // Convert special HTML entities back to characters
-            $text = str_ireplace(['<br />', '<br>', '<br/>'], PHP_EOL, $text); // Convert html <br> to into newline
-            $text = strip_tags($text);
-        }
-        // Store to global var
-        if ($type !== 'debug') {
-            $GLOBALS['last_message'] = $text;
-        }
         if ($type === 'debug' && !$cli_color) {
             // For debug just echo message.
             echo $text . PHP_EOL;
         } else {
             print_cli($cli_class . $text . '%n' . PHP_EOL, $cli_color);
         }
-    } else {
-        $GLOBALS['last_message'] = $text;
-        if ($text === '' || (is_graph() && $type !== 'debug')) {
-            // Do not web output if the string is empty or graph
-            return NULL;
-        }
-        if ($strip) {
-            if ($text === strip_tags($text)) {
-                // Convert special characters to HTML entities only if text not have html tags
-                $text = escape_html($text);
-            }
-            if ($cli_color) {
-                // Replace some Pear::Console_Color2 color codes with html styles
-                $replace = [
-                  '%',                                  // '%%'
-                  '</span>',                            // '%n'
-                  '<span class="label label-warning">', // '%y'
-                  '<span class="label label-success">', // '%g'
-                  '<span class="label label-danger">',  // '%r'
-                  '<span class="label label-primary">', // '%b'
-                  '<span class="label label-info">',    // '%c'
-                  '<span class="label label-default">', // '%W'
-                  '<span class="label label-default" style="color:black;">', // '%k'
-                  '<span style="font-weight: bold;">',  // '%_'
-                  '<span style="text-decoration: underline;">', // '%U'
-                ];
-            } else {
-                $replace = ['%', ''];
-            }
-            $text = str_replace(['%%', '%n', '%y', '%g', '%r', '%b', '%c', '%W', '%k', '%_', '%U'], $replace, $text);
-        }
 
-        $msg = PHP_EOL . '    <div class="' . $class . '">';
-        if ($type !== 'warning' && $type !== 'error') {
-            $msg .= '<button type="button" class="close" data-dismiss="alert">&times;</button>';
-        }
-        if ($type === 'console') {
-            $text = nl2br(trim($text)); // Convert newline to <br /> for console messages with line breaks
-        }
+        return;
+    }
 
-        $msg .= '
+    if (safe_empty($text) ||
+        ($type !== 'debug' && (is_graph() || is_api()))) {
+        // Do not web output if the string is empty or graph or api
+        return;
+    }
+
+    if (str_starts_with($type, 'box-')) {
+        // Boxed Web UI output
+        print_box($text, str_replace('box-', '', $type));
+        return;
+    }
+
+    // General Web UI output
+    $msg = PHP_EOL . '    <div class="' . $class . '">';
+    if (!str_contains_array($type, [ 'warning', 'error', 'danger' ])) {
+        // Dismiss button
+        $msg .= '<button type="button" class="close" data-dismiss="alert">&times;</button>';
+    }
+    if ($type === 'console') {
+        $text = nl2br(trim($text)); // Convert newline to <br /> for console messages with line breaks
+    }
+
+    $msg .= '
       <div>' . $text . '</div>
     </div>' . PHP_EOL;
 
-        echo $msg;
+    echo $msg;
+}
+
+/**
+ * @param string $text
+ * @param bool $color
+ *
+ * @return string
+ */
+function message_strip_tags($text, $color = TRUE) {
+
+    if (is_cli()) {
+        // Strip in CLI output
+        $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');              // Convert special HTML entities back to characters
+        $text = str_ireplace([ '<br />', '<br>', '<br/>' ], PHP_EOL, $text); // Convert html <br> to into newline
+
+        // FIXME. Convert some color label classes to cli tags?
+        return strip_tags($text);
     }
+
+    // Strip in WEB output
+    if ($text === strip_tags($text)) {
+        // Convert special characters to HTML entities only if text not have html tags
+        $text = escape_html($text);
+    }
+
+    if ($color) {
+        // Replace some Pear::Console_Color2 color codes with html styles
+        $to = [
+            '%',                                  // '%%'
+            '</span>',                            // '%n'
+            '<span class="label label-warning">', // '%y'
+            '<span class="label label-success">', // '%g'
+            '<span class="label label-danger">',  // '%r'
+            '<span class="label label-primary">', // '%b'
+            '<span class="label label-info">',    // '%c'
+            '<span class="label label-default">', // '%W'
+            '<span class="label label-default" style="color:black;">', // '%k'
+            '<span style="font-weight: bold;">',  // '%_'
+            '<span style="text-decoration: underline;">', // '%U'
+        ];
+    } else {
+        $to = [ '%', '' ];
+    }
+
+    // Cli colored tags (Pear::Console_Color2)
+    $from = [ '%%', '%n', '%y', '%g', '%r', '%b', '%c', '%W', '%k', '%_', '%U' ];
+
+    return str_replace($from, $to, $text);
 }
 
 function get_last_message()
@@ -3425,9 +3523,8 @@ function trim_number($number) {
  *
  * @return bool
  */
-function is_valid_hostname($hostname, $fqdn = FALSE)
-{
-    // Pre check if hostname is FQDN
+function is_valid_hostname($hostname, $fqdn = FALSE) {
+    // Pre-check if hostname is FQDN
     if ($fqdn && !preg_match('/\.(xn\-\-[a-z0-9]{2,}|[a-z]{2,})$/i', $hostname)) {
         return FALSE;
     }
@@ -3438,15 +3535,14 @@ function is_valid_hostname($hostname, $fqdn = FALSE)
 }
 
 /**
- * Correct alternative for is_int(), is_integer() and ctype_digit() for validate integer numbers.
+ * Correct alternative for is_int(), is_integer() and ctype_digit() for validated integer numbers.
  * Work with string and numbers.
  *
  * @param string|mixed $value
  *
  * @return bool
  */
-function is_intnum($value)
-{
+function is_intnum($value) {
     if (!is_numeric($value)) {
         return FALSE;
     }
@@ -3465,8 +3561,7 @@ function is_intnum($value)
  *
  * @return bool
  */
-function is_valid_param($string, $type = '')
-{
+function is_valid_param($string, $type = '') {
 
     // Empty or not string is invalid
     if (!(is_string($string) || is_numeric($string)) || safe_empty($string)) {
@@ -3476,6 +3571,11 @@ function is_valid_param($string, $type = '')
 
     // --, **, .., **--.--**
     $poor_default_pattern = '/^[\*\.\-]+$/';
+    // single words with possible brackets: <none>, (none), Unknown
+    $poor_words_pattern = 'unknown|uninitialized|private|public|default|test|none|unset|not set|not available|default string|none|empty|snmpv2|n/?a|1234567890|0123456789|\?';
+    // start/end for a poor words pattern (brackets)
+    $poor_pattern_start = '!^[<\\\(]*\s*(';  // <, \, (
+    $poor_pattern_end   = ')\s*[>\\\)]*$!i'; // >, \, )
 
     switch (strtolower($type)) {
         case 'asset_tag':
@@ -3484,12 +3584,14 @@ function is_valid_param($string, $type = '')
         case 'serial':
         case 'version':
         case 'revision':
+            // extra words for sysLocation
+            $poor_snmp_pattern = $poor_pattern_start . $poor_words_pattern . '|sim|No Asset Tag|Tag 12345' . $poor_pattern_end;
+            $poor_snmp_contains = [ ' not set', 'denied', 'No Such' ];
             $valid = ctype_print($string) &&
                      !(str_istarts($string, [ 'Not Avail', 'Not Specified', 'To be filled by O.E.M.' ]) ||
-                       str_contains_array($string, [ 'denied', 'No Such' ]) ||
+                       str_contains_array($string, $poor_snmp_contains) ||
                        preg_match($poor_default_pattern, $string) ||
-                       in_array($string, [ '<EMPTY>', 'empty', 'n/a', 'N/A', 'na', 'NA', '1234567890', 'Default string',
-                                           '0123456789', 'No Asset Tag', 'Tag 12345', 'sim', 'Unknown' ], TRUE));
+                       preg_match($poor_snmp_pattern, $string));
             break;
 
         case 'mac':
@@ -3503,14 +3605,20 @@ function is_valid_param($string, $type = '')
 
         case 'location':
         case 'syslocation':
-            $poor_locations_pattern = 'unknown|private|none|office|location|snmplocation|Sitting on the Dock of the Bay|Not Available';
-            $valid = strlen($string) > 4 && !preg_match('/^[<\\\(]?(' . $poor_locations_pattern . ')[>\\\)]?$/i', $string);
+            // derp cmd for grep locations:
+            // egrep -r --include="*.snmprec" '^1.3.6.1.2.1.1.6.0' . | awk -F '|' '{print $3}' | sort | uniq -c | sort -n
+            // extra words for sysLocation
+            $poor_snmp_pattern = $poor_pattern_start . $poor_words_pattern .
+                                 '|office|address|here|location|snmplocation|syslocation|(No|System) Location' .
+                                 $poor_pattern_end;
+            $poor_snmp_contains = [ ' not set', 'Sitting on the Dock of the Bay', 'Right here, right now', 'edit /etc/snmp/snmpd.conf' ];
+            $valid = strlen($string) > 4 && !(str_contains_array($string, $poor_snmp_contains) || preg_match($poor_snmp_pattern, $string));
             break;
 
         case 'contact':
         case 'syscontact':
-            $valid = !(in_array($string, [ 'Uninitialized', 'not set', '<none>', '(none)', 'SNMPv2', 'Unknown', '?', '<private>' ], TRUE) ||
-                       preg_match($poor_default_pattern, $string));
+            $valid = !(preg_match($poor_default_pattern, $string) ||
+                       preg_match($poor_pattern_start . $poor_words_pattern . $poor_pattern_end, $string));
             break;
 
         case 'sysobjectid':
@@ -3600,33 +3708,45 @@ function is_valid_param($string, $type = '')
  * BOOLEAN safe function to check if hostname resolves as IPv4 or IPv6 address
  *
  * @param string $hostname
- * @param int    $flags
+ * @param string|array $options all - request any record ipv4/ipv6, ipv4 or a - only ipv4, ipv6 or aaaa - only ipv6
  *
  * @return bool
  */
-function is_domain_resolves($hostname, $flags = OBS_DNS_ALL)
-{
-    return (is_valid_hostname($hostname) && gethostbyname6($hostname, $flags));
+function is_domain_resolves($hostname, $options = 'all') {
+    return (is_valid_hostname($hostname) && gethostbyname6($hostname, $options));
 }
 
 /**
- * Get $host record from /etc/hosts
+ * Get host record from /etc/hosts
  *
- * @param string $host
- * @param int    $flags
+ * @param string $host Hostname for resolve
+ * @param string|array $options all - request any record ipv4/ipv6, ipv4 or a - only ipv4, ipv6 or aaaa - only ipv6
  *
- * @return false|mixed|string|null
+ * @return string|false
  */
-function ip_from_hosts($host, $flags = OBS_DNS_ALL)
-{
+function ip_from_hosts($host, $options = 'all') {
     $host = strtolower($host);
+
+    $try_a    = array_value_exist($options, [ 'all', 'ipv4', 'a' ]);
+    $try_aaaa = array_value_exist($options, [ 'all', 'ipv6', 'aaaa' ]);
+
+    if (OBS_DEBUG > 1) {
+        if ($try_a && $try_aaaa) {
+            $debug_msg = 'IPv4/IPv6';
+        } elseif ($try_a) {
+            $debug_msg = 'IPv4 only';
+        } else {
+            $debug_msg = 'IPv6 only';
+        }
+        print_cli("Try resolve '$host' in /etc/hosts as $debug_msg..\n");
+    }
 
     try {
         foreach (new SplFileObject('/etc/hosts') as $line) {
             // skip empty and comments
             if (str_contains($line, '#')) {
                 // remove inline comments
-                [$line,] = explode('#', $line, 2);
+                $line = explode('#', $line, 2)[0];
             }
             $line = trim($line);
             if (safe_empty($line)) {
@@ -3639,9 +3759,10 @@ function ip_from_hosts($host, $flags = OBS_DNS_ALL)
             $ip = array_shift($hosts);
             //$hosts = array_map('strtolower', $d);
             if (in_array($host, $hosts, TRUE)) {
-                if ((is_flag_set(OBS_DNS_A, $flags) && str_contains($ip, '.')) ||
-                    (is_flag_set(OBS_DNS_AAAA, $flags) && str_contains($ip, ':'))) {
-                    print_debug("Host '$host' found in hosts: $ip");
+                if (($try_a && str_contains($ip, '.')) ||
+                    ($try_aaaa && str_contains($ip, ':'))) {
+
+                    print_debug("Host '$host' found in /etc/hosts: $ip");
                     return $ip;
                 }
             }
@@ -3658,24 +3779,20 @@ function ip_from_hosts($host, $flags = OBS_DNS_ALL)
  * Get the IPv4 or IPv6 address corresponding to a given Internet hostname.
  * By default, return IPv4 address (A record) if exist,
  * else IPv6 address (AAAA record) if exist.
- * For get only IPv6 record use gethostbyname6($hostname, OBS_DNS_AAAA).
+ * For get only IPv6 record use gethostbyname6($hostname, 'ipv6').
  *
- * @param string $host
- * @param int    $flags
+ * @param string       $host
+ * @param string|array $options all - request any record ipv4/ipv6, ipv4 or a - only ipv4, ipv6 or aaaa - only ipv6
  *
  * @return false|mixed
  */
-function gethostbyname6($host, $flags = OBS_DNS_ALL)
-{
+function gethostbyname6($host, $options = 'all') {
     // get AAAA record for $host
-    // if flag OBS_DNS_A is set, if AAAA fails, it tries for A
+    // if option ipv4 is set and AAAA fails, it tries for A
     // the first match found is returned
     // otherwise returns FALSE
 
-    $flags |= OBS_DNS_FIRST; // Set return only first found dns record (do not request all A/AAAA/hosts records)
-    $dns   = gethostbynamel6($host, $flags);
-
-    if (safe_count($dns)) {
+    if ($dns = gethostbynamel6($host, $options, TRUE)) {
         return array_shift($dns);
     }
 
@@ -3684,16 +3801,20 @@ function gethostbyname6($host, $flags = OBS_DNS_ALL)
 
 /**
  * Same as gethostbynamel(), but work with both IPv4 and IPv6.
- * By default, returns both IPv4/6 addresses (A and AAAA records),
- * for get only IPv6 addresses use gethostbynamel6($hostname, OBS_DNS_AAAA).
+ * By default, returns both IPv4/IPv6 addresses (A and AAAA records),
+ * for get only IPv6 addresses use gethostbynamel6($hostname, 'ipv6').
  *
- * @param string $host
- * @param int    $flags
+ * @param string       $host
+ * @param string|array $options all - request any record ipv4/ipv6, ipv4 or a - only ipv4, ipv6 or aaaa - only ipv6
+ * @param bool         $first   // Return first found record, for gethostbyname6()
  *
  * @return array|false
  */
-function gethostbynamel6($host, $flags = OBS_DNS_ALL)
-{
+function gethostbynamel6($host, $options = 'all', $first = FALSE) {
+
+    $try_a      = array_value_exist($options, [ 'all', 'ipv4', 'a' ]);
+    $try_aaaa   = array_value_exist($options, [ 'all', 'ipv6', 'aaaa' ]);
+
     // get AAAA records for $host,
     // if $try_a is true, if AAAA fails, it tries for A
     // results are returned in an array of ips found matching type
@@ -3702,13 +3823,9 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
     $ip6 = [];
     $ip4 = [];
 
-    $try_a    = is_flag_set(OBS_DNS_A, $flags);
-    $try_aaaa = is_flag_set(OBS_DNS_AAAA, $flags);
-    $first    = is_flag_set(OBS_DNS_FIRST, $flags); // Return first found record, when flag set
-
-    if ($try_a === TRUE) {
+    if ($try_a) {
         // First try /etc/hosts (v4)
-        $etc4 = ip_from_hosts($host, OBS_DNS_A);
+        $etc4 = ip_from_hosts($host, 'ipv4');
         if ($etc4) {
             $ip4[] = $etc4;
 
@@ -3718,7 +3835,7 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
         }
 
         // Second try /etc/hosts (v6)
-        $etc6 = $try_aaaa ? ip_from_hosts($host, OBS_DNS_AAAA) : FALSE;
+        $etc6 = $try_aaaa ? ip_from_hosts($host, 'ipv6') : FALSE;
         if ($etc6) {
             $ip6[] = $etc6;
 
@@ -3734,7 +3851,7 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
             $dns = [];
         }
 
-        // Request AAAA record (when requested only first record and A record exist, skip)
+        // Request AAAA record (when requested only first record and A record exists, skip)
         if ($try_aaaa && !($first && count($dns))) {
             $dns6 = dns_get_record($host, DNS_AAAA);
             print_debug_vars($dns6);
@@ -3744,7 +3861,7 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
         }
     } elseif ($try_aaaa) {
         // First try /etc/hosts (v6)
-        $etc6 = ip_from_hosts($host, OBS_DNS_AAAA);
+        $etc6 = ip_from_hosts($host, 'ipv6');
         if ($etc6) {
             $ip6[] = $etc6;
 
@@ -3783,27 +3900,25 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
 }
 
 /**
- * Get hostname by IP (both IPv4/IPv6)
- * Return PTR or FALSE.
+ * Get the Internet hostname corresponding to a given IP address.
+ * Support IPv4 and IPv6.
  *
- * @param string $ip
+ * @param string $ip IPv4/IPv6 address
  *
- * @return string|false
+ * @return string|false PTR name or FALSE
  */
-function gethostbyaddr6($ip)
-{
+function gethostbyaddr6($ip) {
 
-    $ptr      = FALSE;
     $resolver = new Net_DNS2_Resolver();
     try {
-        $response = $resolver -> query($ip, 'PTR');
-        if ($response) {
-            $ptr = $response -> answer[0] -> ptrdname;
+        if ($response = $resolver->query($ip, 'PTR')) {
+            return $response->answer[0]->ptrdname;
         }
     } catch (Net_DNS2_Exception $e) {
+        print_debug("gethostbyaddr6($ip) failed: " . $e->getMessage() . PHP_EOL);
     }
 
-    return $ptr;
+    return FALSE;
 }
 
 function elapsed_time($microtime_start, $precision = NULL) {
@@ -4025,11 +4140,11 @@ function uptime_to_seconds($uptime)
 /**
  * Convert age string to seconds.
  *
- * This function convert age string to seconds.
- * If age is numeric than it in seconds.
+ * This function converts age string to seconds.
+ * If age is numeric, then it is in seconds.
  * The supplied age accepts values such as 31d, 240h, 1.5d etc.
  * Accepted age scales are:
- * y (years), M (months), w (weeks), d (days), h (hours), m (minutes), s (seconds).
+ * y (years), M (months), w (weeks), d (days), h (hours), m (minutes), s (seconds), ms (milliseconds).
  * NOTE, for month use CAPITAL 'M'
  * With wrong and negative returns 0
  *
@@ -4041,44 +4156,45 @@ function uptime_to_seconds($uptime)
  * 'Star wars' -> 0
  *
  * @param string|int $age
+ * @param bool $float When TRUE, return value as float
  *
- * @return int
+ * @return int|float
  */
 // TESTME needs unit testing
-function age_to_seconds($age)
-{
+function age_to_seconds($age, $float = FALSE) {
     $age = trim($age);
 
     if (is_numeric($age)) {
-        $age = (int)$age;
         if ($age > 0) {
-            return $age;
+            return $float ? (float)$age : (int)$age;
         }
         return 0;
     }
 
     $pattern = '/^';
-    $pattern .= '(?:(?<years>\d+(?:\.\d)*)\ ?(?:[yY][eE][aA][rR][sS]?|[yY])[,\ ]*)*';         // y (years)
-    $pattern .= '(?:(?<months>\d+(?:\.\d)*)\ ?(?:[mM][oO][nN][tT][hH][sS]?|M)[,\ ]*)*';       // M (months)
-    $pattern .= '(?:(?<weeks>\d+(?:\.\d)*)\ ?(?:[wW][eE][eE][kK][sS]?|[wW])[,\ ]*)*';         // w (weeks)
-    $pattern .= '(?:(?<days>\d+(?:\.\d)*)\ ?(?:[dD][aA][yY][sS]?|[dD])[,\ ]*)*';              // d (days)
+    $pattern .= '(?:(?<years>\d+(?:\.\d+)*)\ ?(?:[yY][eE][aA][rR]\(?[sS]?\)?|[yY])[,\ ]*)*';         // y (years)
+    $pattern .= '(?:(?<months>\d+(?:\.\d+)*)\ ?(?:[mM][oO][nN][tT][hH]\(?[sS]?\)?|M)[,\ ]*)*';       // M (months)
+    $pattern .= '(?:(?<weeks>\d+(?:\.\d+)*)\ ?(?:[wW][eE][eE][kK]\(?[sS]?\)?|[wW])[,\ ]*)*';         // w (weeks)
+    $pattern .= '(?:(?<days>\d+(?:\.\d+)*)\ ?(?:[dD][aA][yY]\(?[sS]?\)?|[dD])[,\ ]*)*';              // d (days)
     $pattern .= '(?:(?:';
-    $pattern .= '(?:(?<hours>\d+(?:\.\d)*)\ ?(?:[hH][oO][uU][rR][sS]?|[hH][rR][sS]|[hH])[,\ ]*)*';         // h (hours)
-    $pattern .= '(?:(?<minutes>\d+(?:\.\d)*)\ ?(?:[mM][iI][nN][uU][tT][eE][sS]?|[mM][iI][nN]|m)[,\ ]*)*';  // m (minutes)
-    $pattern .= '(?:(?<seconds>\d+(?:\.\d)*)\ ?(?:[sS][eE][cC][oO][nN][dD][sS]?|[sS][eE][cC]|[sS]))*';     // s (seconds)
-    $pattern .= '|(?:(?<hours>\d{1,2}):(?<minutes>\d{1,2}):(?<seconds>\d{1,2}(?:\.\d+)*))';                // hh:mm:ss.s
+    $pattern .= '(?:(?<hours>\d+(?:\.\d+)*)\ ?(?:[hH][oO][uU][rR]\(?[sS]?\)?|[hH][rR][sS]|[hH])[,\ ]*)*';           // h (hours)
+    $pattern .= '(?:(?<minutes>\d+(?:\.\d+)*)\ ?(?:[mM][iI][nN][uU][tT][eE]\(?[sS]?\)?|[mM][iI][nN]|m)[,\ ]*)*';    // m (minutes)
+    $pattern .= '(?:(?<seconds>\d+(?:\.\d+)*)\ ?(?:[sS][eE][cC][oO][nN][dD]\(?[sS]?\)?|[sS][eE][cC]|[sS])[,\ ]*)*'; // s (seconds)
+    $pattern .= '(?:(?<mseconds>\d+(?:\.\d+)*)\ ?(?:[mM][iI][lL][lL][iI][sS][eE][cC][oO][nN][dD]\(?[sS]?\)?|[mM][sS][eE][cC]|[mM][sS]))*'; // ms (milliseconds)
+    $pattern .= '|(?:(?<hours>\d{1,2}):(?<minutes>\d{1,2}):(?<seconds>\d{1,2}(?:\.\d+)*))';                  // hh:mm:ss.s
     $pattern .= '))';
     $pattern .= '$/J';
     //print_vars($pattern); echo PHP_EOL;
 
     if (!empty($age) && preg_match($pattern, $age, $matches)) {
-        $ages    = [
-          'years'   => 31536000, // year   = 365 * 24 * 60 * 60
-          'months'  => 2628000, // month  = year / 12
-          'weeks'   => 604800, // week   = 7 days
-          'days'    => 86400, // day    = 24 * 60 * 60
-          'hours'   => 3600, // hour   = 60 * 60
-          'minutes' => 60  // minute = 60
+        $ages = [
+            'years'   => 31536000, // year   = 365 * 24 * 60 * 60
+            'months'  => 2628000,  // month  = year / 12
+            'weeks'   => 604800,   // week   = 7 days
+            'days'    => 86400,    // day    = 24 * 60 * 60
+            'hours'   => 3600,     // hour   = 60 * 60
+            'minutes' => 60,       // minute = 60
+            'mseconds' => 0.001,   // milliseconds = 60
         ];
         $seconds = isset($matches['seconds']) ? (float)$matches['seconds'] : 0;
         foreach ($ages as $period => $scale) {
@@ -4087,7 +4203,7 @@ function age_to_seconds($age)
             }
         }
 
-        return (int)$seconds;
+        return $float ? (float)$seconds : (int)$seconds;
     }
 
     return 0;
@@ -4108,14 +4224,13 @@ function age_to_seconds($age)
  * -886732     -> 0
  * 'Star wars' -> 0
  *
- * @param string|int $age
+ * @param string|int|float $age
  * @param string|int $min_age
  *
  * @return int
  */
 // TESTME needs unit testing
-function age_to_unixtime($age, $min_age = 1)
-{
+function age_to_unixtime($age, $min_age = 1) {
     $age = age_to_seconds($age);
     if ($age >= $min_age) {
         return time() - $age;
@@ -4229,22 +4344,36 @@ function var_decode($string, $method = 'json')
     return $string;
 }
 
-function get_var_true($var, $true = NULL)
-{
+/**
+ * @param mixed $var
+ * @param mixed $true
+ *
+ * @return bool
+ */
+function get_var_true($var, $true = NULL) {
+    if (is_string($var)) {
+        $var = strtolower($var);
+    }
     return $var === '1' || $var === 1 ||
-           $var === 'on' || $var === 'yes' || $var === 'YES' ||
-           $var === 'true' || $var === 'TRUE' ||
+           $var === 'on' || $var === 'yes' || $var === 'true' ||
            $var === TRUE ||
            // allow extra param for true, ie confirm
            (!empty($true) && $var === $true);
 }
 
-function get_var_false($var, $false = NULL)
-{
+/**
+ * @param mixed $var
+ * @param mixed $false
+ *
+ * @return bool
+ */
+function get_var_false($var, $false = NULL) {
+    if (is_string($var)) {
+        $var = strtolower($var);
+    }
     return $var === '0' || $var === 0 ||
-           $var === 'off' || $var === 'no' || $var === 'NO' ||
-           $var === 'false' || $var === 'FALSE' ||
-           $var === FALSE || $var === NULL ||
+           $var === 'off' || $var === 'no' || $var === 'false' ||
+           $var === FALSE || (is_null($false) && $var === NULL) || // FIXME. I not sure about null, because it's here as alternative for isset
            // allow extra param for false, ie confirm
            (!empty($false) && $var === $false);
 }
@@ -4299,18 +4428,52 @@ function var_comma_safe($value)
 }
 
 /**
+ * Parse CSV files with or without header, and return a multidimensional array
+ *
+ * @param string $content
+ * @param bool $has_header
+ * @param string $separator
+ *
+ * @return array
+ */
+function parse_csv($content, $has_header = TRUE, $separator = ",") {
+    $lines  = explode("\n", $content);
+    $lines  = array_filter(array_map('trim', $lines), 'strlen'); // clean empty lines
+
+    # If the CSV file has a header, load up the titles into $headers
+    if ($has_header) {
+        $header  = array_shift($lines);
+        $headers = array_map('trim', str_getcsv($header, $separator));
+        //print_vars($headers);
+    }
+
+    # Process every line
+    $result = [];
+    foreach ($lines as $line) {
+        $csv = array_map('trim', str_getcsv($line, $separator));
+        //print_vars($csv);
+        if ($has_header) {
+            $result[] = array_combine($headers, $csv);
+        } else {
+            $result[] = $csv;
+        }
+    }
+
+    return $result;
+}
+
+/**
  * Parse number with units to numeric.
  *
  * This function converts numbers with units (e.g. 100MB) to their value
  * in bytes (e.g. 104857600).
  *
  * @param string $str
- * @param int Use custom rigid unit base (1000 or 1024)
+ * @param int $unit_base Use custom rigid unit base (1000 or 1024)
  *
- * @return int
+ * @return float
  */
-function unit_string_to_numeric($str, $unit_base = NULL)
-{
+function unit_string_to_numeric($str, $unit_base = NULL) {
     $value = is_string($str) ? trim($str) : $str;
 
     // If it's already a number, return original value
@@ -4333,9 +4496,12 @@ function unit_string_to_numeric($str, $unit_base = NULL)
 
     // Unit base 1000 or 1024
     $prefix_len = strlen($matches['prefix']);
-    if (in_array($unit_base, [1000, 1024])) {
+    $any_unit   = FALSE;
+    if (in_array($unit_base, [ 1000, 1024 ])) {
         // Use rigid unit base, this interprets any units with hard multiplier base
-        $base = $unit_base;
+        $base = (int)$unit_base;
+        // Convert any unit, ie 17.3kVA,
+        $any_unit = $base === 1000 && $prefix_len === 1;
     } elseif ($prefix_len === 2) {
         // IEC prefixes Ki, Gi, Ti, etc
         $base = 1024;
@@ -4359,15 +4525,17 @@ function unit_string_to_numeric($str, $unit_base = NULL)
     }
 
     // https://en.wikipedia.org/wiki/Binary_prefix
-    $prefixes = [ //'b' => 0,
-                  'k' => 1, 'ki' => 1,
-                  'm' => 2, 'mi' => 2,
-                  'g' => 3, 'gi' => 3,
-                  't' => 4, 'ti' => 4,
-                  'p' => 5, 'pi' => 5,
-                  'e' => 6, 'ei' => 6,
-                  'z' => 7, 'zi' => 7,
-                  'y' => 8, 'yi' => 8];
+    $prefixes = [
+        //'b' => 0,
+        'k' => 1, 'ki' => 1,
+        'm' => 2, 'mi' => 2,
+        'g' => 3, 'gi' => 3,
+        't' => 4, 'ti' => 4,
+        'p' => 5, 'pi' => 5,
+        'e' => 6, 'ei' => 6,
+        'z' => 7, 'zi' => 7,
+        'y' => 8, 'yi' => 8
+    ];
 
     $power = 0;
     if ($prefix_len) {
@@ -4386,18 +4554,22 @@ function unit_string_to_numeric($str, $unit_base = NULL)
         case 'Bytes':
         case 'byte':
         case 'bytes':
-            $base = isset($base) ? $base : 1024;
+            $base = $base ?? 1024;
             break;
+
         case 'b':
         case 'Bps':
         case 'bit':
         case 'bits':
         case 'bps':
-            $base = isset($base) ? $base : 1000;
+            $base = $base ?? 1000;
             break;
+
         default:
-            // unknown unit, return original value
-            return $str;
+            if (!$any_unit) {
+                // unknown unit, return original value
+                return $str;
+            }
     }
 
     $multiplier = $base ** $power;
@@ -4417,219 +4589,9 @@ function string_to_id($string)
     return hexdec(hash("crc32b", $string));
 }
 
+
 /**
  * Convert the value of sensor from known unit to defined SI unit (used in poller/discovery)
- *
- * @param float|string $value Value in non standard unit
- * @param string       $unit  Unit name/symbol
- * @param string|null  $type  Type of value (optional, if same unit can used for multiple types)
- *
- * @return float|string Value converted to standard (SI) unit
- */
-function value_to_si($value, $unit, $type = NULL) {
-    if (!is_numeric($value)) {
-        // Just return the original value if not numeric
-        return $value;
-    }
-
-    $unit_lower = strtolower($unit);
-    $case_units = [
-        'c'    => 'C', 'celsius'    => 'C',
-        'f'    => 'F', 'fahrenheit' => 'F',
-        'k'    => 'K', 'kelvin'     => 'K',
-
-        'w'    => 'W', 'watts'      => 'W',
-        'dbm'  => 'dBm',
-
-        'mpsi' => 'Mpsi',
-        'mmhg' => 'mmHg',
-        'inhg' => 'inHg',
-    ];
-    // set a correct unit case (required for external lib)
-    if (isset($case_units[$unit_lower])) {
-        $unit = $case_units[$unit_lower];
-    }
-    switch ($unit_lower) {
-        case 'f':
-        case 'fahrenheit':
-        case 'k':
-        case 'kelvin':
-            try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Temperature::getUnit($unit);
-            } catch (Throwable $e) {
-                $unit = $unit_lower;
-            }
-            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Temperature($value, $unit);
-            $si_value   = $value_from -> toUnit('C');
-            if ($si_value < -273.15) {
-                // Physically incorrect value
-                $si_value = FALSE;
-            }
-
-            $type = 'temperature';
-            $from = $value . " $unit";
-            $to   = $si_value . ' Celsius';
-            break;
-
-        case 'c':
-        case 'celsius':
-            // not convert, just keep correct value
-            $type = 'temperature';
-            break;
-
-        case 'w':
-        case 'watts':
-            if ($type === 'dbm') {
-                // Used when Power convert to dBm
-                // https://en.wikipedia.org/wiki/DBm
-                // https://www.everythingrf.com/rf-calculators/watt-to-dbm
-                if ($value > 0) {
-                    $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, 'W');
-                    $si_value   = $value_from->toUnit('dBm');
-
-                    $from = $value . " $unit";
-                    $to   = $si_value . ' dBm';
-                } elseif (strlen($value) && $value == 0) {
-                    // See: https://jira.observium.org/browse/OBS-3200
-                    $si_value = -99; // This is incorrect, but minimum possible value for dBm
-                    $from     = $value . ' W';
-                    $to       = $si_value . ' dBm';
-                } else {
-                    $si_value = FALSE;
-                    $from     = $value . ' W';
-                    $to       = 'FALSE';
-                }
-            } else {
-                // not convert, just keep correct value
-                $type = 'power';
-            }
-            break;
-
-        case 'dbm':
-            if ($type === 'power') {
-                // Used when Power convert to dBm
-                // https://en.wikipedia.org/wiki/DBm
-                // https://www.everythingrf.com/rf-calculators/dbm-to-watts
-                $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, $unit);
-                $si_value   = $value_from->toUnit('W');
-
-                $from = $value . " $unit";
-                $to   = $si_value . ' W';
-
-            } else {
-                // not convert, just keep correct value
-                $type = 'dbm';
-            }
-            break;
-
-        case 'psi':
-        case 'ksi':
-        case 'mpsi':
-        case 'mmhg':
-        case 'inhg':
-        case 'bar':
-        case 'atm':
-            // https://en.wikipedia.org/wiki/Pounds_per_square_inch
-            try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Pressure::getUnit($unit);
-            } catch (Throwable $e) {
-                $unit = $unit_lower;
-            }
-            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit);
-            $si_value   = $value_from->toUnit('Pa');
-
-            $type = 'pressure';
-            $from = $value . " $unit";
-            $to   = $si_value . ' Pa';
-            break;
-
-        case 'ft/s':
-        case 'fps':
-        case 'ft/min':
-        case 'fpm':
-        case 'lfm': // linear feet per minute
-        case 'mph': // Miles per hour
-        case 'mps': // Miles per second
-        case 'm/min': // Meter per minute
-        case 'km/h':  // Kilometer per hour
-            try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Velocity::getUnit($unit);
-            } catch (Throwable $e) {
-                //PHP 7+
-                $unit = $unit_lower;
-            }
-            // Any velocity units:
-            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Velocity($value, $unit);
-            $si_value   = $value_from->toUnit('m/s');
-
-            $type = 'velocity';
-            $from = $value . " $unit";
-            $to   = $si_value . ' m/s';
-            break;
-
-        case 'ft3/s':
-        case 'cfs':
-        case 'ft3/min':
-        case 'cfm':
-        case 'gpd': // US (gallon per day)
-        case 'gpm': // US (gallon per min)
-        case 'l/min':
-        case 'lpm':
-        case 'cmh':
-        case 'm3/h':
-        case 'cmm':
-        case 'm3/min':
-            try {
-                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow::getUnit($unit);
-            } catch (Throwable $e) {
-                $unit = $unit_lower;
-            }
-            if ($type === 'waterflow') {
-                // Waterflow default unit is L/s
-                $si_unit = 'L/s';
-            } elseif ($type === 'airflow') {
-                // Use for Airflow imperial unit CFM (Cubic foot per minute) as a more common industry standard
-                $si_unit = 'CFM';
-            } else {
-                // For the future
-                $si_unit = 'm^3/s';
-            }
-            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow($value, $unit);
-            $si_value   = $value_from->toUnit($si_unit);
-
-            $from = $value . " $unit";
-            $to   = $si_value . " $si_unit";
-            break;
-
-        default:
-            // Ability to use any custom function to convert value based on unit name
-            $function_name = 'value_unit_' . $unit_lower; // ie: value_unit_ekinops_dbm1($value) or value_unit_ieee32float($value)
-            if (function_exists($function_name)) {
-                $si_value = $function_name($value);
-
-                //$type  = $unit;
-                $from = "$function_name($value)";
-                $to   = $si_value;
-            } elseif ($type === 'pressure' && str_ends($unit_lower, [ 'pa', 'si' ])) {
-                // Any of pressure unit, like hPa
-                $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit);
-                $si_value   = $value_from->toUnit('Pa');
-
-                $from = $value . " $unit";
-                $to   = $si_value . ' Pa';
-            }
-    }
-
-    if (isset($si_value)) {
-        print_debug('Converted ' . strtoupper($type) . ' value: ' . $from . ' -> ' . $to);
-        return $si_value;
-    }
-
-    return $value; // Fallback original value
-}
-
-/**
- * Convert value of sensor from known unit to defined SI unit (used in poller/discovery)
  *
  * @param float|string $value     Value
  * @param string       $unit_from Unit name/symbol for value
@@ -4641,13 +4603,13 @@ function value_to_si($value, $unit, $type = NULL) {
 function value_to_units($value, $unit_from, $class, $unit_to = []) {
     global $config;
 
-    // Convert symbols to supported by lib units
-    $unit_from = str_replace(['<sup>', '</sup>'], ['^', ''], $unit_from); // I.e. mg/m<sup>3</sup> => mg/m^3
-    $unit_from = html_entity_decode($unit_from);                          // I.e. &deg;C => °C
+    // Convert symbols to lib supported units
+    $unit_from = str_replace([ '<sup>', '</sup>' ], [ '^', '' ], $unit_from); // I.e. mg/m<sup>3</sup> => mg/m^3
+    $unit_from = html_entity_decode($unit_from);                              // I.e. &deg;C => °C
 
     // Non numeric values
     if (!is_numeric($value)) {
-        return [$unit_from => $value];
+        return [ $unit_from => $value ];
     }
 
     switch ($class) {
@@ -4676,7 +4638,7 @@ function value_to_units($value, $unit_from, $class, $unit_to = []) {
         case 'lifetime':
         case 'uptime':
         case 'time':
-            if ($unit_from == '') {
+            if (empty($unit_from)) {
                 $unit_from = 's';
             }
             $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Time($value, $unit_from);
@@ -4684,7 +4646,7 @@ function value_to_units($value, $unit_from, $class, $unit_to = []) {
 
         default:
             // Unknown, return original value
-            return [$unit_from => $value];
+            return [ $unit_from => $value ];
     }
 
     // Use our default unit (if not passed)
@@ -4695,9 +4657,9 @@ function value_to_units($value, $unit_from, $class, $unit_to = []) {
     // Convert to units
     $units = [];
     foreach ((array)$unit_to as $to) {
-        // Convert symbols to supported by lib units
-        $tou = str_replace(['<sup>', '</sup>'], ['^', ''], $to); // I.e. mg/m<sup>3</sup> => mg/m^3
-        $tou = html_entity_decode($tou);                         // I.e. &deg;C => °C
+        // Convert symbols to lib supported units
+        $tou = str_replace([ '<sup>', '</sup>' ], [ '^', '' ], $to); // I.e. mg/m<sup>3</sup> => mg/m^3
+        $tou = html_entity_decode($tou);                             // I.e. &deg;C => °C
 
         $units[$to] = $value_from->toUnit($tou);
     }
@@ -4723,7 +4685,7 @@ function nl2space($string)
 }
 
 /**
- * This noob function replace windows/mac newline character to unix newline
+ * This noob function replaces windows/mac newline character to unix newline
  *
  * @param string $string Input string
  *
@@ -4877,8 +4839,7 @@ function safe_json_encode($var, $options = 0) {
     return $str;
 }
 
-function safe_json_decode($str, $options = 0)
-{
+function safe_json_decode($str, $options = 0) {
     if (!is_string($str)) {
         // When not string passed return original variable
         // This is not same as json_decode do, but better for us
@@ -4887,6 +4848,12 @@ function safe_json_decode($str, $options = 0)
             echo 'JSON RAW['.PHP_EOL;
             print_vars($str);
             echo PHP_EOL.']'.PHP_EOL;
+        }
+        return $str;
+    }
+    if ($str === '') {
+        if (OBS_DEBUG) {
+            print_message('JSON DECODE[%yEmpty string%n]');
         }
         return $str;
     }
@@ -4900,19 +4867,26 @@ function safe_json_decode($str, $options = 0)
         $msg = json_last_error_msg();
 
         if ($json_error === JSON_ERROR_CTRL_CHAR) {
-            // Try fix "Control character error, possibly incorrectly encoded"
+            // Try to fix "Control character error, possibly incorrectly encoded"
             $str_fix = preg_replace('/[[:cntrl:]]/', '', smart_quotes($str));
             print_debug_vars($str_fix);
-        } else {
+        } elseif (function_exists('mb_ord')) {
             // Try fix utf errors
             $str_fix = fix_json_unicode(smart_quotes($str));
             print_debug_vars($str_fix);
+        } else {
+            // https://jira.observium.org/browse/OBS-4881
+            // Prevent php fatal errors in poller without mbstring
+            print_debug("WARNING! PHP module mbstring not exist. Please read Observium requirements.");
+            $str_fix = FALSE;
         }
-        $json_fix = @json_decode($str_fix, TRUE, 512, $options);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            //print_vars(smart_quotes(fix_json_unicode($str)));
-            //print_vars($json_fix);
-            return $json_fix;
+        if ($str_fix) {
+            $json_fix = @json_decode($str_fix, TRUE, 512, $options);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                //print_vars(smart_quotes(fix_json_unicode($str)));
+                //print_vars($json_fix);
+                return $json_fix;
+            }
         }
         if (OBS_DEBUG) {
             print_message('JSON DECODE[%r' . $msg . '%n]');
@@ -4928,8 +4902,13 @@ function safe_json_decode($str, $options = 0)
  * "ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ" ->
  * "\u00cb\u0419\u0426\u0423\u041a\u0415\u041d\u0413\u0428\u0429\u0417\u0425\u042a\u0424\u042b\u0412\u0410\u041f\u0420\u041e\u041b\u0414\u0416\u042d\u042f\u0427\u0421\u041c\u0418\u0422\u042c\u0411\u042e"
  */
-function fix_json_unicode($string)
-{
+function fix_json_unicode($string) {
+    if (!function_exists('mb_ord')) {
+        // Safe return original string, for prevent php fatal errors
+        print_debug("WARNING! PHP module mbstring requered for fix_json_unicode().");
+        return $string;
+    }
+
     return preg_replace_callback('/([\x{0080}-\x{FFFF}])/u', function ($match) {
         return '\\u' . str_pad(dechex(mb_ord($match[1], 'UTF-8')), 4, '0', STR_PAD_LEFT);
     }, $string);

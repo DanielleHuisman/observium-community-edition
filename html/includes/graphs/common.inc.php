@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -78,10 +78,16 @@ if (isset($log_y)) {
     $rrd_options .= ' --logarithmic';
 }  /// FIXME. Newer used
 
-if ((isset($alt_y) && !$alt_y) || get_var_false($vars['alt_y'])) {
+// Use alternative Y axis if $alt_y not set to FALSE
+if (!isset($vars['alt_y'])) {
+    // Prefer vars alt_y option
+    $alt_y = !isset($alt_y) || $alt_y;
 } else {
-    $rrd_options .= ' -Y';
-} // Use alternative Y axis if $alt_y not set to FALSE
+    $alt_y = !get_var_false($vars['alt_y']);
+}
+if ($alt_y) {
+    $rrd_options .= ' --alt-y-grid'; // ' -Y'; // for code search full option
+}
 
 if (isset($vars['zoom']) && is_numeric($vars['zoom'])) {
     $rrd_options .= " --zoom='" . $vars['zoom'] . "' ";
@@ -99,36 +105,55 @@ if (isset($vars['style']) && $vars['style']) {
 }
 
 // Autoscale
-if (isset($vars['force_autoscale']) && get_var_true($vars['force_autoscale'])) {
-    $rrd_options .= ' -A';
-} elseif (!isset($scale_min) && !isset($scale_max)) {
-    if ($graph_style === 'mrtg' && !isset($log_y)) { // Don't use this if we're doing logarithmic scale, else it breaks.
-        $rrd_options .= ' --alt-autoscale-max';
-    } else {
-        $rrd_options .= ' --alt-autoscale';
-    }
-    if ($scale_rigid !== FALSE) {
-        $rrd_options .= ' --rigid';
-    }
+
+if(isset($autoscale)) {
+
+  // Explicitely set autoscale
+  switch($autoscale)
+  {
+      case 'alt':
+          $rrd_options .= ' --alt-autoscale';
+          break;
+      case 'alt-max':
+          $rrd_options .= ' --alt-autoscale-max';
+          break;
+      case 'alt-min':
+          $rrd_options .= ' --alt-autoscale-min';
+          break;
+  }
+
 } else {
-    if (isset($scale_min) && is_numeric($scale_min)) {
-        if ($graph_style === 'mrtg' && $scale_min < 0) {
-            // Reset min scale for mrtg style, since it always above zero
-            $scale_min = 0;
-        }
-        $rrd_options .= ' --lower-limit ' . $scale_min;
-        if (!isset($scale_max)) {
+    if (isset($vars['force_autoscale']) && get_var_true($vars['force_autoscale'])) {
+        $rrd_options .= ' --alt-autoscale'; // ' -A'; // for code search full option
+    } elseif (!isset($scale_min) && !isset($scale_max)) {
+        if ($graph_style === 'mrtg' && !isset($log_y)) { // Don't use this if we're doing logarithmic scale, else it breaks.
             $rrd_options .= ' --alt-autoscale-max';
+        } else {
+            $rrd_options .= ' --alt-autoscale';
         }
-    }
-    if (isset($scale_max) && is_numeric($scale_max)) {
-        $rrd_options .= ' --upper-limit ' . $scale_max;
-        if (!isset($scale_min)) {
-            $rrd_options .= ' --alt-autoscale-min';
+        if ($scale_rigid !== FALSE) {
+            $rrd_options .= ' --rigid';
         }
-    }
-    if (isset($scale_rigid) && $scale_rigid) {
-        $rrd_options .= ' --rigid';
+    } else {
+        if (isset($scale_min) && is_numeric($scale_min)) {
+            if ($graph_style === 'mrtg' && $scale_min < 0) {
+                // Reset min scale for mrtg style, since it always above zero
+                $scale_min = 0;
+            }
+            $rrd_options .= ' --lower-limit ' . $scale_min;
+            if (!isset($scale_max)) {
+                $rrd_options .= ' --alt-autoscale-max';
+            }
+        }
+        if (isset($scale_max) && is_numeric($scale_max)) {
+            $rrd_options .= ' --upper-limit ' . $scale_max;
+            if (!isset($scale_min)) {
+                $rrd_options .= ' --alt-autoscale-min';
+            }
+        }
+        if (isset($scale_rigid) && $scale_rigid) {
+            $rrd_options .= ' --rigid';
+        }
     }
 }
 

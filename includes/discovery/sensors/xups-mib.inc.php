@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -128,11 +128,11 @@ foreach ($xups_array as $index => $entry) {
                 $oid = ".1.3.6.1.4.1.534.1.4.4.1.7.$index";
                 $value = $entry['xupsOutputCurrentHighPrecision'];
                 $options['limit_auto'] = FALSE; // Not sure
-                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsOutputCurrentHighPrecision', $oid, $index, NULL, $descr, 0.1, $value, $options);
+                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsOutputCurrentHighPrecision', $oid, $index, $descr, 0.1, $value, $options);
             } elseif ($entry['xupsOutputCurrent'] != 0) {
                 $oid = ".1.3.6.1.4.1.534.1.4.4.1.3.$index"; # XUPS-MIB::xupsOutputCurrent.$index
                 $value = $entry['xupsOutputCurrent'];
-                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsOutputCurrent', $oid, $index, NULL, $descr, 1, $value, $options);
+                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsOutputCurrent', $oid, $index, $descr, 1, $value, $options);
             }
             unset($options['rename_rrd'], $options['limit_auto']);
             //discover_sensor('current', $device, $oid, "xupsOutputEntry.".$index, 'xups', $descr, 1, $value);
@@ -154,7 +154,7 @@ foreach ($xups_array as $index => $entry) {
         $oid   = ".1.3.6.1.4.1.534.1.4.4.1.9.$index";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           # XUPS-MIB::xupsOutputVA.$index
         $value = $entry['xupsOutputVA'];
         if ($value != 0) {
-            discover_sensor_ng($device, 'apower', 'XUPS-MIB', 'xupsOutputVA', $oid, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'apower', 'XUPS-MIB', 'xupsOutputVA', $oid, $index, $descr, 1, $value, $options);
         }
     }
 
@@ -191,7 +191,7 @@ foreach ($xups_array as $index => $entry) {
             if (isset($entry['xupsBypassCurrentHighPrecision'])) { // && $entry['xupsBypassCurrentHighPrecision'] != 0)
                 $oid   = ".1.3.6.1.4.1.534.1.5.3.1.5.$index";
                 $value = $entry['xupsBypassCurrentHighPrecision'];
-                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsBypassCurrentHighPrecision', $oid, $index, NULL, $descr, 0.1, $value, $options);
+                discover_sensor_ng($device, 'current', 'XUPS-MIB', 'xupsBypassCurrentHighPrecision', $oid, $index, $descr, 0.1, $value, $options);
             }
         }
     }
@@ -237,7 +237,7 @@ $oid   = ".1.3.6.1.4.1.534.1.4.9.5.0";                                          
 $descr = "Output Power Factor";
 $value = $entry['xupsOutputAveragePowerFactor'];
 if ($value != 0) {
-    discover_sensor_ng($device, 'powerfactor', 'XUPS-MIB', 'xupsOutputAveragePowerFactor', $oid, 0, NULL, $descr, 1, $value);
+    discover_sensor_ng($device, 'powerfactor', 'XUPS-MIB', 'xupsOutputAveragePowerFactor', $oid, 0, $descr, 1, $value);
 }
 
 ## Bypass Frequency

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -48,7 +48,7 @@ foreach (dbFetchRows('SELECT * FROM `ospf_instances`' . generate_where_clause(ge
                      " ORDER BY `device_id`, `ospfVersionNumber`") as $instance) {
     $device = device_by_id_cache($instance['device_id']);
     $ospf_version = $instance['ospfVersionNumber'];
-    if ($ospf_version === 'version3') {
+    if ($ospf_version === 'version3' && !filter_var($instance['ospfRouterId'], FILTER_VALIDATE_IP)) {
         $instance['ospfRouterId'] = long2ip($instance['ospfRouterId']);
     }
 

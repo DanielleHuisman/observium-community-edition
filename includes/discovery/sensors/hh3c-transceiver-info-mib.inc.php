@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -59,7 +59,7 @@ foreach ($oids as $index => $entry) {
           'limit_low'       => $entry['hh3cTransceiverTempLoAlarm'] * $scale_limit,
         ];
         $options['rename_rrd'] = "hh3c-transceiver-info-mib-hh3cTransceiverTemperature.$index";
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 
     // hh3cTransceiverBiasCurrent.54 = INTEGER: 532
@@ -79,7 +79,7 @@ foreach ($oids as $index => $entry) {
           'limit_low'       => $entry['hh3cTransceiverBiasLoAlarm'] * $scale_limit,
         ];
         $options['rename_rrd'] = "hh3c-transceiver-info-mib-hh3cTransceiverBiasCurrent.$index";
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 
     // hh3cTransceiverVoltage.54 = INTEGER: 325
@@ -99,7 +99,7 @@ foreach ($oids as $index => $entry) {
           'limit_low'       => $entry['hh3cTransceiverVccLoAlarm'] * $scale_limit,
         ];
         $options['rename_rrd'] = "hh3c-transceiver-info-mib-hh3cTransceiverVoltage.$index";
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 
     // hh3cTransceiverCurTXPower.54 = INTEGER: -251
@@ -115,13 +115,14 @@ foreach ($oids as $index => $entry) {
         // 22387 -> 0.0022387W -> 3.5dBm
         $scale_limit           = 0.0000001; // Limits have different scale
         $limits                = [
-          'limit_high'      => value_to_si($entry['hh3cTransceiverPwrOutHiAlarm'] * $scale_limit, 'W', 'dbm'),
-          'limit_high_warn' => value_to_si($entry['hh3cTransceiverPwrOutHiWarn'] * $scale_limit, 'W', 'dbm'),
-          'limit_low_warn'  => value_to_si($entry['hh3cTransceiverPwrOutLoWarn'] * $scale_limit, 'W', 'dbm'),
-          'limit_low'       => value_to_si($entry['hh3cTransceiverPwrOutLoAlarm'] * $scale_limit, 'W', 'dbm'),
+            'limit_unit'      => 'W', // need unit conversion
+            'limit_high'      => $entry['hh3cTransceiverPwrOutHiAlarm'] * $scale_limit,
+            'limit_high_warn' => $entry['hh3cTransceiverPwrOutHiWarn'] * $scale_limit,
+            'limit_low_warn'  => $entry['hh3cTransceiverPwrOutLoWarn'] * $scale_limit,
+            'limit_low'       => $entry['hh3cTransceiverPwrOutLoAlarm'] * $scale_limit,
         ];
         $options['rename_rrd'] = "hh3c-transceiver-info-mib-hh3cTransceiverCurTXPower.$index";
-        discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 
     // hh3cTransceiverCurRXPower.54 = INTEGER: -834
@@ -137,13 +138,14 @@ foreach ($oids as $index => $entry) {
         // 22387 -> 0.0022387W -> 3.5dBm
         $scale_limit           = 0.0000001; // Limits have different scale
         $limits                = [
-          'limit_high'      => value_to_si($entry['hh3cTransceiverRcvPwrHiAlarm'] * $scale_limit, 'W', 'dbm'),
-          'limit_high_warn' => value_to_si($entry['hh3cTransceiverRcvPwrHiWarn'] * $scale_limit, 'W', 'dbm'),
-          'limit_low_warn'  => value_to_si($entry['hh3cTransceiverRcvPwrLoWarn'] * $scale_limit, 'W', 'dbm'),
-          'limit_low'       => value_to_si($entry['hh3cTransceiverRcvPwrLoAlarm'] * $scale_limit, 'W', 'dbm'),
+            'limit_unit'      => 'W', // need unit conversion
+            'limit_high'      => $entry['hh3cTransceiverRcvPwrHiAlarm'] * $scale_limit,
+            'limit_high_warn' => $entry['hh3cTransceiverRcvPwrHiWarn'] * $scale_limit,
+            'limit_low_warn'  => $entry['hh3cTransceiverRcvPwrLoWarn'] * $scale_limit,
+            'limit_low'       => $entry['hh3cTransceiverRcvPwrLoAlarm'] * $scale_limit,
         ];
         $options['rename_rrd'] = "hh3c-transceiver-info-mib-hh3cTransceiverCurRXPower.$index";
-        discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+        discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid, $index, $descr, $scale, $value, array_merge($options, $limits));
     }
 }
 

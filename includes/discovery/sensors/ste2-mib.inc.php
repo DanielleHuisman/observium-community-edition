@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -65,7 +65,8 @@ foreach ($oids as $index => $entry) {
 
     if ($entry['sensState'] !== 'invalid' && $sensor_type !== 'status') {
         //discover_sensor($sensor_type, $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
-        discover_sensor_ng($device, $sensor_type, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $sensor_type, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
+        continue;
     }
 
     $oid_name = 'sensState';
@@ -73,7 +74,6 @@ foreach ($oids as $index => $entry) {
     $type     = 'ste2-SensorState';
     $value    = $entry[$oid_name];
 
-    //discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, [ 'entPhysicalClass' => 'other' ]);
     discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, ['entPhysicalClass' => 'other']);
 }
 

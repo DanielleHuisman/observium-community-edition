@@ -1,0 +1,871 @@
+ADTRAN-TWAMP-REFLECTOR-MIB
+
+-- TITLE:     The ADTRAN MEF MIB
+-- PRODUCT:   Metro Ethernet Products
+-- VERSION:   1.0
+-- DATE:      1/29/08
+-- AUTHOR:    Matthew Tomlin
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN GENTWAMP-REFLECTOR MIB objects
+
+--
+-- This MIB contains items used to support RFC5357 TWAMP for the roles
+-- of both the TWAMP server and TWAMP session reflector.  The role of 
+-- session-sender is not supported in this MIB.  A pictorial representation
+-- of TWAMP roles (from RFC5357) is as follows:
+--
+--       +~~~~~~~~~~~~~~~~+                +~~~~~~~~~~~~~~~~~~~+
+--       | Session-Sender | <-TWAMP-Test-> | Session-Reflector |
+--       +~~~~~~~~~~~~~~~~+                +~~~~~~~~~~~~~~~~~~~+
+--         ^                                     ^
+--         |                                     |
+--         |                                     |
+--         |                                     |
+--         |  +~~~~~~~~~~~~~~~~+<----------------+
+--         |  |     Server     |
+--         |  +~~~~~~~~~~~~~~~~+
+--         |    ^
+--         |    |
+--         | TWAMP-Control
+--         |    |
+--         v    v
+--       +~~~~~~~~~~~~~~~~+
+--       | Control-Client |
+--       +~~~~~~~~~~~~~~~~+
+
+-- HISTORY:
+-- 01/29/08 met STATUS: PRELIMINARY.
+-- 04/23/08 kle Got rid of tables in favor of just scalars.  Also, changed Counter32s to
+--              Gauge32s.
+-- 06/5/08 kle  Got rid of syntax error in imports statement.  Changed access of
+--              adTWAMPReflectorApplClearCounters from write-only to read-write.
+--              The adTWAMPReflectorStatsGroupRev1 had
+--              adTWAMPReflectorStatsSessionsOpened duplicated 3 times.  Instead,
+--              these 3 duplicates should have been the following:
+--                  adTWAMPReflectorStatsSessionsClosed
+--                  adTWAMPReflectorStatsSessionsRejected,
+--                  adTWAMPReflectorStatsSessionsActive
+--
+-- 11/9/08 kle  Add adTWAMPReflectorCtrlTimeout and adTWAMPReflectorTestTimeout.
+--              Added adTWAMPReflectorCtrlEnable to
+--              adTWAMPReflectorCtrlGroupRev1.  Changed the range on
+--              adTWAMPReflectorCtrlTCPport from (1-65534) to (1-65535).
+-- 11/11/08 jlb Changed adTWAMPReflectorControlTimeout back to adTWAMPReflectorCtrlMaxSessions as you cannot rename an OID
+--              in a released MIB.
+-- 07/09/09 jlb Added adTWAMPReflectorTestUDPportRange.
+-- 04/22/10 kle Added adTWAMPReflectorStatsTestSessionsOpened,
+--                    adTWAMPReflectorStatsTestSessionsClosed,
+--                    adTWAMPReflectorStatsTestSessionsRejected,
+--                    adTWAMPReflectorStatsTestSessionsActive
+-- 07/06/10 kle Added adTWAMPVerboseServerStatsTable,
+--                    adTWAMPVerboseReflectorStatsTable,
+--                    adTWAMPAssociationTable
+-- 07/07/10 kle Added adTWAMPVerboseServerStatsServTmoStatus,
+--                    adTWAMPVerboseReflectorStatsTestTmoStatus
+
+-- ******************************************************************************************
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE,
+    MODULE-IDENTITY,
+    TimeTicks,
+    IpAddress,
+    Integer32,
+    Gauge32,
+    Unsigned32,
+    Counter64
+        FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP
+        FROM SNMPv2-CONF
+
+    DisplayString,
+    RowStatus,
+    TruthValue,
+    DateAndTime,
+    TEXTUAL-CONVENTION
+    	FROM SNMPv2-TC
+
+    adGenTWAMPReflector,
+    adTWAMPReflectorID
+    	FROM ADTRAN-SHARED-EOCU-MIB
+
+    InterfaceIndex,
+   	ifIndex,
+   	OwnerString
+      	FROM IF-MIB
+
+        adShared
+     	FROM ADTRAN-MIB
+    ;
+
+
+--==================================================================================================================
+adtranTwampReflectorMib MODULE-IDENTITY
+  LAST-UPDATED "200801290000Z"
+  ORGANIZATION "Adtran, Inc.
+                http://www.adtran.com"
+  CONTACT-INFO
+       "CND Tech Support
+       Postal: ADTRAN, Inc.
+               901 Explorer Blvd.
+               Huntsville, AL  35806
+       Tel:    +1 800 726-8663
+       Fax:    +1 256 963 6217
+       E-mail: support@adtran.com"
+  DESCRIPTION
+     "This MIB defines the objects for Adtran's Two-way Active Measurement
+     Protocol Responder implementation."
+
+  REVISION "200801290000Z"
+  DESCRIPTION
+        "Preliminary Version 0.1"
+  ::= { adTWAMPReflectorID 1}
+
+    adTWAMPReflectorObjects       	OBJECT IDENTIFIER ::= { adGenTWAMPReflector 1 }
+  	adTWAMPReflectorAppl   			OBJECT IDENTIFIER ::= { adTWAMPReflectorObjects 1 }
+	adTWAMPReflectorCtrl   			OBJECT IDENTIFIER ::= { adTWAMPReflectorObjects 2 }
+	adTWAMPReflectorStats   		OBJECT IDENTIFIER ::= { adTWAMPReflectorObjects 3 }
+	adTWAMPReflectorLookup   		OBJECT IDENTIFIER ::= { adTWAMPReflectorObjects 4 }
+
+	adTWAMPReflectorMibConformance  OBJECT IDENTIFIER ::= { adGenTWAMPReflector 2 }
+	adTWAMPReflectorMibGroups       OBJECT IDENTIFIER ::= { adTWAMPReflectorMibConformance 1 }
+
+-- ========================================================================
+
+-- ###########################################################################
+-- ###########################################################################
+-- A P P L I C A T I O N   G R O U P
+-- ###########################################################################
+-- ###########################################################################
+
+adTWAMPReflectorApplClearCounters OBJECT-TYPE
+    SYNTAX  INTEGER {
+    	clearCounters(1)
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Clear the Two-way Active Measurement Protocol (TWAMP) statistics
+         for ALL TWAMP servers and session-reflectors.  
+         A read will always return a 1."
+    ::= { adTWAMPReflectorAppl 1 }
+
+
+
+-- ###########################################################################
+-- ###########################################################################
+-- C O N T R O L   G R O U P
+-- ###########################################################################
+-- ###########################################################################
+
+adTWAMPReflectorCtrlEnable OBJECT-TYPE
+    SYNTAX  INTEGER {
+    	disable(1),
+    	enable(2)
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Enable or disable device as a Two-way Active Measurement Protocol (TWAMP)
+         server and session-reflector."
+    ::= { adTWAMPReflectorCtrl 1 }
+
+
+adTWAMPReflectorCtrlTCPport OBJECT-TYPE
+    SYNTAX Integer32(1..65535)
+    UNITS "octets"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Specify the TCP destination port that is allowed for use
+         by the TWAMP session-sender for communication to the TWAMP
+         server.  Only one destination port can be configured for 
+         communications with the TWAMP server."
+    ::= { adTWAMPReflectorCtrl 2 }
+
+adTWAMPReflectorCtrlMaxSessions OBJECT-TYPE
+    SYNTAX Integer32(1..10)
+    UNITS "octets"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Specify the maximum number of simultaneous TWAMP-Control
+         connections that the TWAMP server will allow."
+      ::= { adTWAMPReflectorCtrl 3 }
+
+adTWAMPReflectorCtrlTimeout OBJECT-TYPE
+    SYNTAX Integer32(1..65535)
+    UNITS "octets"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Specify the TWAMP server's control connection timeout (SERVWAIT) 
+         for all TWAMP-Control sessions established on the TWAMP server."
+      ::= { adTWAMPReflectorCtrl 4 }
+
+adTWAMPReflectorCtrlTestTimeout OBJECT-TYPE
+    SYNTAX Integer32(1..65535)
+    UNITS "octets"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Specify the test connection timeout (REFWAIT) for all
+         TWAMP-Test session reflectors."
+      ::= { adTWAMPReflectorCtrl 5 }
+
+adTWAMPReflectorTestUDPportRange OBJECT-TYPE
+    SYNTAX OCTET STRING
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Specify the destination UDP port range that is allowed
+         for TWAMP test-session usage on any TWAMP reflector.
+
+		The first two octets are the minimum value.
+  		The second two octets are the maximum value.
+  		If only two octets are used in the set, the single value
+    	will be treated as both the minimum and maximum value.
+
+        The valid range for the minimum and maximum values are
+        1024-65535.  The minimum value must be less than or equal
+  		to the maximum value.
+
+        The default values are:
+            Minimum = 1024 (0x0400)
+            Maximum = 65535 (0xFFFF)
+
+        Example:
+	      	Min = 0x0400 Max = 0xFFFF
+            Value = 04 00 FF FF"
+    ::= { adTWAMPReflectorCtrl 6 }
+
+
+
+-- ###########################################################################
+-- ###########################################################################
+-- S T A T I S T I C S   G R O U P
+-- ###########################################################################
+-- ###########################################################################
+
+adTWAMPReflectorStatsRxTestPkts OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP Test-session packets received.
+         This count is a summation of all packets received on any 
+         session-reflector established since powerup or since the
+         last clearing of these counts -
+         (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 1 }
+
+adTWAMPReflectorStatsTxTestPkts OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP Test-session packets reflected.
+         This count is a summation of all packets reflected by any 
+         session-reflector established since powerup or since the
+         last clearing of these counts -
+         (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 2 }
+
+adTWAMPReflectorStatsSessionsOpened OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP control-sessions that have been 
+         opened since powerup or since the last clearing of these
+         counts - (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 3 }
+
+adTWAMPReflectorStatsSessionsClosed OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP control-sessions that have been 
+         closed since powerup or since the last clearing of these
+         counts - (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 4 }
+
+adTWAMPReflectorStatsSessionsRejected OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP control-sessions that have been 
+         rejected since powerup or since the last clearing of these
+         counts - (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 5 }
+
+
+adTWAMPReflectorStatsSessionsActive OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP control-sessions that are currently 
+         active."
+    ::= { adTWAMPReflectorStats 6 }
+
+adTWAMPReflectorStatsTestSessionsOpened OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP test-sessions that have been
+         opened since powerup or since the last clearing of these
+         counts - (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 7 }
+
+adTWAMPReflectorStatsTestSessionsClosed OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP test-sessions that have been 
+         closed since powerup or since the last clearing of these
+         counts - (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 8 }
+
+adTWAMPReflectorStatsTestSessionsRejected OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP test-sessions that have been 
+         rejected since powerup or since the last clearing of these
+         counts - (e.g., via adTWAMPReflectorApplClearCounters)."
+    ::= { adTWAMPReflectorStats 9 }
+
+
+adTWAMPReflectorStatsTestSessionsActive OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A count of ALL the TWAMP test-sessions that are currently 
+         active."
+    ::= { adTWAMPReflectorStats 10 }
+
+    
+-- ###########################################################################
+-- V E R B O S E   S T A T I S T I C S   -   S E R V E R
+-- ###########################################################################
+
+adTWAMPVerboseServerStatsTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AdTWAMPVerboseServerStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+               "Twamp Verbose Server Statistics Table"
+    ::= { adTWAMPReflectorStats 11 }
+
+adTWAMPVerboseServerStatsEntry OBJECT-TYPE
+    SYNTAX  AdTWAMPVerboseServerStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+               "Table Entry"
+    INDEX   { adTWAMPClientIpAddress, 
+              adTWAMPClientTcpSourcePort }
+    ::= { adTWAMPVerboseServerStatsTable 1 }
+
+AdTWAMPVerboseServerStatsEntry ::=
+    SEQUENCE {  
+                adTWAMPClientIpAddress                     IpAddress,
+                adTWAMPClientTcpSourcePort                 Integer32,
+                adTWAMPClientTcpDestPort                   Integer32,
+				adTWAMPVerboseServerStatsState             INTEGER,
+				adTWAMPVerboseServerStatsRxTestPkts        Integer32,
+                adTWAMPVerboseServerStatsTxTestPkts        Integer32,
+                adTWAMPVerboseServerStatsAuthMode          INTEGER,
+                adTWAMPVerboseServerStatsServTmo           Integer32,
+                adTWAMPVerboseServerStatsServTmoRemaining  Integer32,
+                adTWAMPVerboseServerStatsServTmoStatus     INTEGER
+             }
+
+
+adTWAMPClientIpAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "IpAddress of TWAMP Control-Client which opened a 
+             TCP connection on the TWAMP server at the TCP port 
+             identified by adTWAMPClientTcpSourcePort."
+    ::= { adTWAMPVerboseServerStatsEntry 1 }
+
+adTWAMPClientTcpSourcePort OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The TCP source port used by the TWAMP control-client 
+             to communicate with the TWAMP server."
+    ::= { adTWAMPVerboseServerStatsEntry 2 }
+
+adTWAMPClientTcpDestPort OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The TCP destination port used by the TWAMP control-client 
+             to communicate with the TWAMP server"
+    ::= { adTWAMPVerboseServerStatsEntry 3 }
+
+adTWAMPVerboseServerStatsState OBJECT-TYPE
+    SYNTAX INTEGER {
+                     initialized(1),   
+                     opening(2),   
+					 setup(3),
+					 starting(4),
+					 active(5),
+                     registerSession(6),
+                     acceptSession(7),
+                     startSessions(8),
+                     startAck(9),
+                     stopSessions(10),
+                     stopAck(11),
+                     closed(12),
+                     reserved(13),
+                     unknown(14)
+                   }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "Status of the TWAMP server on the TWAMP-control
+             connection identified by adTWAMPClientIpAddress and
+             adTWAMPClientTcpSourcePort."
+    ::= { adTWAMPVerboseServerStatsEntry 4 }
+
+adTWAMPVerboseServerStatsRxTestPkts OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "A count of ALL the TWAMP Test-session packets received on TWAMP
+             reflectors spawned by the TWAMP-control connection identified
+             by adTWAMPClientIpAddress and adTWAMPClientTcpSourcePort."
+    ::= { adTWAMPVerboseServerStatsEntry 5 }
+    
+adTWAMPVerboseServerStatsTxTestPkts OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "A count of ALL the TWAMP Test-session packets transmitted on TWAMP
+             reflectors spawned by the TWAMP-control connection identified
+             by adTWAMPClientIpAddress and adTWAMPClientTcpSourcePort."
+    ::= { adTWAMPVerboseServerStatsEntry 6 }
+    
+adTWAMPVerboseServerStatsAuthMode OBJECT-TYPE
+    SYNTAX INTEGER {
+                     unauthenticated(1),   
+					 authenticated(2),
+					 encrypted(3)
+                   }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "Authentication mode of the TWAMP-control connection identified
+             by adTWAMPClientIpAddress and adTWAMPClientTcpSourcePort and also
+             the authentication mode of the TWAMP reflectors spawned by this
+             TWAMP-control connection."
+
+    ::= { adTWAMPVerboseServerStatsEntry 7 }
+    
+adTWAMPVerboseServerStatsServTmo OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The provisioned control server timeout of the TWAMP-control 
+             connection identified by adTWAMPClientIpAddress and 
+             adTWAMPClientTcpSourcePort.  This is the SERVWAIT timeout 
+             described in the TWAMP RFC5357 specification."
+
+    ::= { adTWAMPVerboseServerStatsEntry 8 }
+    
+adTWAMPVerboseServerStatsServTmoRemaining OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The control server timeout remaining on the TWAMP-control
+             connection identified by adTWAMPClientIpAddress and 
+             adTWAMPClientTcpSourcePort.  This is time remaining on the
+             SERVWAIT timeout described in the TWAMP RFC5357 specification."
+    ::= { adTWAMPVerboseServerStatsEntry 9 }
+
+adTWAMPVerboseServerStatsServTmoStatus OBJECT-TYPE
+    SYNTAX INTEGER {
+                     active(1),   
+					 suspendedForActiveTestSession(2),
+					 serverClosurePending(3)
+                   }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The control server timeout status on the TWAMP-control
+             connection identified by adTWAMPClientIpAddress and 
+             adTWAMPClientTcpSourcePort.  
+
+             A status of active indicates that the server timeout 
+             functionality is active.  
+
+             A status of suspendedForActiveTestSession indicates that the
+             server timeout functionality has been currently suspended
+             until the active test sessions associated with this server
+             have been stopped or have timed out.  
+
+             A status of serverClosurePending indicates that the server
+             is in the process of being closed."
+    ::= { adTWAMPVerboseServerStatsEntry 10 }
+    
+
+-- ###########################################################################
+-- V E R B O S E   S T A T I S T I C S   -   R E F L E C T O R
+-- ###########################################################################
+adTWAMPVerboseReflectorStatsTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AdTWAMPVerboseReflectorStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+               "Twamp Verbose Reflector Statistics Table"
+    ::= { adTWAMPReflectorStats 12 }
+
+adTWAMPVerboseReflectorStatsEntry OBJECT-TYPE
+    SYNTAX  AdTWAMPVerboseReflectorStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+               "Table Entry"
+    INDEX   { adTWAMPSenderIpAddress, 
+              adTWAMPSenderUdpDestPort }
+    ::= { adTWAMPVerboseReflectorStatsTable 1 }
+
+AdTWAMPVerboseReflectorStatsEntry ::=
+    SEQUENCE {  
+                adTWAMPSenderIpAddress                        IpAddress,
+                adTWAMPSenderUdpDestPort                      Integer32,
+                adTWAMPSenderUdpSourcePort                    Integer32,
+                adTWAMPAssociatedClientIpAddress              IpAddress,
+                adTWAMPAssociatedClientTcpSourcePort          Integer32,
+				adTWAMPVerboseReflectorStatsState             INTEGER,
+				adTWAMPVerboseReflectorStatsRxTestPkts        Integer32,
+                adTWAMPVerboseReflectorStatsTxTestPkts        Integer32,
+                adTWAMPVerboseReflectorStatsPaddingLength     Integer32,
+                adTWAMPVerboseReflectorStatsTypePDescriptor   Integer32,
+                adTWAMPVerboseReflectorStatsPacketTimeout     Integer32,
+                adTWAMPVerboseReflectorStatsTestTmo           Integer32,
+                adTWAMPVerboseReflectorStatsTestTmoRemaining  Integer32,
+                adTWAMPVerboseReflectorStatsTestTmoStatus     INTEGER
+             }
+
+
+
+adTWAMPSenderIpAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The IpAddress of the TWAMP Session-Sender which is currently
+             bound to adTWAMPSenderUdpDestPort and adTWAMPSenderUdpSourcePort
+             for communication to the TWAMP session-reflector."
+    ::= { adTWAMPVerboseReflectorStatsEntry 1 }
+
+adTWAMPSenderUdpDestPort OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The UDP destination port used by the TWAMP session-sender 
+             to communicate with the TWAMP session-reflector"
+    ::= { adTWAMPVerboseReflectorStatsEntry 2 }
+
+adTWAMPSenderUdpSourcePort OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The UDP source port used by the TWAMP session-sender 
+             to communicate with the TWAMP session-reflector"
+    ::= { adTWAMPVerboseReflectorStatsEntry 3 }
+
+adTWAMPAssociatedClientIpAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The IpAddress of the associated TWAMP Control-Client from which
+             the session-reflector was spawned.  A session-reflector is
+             spawned when the TWAMP server accepts the request-session message
+             from the control-client." 
+    ::= { adTWAMPVerboseReflectorStatsEntry 4 }
+
+adTWAMPAssociatedClientTcpSourcePort OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The TCP source port used by the associated TWAMP control-client
+             to communicate with the TWAMP server from which the
+             session-reflector was spawned.  A session-reflector is
+             spawned when the TWAMP server accepts the request-session message
+             from the control-client."
+    ::= { adTWAMPVerboseReflectorStatsEntry 5 }
+
+adTWAMPVerboseReflectorStatsState OBJECT-TYPE
+    SYNTAX INTEGER {
+                     initialized(1),   
+					 waitingToStart(2),
+					 inProgress(3),
+					 stopping(4),
+                     stopped(5),
+                     exception(6),
+                     unknown(7)   
+                   }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "Status of the TWAMP session-reflector."
+    ::= { adTWAMPVerboseReflectorStatsEntry 6 }
+
+adTWAMPVerboseReflectorStatsRxTestPkts OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "Test-session packets received on the TWAMP session-reflector."
+    ::= { adTWAMPVerboseReflectorStatsEntry 7 }
+    
+adTWAMPVerboseReflectorStatsTxTestPkts OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "Test-session packets transmitted by the TWAMP session-reflector."
+    ::= { adTWAMPVerboseReflectorStatsEntry 8 }
+
+
+adTWAMPVerboseReflectorStatsPaddingLength OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "Padding length of packets transmitted the TWAMP 
+             session-reflector."
+    ::= { adTWAMPVerboseReflectorStatsEntry 9 }
+
+adTWAMPVerboseReflectorStatsTypePDescriptor OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "Type P descriptor used by the TWAMP session-reflector
+             to populate the DSCP or PHB fields of the packets
+             transmitted by the session-reflector."
+    ::= { adTWAMPVerboseReflectorStatsEntry 10 }
+
+adTWAMPVerboseReflectorStatsPacketTimeout OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The packet timeout used by the TWAMP session-sender to 
+             mark packets as lost if a packet belonging to the test-session 
+             is not received from the session-reflector in the amount of
+             time indicated by the packet timeout."
+    ::= { adTWAMPVerboseReflectorStatsEntry 11 }
+
+adTWAMPVerboseReflectorStatsTestTmo OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The provisioned test reflector timeout of the TWAMP 
+             session-reflector.  This is the REFWAIT timeout described
+             in the TWAMP RFC5357 specification."
+    ::= { adTWAMPVerboseReflectorStatsEntry 12 }
+    
+adTWAMPVerboseReflectorStatsTestTmoRemaining OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The test reflector timeout remaining of the TWAMP 
+             session-reflector.  This is time remaining on the REFWAIT
+             timeout described in the TWAMP RFC5357 specification."
+    ::= { adTWAMPVerboseReflectorStatsEntry 13 }
+    
+adTWAMPVerboseReflectorStatsTestTmoStatus OBJECT-TYPE
+    SYNTAX INTEGER {
+                     active(1),   
+					 waitingOnPacketTimeout(2)
+                   }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The test reflector timeout status of the TWAMP 
+             session-reflector.    
+
+             A status of active indicates that the reflector timeout 
+             functionality is active.  
+
+             A status of waitingOnPacketTimeout indicates that the TWAMP
+             server has received the stop-sessions command from the TWAMP
+             control-client that spawned the test reflector.  The test 
+             reflector timeout functionality is no longer active.  However,
+             the test reflector is waiting for the packet timeout period to
+             expire before shutting down."
+    ::= { adTWAMPVerboseReflectorStatsEntry 14 }
+    
+
+
+-- ###########################################################################
+-- ###########################################################################
+-- L O O K U P   G R O U P
+-- ###########################################################################
+-- ###########################################################################
+
+adTWAMPAssociationTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AdTWAMPAssociationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+               "Provides association/lookup information between the
+                TWAMP server to currently existing session-reflectors.
+                More formally speaking, this table provides the association 
+                between existing TWAMP-control and TWAMP-test sessions.  A 
+                TWAMP-control session is uniquely identified by the client IP
+                address and client TCP source port used to communicate with 
+                the TWAMP server.  A TWAMP-test session is uniquely identified 
+                by the session-sender IP address and session-sender UDP 
+                destination port used to communicate with the session-reflector.
+                Because TWAMP server statistics for a particular TCP connection 
+                depend on the session-reflector/s that were spawned from the 
+                TWAMP server's particular TCP connection, this dependence 
+                information is made available through this table."
+    ::= { adTWAMPReflectorLookup 1 }
+
+adTWAMPAssociationEntry OBJECT-TYPE
+    SYNTAX  AdTWAMPAssociationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+               "Table Entry"
+    INDEX   { adTWAMPClientIpAddress, 
+              adTWAMPClientTcpSourcePort,
+              adTWAMPSenderIpAddress,
+              adTWAMPSenderUdpDestPort }
+    ::= { adTWAMPAssociationTable 1 }
+
+AdTWAMPAssociationEntry ::=
+    SEQUENCE {  
+				adTWAMPNumOfSpawnedReflectors             Integer32
+             }
+
+
+adTWAMPNumOfSpawnedReflectors OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION 
+            "The existing number of session-reflectors that were spawned
+             by the TWAMP-control session uniquely identified by the client IP
+             address and client TCP source port identified by 
+             adTWAMPClientIpAddress and adTWAMPClientTcpSourcePort."
+    ::= { adTWAMPAssociationEntry 1 }
+
+
+
+-- ###########################################################################
+-- ###########################################################################
+-- O B J E C T   G R O U P S
+-- ###########################################################################
+-- ###########################################################################
+adTWAMPReflectorApplGroupRev1 OBJECT-GROUP
+  OBJECTS {
+    adTWAMPReflectorApplClearCounters
+  }
+  STATUS current
+  DESCRIPTION
+    ""
+  ::= { adTWAMPReflectorMibGroups 1 }
+
+adTWAMPReflectorCtrlGroupRev1 OBJECT-GROUP
+  OBJECTS {
+    adTWAMPReflectorCtrlTCPport,
+    adTWAMPReflectorCtrlMaxSessions,
+    adTWAMPReflectorCtrlEnable,
+    adTWAMPReflectorCtrlTimeout,
+    adTWAMPReflectorCtrlTestTimeout
+    }
+  STATUS current
+  DESCRIPTION
+    ""
+  ::= { adTWAMPReflectorMibGroups 2 }
+
+adTWAMPReflectorStatsGroupRev1 OBJECT-GROUP
+  OBJECTS {
+    adTWAMPReflectorStatsRxTestPkts,
+    adTWAMPReflectorStatsTxTestPkts,
+    adTWAMPReflectorStatsSessionsOpened,
+    adTWAMPReflectorStatsSessionsClosed,
+    adTWAMPReflectorStatsSessionsRejected,
+    adTWAMPReflectorStatsSessionsActive,
+    adTWAMPReflectorStatsTestSessionsOpened,
+    adTWAMPReflectorStatsTestSessionsClosed,
+    adTWAMPReflectorStatsTestSessionsRejected,
+    adTWAMPReflectorStatsTestSessionsActive,
+    adTWAMPClientTcpDestPort,
+	adTWAMPVerboseServerStatsState,
+	adTWAMPVerboseServerStatsRxTestPkts,
+    adTWAMPVerboseServerStatsTxTestPkts,
+    adTWAMPVerboseServerStatsAuthMode,
+    adTWAMPVerboseServerStatsServTmo,
+    adTWAMPVerboseServerStatsServTmoRemaining,
+    adTWAMPVerboseServerStatsServTmoStatus,
+    adTWAMPSenderUdpSourcePort,
+    adTWAMPAssociatedClientIpAddress,
+    adTWAMPAssociatedClientTcpSourcePort,
+	adTWAMPVerboseReflectorStatsState,
+	adTWAMPVerboseReflectorStatsRxTestPkts,
+    adTWAMPVerboseReflectorStatsTxTestPkts,
+    adTWAMPVerboseReflectorStatsPaddingLength,
+    adTWAMPVerboseReflectorStatsTypePDescriptor,
+    adTWAMPVerboseReflectorStatsPacketTimeout,
+    adTWAMPVerboseReflectorStatsTestTmo,
+    adTWAMPVerboseReflectorStatsTestTmoRemaining,
+    adTWAMPVerboseReflectorStatsTestTmoStatus
+  }
+  STATUS current
+  DESCRIPTION
+    ""
+  ::= { adTWAMPReflectorMibGroups 3 }
+
+adTWAMPReflectorLookupGroupRev1 OBJECT-GROUP
+  OBJECTS {
+    adTWAMPNumOfSpawnedReflectors
+  }
+  STATUS current
+  DESCRIPTION
+    ""
+  ::= { adTWAMPReflectorMibGroups 4 }
+
+
+
+  END
+
+
+
+

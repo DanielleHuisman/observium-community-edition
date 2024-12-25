@@ -1,0 +1,447 @@
+DNOS-NTP-MIB DEFINITIONS ::= BEGIN
+    
+-- Broadcom FastPath NTP MIB
+-- Copyright 2021 Broadcom.
+-- This SNMP Management Information Specification
+-- embodies Broadcom's confidential and proprietary
+-- intellectual property. Broadcom retains all title
+-- and ownership in the Specification including any revisions.
+   
+-- This Specification is supplied "AS IS", Broadcom
+-- makes no warranty, either expressed or implied,
+-- as to the use, operation, condition, or performance of the
+-- Specification.
+    
+IMPORTS
+   MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, Counter32, Gauge32
+                                                       FROM SNMPv2-SMI
+   TEXTUAL-CONVENTION, TruthValue, RowStatus, DateAndTime          FROM SNMPv2-TC
+   MODULE-COMPLIANCE, OBJECT-GROUP                     FROM SNMPv2-CONF
+   InetAddressType, InetAddress, InetPortNumber        FROM INET-ADDRESS-MIB
+   dnOS                                            FROM DELL-REF-MIB
+   InterfaceIndexOrZero                                FROM IF-MIB
+   DisplayString                                       FROM RFC1213-MIB;
+    
+agentNtpMIB MODULE-IDENTITY
+    LAST-UPDATED "202112060000Z" -- 06 Dec 2021 12:00:00 GMT
+    ORGANIZATION "Dell"
+    CONTACT-INFO ""
+    
+    DESCRIPTION
+        "This MIB module defines a portion of the SNMP MIB under
+         the Dell enterprise OID pertaining to
+         NTP client configuration and statistical collection."
+    
+      -- Revision history.
+    REVISION
+          "202112060000Z" -- 06 Dec 2021 12:00:00 GMT
+    DESCRIPTION 
+        "Initial version of this MIB module."
+    ::= { dnOS 168 }
+    
+    -- -------------------------------------------------------------
+    -- MIB Objects
+    -- -------------------------------------------------------------
+    
+    agentNtpObjects   OBJECT IDENTIFIER ::= { agentNtpMIB 1 }
+    
+    agentNtpConfigGroup   OBJECT IDENTIFIER  ::= { agentNtpObjects 1 }
+    
+    -- -------------------------------------------------------------
+    -- NTP Configuration Group
+    -- -------------------------------------------------------------
+    agentNtpAuthenticationMode OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The NTP authentication mode that this device supports.
+    		     The value true(1) indicates that message authentication
+    		     is supported for NTP communication."
+        DEFVAL { false }
+        ::= { agentNtpConfigGroup 1 }
+    
+    agentNtpBroadcastDelay OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..999999)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The estimated round-trip delay in microseconds between an
+    		     NTP agent operating in broadcast(3) mode, as specified by
+             agentNtpMode and an NTP broadcast server."
+        DEFVAL { 3000 }
+        ::= { agentNtpConfigGroup 2 }
+    
+    agentNtpBroadcastClientMode OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    enable(1),
+                    disable(2)
+    	              }
+    	  MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This command is used to enable/disable the broadcast client mode."
+        DEFVAL { disable }
+        ::= { agentNtpConfigGroup 3 }
+    
+    agentNtpSourceInterface OBJECT-TYPE
+        SYNTAX      InterfaceIndexOrZero
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "A source-interface selection on an Interface Index (like vlan based
+             routing interface, port based routing interface, loopback interface,
+             tunnel interface). A non-zero value indicates ifIndex for the
+             corresponding interface entry in the ifTable is selected.
+             A zero value indicates the source-interface un-selection."
+        ::= { agentNtpConfigGroup 4 }
+    
+    agentNtpServicePortSrcInterface OBJECT-TYPE
+        SYNTAX  INTEGER {
+                servicePortEnable(1),
+                servicePortDisable(2)
+                }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "To select Service Port as a source-interface."
+        ::= { agentNtpConfigGroup 5 }
+    
+    agentNtpVrfName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(0..15))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "A textual string containing the name of a VRF Instance.
+             This specifies the VRF Instance used for the NTP servers."
+        ::= { agentNtpConfigGroup 6 }
+    
+-- -------------------------------------------------------------
+--  NTP Authentication Keys Table
+-- -------------------------------------------------------------
+    agentNtpAuthKeyTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AgentNtpAuthKeyEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table containing configuration of Authentication Keys
+    		     for NTP.  Each authentication key entry is represented
+    		     by single conceptual row in this table."
+        ::= { agentNtpConfigGroup 7 }
+    
+    agentNtpAuthKeyEntry OBJECT-TYPE
+        SYNTAX      AgentNtpAuthKeyEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Information for a particular NTP authentication key."
+        INDEX { agentNtpAuthKeyIndex }
+        ::= { agentNtpAuthKeyTable 1 }
+    
+    AgentNtpAuthKeyEntry ::=
+        SEQUENCE {
+            agentNtpAuthKeyIndex
+                Unsigned32,
+            agentNtpAuthKeyNumber
+                Unsigned32,
+            agentNtpAuthKeyMessageAuthAlg
+                INTEGER,
+            agentNtpAuthKeyEncryptionStatus
+                TruthValue,
+            agentNtpAuthKeyName
+    		        DisplayString,
+            agentNtpAuthKeyTrustedStatus
+    		        TruthValue,
+            agentNtpAuthKeyRowStatus
+                RowStatus
+        }
+    
+    agentNtpAuthKeyIndex OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..5)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This object uniquely identifies the entry in the table."
+        ::= { agentNtpAuthKeyEntry 1 }
+    
+    agentNtpAuthKeyNumber OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..65535)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Authentication key number."
+        ::= { agentNtpAuthKeyEntry 2 }
+    
+    agentNtpAuthKeyMessageAuthAlg OBJECT-TYPE
+        SYNTAX      INTEGER {
+                     md5(1),
+                     sha1(2),
+                     sha2(3)
+    	              }  
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Message authentication algorithm used while using this key."
+        DEFVAL { md5 }
+        ::= { agentNtpAuthKeyEntry 3 }
+    
+    agentNtpAuthKeyEncryptionStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The NTP authentication key encryption status.
+            The value true(1) indicates that key is already encrypted.
+            Get of this object always returns true.
+            Encryption status can set with agentNtpAuthKeyName."
+        DEFVAL { false }
+        ::= { agentNtpAuthKeyEntry 4 }
+    
+    agentNtpAuthKeyName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(0..128))
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "A textual string containing the key.
+             Get of this object always returns the key in the encrypted format.
+             Key name can set with agentNtpAuthKeyEncryptionStatus.
+             if key name is in plain text, length of key name must not grater than 15.
+             if key name is encrypted, length of key name upto 128."
+        ::= { agentNtpAuthKeyEntry 5 }
+    
+    agentNtpAuthKeyTrustedStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The NTP authentication key trusted status.
+    		     The value true(1) indicates that key is trusted."
+        DEFVAL { false }
+        ::= { agentNtpAuthKeyEntry 6 }
+    
+    agentNtpAuthKeyRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The row status of this conceptual row in the table.
+    
+             active
+                - The authentication key is available for use in NTP operations.
+                  Other writable leaves in this table can not be modified while
+                  the row is in the active state.
+
+            notReady 
+                -  Indicates that the conceptual row exists in the agent, 
+                   one or more required columns in the row are not instantiated.
+    
+             createAndGo
+                - This is the preferred mechanism for creating conceptual
+                  rows in this table.  This value can never be read as
+                  the row will always transition immediately to active.
+    
+             destroy
+                - This will remove the conceptual row from the table and
+                  make it unavailable for NTP operations. "
+    
+        ::= { agentNtpAuthKeyEntry 7 }
+    
+    -- -------------------------------------------------------------
+    -- NTP Server Table
+    -- -------------------------------------------------------------
+    agentNtpServerTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AgentNtpServerEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A table containing configuration and statistical
+             information for NTP servers.  Each server
+             entry is represented by single conceptual row in this
+             table."
+        ::= { agentNtpConfigGroup 8 }
+    
+    agentNtpServerEntry OBJECT-TYPE
+        SYNTAX      AgentNtpServerEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Information for a particular NTP server."
+        INDEX { agentNtpServerIndex }
+        ::= { agentNtpServerTable 1 }
+    
+    AgentNtpServerEntry ::=
+        SEQUENCE {
+            agentNtpServerIndex
+                Unsigned32,
+            agentNtpServerAddressType
+                InetAddressType,
+            agentNtpServerAddress
+                InetAddress,
+            agentNtpServerVersion
+                INTEGER,
+            agentNtpServerAuthKeyNumber
+                Unsigned32,
+            agentNtpServerMinPollInterval
+                Unsigned32,
+            agentNtpServerMaxPollInterval
+                Unsigned32,
+            agentNtpServerPreferStatus
+    		        TruthValue,
+            agentNtpServerBurstStatus
+    		        TruthValue,
+            agentNtpServerIburstStatus
+    		        TruthValue,
+            agentNtpServerRowStatus
+                RowStatus
+        }
+    
+    agentNtpServerIndex OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..8)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This object uniquely identifies the entry in the table."
+        ::= { agentNtpServerEntry 1 }
+    
+    agentNtpServerAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "This object specifies how agentNtpServerAddr is
+             encoded.  Support for all possible enumerations defined by
+             InetAddressType is NOT REQUIRED. Address type can be set with agentNtpServerAddress."
+        ::= { agentNtpServerEntry 2 }
+    
+    agentNtpServerAddress OBJECT-TYPE
+        SYNTAX      InetAddress (SIZE(1..64))
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The encoded internet address of an NTP server.
+             Unicast NTP requests will be sent to this address.  If this
+             address is a DNS hostname, then that hostname SHOULD be
+             resolved into an IP address each time a NTP request is sent
+             to it. Server address can be set with agentNtpServerAddressType."
+        ::= { agentNtpServerEntry 3 }
+    
+    agentNtpServerVersion OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    version1(1),
+                    version2(2),
+                    version3(3),
+                    version4(4)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The NTP version this server supports.  This is the value
+             that will be encoded in NTP polls when operating in unicast(1)
+             administrative mode."
+        REFERENCE
+            "RFC 5095 - Network Time Protocol (NTP) Version 4."
+        DEFVAL { version4 }
+    	::= { agentNtpServerEntry 4 }
+    
+    agentNtpServerAuthKeyNumber OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..65535)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "NTP server authentication key number."
+        ::= { agentNtpServerEntry 5 }
+    
+    agentNtpServerMinPollInterval OBJECT-TYPE
+        SYNTAX      Unsigned32 (6..10)
+        UNITS       "seconds"
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The minimum number of seconds between successive NTP polls
+             of the server in seconds as a power of two.  This
+             polling interval is used for NTP requests in
+             unicast(1) or broadcast(2) administrative mode."
+        DEFVAL { 6 }
+        ::= { agentNtpServerEntry 6 }
+    
+    agentNtpServerMaxPollInterval OBJECT-TYPE
+        SYNTAX      Unsigned32 (6..10)
+        UNITS       "seconds"
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The maximum number of seconds between successive NTP polls
+             of the server in seconds as a power of two.  This
+             polling interval is used for NTP requests in
+             unicast(1) or broadcast(2) administrative mode."
+        DEFVAL { 10 }
+        ::= { agentNtpServerEntry 7 }
+    
+    agentNtpServerPreferStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The NTP server preference status.
+    		     The value true(1) indicates that server is preferred."
+        DEFVAL { false }
+        ::= { agentNtpServerEntry 8 }
+    
+    agentNtpServerBurstStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The NTP server burst status.
+    		     The value true(1) indicates that burst should be configured."
+        DEFVAL { false }
+        ::= { agentNtpServerEntry 9 }
+    
+    agentNtpServerIburstStatus OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The NTP server iburst status.
+    		     The value true(1) indicates that iburst should be configured."
+        DEFVAL { false }
+        ::= { agentNtpServerEntry 10 }
+    
+    agentNtpServerRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The row status of this conceptual row in the table.
+            active
+                - The server is available for use in NTP client operations.
+                  Other writable leaves in this table MAY be modified while
+                  the row is in the active state. If status is 'active'
+                  columns in the row can not be modified.
+
+            notInService 
+                -  Indicates that the conceptual row exists in the agent,
+                   but is unavailable for use by the managed device, 'notInService'
+                   has no implication regarding the internal consistency of
+                   the row, availability of resources, or consistency with
+                   the current state of the managed device. To modify columns
+                   of the existing row, status needs to set as 'notInService'. 
+
+            notReady 
+                -  Indicates that the conceptual row exists in the agent,
+                   but is missing information necessary in order to be available
+                   for use by the managed device. One or more required columns
+                   in the row are not instantiated.
+                  
+            createAndGo
+                - This is the preferred mechanism for creating conceptual
+                  rows in this table.  This value can never be read as
+                  the row will always transition immediately to active.
+    
+            destroy
+                - This will remove the conceptual row from the table and
+                  make it unavailable for NTP client operations. "
+    
+        ::= { agentNtpServerEntry 11 }
+    
+END

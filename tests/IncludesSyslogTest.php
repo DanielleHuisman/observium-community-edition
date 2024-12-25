@@ -7,227 +7,243 @@ include(__DIR__ . '../html/includes/functions.inc.php');
 
 class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
 
-  /**
-  * @dataProvider providerProcessSyslogLine
-  * @group process
-  */
-  public function testProcessSyslogLine($line, $result) {
-    // Create fake device array from syslog line
-    $os = explode('||', $line, 2)[0];
-    $device = array('hostname' => $os, 'device_id' => crc32($os), 'os' => $os);
-    if (isset($GLOBALS['config']['os'][$os]['os_group'])) {
-      $device['os_group'] = $GLOBALS['config']['os'][$os]['os_group'];
+    /**
+    * @dataProvider providerProcessSyslogLine
+    * @group process
+    */
+    public function testProcessSyslogLine($line, $result) {
+        // Create fake device array from syslog line
+        $os = explode('||', $line, 2)[0];
+        $device = array('hostname' => $os, 'device_id' => crc32($os), 'os' => $os);
+        if (isset($GLOBALS['config']['os'][$os]['os_group'])) {
+            $device['os_group'] = $GLOBALS['config']['os'][$os]['os_group'];
+        }
+        //var_dump($GLOBALS['config']['os'][$os]);
+
+        // Override device cache for syslog processing:
+        $host = $device['hostname'];
+        $dev_cache = [];
+        $dev_cache[$host]['lastchecked'] = time();
+        $dev_cache[$host]['device_id']  = $device['device_id'];
+        $dev_cache[$host]['os']         = $device['os'];
+        if (isset($device['os_group'])) {
+            $dev_cache[$host]['os_group'] = $device['os_group'];
+        }
+        $GLOBALS['dev_cache'] = $dev_cache;
+
+        // Override config syslog filter
+        $GLOBALS['config']['syslog']['filter'] = [ 'TEST', 'derp' ];
+
+        if ($tmp = process_syslog_line($line)) {
+            // Just custom resort array
+            $entry = [];
+            foreach ([ 'facility', 'priority', 'level', 'tag', // [ 'host', 'facility', 'priority', 'level', 'tag',
+                       'program', 'msg', 'msg_orig' ] as $key) {
+                $entry[$key] = $tmp[$key];
+            }
+        } else {
+            $entry = $tmp; // FALSE positive
+        }
+
+        $this->assertSame($result, $entry);
     }
-    //var_dump($GLOBALS['config']['os'][$os]);
-
-    // Override device cache for syslog processing:
-    $host = $device['hostname'];
-    $dev_cache = [];
-    $dev_cache[$host]['lastchecked'] = time();
-    $dev_cache[$host]['device_id']  = $device['device_id'];
-    $dev_cache[$host]['os']         = $device['os'];
-    if (isset($device['os_group'])) {
-      $dev_cache[$host]['os_group'] = $device['os_group'];
-    }
-    $GLOBALS['dev_cache'] = $dev_cache;
-
-    // Override config syslog filter
-    $GLOBALS['config']['syslog']['filter'] = [ 'TEST', 'derp' ];
-
-    if ($tmp = process_syslog_line($line)) {
-      // Just custom resort array
-      $entry = [];
-      foreach ([ 'facility', 'priority', 'level', 'tag', // [ 'host', 'facility', 'priority', 'level', 'tag',
-                 'program', 'msg', 'msg_orig' ] as $key) {
-        $entry[$key] = $tmp[$key];
-      }
-    } else {
-      $entry = $tmp; // FALSE positive
-    }
-
-    $this->assertSame($result, $entry);
-  }
 
 
-  public function providerProcessSyslogLine()
-  {
-    $result = [];
-    // Linux/Unix
-    $result[] = array('linux||9||6||6||CRON[3196]:||2018-03-13 06:25:01|| (root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))||CRON',
-                                     array('facility'  => 'cron', 'priority' => '6', 'level' => '6',
-                                           'tag'       => 'CRON[3196]', 'program' => 'CRON',
-                                           'msg'       => '(root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))',
-                                           'msg_orig'  => '(root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))',
-                                           ));
-    $result[] = array('linux||4||6||6||sshd[10809]:||2018-03-19 15:28:47|| message repeated 2 times: [ Failed password for root from 221.194.44.211 port 49810 ssh2]||sshd',
-                                     array('facility'  => 'auth', 'priority' => '6', 'level' => '6',
-                                           'tag'       => 'sshd[10809]', 'program' => 'SSHD',
-                                           'msg'       => 'Failed password for root from 221.194.44.211 port 49810 ssh2',
-                                           'msg_orig'  => 'message repeated 2 times: [ Failed password for root from 221.194.44.211 port 49810 ssh2]',
-                                           ));
-    $result[] = array('linux||5||6||6||rsyslogd0:||2018-03-14 06:28:18|| action \'action 18\' resumed (module \'builtin:ompipe\') [try http://www.rsyslog.com/e/0 ]||rsyslogd0',
-                                     array('facility'  => 'syslog', 'priority' => '6', 'level' => '6',
-                                           'tag'       => 'rsyslogd0', 'program' => 'RSYSLOGD',
-                                           'msg'       => 'action \'action 18\' resumed (module \'builtin:ompipe\') [try http://www.rsyslog.com/e/0 ]',
-                                           'msg_orig'  => 'action \'action 18\' resumed (module \'builtin:ompipe\') [try http://www.rsyslog.com/e/0 ]',
-                                           ));
-    $result[] = array('linux||5||4||4||rsyslogd-2007:||2018-03-14 06:55:50|| action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]||rsyslogd-2007',
-                                     array('facility'  => 'syslog', 'priority' => '4', 'level' => '4',
-                                           'tag'       => 'rsyslogd-2007', 'program' => 'RSYSLOGD',
-                                           'msg'       => 'action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]',
-                                           'msg_orig'  => 'action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]',
-                                           ));
-    $result[] = [ 'linux||9||5||5||run-parts(/etc/cron.hourly)[2654||2021-11-26 08:01:01|| starting 0anacron||run-parts(',
-                  [ 'facility'  => 'cron', 'priority' => '5', 'level' => '5',
-                    'tag'       => 'run-parts,/etc/cron.hourly', 'program' => '0ANACRON',
-                    'msg'       => 'starting 0anacron',
-                    'msg_orig'  => 'starting 0anacron', ]
-    ];
-    $result[] = [ 'linux||3||6||6||fail2ban-client[20598]:||2018-06-07 14:36:03|| 2018-06-07 14:36:03,699 fail2ban.server         [20601]: INFO    Starting Fail2ban v0.9.3||fail2ban-client',
-                  [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
-                    'tag'       => 'client,INFO', 'program' => 'FAIL2BAN',
-                    'msg'       => 'Starting Fail2ban v0.9.3',
-                    'msg_orig'  => '2018-06-07 14:36:03,699 fail2ban.server         [20601]: INFO    Starting Fail2ban v0.9.3', ]
-    ];
-    $result[] = [ 'linux||3||6||6||fail2ban-server:||2021-11-12 11:51:25|| Server ready||fail2ban-server',
-                  [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
-                    'tag'       => 'server', 'program' => 'FAIL2BAN',
-                    'msg'       => 'Server ready',
-                    'msg_orig'  => 'Server ready', ]
-    ];
-    $result[] = [ 'linux||3||5||5||fail2ban.actions[4314]:||2021-11-26 11:15:57|| NOTICE [sshd] Unban 116.98.170.132||fail2ban.actions',
-                  [ 'facility'  => 'daemon', 'priority' => '5', 'level' => '5',
-                    'tag'       => 'actions,NOTICE', 'program' => 'FAIL2BAN',
-                    'msg'       => '[sshd] Unban 116.98.170.132',
-                    'msg_orig'  => 'NOTICE [sshd] Unban 116.98.170.132', ]
-    ];
-    // from group definition
-    $result[] = array('linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root||sshd',
-                                     array('facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'sshd[9071]', 'program' => 'SSHD',
-                                           'msg'       => 'PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root',
-                                           'msg_orig'  => 'PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root',
-                                           ));
-    $result[] = array('linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root||sshd',
-                                     array('facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'sshd[9071],pam_unix,auth', 'program' => 'SSHD',
-                                           'msg'       => 'pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root',
-                                           'msg_orig'  => 'pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root',
-                                           ));
-    $result[] = array('linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| pam_krb5[sshd:auth]: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231||sshd',
-                                     array('facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'sshd[9071],pam_krb5,auth', 'program' => 'SSHD',
-                                           'msg'       => 'pam_krb5[sshd:auth]: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231',
-                                           'msg_orig'  => 'pam_krb5[sshd:auth]: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231',
-                                           ));
-    $result[] = array('linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| pam_krb5: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231||sshd',
-                                     array('facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'sshd[9071],pam_krb5', 'program' => 'SSHD',
-                                           'msg'       => 'pam_krb5: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231',
-                                           'msg_orig'  => 'pam_krb5: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231',
-                                           ));
+    public function providerProcessSyslogLine() {
+      
+        $result = [];
+      
+        // Linux/Unix
+        $result[] = [ 'linux||9||6||6||CRON[3196]:||2018-03-13 06:25:01|| (root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))||CRON',
+                      [ 'facility'  => 'cron', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'CRON[3196]', 'program' => 'CRON',
+                        'msg'       => '(root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))',
+                        'msg_orig'  => '(root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))', ]
+        ];
+        $result[] = [ 'linux||4||6||6||sshd[10809]:||2018-03-19 15:28:47|| message repeated 2 times: [ Failed password for root from 221.194.44.211 port 49810 ssh2]||sshd',
+                      [ 'facility'  => 'auth', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'sshd[10809]', 'program' => 'SSHD',
+                        'msg'       => 'Failed password for root from 221.194.44.211 port 49810 ssh2',
+                        'msg_orig'  => 'message repeated 2 times: [ Failed password for root from 221.194.44.211 port 49810 ssh2]', ]
+        ];
+        $result[] = [ 'linux||5||6||6||rsyslogd0:||2018-03-14 06:28:18|| action \'action 18\' resumed (module \'builtin:ompipe\') [try http://www.rsyslog.com/e/0 ]||rsyslogd0',
+                      [ 'facility'  => 'syslog', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'rsyslogd0', 'program' => 'RSYSLOGD',
+                        'msg'       => 'action \'action 18\' resumed (module \'builtin:ompipe\') [try http://www.rsyslog.com/e/0 ]',
+                        'msg_orig'  => 'action \'action 18\' resumed (module \'builtin:ompipe\') [try http://www.rsyslog.com/e/0 ]', ]
+        ];
+        $result[] = [ 'linux||5||4||4||rsyslogd-2007:||2018-03-14 06:55:50|| action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]||rsyslogd-2007',
+                      [ 'facility'  => 'syslog', 'priority' => '4', 'level' => '4',
+                        'tag'       => 'rsyslogd-2007', 'program' => 'RSYSLOGD',
+                        'msg'       => 'action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]',
+                        'msg_orig'  => 'action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]', ]
+        ];
+        $result[] = [ 'linux||9||5||5||run-parts(/etc/cron.hourly)[2654||2021-11-26 08:01:01|| starting 0anacron||run-parts(',
+                      [ 'facility'  => 'cron', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'run-parts,/etc/cron.hourly', 'program' => '0ANACRON',
+                        'msg'       => 'starting 0anacron',
+                        'msg_orig'  => 'starting 0anacron', ]
+        ];
+        $result[] = [ 'linux||3||6||6||fail2ban-client[20598]:||2018-06-07 14:36:03|| 2018-06-07 14:36:03,699 fail2ban.server         [20601]: INFO    Starting Fail2ban v0.9.3||fail2ban-client',
+                      [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'client,INFO', 'program' => 'FAIL2BAN',
+                        'msg'       => 'Starting Fail2ban v0.9.3',
+                        'msg_orig'  => '2018-06-07 14:36:03,699 fail2ban.server         [20601]: INFO    Starting Fail2ban v0.9.3', ]
+        ];
+        $result[] = [ 'linux||3||6||6||fail2ban-server:||2021-11-12 11:51:25|| Server ready||fail2ban-server',
+                      [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'server', 'program' => 'FAIL2BAN',
+                        'msg'       => 'Server ready',
+                        'msg_orig'  => 'Server ready', ]
+        ];
+        $result[] = [ 'linux||3||5||5||fail2ban.actions[4314]:||2021-11-26 11:15:57|| NOTICE [sshd] Unban 116.98.170.132||fail2ban.actions',
+                      [ 'facility'  => 'daemon', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'actions,NOTICE', 'program' => 'FAIL2BAN',
+                        'msg'       => '[sshd] Unban 116.98.170.132',
+                        'msg_orig'  => 'NOTICE [sshd] Unban 116.98.170.132', ]
+        ];
+        
+        // from group definition
+        $result[] = [ 'linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root||sshd',
+                      [ 'facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'sshd[9071]', 'program' => 'SSHD',
+                        'msg'       => 'PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root',
+                        'msg_orig'  => 'PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root', ]
+        ];
+        $result[] = [ 'linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root||sshd',
+                      [ 'facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'sshd[9071],pam_unix,auth', 'program' => 'SSHD',
+                        'msg'       => 'pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root',
+                        'msg_orig'  => 'pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root', ]
+        ];
+        $result[] = [ 'linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| pam_krb5[sshd:auth]: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231||sshd',
+                      [ 'facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'sshd[9071],pam_krb5,auth', 'program' => 'SSHD',
+                        'msg'       => 'pam_krb5[sshd:auth]: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231',
+                        'msg_orig'  => 'pam_krb5[sshd:auth]: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231', ]
+        ];
+        $result[] = [ 'linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| pam_krb5: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231||sshd',
+                      [ 'facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'sshd[9071],pam_krb5', 'program' => 'SSHD',
+                        'msg'       => 'pam_krb5: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231',
+                        'msg_orig'  => 'pam_krb5: authentication failure; logname=root uid=0 euid=0 tty=ssh ruser= rhost=123.213.132.231', ]
+        ];
+    
+        $result[] = [ 'freebsd||14||6||6||kernel:||2018-03-21 13:07:05|| Mar 21 13:07:05 somehost syslogd: exiting on signal 15||kernel',
+                      [ 'facility'  => 'console', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'kernel', 'program' => 'KERNEL',
+                        'msg'       => 'somehost syslogd: exiting on signal 15',
+                        'msg_orig'  => 'Mar 21 13:07:05 somehost syslogd: exiting on signal 15', ]
+        ];
+        $result[] = [ 'freebsd||9||6||6||/usr/sbin/cron[19422]:||2018-03-21 13:10:00|| (root) CMD (/usr/libexec/atrun)||',
+                      [ 'facility'  => 'cron', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'cron[19422]', 'program' => 'CRON',
+                        'msg'       => '(root) CMD (/usr/libexec/atrun)',
+                        'msg_orig'  => '(root) CMD (/usr/libexec/atrun)', ]
+        ];
+        $result[] = [ 'freebsd||3||6||6||transmission-daemon[56416]:||2018-03-21 14:53:11|| Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)     ||transmission-daemon',
+                      [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+                        'tag'       => 'transmission-daemon[56416],announcer.c', 'program' => 'TRANSMISSION-DAEMON',
+                        'msg'       => 'Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)',
+                        'msg_orig'  => 'Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)', ]
+        ];
+        $result[] = [ 'linux||3||5||5||dbus[523]:||2021-11-26 11:07:35|| [system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)||dbus',
+                      [ 'facility'  => 'daemon', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'dbus[523],system', 'program' => 'DBUS',
+                        'msg'       => '[system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)',
+                        'msg_orig'  => '[system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)', ]
+        ];
 
-    $result[] = array('freebsd||14||6||6||kernel:||2018-03-21 13:07:05|| Mar 21 13:07:05 somehost syslogd: exiting on signal 15||kernel',
-                                     array('facility'  => 'console', 'priority' => '6', 'level' => '6',
-                                           'tag'       => 'kernel', 'program' => 'KERNEL',
-                                           'msg'       => 'somehost syslogd: exiting on signal 15',
-                                           'msg_orig'  => 'Mar 21 13:07:05 somehost syslogd: exiting on signal 15',
-                                           ));
-    $result[] = array('freebsd||9||6||6||/usr/sbin/cron[19422]:||2018-03-21 13:10:00|| (root) CMD (/usr/libexec/atrun)||',
-                                     array('facility'  => 'cron', 'priority' => '6', 'level' => '6',
-                                           'tag'       => 'cron[19422]', 'program' => 'CRON',
-                                           'msg'       => '(root) CMD (/usr/libexec/atrun)',
-                                           'msg_orig'  => '(root) CMD (/usr/libexec/atrun)',
-                                           ));
-    $result[] = array('freebsd||3||6||6||transmission-daemon[56416]:||2018-03-21 14:53:11|| Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)     ||transmission-daemon',
-                                     array('facility'  => 'daemon', 'priority' => '6', 'level' => '6',
-                                           'tag'       => 'transmission-daemon[56416],announcer.c', 'program' => 'TRANSMISSION-DAEMON',
-                                           'msg'       => 'Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)',
-                                           'msg_orig'  => 'Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)',
-                                           ));
-    $result[] = [ 'linux||3||5||5||dbus[523]:||2021-11-26 11:07:35|| [system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)||dbus',
-                  [ 'facility'  => 'daemon', 'priority' => '5', 'level' => '5',
-                    'tag'       => 'dbus[523],system', 'program' => 'DBUS',
-                    'msg'       => '[system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)',
-                    'msg_orig'  => '[system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)', ]
-    ];
-    // Another repeated message
-    $result[] = array('freebsd||1||4||4||message||2018-03-21 14:50:37|| repeated 2 times||message',
-                                     FALSE);
+        // Another repeated message
+        $result[] = [ 'freebsd||1||4||4||message||2018-03-21 14:50:37|| repeated 2 times||message', FALSE ];
 
-    // Windows
-    $result[] = array('windows||3||3||3||Security-Auditing:||2018-03-17 15:53:43|| 4625: AUDIT_FAILURE An account failed to log on. Subject: Security ID: S-1-0-0 Account Name: - Account Domain: - Logon ID: 0x0 Logon Type: 3 Account For Which Logon Failed: Security ID: S-1-0-0 Account Name: ADMINISTRATOR Account Domain: Failure Information: Failure Reason: Unknown user name or bad password. Status: 0xc000006d Sub Status: 0xc000006a Process Information: Caller Process ID: 0x0 Caller Process Name: - Network Information: Workstation Name: Source Network Address: - Source Port: - Detailed Authentication Information: Logon Process: NtLmSsp Authentication Package: NTLM Transited Services: - Package Name (NTLM only): - Key Length: 0 This event is generated when a logon request fails. It is generated on the computer where access was attempted. The Subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe. The Logon Type field indicates the kind of logon that was requested. The most common types are 2 (interactive) and 3 (network). The Process Information fields indicate which account and process on the system requested the logon. The Network Information fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases. The authentication information fields provide detailed information about this specific logon request. - Transited services indicate which intermediate services have participated in this logon request. - Package name indicates which sub-protocol was used among the NTLM protocols. - Key length indicates the length of the generated session key. This will be 0 if no session key was requested.||Security-Auditing',
-                                     array('facility'  => 'daemon', 'priority' => '3', 'level' => '3',
-                                           'tag'       => 'Security-Auditing', 'program' => 'SECURITY-AUDITING',
-                                           'msg'       => '4625: AUDIT_FAILURE An account failed to log on. Subject: Security ID: S-1-0-0 Account Name: - Account Domain: - Logon ID: 0x0 Logon Type: 3 Account For Which Logon Failed: Security ID: S-1-0-0 Account Name: ADMINISTRATOR Account Domain: Failure Information: Failure Reason: Unknown user name or bad password. Status: 0xc000006d Sub Status: 0xc000006a Process Information: Caller Process ID: 0x0 Caller Process Name: - Network Information: Workstation Name: Source Network Address: - Source Port: - Detailed Authentication Information: Logon Process: NtLmSsp Authentication Package: NTLM Transited Services: - Package Name (NTLM only): - Key Length: 0 This event is generated when a logon request fails. It is generated on the computer where access was attempted. The Subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe. The Logon Type field indicates the kind of logon that was requested. The most common types are 2 (interactive) and 3 (network). The Process Information fields indicate which account and process on the system requested the logon. The Network Information fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases. The authentication information fields provide detailed information about this specific logon request. - Transited services indicate which intermediate services have participated in this logon request. - Package name indicates which sub-protocol was used among the NTLM protocols. - Key length indicates the length of the generated session key. This will be 0 if no session key was requested.',
-                                           'msg_orig'  => '4625: AUDIT_FAILURE An account failed to log on. Subject: Security ID: S-1-0-0 Account Name: - Account Domain: - Logon ID: 0x0 Logon Type: 3 Account For Which Logon Failed: Security ID: S-1-0-0 Account Name: ADMINISTRATOR Account Domain: Failure Information: Failure Reason: Unknown user name or bad password. Status: 0xc000006d Sub Status: 0xc000006a Process Information: Caller Process ID: 0x0 Caller Process Name: - Network Information: Workstation Name: Source Network Address: - Source Port: - Detailed Authentication Information: Logon Process: NtLmSsp Authentication Package: NTLM Transited Services: - Package Name (NTLM only): - Key Length: 0 This event is generated when a logon request fails. It is generated on the computer where access was attempted. The Subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe. The Logon Type field indicates the kind of logon that was requested. The most common types are 2 (interactive) and 3 (network). The Process Information fields indicate which account and process on the system requested the logon. The Network Information fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases. The authentication information fields provide detailed information about this specific logon request. - Transited services indicate which intermediate services have participated in this logon request. - Package name indicates which sub-protocol was used among the NTLM protocols. - Key length indicates the length of the generated session key. This will be 0 if no session key was requested.',
-                                           ));
+        // Windows
+        $result[] = [ 'windows||3||3||3||Security-Auditing:||2018-03-17 15:53:43|| 4625: AUDIT_FAILURE An account failed to log on. Subject: Security ID: S-1-0-0 Account Name: - Account Domain: - Logon ID: 0x0 Logon Type: 3 Account For Which Logon Failed: Security ID: S-1-0-0 Account Name: ADMINISTRATOR Account Domain: Failure Information: Failure Reason: Unknown user name or bad password. Status: 0xc000006d Sub Status: 0xc000006a Process Information: Caller Process ID: 0x0 Caller Process Name: - Network Information: Workstation Name: Source Network Address: - Source Port: - Detailed Authentication Information: Logon Process: NtLmSsp Authentication Package: NTLM Transited Services: - Package Name (NTLM only): - Key Length: 0 This event is generated when a logon request fails. It is generated on the computer where access was attempted. The Subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe. The Logon Type field indicates the kind of logon that was requested. The most common types are 2 (interactive) and 3 (network). The Process Information fields indicate which account and process on the system requested the logon. The Network Information fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases. The authentication information fields provide detailed information about this specific logon request. - Transited services indicate which intermediate services have participated in this logon request. - Package name indicates which sub-protocol was used among the NTLM protocols. - Key length indicates the length of the generated session key. This will be 0 if no session key was requested.||Security-Auditing',
+                      [ 'facility'  => 'daemon', 'priority' => '3', 'level' => '3',
+                        'tag'       => 'Security-Auditing', 'program' => 'SECURITY-AUDITING',
+                        'msg'       => '4625: AUDIT_FAILURE An account failed to log on. Subject: Security ID: S-1-0-0 Account Name: - Account Domain: - Logon ID: 0x0 Logon Type: 3 Account For Which Logon Failed: Security ID: S-1-0-0 Account Name: ADMINISTRATOR Account Domain: Failure Information: Failure Reason: Unknown user name or bad password. Status: 0xc000006d Sub Status: 0xc000006a Process Information: Caller Process ID: 0x0 Caller Process Name: - Network Information: Workstation Name: Source Network Address: - Source Port: - Detailed Authentication Information: Logon Process: NtLmSsp Authentication Package: NTLM Transited Services: - Package Name (NTLM only): - Key Length: 0 This event is generated when a logon request fails. It is generated on the computer where access was attempted. The Subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe. The Logon Type field indicates the kind of logon that was requested. The most common types are 2 (interactive) and 3 (network). The Process Information fields indicate which account and process on the system requested the logon. The Network Information fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases. The authentication information fields provide detailed information about this specific logon request. - Transited services indicate which intermediate services have participated in this logon request. - Package name indicates which sub-protocol was used among the NTLM protocols. - Key length indicates the length of the generated session key. This will be 0 if no session key was requested.',
+                        'msg_orig'  => '4625: AUDIT_FAILURE An account failed to log on. Subject: Security ID: S-1-0-0 Account Name: - Account Domain: - Logon ID: 0x0 Logon Type: 3 Account For Which Logon Failed: Security ID: S-1-0-0 Account Name: ADMINISTRATOR Account Domain: Failure Information: Failure Reason: Unknown user name or bad password. Status: 0xc000006d Sub Status: 0xc000006a Process Information: Caller Process ID: 0x0 Caller Process Name: - Network Information: Workstation Name: Source Network Address: - Source Port: - Detailed Authentication Information: Logon Process: NtLmSsp Authentication Package: NTLM Transited Services: - Package Name (NTLM only): - Key Length: 0 This event is generated when a logon request fails. It is generated on the computer where access was attempted. The Subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe. The Logon Type field indicates the kind of logon that was requested. The most common types are 2 (interactive) and 3 (network). The Process Information fields indicate which account and process on the system requested the logon. The Network Information fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases. The authentication information fields provide detailed information about this specific logon request. - Transited services indicate which intermediate services have participated in this logon request. - Package name indicates which sub-protocol was used among the NTLM protocols. - Key length indicates the length of the generated session key. This will be 0 if no session key was requested.', ]
+        ];
 
-    // Cisco IOS
-    $result[] = array('ios||23||5||5||26644:||2013-11-08 07:19:24|| *Mar  1 18:48:50.483 UTC: %SYS-5-CONFIG_I: Configured from console by vty2 (10.34.195.36)||26644',
-                                     array('facility'  => 'local7', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'CONFIG_I', 'program' => 'SYS',
-                                           'msg'       => 'Configured from console by vty2 (10.34.195.36)',
-                                           'msg_orig'  => '*Mar  1 18:48:50.483 UTC: %SYS-5-CONFIG_I: Configured from console by vty2 (10.34.195.36)',
-                                           ));
-    $result[] = array('ios||23||5||5||26644:||2013-11-08 07:19:24|| 00:00:48: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet2/0/1, changed state to down 2 (Switch-2)||26644',
-                                     array('facility'  => 'local7', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'UPDOWN', 'program' => 'LINEPROTO',
-                                           'msg'       => 'Line protocol on Interface GigabitEthernet2/0/1, changed state to down 2 (Switch-2)',
-                                           'msg_orig'  => '00:00:48: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet2/0/1, changed state to down 2 (Switch-2)',
-                                           ));
+        // Cisco IOS
+        $result[] = [ 'ios||23||5||5||26644:||2013-11-08 07:19:24|| *Mar  1 18:48:50.483 UTC: %SYS-5-CONFIG_I: Configured from console by vty2 (10.34.195.36)||26644',
+                      [ 'facility'  => 'local7', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'CONFIG_I', 'program' => 'SYS',
+                        'msg'       => 'Configured from console by vty2 (10.34.195.36)',
+                        'msg_orig'  => '*Mar  1 18:48:50.483 UTC: %SYS-5-CONFIG_I: Configured from console by vty2 (10.34.195.36)', ]
+        ];
+        $result[] = [ 'ios||23||5||5||26644:||2013-11-08 07:19:24|| 00:00:48: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet2/0/1, changed state to down 2 (Switch-2)||26644',
+                      [ 'facility'  => 'local7', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'UPDOWN', 'program' => 'LINEPROTO',
+                        'msg'       => 'Line protocol on Interface GigabitEthernet2/0/1, changed state to down 2 (Switch-2)',
+                        'msg_orig'  => '00:00:48: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet2/0/1, changed state to down 2 (Switch-2)', ]
+        ];
 
-    // Unknown program and tag
-    $result[] = array('ios||23||7||7||12602:||2016-10-24 11:34:02|| Oct 24 11:34:01.275: VSTACK_ERR: ||12602',
-                                     array('facility'  => 'local7', 'priority' => '7', 'level' => '7',
-                                           'tag'       => 'debug', 'program' => 'DEBUG',
-                                           'msg'       => 'VSTACK_ERR:',
-                                           'msg_orig'  => 'Oct 24 11:34:01.275: VSTACK_ERR:',
-                                           ));
-    $result[] = array('ios||23||7||7||12603:||2016-10-24 11:34:02||  smi_ibc_dl_handle_events : invalid message||12603',
-                                     array('facility'  => 'local7', 'priority' => '7', 'level' => '7',
-                                           'tag'       => 'debug', 'program' => 'DEBUG',
-                                           'msg'       => 'smi_ibc_dl_handle_events : invalid message',
-                                           'msg_orig'  => 'smi_ibc_dl_handle_events : invalid message',
-                                           ));
-    $result[] = array('ios||23||7||7||12622:||2016-10-26 10:05:37|| Oct 26 10:05:36.301: Invalid packet (too small) length=0',
-                                     array('facility'  => 'local7', 'priority' => '7', 'level' => '7',
-                                           'tag'       => 'debug', 'program' => 'DEBUG',
-                                           'msg'       => 'Invalid packet (too small) length=0',
-                                           'msg_orig'  => 'Oct 26 10:05:36.301: Invalid packet (too small) length=0',
-                                           ));
+        // Origin-ID
+        $result[] = [ 'ios||21||3||3||101:||2024-10-02 16:15:59|| 10.230.0.97: Oct  2 15:15:58: %LINK-3-UPDOWN: Interface GigabitEthernet1/0/7, changed state to up||101',
+                      [ 'facility'  => 'local5', 'priority' => '3', 'level' => '3',
+                        'tag'       => 'UPDOWN,10.230.0.97', 'program' => 'LINK',
+                        'msg'       => 'Interface GigabitEthernet1/0/7, changed state to up',
+                        'msg_orig'  => '10.230.0.97: Oct  2 15:15:58: %LINK-3-UPDOWN: Interface GigabitEthernet1/0/7, changed state to up', ]
+        ];
+        $result[] = [ 'ios||21||5||5||119:||2024-10-02 16:17:51|| test-originid: Oct  2 15:17:50: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1/0/7, changed state to up||119',
+                      [ 'facility'  => 'local5', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'UPDOWN,test-originid', 'program' => 'LINEPROTO',
+                        'msg'       => 'Line protocol on Interface GigabitEthernet1/0/7, changed state to up',
+                        'msg_orig'  => 'test-originid: Oct  2 15:17:50: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1/0/7, changed state to up', ]
+        ];
+      
+        // Unknown program and tag
+        $result[] = [ 'ios||23||7||7||12602:||2016-10-24 11:34:02|| Oct 24 11:34:01.275: VSTACK_ERR: ||12602',
+                      [ 'facility'  => 'local7', 'priority' => '7', 'level' => '7',
+                        'tag'       => 'debug', 'program' => 'DEBUG',
+                        'msg'       => 'VSTACK_ERR:',
+                        'msg_orig'  => 'Oct 24 11:34:01.275: VSTACK_ERR:', ]
+        ];
+        $result[] = [ 'ios||23||7||7||12603:||2016-10-24 11:34:02||  smi_ibc_dl_handle_events : invalid message||12603',
+                      [ 'facility'  => 'local7', 'priority' => '7', 'level' => '7',
+                        'tag'       => 'debug', 'program' => 'DEBUG',
+                        'msg'       => 'smi_ibc_dl_handle_events : invalid message',
+                        'msg_orig'  => 'smi_ibc_dl_handle_events : invalid message', ]
+        ];
+        $result[] = [ 'ios||23||7||7||12622:||2016-10-26 10:05:37|| Oct 26 10:05:36.301: Invalid packet (too small) length=0',
+                      [ 'facility'  => 'local7', 'priority' => '7', 'level' => '7',
+                        'tag'       => 'debug', 'program' => 'DEBUG',
+                        'msg'       => 'Invalid packet (too small) length=0',
+                        'msg_orig'  => 'Oct 26 10:05:36.301: Invalid packet (too small) length=0', ]
+        ];
 
-    // Examples from real system
-    $result[] = array('ios||23||4||4||26644:||2013-11-08 07:19:24|| 033884: Nov  8 07:19:23.993: %FW-4-TCP_OoO_SEG: Dropping TCP Segment: seq:-1169729434 1500 bytes is out-of-order; expected seq:3124765814. Reason: TCP reassembly queue overflow - session 10.10.32.37:56316 to 93.186.239.142:80 on zone-pair Local->Internet class All_Inspection||26644',
-                                     array('facility'  => 'local7', 'priority' => '4', 'level' => '4',
-                                           'tag'       => 'TCP_OoO_SEG', 'program' => 'FW',
-                                           'msg'       => 'Dropping TCP Segment: seq:-1169729434 1500 bytes is out-of-order; expected seq:3124765814. Reason: TCP reassembly queue overflow - session 10.10.32.37:56316 to 93.186.239.142:80 on zone-pair Local->Internet class All_Inspection',
-                                           'msg_orig'  => '033884: Nov  8 07:19:23.993: %FW-4-TCP_OoO_SEG: Dropping TCP Segment: seq:-1169729434 1500 bytes is out-of-order; expected seq:3124765814. Reason: TCP reassembly queue overflow - session 10.10.32.37:56316 to 93.186.239.142:80 on zone-pair Local->Internet class All_Inspection',
-                                           ));
-    $result[] = array('ios||23||5||5||1747:||2018-03-12 13:47:44|| 001743: *Apr 25 04:16:54.749: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.12.0.251 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded||1747',
-                                     array('facility'  => 'local7', 'priority' => '5', 'level' => '5',
-                                           'tag'       => 'SSH2_SESSION', 'program' => 'SSH',
-                                           'msg'       => 'SSH2 Session request from 10.12.0.251 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded',
-                                           'msg_orig'  => '001743: *Apr 25 04:16:54.749: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.12.0.251 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded',
-                                           ));
-    $result[] = array('ios||23||5||5||908:||2018-03-12 13:45:15|| Mar 12 13:45:14.241: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.10.10.10 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded||908',
-                                     array('facility'  => 'local7', 'priority' => '5', 'level' => '5',
-                                           'tag' => 'SSH2_SESSION', 'program' => 'SSH',
-                                           'msg'       => 'SSH2 Session request from 10.10.10.10 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded',
-                                           'msg_orig'  => 'Mar 12 13:45:14.241: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.10.10.10 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded',
-                                           ));
-    $result[] = array('ios||23||5||5||2559:||2017-01-26 04:27:10|| 003174: Jan 26 04:27:09.174 MSK: %BGP-5-ADJCHANGE: neighbor 10.0.1.17 vpn vrf hostcomm-private Up ||2559',
-                                     array('facility'  => 'local7', 'priority' => '5', 'level' => '5',
-                                           'tag' => 'ADJCHANGE', 'program' => 'BGP',
-                                           'msg'       => 'neighbor 10.0.1.17 vpn vrf hostcomm-private Up',
-                                           'msg_orig'  => '003174: Jan 26 04:27:09.174 MSK: %BGP-5-ADJCHANGE: neighbor 10.0.1.17 vpn vrf hostcomm-private Up',
-                                           ));
-    $result[] = array('ios||23||4||4||12601:||2016-10-24 11:34:01|| -Traceback= BF7490z 195628z 10D3A0Cz 10D30B8z 10D8C28z 10D9B70z 10DAFE0z 10DB174z 10D34ECz 133F918z 133A9D4z||12601',
-                                     array('facility'  => 'local7', 'priority' => '4', 'level' => '4',
-                                           'tag'       => 'Traceback', 'program' => 'TRACEBACK',
-                                           'msg'       => 'BF7490z 195628z 10D3A0Cz 10D30B8z 10D8C28z 10D9B70z 10DAFE0z 10DB174z 10D34ECz 133F918z 133A9D4z',
-                                           'msg_orig'  => '-Traceback= BF7490z 195628z 10D3A0Cz 10D30B8z 10D8C28z 10D9B70z 10DAFE0z 10DB174z 10D34ECz 133F918z 133A9D4z',
-                                           ));
+        // Examples from real system
+        $result[] = [ 'ios||23||4||4||26644:||2013-11-08 07:19:24|| 033884: Nov  8 07:19:23.993: %FW-4-TCP_OoO_SEG: Dropping TCP Segment: seq:-1169729434 1500 bytes is out-of-order; expected seq:3124765814. Reason: TCP reassembly queue overflow - session 10.10.32.37:56316 to 93.186.239.142:80 on zone-pair Local->Internet class All_Inspection||26644',
+                      [ 'facility'  => 'local7', 'priority' => '4', 'level' => '4',
+                        'tag'       => 'TCP_OoO_SEG', 'program' => 'FW',
+                        'msg'       => 'Dropping TCP Segment: seq:-1169729434 1500 bytes is out-of-order; expected seq:3124765814. Reason: TCP reassembly queue overflow - session 10.10.32.37:56316 to 93.186.239.142:80 on zone-pair Local->Internet class All_Inspection',
+                        'msg_orig'  => '033884: Nov  8 07:19:23.993: %FW-4-TCP_OoO_SEG: Dropping TCP Segment: seq:-1169729434 1500 bytes is out-of-order; expected seq:3124765814. Reason: TCP reassembly queue overflow - session 10.10.32.37:56316 to 93.186.239.142:80 on zone-pair Local->Internet class All_Inspection', ]
+        ];
+        $result[] = [ 'ios||23||5||5||1747:||2018-03-12 13:47:44|| 001743: *Apr 25 04:16:54.749: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.12.0.251 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded||1747',
+                      [ 'facility'  => 'local7', 'priority' => '5', 'level' => '5',
+                        'tag'       => 'SSH2_SESSION', 'program' => 'SSH',
+                        'msg'       => 'SSH2 Session request from 10.12.0.251 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded',
+                        'msg_orig'  => '001743: *Apr 25 04:16:54.749: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.12.0.251 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded', ]
+        ];
+        $result[] = [ 'ios||23||5||5||908:||2018-03-12 13:45:15|| Mar 12 13:45:14.241: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.10.10.10 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded||908',
+                      [ 'facility'  => 'local7', 'priority' => '5', 'level' => '5',
+                        'tag' => 'SSH2_SESSION', 'program' => 'SSH',
+                        'msg'       => 'SSH2 Session request from 10.10.10.10 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded',
+                        'msg_orig'  => 'Mar 12 13:45:14.241: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.10.10.10 (tty = 0) using crypto cipher \'3des-cbc\', hmac \'hmac-md5\' Succeeded', ]
+        ];
+        $result[] = [ 'ios||23||5||5||2559:||2017-01-26 04:27:10|| 003174: Jan 26 04:27:09.174 MSK: %BGP-5-ADJCHANGE: neighbor 10.0.1.17 vpn vrf hostcomm-private Up ||2559',
+                      [ 'facility'  => 'local7', 'priority' => '5', 'level' => '5',
+                        'tag' => 'ADJCHANGE', 'program' => 'BGP',
+                        'msg'       => 'neighbor 10.0.1.17 vpn vrf hostcomm-private Up',
+                        'msg_orig'  => '003174: Jan 26 04:27:09.174 MSK: %BGP-5-ADJCHANGE: neighbor 10.0.1.17 vpn vrf hostcomm-private Up', ]
+        ];
+        $result[] = [ 'ios||23||4||4||12601:||2016-10-24 11:34:01|| -Traceback= BF7490z 195628z 10D3A0Cz 10D30B8z 10D8C28z 10D9B70z 10DAFE0z 10DB174z 10D34ECz 133F918z 133A9D4z||12601',
+                      [ 'facility'  => 'local7', 'priority' => '4', 'level' => '4',
+                        'tag'       => 'Traceback', 'program' => 'TRACEBACK',
+                        'msg'       => 'BF7490z 195628z 10D3A0Cz 10D30B8z 10D8C28z 10D9B70z 10DAFE0z 10DB174z 10D34ECz 133F918z 133A9D4z',
+                        'msg_orig'  => '-Traceback= BF7490z 195628z 10D3A0Cz 10D30B8z 10D8C28z 10D9B70z 10DAFE0z 10DB174z 10D34ECz 133F918z 133A9D4z', ]
+        ];
 
     // Cisco IOS-XR
 

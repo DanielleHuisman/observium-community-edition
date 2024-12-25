@@ -26,7 +26,15 @@
   </div>
 */
 
-if ($_SESSION['userlevel'] >= 5 && $config['weathermap']['enable']) {
+if (!$config['weathermap']['enable']) {
+    print_error_permission("Weather map disabled");
+    return;
+}
+
+if ($_SESSION['userlevel'] < 5) {
+    print_error_permission();
+    return;
+}
 
     $navbar['class'] = 'navbar-narrow';
     $navbar['brand'] = 'Weathermaps';
@@ -171,9 +179,5 @@ if ($_SESSION['userlevel'] >= 5 && $config['weathermap']['enable']) {
         echo '</div>';
 
     }
-} else {
-
-    print_error_permission();
-}
 
 // EOF

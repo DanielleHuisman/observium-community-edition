@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -53,8 +52,7 @@ while ($i < 29) {
             //print_r($x);
 
             if (is_numeric($oids[$x['oid_text']])) {
-                discover_sensor_ng($device, $x['class'], $mib, $x['name'], $x['oid_num'], $x['index'], 'adf01', $x['descr'], $x['scale'], $oids[$x['oid_text']]);
-            } else {
+                discover_sensor_ng($device, $x['class'], $mib, $x['name'], $x['oid_num'], $x['index'], $x['descr'], $x['scale'], $oids[$x['oid_text']], [ 'sensor_type' => 'adf01' ]);
             }
         }
 
@@ -88,8 +86,7 @@ foreach ([25, 26] as $i) {
         //print_r($x);
 
         if (is_numeric($oids[$x['oid_text']])) {
-            discover_sensor_ng($device, $x['class'], $mib, $x['name'], $x['oid_num'], $x['index'], 'adf01', $x['descr'], $x['scale'], $oids[$x['oid_text']]);
-        } else {
+            discover_sensor_ng($device, $x['class'], $mib, $x['name'], $x['oid_num'], $x['index'], $x['descr'], $x['scale'], $oids[$x['oid_text']], [ 'sensor_type' => 'adf01' ]);
         }
     }
 }

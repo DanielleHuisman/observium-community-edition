@@ -1,0 +1,442 @@
+    ADTRAN-TAESCUAUTOUPGRADE-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN enhanced System Controller Unit Auto Upgrade MIB
+    -- PRODUCT:   1181018L1
+    -- VERSION:   1.0
+    -- DATE:      04/05/02
+
+    -- This MIB defines the Auto Upgrade feature for the Total Access
+    -- 3000 enhanced SCU.
+
+    -- HISTORY:
+      -- Day/month/Year
+       -- 07/04/03 ap   First edition.
+       -- 04/30/04 ap   Add Disabled enum to adTAeScuAutoUpgradeMode
+       -- 16/03/04 dlw  Added adTAeScuAutoUpgradeSystemRelease
+       -- 11/07/06 dlw  Added adTAeScuAutoUpgradeSWVerErrLevel and adTAAUSoftwareVerError traps.
+       -- 05/16/08 ap   Change SEVERITY  to WARNING for auto upgrade alarms
+
+    IMPORTS
+        OBJECT-TYPE, MODULE-IDENTITY,
+        Integer32, NOTIFICATION-TYPE, OBJECT-IDENTITY
+            FROM SNMPv2-SMI
+       adTAeSCUmg, adTAeSCUmgNotificationEvents,
+        adTAeSCU
+            FROM ADTRAN-TAeSCU-MIB
+        DisplayString
+            FROM SNMPv2-TC
+        sysName
+            FROM SNMPv2-MIB
+        adGenSlotProdSwVersion, adGenSlotProdName, adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+
+    ;
+
+    adTAeSCUAutoUpgradeMgmt MODULE-IDENTITY
+         LAST-UPDATED "201002241300Z"
+         ORGANIZATION "Adtran, Inc."
+         CONTACT-INFO
+           "CND Tech Support
+               Postal: ADTRAN, Inc.
+                       901 Explorer Blvd.
+                       Huntsville, AL  35806
+                       Tel: +1 800 726-8663
+                       Fax: +1 256 963 6217
+                       E-mail: support@adtran.com"
+         DESCRIPTION
+            "This MIB defines the objects for the genescu MIB."
+         REVISION "201002241300Z"
+         DESCRIPTION "Converted from SNMPv1 adTAeSCUAutoUpgrade.mib file."
+      ::= { adTAeSCUmg 11 }
+
+    -- OBJECT IDENTIFIERS
+
+    ---
+    --- SCU Auto Upgrade
+    ---
+
+    --    adTAeSCUAutoUpgradeMgmt  OBJECT IDENTIFIER ::= { adTAeSCUmg 11 }
+
+
+        adTAeScuAutoUpgradeInitiate OBJECT-TYPE
+                SYNTAX  INTEGER {
+                    initiateAutoUpgrade(1)
+                    }
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                  "This OID instructs the Auto Upgrade system to determine
+                   which modules in the shelf require firmware upgrade, then
+                   to upgrade each card if necessary.  Status and progress of
+                   the Auto Upgrade system may be monitored through the use of
+                   the adTAeScuAutoUpgradeStatus OID."
+                ::= { adTAeSCUAutoUpgradeMgmt 1 }
+
+        adTAeScuAutoUpgradeCancel OBJECT-TYPE
+                SYNTAX  INTEGER {
+                    cancelAutoUpgrade(1)
+                    }
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                  "Request that Auto Upgrade operations be stopped.  This
+                   OID will not abort an upgrade in progress, but will halt
+                   the auto upgrade process after the current module has
+                   finished."
+                ::= { adTAeSCUAutoUpgradeMgmt 2 }
+
+
+        adTAeScuAutoUpgradeRetries OBJECT-TYPE
+                SYNTAX  Integer32 (0..10)
+                MAX-ACCESS  read-write
+                STATUS  current
+               DESCRIPTION
+                  "The Retries value specifies how many times the SCU
+                   should attempt to re-retrieve a flash firmware file via
+                   TFTP, or re-send the retrieved flash firmware file to a
+                   module.  A value of zero indicates that retries should
+                   not be attempted."
+                ::= { adTAeSCUAutoUpgradeMgmt 3 }
+
+
+        adTAeScuAutoUpgradeRefeshInterval OBJECT-TYPE
+                SYNTAX  Integer32 (0..744)
+                MAX-ACCESS  read-write
+                STATUS  current
+               DESCRIPTION
+                  "The hourly RefreshInterval value specifies how often the SCU
+                   should check the TFTP server for changes to the
+                   configuration file.  A value of zero indicates the SCU
+                   should not check the TFTP server for a more recent
+                   configuration file, effectively 'freezing' the current
+                   configuration.  Auto Upgrade refresh operation will occur
+                   only if the UpdateMode value is set to Auto(1)"
+                ::= { adTAeSCUAutoUpgradeMgmt 4}
+
+        adTAeScuAutoUpgradeMode OBJECT-TYPE
+                SYNTAX  INTEGER {
+                    auto(1),
+                    manual(2),
+               disabled(3)
+                    }
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                  "The UpdateMode value specifies how the Auto TFTP
+                   Upgrade system should operate.
+
+                   auto(1) - indicates that modules should be automatically
+                   checked and upgraded after power-up of the SCU or upon
+                   module insertion into the shelf.  If this value is set
+                   to auto(1), actions controlled by the RefreshInterval
+                   value will be enabled.
+
+                   Manual(2) - indicates that modules should be checked and
+                   upgraded only when instructed via SNMP or menus.  If
+                   this value is set to manual(2), actions controlled by
+                   the RefreshInterval value will be disabled."
+                ::= { adTAeSCUAutoUpgradeMgmt 5 }
+
+
+        adTAeScuAutoUpgradeConfigFilename OBJECT-TYPE
+                SYNTAX  DisplayString (SIZE(0..40))
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                  "The ConfigFilename OID specifies the TFTP filename to
+                   be retrieved by the Auto Upgrade system.  This
+                   configuration contains information such as module part
+                   number, product revision, firmware revision, and firmware
+                   filename that are necessary to perform auto upgrade
+                   operations."
+                ::= { adTAeSCUAutoUpgradeMgmt 6 }
+
+        adTAeScuAutoUpgradeBasePath OBJECT-TYPE
+                SYNTAX  DisplayString (SIZE(0..40))
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                  "The BasePath OID allows the customer to specify a
+                   directory prefix where the flash firmware files will be
+                   located on the TFTP server.  It is assumed that all TA3000
+                   flash firmware files will be located in the same directory,
+                   so this value applies to all Auto Upgrade module-
+                   specification entries.
+
+                   The BasePath argument may not contain spaces, commas,
+                   quotes, or other unusual characters that would generally
+                   be considered invalid in a path specification.  Although
+                   the SCU does not interpret the contents of this string,
+                   please keep in mind that different operating systems have
+                   different rules concerning what constitutes valid
+                   characters and path/file separators."
+                ::= { adTAeSCUAutoUpgradeMgmt 7 }
+
+        adTAeScuAutoUpgradeInvalidate OBJECT-TYPE
+                SYNTAX  INTEGER {
+                    discardCurrentConfigInfo(1)
+                    }
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                  "This OID instructs the Auto Upgrade system to discard the
+                   current configuration Information and re-retrieve the Auto
+                   Upgrade Configuration file from the TFTP host."
+                ::= { adTAeSCUAutoUpgradeMgmt 8 }
+
+        adTAeScuAutoUpgradeSystemRelease OBJECT-TYPE
+                SYNTAX  DisplayString
+                MAX-ACCESS  read-only
+                STATUS  current
+                DESCRIPTION
+                  "This OID displays the System Release Name."
+                ::= { adTAeSCUAutoUpgradeMgmt 9 }
+
+        --
+        -- Upgrade Status
+        --
+
+        adTAeSCUAutoUpgradeStatusTable OBJECT-TYPE
+            SYNTAX  SEQUENCE OF AdTAeSCUAutoUpgradeStatusEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+                  "Copy provision status table"
+          ::= { adTAeSCUAutoUpgradeMgmt 10 }
+
+
+        adTAeSCUAutoUpgradeStatusEntry OBJECT-TYPE
+            SYNTAX  AdTAeSCUAutoUpgradeStatusEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+                  "An entry in the Copy provision status table."
+          INDEX   { adGenSlotInfoIndex }
+          ::= { adTAeSCUAutoUpgradeStatusTable 1 }
+
+        AdTAeSCUAutoUpgradeStatusEntry ::=
+            SEQUENCE {
+                  adTAeScuAutoUpgradeStatus
+                      DisplayString
+            }
+
+        adTAeScuAutoUpgradeStatus OBJECT-TYPE
+                SYNTAX  DisplayString (SIZE(1..255))
+                MAX-ACCESS  read-only
+                STATUS  current
+                DESCRIPTION
+                  "This OID will return a formatted string describing the
+                   current status and progress of Auto Upgrade operations.
+                   Refer to the ''TA3000 Auto TFTP Upgrade Feature'' user
+                   guide for details."
+                ::= { adTAeSCUAutoUpgradeStatusEntry 1 }
+
+        --
+        -- Software Version
+        --
+
+        adTAeScuAutoUpgradeSWVerErrLevel  OBJECT-TYPE
+                SYNTAX  INTEGER {
+                               alert(3),
+                               minor(4),
+                               major(5),
+                               critical(6)
+                          }
+                MAX-ACCESS  read-write
+                STATUS  current
+                DESCRIPTION
+                   "Auto Upgrade Software Version Error Level."
+                ::= { adTAeSCUAutoUpgradeMgmt 11 }
+
+
+
+
+    -----------------------------------------------
+    ------------------ AutoUpgrade Traps ----------
+    -----------------------------------------------
+
+        adTAeSCUAutoUpgradeConfigChanged  NOTIFICATION-TYPE
+                      OBJECTS     {
+                                   adTrapInformSeqNum,
+                                   sysName
+                                   }
+                      STATUS  current
+                      DESCRIPTION
+                                   "This trap is used to indicate that a change in the Auto
+                                    Upgrade configuration file has been detected."
+            --#TYPE        "Information - AutoUpgrade configuration file has been detected"
+            --#SUMMARY   "TAeSCU 24150: AutoUpgrade configuration file has been detected;"
+            --#SUMMARY   "detected at shelf: %s"
+            --#ARGUMENTS { 1 }
+            --#SEVERITY  WARNING
+            --#GENERIC   6
+            --#CATEGORY  "Information Events"
+            --#SOURCE_ID "A"
+            --#TIMEINDEX 0
+            ::= { adTAeSCUmgNotificationEvents 24150 }
+
+        adTAeSCUAutoUpgradeInvalidConfigFile  NOTIFICATION-TYPE
+                      OBJECTS     {
+                                   adTrapInformSeqNum,
+                                   sysName
+                                   }
+                      STATUS  current
+                      DESCRIPTION
+                                   "This trap is used to indicate that a problem with the
+                                      Auto Upgrade configuration file has been detected, such
+                                      as a TFTP error while retrieving the file, or an error
+                                      during parsing.  The EMS should perform a 'get' on the
+                                      AdTAeScuAutoUpgradeStatus OID for further information
+                                      regarding the error condition."
+            --#TYPE        "Minor - Invalid Auto Upgrade configuration file has been detected."
+            --#SUMMARY   "TAeSCU 24152: Invalid Auto Upgrade configuration file has been detected.;"
+            --#SUMMARY   "detected at shelf: %s"
+            --#ARGUMENTS { 1 }
+            --#SEVERITY  WARNING
+            --#GENERIC   6
+            --#CATEGORY  "Error Events"
+            --#SOURCE_ID "A"
+            --#TIMEINDEX 0
+            ::=  { adTAeSCUmgNotificationEvents 24152 }
+
+        adTAeSCUAutoUpgradeModuleUpgradeStarted  NOTIFICATION-TYPE
+                      OBJECTS     {
+                                   adTrapInformSeqNum,
+                                   sysName,
+                                   adGenSlotInfoIndex
+                                   }
+                      STATUS  current
+                      DESCRIPTION
+                                   "This trap is used to indicate that a module upgrade
+                                    operation has been started."
+            --#TYPE        "Information - Module upgrade operation started."
+            --#SUMMARY   "TAeSCU 24154: Module upgrade operation started;"
+            --#SUMMARY   "started at shelf: %s slot %d"
+            --#ARGUMENTS { 1, 2 }
+            --#SEVERITY  WARNING
+            --#GENERIC   6
+            --#CATEGORY  "Information Events"
+            --#SOURCE_ID "A"
+            --#TIMEINDEX 0
+            ::=  { adTAeSCUmgNotificationEvents 24154 }
+
+        adTAeSCUAutoUpgradeModuleUpgradeCompleted  NOTIFICATION-TYPE
+                      OBJECTS     {
+                                   adTrapInformSeqNum,
+                                   sysName,
+                                   adGenSlotInfoIndex
+                                   }
+                      STATUS  current
+                      DESCRIPTION
+                                   "This trap is used to indicate that a module upgrade
+                                    operation has successfully completed."
+            --#TYPE        "Information - Module upgrade operation has successfully completed."
+            --#SUMMARY   "TAeSCU 24156: Module upgrade operation has successfully completed;"
+            --#SUMMARY   "completed at shelf: %s slot %d"
+            --#ARGUMENTS { 1, 2 }
+            --#SEVERITY  WARNING
+            --#GENERIC   6
+            --#CATEGORY  "Information Events"
+            --#SOURCE_ID "A"
+            --#TIMEINDEX 0
+            ::=  { adTAeSCUmgNotificationEvents 24156 }
+
+        adTAeSCUAutoUpgradeModuleUpgradeFailed  NOTIFICATION-TYPE
+                      OBJECTS     {
+                                   adTrapInformSeqNum,
+                                   sysName,
+                                   adGenSlotInfoIndex,
+                                   adTAeScuAutoUpgradeStatus
+                                   }
+                      STATUS  current
+                      DESCRIPTION
+                                   "This trap is used to indicate that a module upgrade
+                                      operation has failed.  The EMS should perform a 'get'
+                                      on the AdTAeScuAutoUpgradeStatus OID for further
+                                      information regarding the error condition."
+            --#TYPE        "Warning - Module upgrade operation has failed."
+            --#SUMMARY   "TAeSCU 24158: Module upgrade operation has failed;"
+            --#SUMMARY   "failed at shelf: %s slot %d: (%s)"
+            --#ARGUMENTS { 1, 2, 3 }
+            --#SEVERITY  WARNING
+            --#GENERIC   6
+            --#CATEGORY  "Information Events"
+            --#SOURCE_ID "A"
+            --#TIMEINDEX 0
+            ::=  { adTAeSCUmgNotificationEvents 24158 }
+
+        adTAeSCUAutoUpgradeUnknownModule  NOTIFICATION-TYPE
+                      OBJECTS     {
+                                   adTrapInformSeqNum,
+                                   sysName,
+                                   adGenSlotInfoIndex
+                                   }
+                      STATUS  current
+                      DESCRIPTION
+                                   "This trap is used to indicate that a module
+                                    is not present in the Auto Upgrade configuration
+                                    file.  This module cannot be upgrade by the Auto
+                                    Upgrade system."
+            --#SUMMARY   "TAeSCU 24160: Module is not present in the Auto Upgrade configuration file;"
+            --#SUMMARY   "failed at shelf: %s slot %d"
+            --#ARGUMENTS { 1, 2 }
+            --#SEVERITY  WARNING
+            --#GENERIC   6
+            --#CATEGORY  "Information Events"
+            --#SOURCE_ID "A"
+            --#TIMEINDEX 0
+            ::=  { adTAeSCUmgNotificationEvents 24160 }
+
+        adTAAUSoftwareVerErrorClear  NOTIFICATION-TYPE
+                OBJECTS       {
+                        adTrapInformSeqNum,
+                        sysName,
+                        adGenSlotInfoIndex,
+                        adGenSlotProdName,
+                        adGenSlotProdSwVersion,
+                        adTAeScuAutoUpgradeSWVerErrLevel
+                        }
+                STATUS  current
+                DESCRIPTION
+                  "Auto Upgrade Software Version Error"
+          --#TYPE      "Minor - Auto Upgrade Software Version Error"
+          --#SUMMARY   "adTAeSCU 24166:  Auto Upgrade Software Version Error"
+          --#SUMMARY   "detected at chassis: %s, slot: %d"
+          --#ARGUMENTS { 1 }
+          --#SEVERITY  MINOR
+          --#GENERIC   6
+          --#CATEGORY  "Auto Upgrade Software Version Error"
+          --#SOURCE_ID "A"
+          --#TIMEINDEX 0
+          ::=  { adTAeSCUmgNotificationEvents 24166 }
+
+        adTAAUSoftwareVerErrorActive  NOTIFICATION-TYPE
+                OBJECTS       {
+                        adTrapInformSeqNum,
+                        sysName,
+                        adGenSlotInfoIndex,
+                        adGenSlotProdName,
+                        adGenSlotProdSwVersion,
+                        adTAeScuAutoUpgradeSWVerErrLevel
+                        }
+                STATUS  current
+                DESCRIPTION
+                  "Auto Upgrade Software Version Error"
+          --#TYPE      "Minor - Auto Upgrade Software Version Error"
+          --#SUMMARY   "adTAeSCU 24167:  Auto Upgrade Software Version Error"
+          --#SUMMARY   "detected at chassis: %s, slot: %d"
+          --#ARGUMENTS { 1 }
+          --#SEVERITY  MINOR
+          --#GENERIC   6
+          --#CATEGORY  "Auto Upgrade Software Version Error"
+          --#SOURCE_ID "A"
+          --#TIMEINDEX 0
+          ::=  { adTAeSCUmgNotificationEvents 24167 }
+--
+
+   END
+

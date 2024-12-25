@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -69,9 +69,10 @@ foreach ($cdp_array as $ifIndex => $port_neighbours) {
 
         // Remote hostname
         // NOTE. cdpCacheDeviceId have undocumented limit by 40 chars!
-        if (preg_match('/^([A-F\d]{2}\s?){6}$/', $cdp_entry['cdpCacheDeviceId'])) {
+        if (preg_match('/^([A-F\d]{2}\s?){6}$/i', $cdp_entry['cdpCacheDeviceId'])) {
             // HEX mac address
             // cdpCacheDeviceId.3.1 = "98 90 96 D1 59 5A "
+            // cdpCacheDeviceId.3.1 = "549fc6fd89c7"
             $remote_hostname = $cdp_entry['cdpCacheDeviceId'];
             $remote_mac      = str_replace(' ', '', $cdp_entry['cdpCacheDeviceId']);
         } elseif (preg_match('/^01 (?<ip>([A-F\d]{2}\s?){4})$/', $cdp_entry['cdpCacheDeviceId'], $matches)) {
@@ -95,7 +96,7 @@ foreach ($cdp_array as $ifIndex => $port_neighbours) {
                 }
                 $remote_hostname = $cdp_entry['cdpCacheDeviceId'];
             } else {
-                [$remote_hostname] = explode('(', $remote_hostname); // Fix for Nexus CDP neighbors: <hostname>(serial number)
+                $remote_hostname = explode('(', $remote_hostname)[0]; // Fix for Nexus CDP neighbors: <hostname>(serial number)
             }
         }
         $hostname_len = strlen($remote_hostname);
@@ -114,6 +115,25 @@ foreach ($cdp_array as $ifIndex => $port_neighbours) {
 
         // Remote address
         $remote_address = hex2ip($cdp_entry['cdpCacheAddress']);
+        // MGMT address, select best
+        $mgmt_address = hex2ip($cdp_entry['cdpCachePrimaryMgmtAddr']);
+        if ($mgmt_address && $remote_address !== $mgmt_address) {
+            $remote_type = get_ip_type($remote_address);
+            $mgmt_type   = get_ip_type($mgmt_address);
+            // cdpCacheAddressType.436207616.16318465 = ip
+            // cdpCacheAddress.436207616.16318465 = "64 69 00 31 " -> 100.105.0.49 (cgnat)
+            // cdpCachePrimaryMgmtAddrType.436207616.16318465 = ip
+            // cdpCachePrimaryMgmtAddr.436207616.16318465 = "0A AF 0C 3C " -> 10.175.12.60
+            // cdpCacheSecondaryMgmtAddrType.436207616.16318465 = ip
+            // cdpCacheSecondaryMgmtAddr.436207616.16318465 = ""
+            if (in_array($remote_type, [ 'cgnat', 'link-local' ]) &&
+                !in_array($mgmt_type, [ 'cgnat', 'link-local' ])) {
+                print_debug("Select best address:\n  cdpCacheAddress - $remote_address ($remote_type),\n* cdpCachePrimaryMgmtAddr - $mgmt_address ($mgmt_type)");
+                $remote_address = $mgmt_address;
+            } else {
+                print_debug("Select best address:\n* cdpCacheAddress - $remote_address ($remote_type),\n  cdpCachePrimaryMgmtAddr - $mgmt_address ($mgmt_type)");
+            }
+        }
 
         // Last change
         /* Derp. Do not use Last change from neighbour, it's not correct for us
@@ -138,7 +158,7 @@ foreach ($cdp_array as $ifIndex => $port_neighbours) {
             }
         }
 
-        // Try find remote device and check if already cached
+        // Try to find a remote device and check if already cached
         $remote_device_id = get_autodiscovery_device_id($device, $remote_hostname, $remote_address, $remote_mac);
         if (is_null($remote_device_id) &&                             // NULL - never cached in other rounds
             check_autodiscovery($remote_hostname, $remote_address)) { // Check all previous autodiscovery rounds

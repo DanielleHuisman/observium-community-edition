@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -171,10 +171,49 @@ foreach ($sensors_def as $entry) {
             $options['rename_rrd'] = $entry['rename_rrd'];
         }
 
-        discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, $descr, 1, $value, $options);
 
     } else {
-        discover_status_ng($device, $mib, $entry['oid'], $oid_num, $index, 'serverscheck-status', $descr, $value, ['entPhysicalClass' => 'other']);
+        // ServersCheck::sensor11Name.0 = STRING: "Smoke"
+        // ServersCheck::sensor11value.0 = STRING: "OFF"
+        // ServersCheck::sensor11ErrState.0 = STRING: "-"
+        // ServersCheck::sensor11lastErrTime.0 = STRING: "-"
+        // ServersCheck::sensor11lastErrMsg.0 = STRING: "-"
+
+        // ServersCheck::sensor12Name.0 = STRING: "PowerFail"
+        // ServersCheck::sensor12value.0 = STRING: "PWR FAIL"
+        // ServersCheck::sensor12ErrState.0 = STRING: "DOWN"
+        // ServersCheck::sensor12lastErrTime.0 = STRING: "23 May 2017,21:10:47"
+        // ServersCheck::sensor12lastErrMsg.0 = STRING: "PowerFail,PWR FAIL,DOWN,23 May 2017,21:10:47"
+
+        // ServersCheck::sensor13Name.0 = STRING: "Water Leak Floor"
+        // ServersCheck::sensor13value.0 = STRING: "DRY"
+        // ServersCheck::sensor13ErrState.0 = STRING: "-"
+        // ServersCheck::sensor13lastErrTime.0 = STRING: "-"
+        // ServersCheck::sensor13lastErrMsg.0 = STRING: "-"
+
+        // ServersCheck::sensor14Name.0 = STRING: "Water Leak Roof"
+        // ServersCheck::sensor14value.0 = STRING: "DRY"
+        // ServersCheck::sensor14ErrState.0 = STRING: "-"
+        // ServersCheck::sensor14lastErrTime.0 = STRING: "-"
+        if (str_contains($descr, "Smoke")) {
+            $type = "serverscheck-off";
+        } elseif (str_contains($descr, "Leak")) {
+            $type = "serverscheck-leak";
+        // } elseif (str_contains($descr, "Dew Point")) {
+        //     $class = "dewpoint";
+        // } elseif (str_contains($descr, "Volt")) {
+        //     $class = "voltage";
+        // } elseif (str_contains($descr, "Airflow")) {
+        //     $class = "airflow";
+        // } elseif (str_contains($descr, "Dust")) {
+        //     $class = "dust";
+        // } elseif (str_contains($descr, "Sound")) {
+        //     $class = "sound";
+        } else {
+            $type = "serverscheck-status";
+        }
+        discover_status_ng($device, $mib, $entry['oid'], $oid_num, $index, $type, $descr, $value, [ 'entPhysicalClass' => 'other' ]);
     }
 }
 

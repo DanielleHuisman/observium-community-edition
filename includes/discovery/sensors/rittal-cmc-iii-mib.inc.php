@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -247,7 +247,7 @@ foreach ($device_sensors as $device_index => $sensors) {
                         discover_counter($device, $counter_type, $mib, $object, $oid_num, $index, $descr, $scale, $value, $options);
                     }
                 } else {
-                    discover_sensor_ng($device, $type, $mib, $object, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+                    discover_sensor_ng($device, $type, $mib, $object, $oid_num, $index, $descr, $scale, $value, $options);
                 }
             } elseif (!(isset($sensor['status']) || isset($sensor['rotation']))) {
                 print_debug("[DEBUG] Unknown sensor detected:");
@@ -272,14 +272,13 @@ foreach ($device_sensors as $device_index => $sensors) {
 
             $index = $entry['index'];
             $unit  = $entry['cmcIIIVarUnit'];
-            //$type  = $entry['cmcIIIVarType'];
             //$name  = $entry['cmcIIIVarName'];
             $value   = $entry['cmcIIIVarValueInt'];
             $oid_num = '.1.3.6.1.4.1.2606.7.4.2.2.1.11.' . $index;
 
             $object = 'cmcIIIVarValueInt';
 
-            discover_sensor_ng($device, 'fanspeed', $mib, $object, $oid_num, $index, NULL, $descr, $scale, $value, ['rename_rrd' => "Rittal-CMC-III-cmcIIIVarTable.$index"]);
+            discover_sensor_ng($device, 'fanspeed', $mib, $object, $oid_num, $index, $descr, $scale, $value, [ 'rename_rrd' => "Rittal-CMC-III-cmcIIIVarTable.$index" ]);
         }
     }
 }

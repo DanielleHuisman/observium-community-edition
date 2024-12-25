@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -18,9 +18,9 @@ if (is_device_mib($device, 'CISCO-VTP-MIB')) {
 $domain_index = '1';
 
 if (safe_count($discovery_vlans[$domain_index]) &&
-    is_device_mib($device, ['CISCOSB-vlan-MIB', 'RADLAN-vlan-MIB', 'Dell-vlan-MIB',
-                            'DLINK-3100-vlan-MIB', 'EDGECORE-vlan-MIB', 'NETGEAR-RADLAN-vlan-MIB',
-                            'A3COM-HUAWEI-LswVLAN-MIB', 'IEEE8021-Q-BRIDGE-MIB'])) {
+    is_device_mib($device, [ 'CISCOSB-vlan-MIB', 'HPE-vlan-MIB', 'RADLAN-vlan-MIB', 'Dell-vlan-MIB',
+                             'DLINK-3100-vlan-MIB', 'EDGECORE-vlan-MIB', 'NETGEAR-RADLAN-vlan-MIB',
+                             'A3COM-HUAWEI-LswVLAN-MIB', 'IEEE8021-Q-BRIDGE-MIB' ])) {
     // Already discovered by RADLAN based vlans or IEEE8021-Q-BRIDGE-MIB
     return;
 }

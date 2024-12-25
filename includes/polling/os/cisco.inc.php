@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -98,7 +98,7 @@ if (is_array($entPhysical)) {
             // 720X, try again get correct serial/version
             $hw_module = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalSerialNum` != ? AND `deleted` IS NULL', [$device['device_id'], 'module', '1', '']);
             if ($hw_module['entPhysicalSoftwareRev']) {
-                if ($device['os'] === 'iosxe') {
+                if ($device['os'] === 'iosxe' || $device['os'] === 'wlcxe') {
                     // For IOS-XE fix only version
                     $entPhysical['entPhysicalSoftwareRev'] = $hw_module['entPhysicalSoftwareRev'];
                 } else {

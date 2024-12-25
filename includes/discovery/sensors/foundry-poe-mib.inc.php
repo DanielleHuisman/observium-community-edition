@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -34,7 +34,6 @@ if (safe_count($oids)) {
         $descr    = "PoE Allocated Power Unit $index";
         $oid_name = 'snAgentPoeUnitPowerCapacityFree';
         $oid_num  = ".1.3.6.1.4.1.1991.1.1.2.14.4.1.1.3.$index";
-        $type     = $mib . '-' . $oid_name;
         $value    = $entry[$oid_name]; // What the f**k FOUNDRY, why not just used value??
         $scale    = 0.001;
         $negative = -1;
@@ -50,7 +49,7 @@ if (safe_count($oids)) {
         $options['sensor_addition'] = $entry['snAgentPoeUnitPowerCapacityTotal'] * $negative;
 
         // Warning, negative scale here!
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $negative * $scale, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $negative * $scale, $value, $options);
     }
 } else {
     // All other
@@ -62,8 +61,7 @@ if (safe_count($oids)) {
         $descr    = "PoE Allocated Power";
         $oid_name = 'snAgentPoeGblPowerCapacityFree';
         $oid_num  = ".1.3.6.1.4.1.1991.1.1.2.14.1.2.$index";
-        $type     = $mib . '-' . $oid_name;
-        $value    = $entry[$oid_name];                                                   // What the f**k FOUNDRY, why not just used value??
+        $value    = $entry[$oid_name];
         $scale    = 0.001;
         $negative = -1;
 
@@ -78,7 +76,7 @@ if (safe_count($oids)) {
         $options['sensor_addition'] = $entry['snAgentPoeGblPowerCapacityTotal'] * $negative;
 
         // Warning, negative scale here!
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $negative * $scale, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $negative * $scale, $value, $options);
     }
 }
 
@@ -142,7 +140,7 @@ foreach ($oids as $index => $entry) {
     } else {
         unset($options['limit_high']);
     }
-    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 }
 
 // EOF

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -54,11 +54,11 @@ error_reporting(E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR);
 // FIXME. Migrate to $config['db']['option']
 #$config['db_port']          = ''; // MySQL port (leave blank for default port: 3306)
 #$config['db_socket']        = ''; // Path to the socket (leave blank for default socket)
-$config['db_persistent'] = FALSE; // Whether persistent connections should be used or not. WARNING use at own risk!
-$config['db_compress']   = FALSE; // Use compressed protocol for the MySQL connection
+$config['db_persistent'] = FALSE;  // Whether persistent connections should be used or not. WARNING use at own risk!
+$config['db_compress']   = FALSE;  // Use compressed protocol for the MySQL connection
 // Optionally SSL (only for MySQLi)
-$config['db_ssl']        = FALSE; // If TRUE mysql connection uses ssl (only available with mysqli engine)
-$config['db_ssl_verify'] = TRUE;        // disables SSL certificate validation on mysqlnd
+$config['db_ssl']        = FALSE;  // If TRUE mysql connection uses ssl (only available with mysqli engine)
+$config['db_ssl_verify'] = TRUE;   // disables SSL certificate validation on mysqlnd
 #$config['db_ssl_key']       = ''; // path to ssl key file
 #$config['db_ssl_cert']      = ''; // path to ssl certificate file
 #$config['db_ssl_ca']        = ''; // path to ssl ca file
@@ -71,6 +71,9 @@ $config['db']['debug'] = FALSE;       // If TRUE store errors in DB queries into
 #$config['db_user']          = 'USERNAME';
 #$config['db_pass']          = 'PASSWORD';
 #$config['db_name']          = 'observium'; // DB base name (default: observium)
+
+// PHP settings
+#$config['php_memory_limit_min'] = '512M'; // Override PHP memory_limit setting from php.ini if less than this minimum. Has no effect until setting specified.
 
 // Default directories
 
@@ -99,24 +102,24 @@ $config['snmpgetnext']   = "/usr/bin/snmpgetnext";
 $config['snmpbulkget']   = "/usr/bin/snmpbulkget";
 $config['snmpbulkwalk']  = "/usr/bin/snmpbulkwalk";
 $config['snmptranslate'] = "/usr/bin/snmptranslate";
-$config['whois']         = "/usr/bin/whois";
-$config['mtr']           = "/usr/bin/mtr";
-$config['nmap']          = "/usr/bin/nmap";
-$config['ipmitool']      = "/usr/bin/ipmitool";
-$config['virsh']         = "/usr/bin/virsh";
-$config['dot']           = "/usr/bin/dot";
-$config['unflatten']     = "/usr/bin/unflatten";
-$config['neato']         = "/usr/bin/neato";
-$config['sfdp']          = "/usr/bin/sfdp";
+$config['whois']         = "/usr/bin/whois";     // ip_whois()
+$config['mtr']           = "/usr/bin/mtr";       // is_pingable()
+$config['ipmitool']      = "/usr/bin/ipmitool";  // ipmi module
+$config['virsh']         = "/usr/bin/virsh";     // libvirt module
+$config['wmic']          = "/bin/wmic";          // wmi_cmd()
+$config['dot']           = "/usr/bin/dot";       // Graphviz, networkmap (only)
+//$config['unflatten']     = "/usr/bin/unflatten"; // Graphviz, networkmap (only, unused)
+//$config['neato']         = "/usr/bin/neato";     // Graphviz (unused)
+//$config['sfdp']          = "/usr/bin/sfdp";      // Graphviz, networkmap (only, unused)
 $config['svn']           = "/usr/bin/svn";
 $config['git']           = "/usr/bin/git"; // Used in show device config feature for git-enabled repos and rancid >= 3.2
-$config['wmic']          = "/bin/wmic";
-$config['file']          = "/usr/bin/file";
-$config['wc']            = "/usr/bin/wc";
-$config['sudo']          = "/usr/bin/sudo";
-$config['tail']          = "/usr/bin/tail";
-$config['cut']           = "/usr/bin/cut";
-$config['tr']            = "/usr/bin/tr";
+//$config['nmap']          = "/usr/bin/nmap"; // unused
+//$config['file']          = "/usr/bin/file"; // unused
+//$config['wc']            = "/usr/bin/wc";   // unused
+//$config['sudo']          = "/usr/bin/sudo"; // unused
+//$config['tail']          = "/usr/bin/tail"; // unused
+//$config['cut']           = "/usr/bin/cut";  // unused
+//$config['tr']            = "/usr/bin/tr";   // unused
 
 
 // RRD Format Settings
@@ -230,18 +233,10 @@ $config['graphs']['style']               = "default"; // Possible values: defaul
 $config['graphs']['size']                = 'normal';  // Possible values: normal, big
 $config['graphs']['ports_scale_force']   = 1;         // Force scale also if real data more than selected scale
 $config['graphs']['ports_scale_default'] = "auto";    // Possible values: auto, speed, scales from $config['graphs']['ports_scale_list']
-$config['graphs']['ports_scale_list']    = [ '100Gbit', '50Gbit', '40Gbit', '25Gbit', '10Gbit', '5Gbit', '2.5Gbit', '1Gbit', '100Mbit', '10Mbit' ];
+$config['graphs']['ports_scale_list']    = [ '800Gbit', '400Gbit', '100Gbit', '50Gbit', '40Gbit', '25Gbit', '10Gbit', '5Gbit', '2.5Gbit', '1Gbit', '100Mbit', '10Mbit' ];
 $config['graphs']['stacked_processors']  = TRUE;
 $config['graphs']['dynamic_labels']      = TRUE;      // Draw different color markers for labels (instead square marker).
 $config['graphs']['always_draw_max']     = FALSE;     // Allow suppression of MAX region for aesthetic reasons on graphs < 1 week long
-
-$config['int_customers']        = 1;  // Enable Customer Port Parsing
-$config['int_customers_graphs'] = 1;  // Enable Customer Port List Graphs
-$config['int_transit']          = 1;  // Enable Transit Types
-$config['int_peering']          = 1;  // Enable Peering Types
-$config['int_core']             = 1;  // Enable Core Port Types
-$config['int_l2tp']             = 0;  // Enable L2TP Port Types
-$config['int_groups']           = []; // Custom Interface Types
 
 // PING Settings - Retries/Timeouts (default timeout same as for fping)
 $config['ping']['retries'] = 3; // How many times to retry ping (1 - 10)
@@ -320,8 +315,9 @@ $config['smsbox']['from']     = ''; // Phone number of sender, usually overridde
 
 $config['alerts']['bgp']['whitelist'] = NULL;      // Populate as an array with ASNs to alert on.
 
-$config['alerts']['interval'] = 86400;     // How frequently to re-send a notification for a continuing alert condition
-// In seconds. Default is 1 day.
+// How frequently to re-send a notification for a continuing alert condition
+$config['alerts']['critical']['interval'] = 86400; // Default is 1 day.
+$config['alerts']['warning']['interval']  = 86400; // Default is 1 day.
 
 $config['alerts']['suppress']       = FALSE; // Suppress all notifications.
 $config['alerts']['disable']['all'] = FALSE; // Disable all notifications.
@@ -334,6 +330,15 @@ $config['alerts']['disable']['all'] = FALSE; // Disable all notifications.
 // $config['alerts']['status'][1] = '1'; // RECOVERY
 // $config['alerts']['status'][2] = '2'; // DELAYED
 // $config['alerts']['status'][3] = '3'; // SUPPRESSED
+// $config['alerts']['status'][9] = '0'; // SYSLOG
+// Custom alerts status name, in notification message tag for: %TITLE%
+// See: alert_status_array()
+$config['alerts']['status_name'][0] = 'ALERT';    // ALERT
+$config['alerts']['status_name'][1] = 'RECOVER';  // RECOVERY
+// Seems as not required
+// $config['alerts']['status_name'][2] = 'DELAY';    // DELAYED
+// $config['alerts']['status_name'][3] = 'SUPPRESS'; // SUPPRESSED
+$config['alerts']['status_name'][9] = 'SYSLOG';   // SYSLOG
 
 // Poller wrapper settings
 #$config['poller-wrapper']['threads']           = 0;         // The number of poller threads that should run simultaneously. Default: CPU count x 2
@@ -724,7 +729,23 @@ $config['bad_iftype'][] = "usb"; // Ignore USB pseudo interface (BSD)
 // FIXME. Rename to $config['ports']['ignore_alias_regexp']
 $config['bad_ifalias_regexp'] = [];
 
-$config['ports']['ignore_errors_iftype'] = ['ieee80211'];
+$config['ports']['ignore_errors_iftype'] = [ 'ieee80211' ];
+
+// Port Description Parsing types and options
+
+$config['port_descr_parser']                = "includes/port-descr-parser.inc.php"; // Parse port descriptions into fields, custom function. WARNING! use descr_regexp instead
+$config['ports']['descr_regexp'][]          = "/^(?<type>\w+):\s*(?<descr>\w[^\[\(\{]*)(\s*\[(?<speed>.+)\])?(\s*\((?<notes>.+)\))?(\s*\{(?<circuit>.+)\})?/";
+
+// Enable/disable only for Web UI display, parsing always
+$config['ports']['descr_groups']['cust']    = [ 'name' => 'Customers', 'enable' => TRUE,  'icon' => 'port-customer', 'graphs' => TRUE ];
+$config['ports']['descr_groups']['peering'] = [ 'name' => 'Peering',   'enable' => TRUE,  'icon' => 'port-peering' ];
+$config['ports']['descr_groups']['transit'] = [ 'name' => 'Transit',   'enable' => TRUE,  'icon' => 'port-transit' ];
+$config['ports']['descr_groups']['core']    = [ 'name' => 'Core',      'enable' => TRUE,  'icon' => 'port-core' ];
+$config['ports']['descr_groups']['server']  = [ 'name' => 'Servers',   'enable' => TRUE,  'icon' => 'devices' ];
+$config['ports']['descr_groups']['l2tp']    = [ 'name' => 'L2TP',      'enable' => FALSE, 'icon' => 'users' ];
+$config['ports']['descr_groups']['service'] = [ 'name' => 'Services',  'enable' => FALSE, 'icon' => 'service' ];
+
+$config['int_groups']                       = []; // Custom Interface Types, simple list saved for compatibility with old configs
 
 // Neighbour discovery/autodiscovery options
 // Ignore discover remote devices via discovery protocols (CDP, LLDP, FDP, AMAP and other)
@@ -995,12 +1016,22 @@ $config['syslog']['timestamp']     = 'system';    // Use timestamp from Observiu
 //$config['syslog']['host_map_regexp']['/^(\w[^\.\s]+)$/'] = '$1.mydomain.com'; // host -> host.mydomain.com
 //$config['syslog']['host_map_regexp']['/^(\S+)-re\d+/']   = '$1'; // junos-re0 -> junos
 
+// Filter by syslog message (only, case-sensitive), if contains this string
 $config['syslog']['filter'][] = 'last message repeated';
 $config['syslog']['filter'][] = 'Connection from UDP: [';
 $config['syslog']['filter'][] = 'ipSystemStatsTable node ipSystemStatsOutFragOKs not implemented';
 $config['syslog']['filter'][] = 'diskio.c';  // Ignore some crappy stuff from SNMP daemon
 $config['syslog']['filter'][] = '/run/user/lightdm/gvfs: Permission denied';
 $config['syslog']['filter'][] = "Could not open output pipe '/dev/xconsole'";
+
+// Filter by syslog message (only), if matched regex pattern
+//$config['syslog']['filter_regex'][] = '/^regex example$/';
+
+// Filter by syslog program (only, case-insensitive), if program equals one of this
+//$config['syslog']['filter_program'][] = 'LLDP';
+
+// Filter by syslog tag (only, case-insensitive), if one of tag equals one of this
+//$config['syslog']['filter_tag'][] = 'LLDP';
 
 $config['syslog']['fifo'] = FALSE;       // Set this to a FIFO to take input from FIFO
 
@@ -1018,6 +1049,7 @@ $config['realtime_interval'] = 2;        // Default interval when not set in per
  * By default, age in numeric value are seconds
  */
 
+$config['housekeeping']['bill_data']['age']     = '12M'; // Maximum age of billing data entries; 0 to disable
 $config['housekeeping']['syslog']['age']        = '1M'; // Maximum age of syslog entries; 0 to disable
 $config['housekeeping']['eventlog']['age']      = '6M'; // Maximum age of event log entries; 0 to disable
 $config['housekeeping']['alertlog']['age']      = '6M'; // Maximum age of alert log entries; 0 to disable
@@ -1160,8 +1192,6 @@ $config['discovery_modules']['raid']             = 0;
 
 // Ports extension modules
 
-$config['port_descr_parser']               = "includes/port-descr-parser.inc.php"; // Parse port descriptions into fields
-$config['port_descr_regexp']               = ["/^(?<type>\w+):\s*(?<descr>\w[^\[\(\{]*)(\s*\[(?<speed>.+)\])?(\s*\((?<notes>.+)\))?(\s*\{(?<circuit>.+)\})?/"];
 $config['enable_ports_etherlike']          = 0; // Enable Polling EtherLike-MIB (doubles interface processing time)
 $config['enable_ports_junoseatmvp']        = 0; // Enable JunOSe ATM VC Discovery/Poller
 $config['enable_ports_adsl']               = 1; // Enable ADSL-LINE-MIB

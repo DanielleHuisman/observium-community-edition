@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -15,12 +15,24 @@ if (str_starts_with($poll_device['sysDescr'], 'Linux')) {
     $version = explode(' ', $poll_device['sysDescr'])[2];
     $kernel  = $version;
 
+    // https://openwrt.org/about/history
     // this dumb way for detect version....
     // FIXME. I think it incorrect in some cases, but work for latest versions.
     $openwrt_versions = [
+        '6.6' => [
+            63 => '24.10.0-rc2',
+        ],
         '5.15' => [
-            //212 => '19.07.6',
+            167 => '23.05.5',
+            162 => '23.05.4',
+            150 => '23.05.3',
+            137 => '23.05.2',
             134 => '23.05.0',
+        ],
+        '5.10' => [
+            221 => '22.03.7',
+            201 => '22.03.6',
+            134 => '22.03.5',
             //187 => '19.07.4',
         ],
         '4.14' => [

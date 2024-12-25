@@ -1,52 +1,36 @@
 CISCOSB-rlInterfaces DEFINITIONS ::= BEGIN
 
--- Title:      CISCOSB Switch Interfaces Private
--- Version:    7.45
--- Date:       07 May 2006
--- 30-Nov-2004 Added type AutoNegCapabilitiesBits
--- 30-Nov-2004 Added fields swIfAdminSpeedDuplexAutoNegotiationLocalCapabilities
---                          swIfOperSpeedDuplexAutoNegotiationLocalCapabilities
---                          swIfSpeedDuplexNegotiationRemoteCapabilities to swIfEntry
--- 22-Nov-2005 Obsoleted field swIfPhysAddressType
--- 22-Nov-2005 Added rlIfBaseMACAddressPerIfIndex
--- 30-Oct-2005 Added swIfExtTable
--- 30-Nov-2005 Added fields swIfAdminComboMode
---                          swIfOperComboMode swIfExtTable to swIfEntry
--- 05-Dec-2005 Added rlFlowControlCascadeMode and rlFlowControlCascadeType
--- 23-Feb-2005 Added rlFlowControlRxPerSystem
--- 07-May-2006 Added rlCascadePortProtectionAction
--- 04-Jun-2006 Added multiple-auth enum to swIfHostMode
--- 11-Jun-2008 Added rlManagementIfIndex
--- 06-Jun-2009 Added rlIfClearPortMacAddresses
--- 30-May-2011  Added MODULE-IDENTITY
+-- Title: CISCOSB Switch Interfaces Private
 
 IMPORTS
-    switch001, rlIfInterfaces                               FROM CISCOSB-MIB
     ifIndex, InterfaceIndex, InterfaceIndexOrZero           FROM IF-MIB
     PortList                                                FROM Q-BRIDGE-MIB
     Unsigned32, Integer32, Counter32,
     MODULE-IDENTITY, OBJECT-TYPE                            FROM SNMPv2-SMI
     RowStatus, TruthValue, TEXTUAL-CONVENTION,
-    DisplayString                                           FROM SNMPv2-TC;
+    DisplayString                                           FROM SNMPv2-TC
+    switch001, 	rlIfInterfaces                               FROM CISCOSB-MIB;
+
 
 swInterfaces MODULE-IDENTITY
-      	LAST-UPDATED "201304010000Z"  -- April 1, 2013
-		ORGANIZATION "Cisco Systems, Inc."
+      LAST-UPDATED "201304010000Z"  -- April 1, 2013
+                ORGANIZATION "Cisco Systems, Inc."
+                CONTACT-INFO
+                "Postal: 170 West Tasman Drive
+                San Jose , CA 95134-1706
+                USA
 
-		CONTACT-INFO
-		"Postal: 170 West Tasman Drive
-		San Jose , CA 95134-1706
-		USA
+                
+                Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
 
-		
-		Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
-
-        DESCRIPTION
-             "The private MIB module definition for Switch Interfaces."
-      	REVISION     "201304010000Z"  -- April 1, 2013
-      	DESCRIPTION
+      DESCRIPTION
+              "The MIB module describes the private MIB for Switch Interfaces supported
+               by CISCOSB ROS software and products."
+      REVISION     "201304010000Z"  -- April 1, 2013
+      DESCRIPTION
               "Added MODULE-IDENTITY"
-        ::= { switch001 43 }
+      ::= { switch001 43  }
+
 
 -- These bits can be set in any combination (except unknown)
 -- for field swIfAdminSpeedDuplexAutoNegotiationLocalCapabilities
@@ -70,10 +54,11 @@ AutoNegCapabilitiesBits ::= TEXTUAL-CONVENTION
         tenGigaFull(8),
         fiveGigaFull(9),
         twoPointFiveGigaFull(10),
-	twentyFiveGigaFull(11),
-	fortyGigaFull(12),
-	fiftyGigaFull(13),
-	oneHundredGigaFull(14)
+		twentyFiveGigaFull(11),
+		fortyGigaFull(12),
+		fiftyGigaFull(13),
+		oneHundredGigaFull(14),
+		twoHundredGigaFull(15)
     }
 
 --
@@ -144,7 +129,11 @@ SwIfEntry ::= SEQUENCE {
         swIfAdminComboMode                                      INTEGER,
         swIfOperComboMode                                       INTEGER,
         swIfAutoNegotiationMasterSlavePreference                INTEGER,
-        swIfPortCapabilities                                    AutoNegCapabilitiesBits
+        swIfPortCapabilities                                    AutoNegCapabilitiesBits,
+	swIfPortStateDuration					INTEGER,
+        swIfApNegotiationLane                                   INTEGER,
+        swIfPortFecMode                                         INTEGER,
+        swIfPortNumOfLanes                                      INTEGER
         }
 
 
@@ -292,8 +281,8 @@ swIfType  OBJECT-TYPE
         eth20G(7),
         eth40G(8),
         eth100G(9),
-        eth25G(10),	
-        eth50G(11),	
+        eth25G(10),
+        eth50G(11),
         unknown(12)
     }
     MAX-ACCESS  read-only
@@ -776,6 +765,57 @@ swIfPortCapabilities OBJECT-TYPE
     DESCRIPTION
         "Returns the port capabilities."
     ::= { swIfEntry 46 }
+
+
+swIfPortStateDuration OBJECT-TYPE
+    SYNTAX   INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The amount of time(in sec) that a port has been up or down."
+    ::= {  swIfEntry 47  }
+
+swIfApNegotiationLane OBJECT-TYPE
+    SYNTAX  INTEGER {
+        laneZero(0),
+        laneOne(1),
+        laneTwo(2),
+        laneThree(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS       current
+    DESCRIPTION
+        "which lane is used to perform negotiation in AP mode."
+    DEFVAL { laneZero }
+    ::= { swIfEntry 48}
+
+swIfPortFecMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        fc(1),
+        rs(2),
+        none(3),
+		default(128)
+    }
+    MAX-ACCESS  read-write
+    STATUS       current
+    DESCRIPTION
+        "determine fec (error correction) mode."
+    ::= { swIfEntry 49 }
+
+swIfPortNumOfLanes OBJECT-TYPE
+    SYNTAX  INTEGER {
+        oneLane(1),
+        twoLanes(2),
+        fourLanes(4),
+		eightLanes(8),
+		default(128)
+    }
+    MAX-ACCESS  read-write
+    STATUS       current
+    DESCRIPTION
+        "determine number of lanes to configure interface mode."
+	DEFVAL { default }
+    ::= { swIfEntry 50 }
 
 --
 -- swIfMibVersion
@@ -1331,9 +1371,9 @@ rlIfPortsNegotationTuning OBJECT-TYPE
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
-        "indicates if to apply link negotiation tuning WA globally for all ports with PHY 3140."    
-    ::= { rlIfInterfaces 33 } 
-    
+        "indicates if to apply link negotiation tuning WA globally for all ports with PHY 3140."
+    ::= { rlIfInterfaces 33 }
+
 rlFlowControlPerSystem OBJECT-TYPE
     SYNTAX      TruthValue
     MAX-ACCESS  read-write
@@ -1373,7 +1413,7 @@ macOpifIndex OBJECT-TYPE
          particular value of this index is the same interface as
          identified by the same value of ifIndex (MIB II)."
     ::= {  macOperationEntry 1  }
-	
+
 macOpType OBJECT-TYPE
     SYNTAX  INTEGER {
         securePortDynamicToStatic(1),
@@ -1384,7 +1424,117 @@ macOpType OBJECT-TYPE
     DESCRIPTION
         " This variable indicates what operation should be performed on the MAC
           of the given interface."
-    ::= {  macOperationEntry 2  }	
+    ::= {  macOperationEntry 2  }
+
+NumOfLanesBits ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "num of lanes for interface mode in speed bits."
+    SYNTAX BITS {
+		default(0),
+        oneLane(1),
+        twoLanes(2),
+        fourLanes(3),
+        eightLanes(4)
+    }
+
+rlIfApPortTable    OBJECT-TYPE
+   SYNTAX  SEQUENCE  OF RlIfApPortEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+    "Information and configuration of AP advertisements feature."
+   ::=  { rlIfInterfaces 35 }
+
+rlIfApPortEntry OBJECT-TYPE
+   SYNTAX  RlIfApPortEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+    "Defines the contents of each line in the rlIfApPortTable table."
+   INDEX   { rlIfApPortIndex, rlIfApPortSpeed }
+   ::=  { rlIfApPortTable 1 }
+
+RlIfApPortEntry ::= SEQUENCE {
+        rlIfApPortIndex                                         INTEGER,
+	rlIfApPortSpeed                                         INTEGER,
+        rlIfApPortFcFecSupported	                        INTEGER,
+        rlIfApPortRsFecSupported                                INTEGER,
+	rlIfApPortFecRequired	                                INTEGER,
+	rlIfApPortNumOfLanesBmp					NumOfLanesBits
+    }
+
+rlIfApPortIndex OBJECT-TYPE
+    SYNTAX   INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Index to the swIfApTable. The interface defined by a
+         particular value of this index is the same interface as
+         identified by the same value of ifIndex (MIB II)."
+    ::= {  rlIfApPortEntry 1  }
+
+rlIfApPortSpeed OBJECT-TYPE
+   SYNTAX  INTEGER
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+        "This variable specifies the required speed of this interface in bits
+         per second. This specification will take effect only if
+         swIfSpeedDuplexAutoNegotiation is disabled.
+         A value of 10 is returned for 10G.
+         A value of 0 is returned if the value of the variable
+         hasn't been set."
+   DEFVAL { 0 }
+  ::= { rlIfApPortEntry  2 }
+
+rlIfApPortFcFecSupported  OBJECT-TYPE
+    SYNTAX  INTEGER {
+        default(0),
+        true(1),
+        false(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable or disable support FC fec on an interface."
+    DEFVAL { default }
+    ::= {  rlIfApPortEntry 3 }
+
+rlIfApPortRsFecSupported  OBJECT-TYPE
+    SYNTAX  INTEGER {
+        default(0),
+        true(1),
+        false(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable or disable support RS fec on an interface."
+    DEFVAL { default }
+    ::= {  rlIfApPortEntry 4 }
+
+rlIfApPortFecRequired  OBJECT-TYPE
+    SYNTAX  INTEGER {
+        default(0),
+        true(1),
+        false(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Required or not required fec from link partner."
+    DEFVAL { default }
+    ::= {  rlIfApPortEntry 5 }
+
+rlIfApPortNumOfLanesBmp OBJECT-TYPE
+    SYNTAX NumOfLanesBits
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "num of lanes to advertize per speed for interface mode."
+    DEFVAL { {default} }
+    ::= { rlIfApPortEntry 6 }
 
 END
 

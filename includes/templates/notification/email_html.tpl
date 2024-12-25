@@ -10,7 +10,8 @@
  */
 /**
  * Used keys:
- * ALERT_STATE, ALERT_URL, ALERT_MESSAGE, CONDITIONS, METRICS, DURATION,
+ * ALERT_STATE, ALERT_STATE_NAME, ALERT_URL, ALERT_MESSAGE,
+ * CONDITIONS, METRICS, DURATION,
  * ENTITY_LINK, ENTITY_DESCRIPTION, ENTITY_GRAPHS,
  * DEVICE_LINK, DEVICE_HARDWARE, DEVICE_OS, DEVICE_LOCATION, DEVICE_UPTIME
  */
@@ -94,7 +95,7 @@
 <body>
 <table class="table box box-solid">
   <tbody>
-    <tr class="{{ALERT_STATE}}"><td class="state-marker"></td><td style="padding: 10px;" class="header">{{ALERT_STATE}}</td><td><a style="float: right;" href="{{{ALERT_URL}}}">Modify</a></td></tr>
+    <tr class="{{ALERT_STATE}}"><td class="state-marker"></td><td style="padding: 10px;" class="header">{{ALERT_STATE_NAME}}</td><td><a style="float: right;" href="{{{ALERT_URL}}}">Modify</a></td></tr>
     <tr><td colspan=2><strong>Alert</strong></td><td class="{{ALERT_STATE}}"><strong>{{ALERT_MESSAGE}}</strong></td></tr>
     {{#ENTITY_LINK}}
     <tr><td colspan=2><strong>Entity</strong></td><td><strong>{{{ENTITY_LINK}}}</strong></td></tr>

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -417,13 +417,15 @@ foreach (['graphs'] as $type) {
     }
 }
 
-if (isset($vars['pagination']) && (!$vars['pagination'] || $vars['pagination'] == 'no')) {
-    $navbar['options_right']['pagination'] = ['text' => 'Enable Pagination', 'url' => generate_url($vars, ['pagination' => NULL])];
-} else {
-    $navbar['options_right']['pagination'] = ['text' => 'Disable Pagination', 'url' => generate_url($vars, ['pagination' => '0', 'pageno' => NULL, 'pagesize' => NULL])];
+if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5) {
+    if (get_var_true($vars['show_groups'])) {
+        $navbar['options_right']['show_groups'] = [ 'text' => 'Hide Groups', 'url' => generate_url($vars, [ 'show_groups' => NULL ]) ];
+    } else {
+        $navbar['options_right']['show_groups'] = [ 'text' => 'Show Groups', 'url' => generate_url($vars, [ 'show_groups' => 'yes' ]) ];
+    }
 }
 
-if ($vars['searchbar'] == "hide") {
+if (get_var_false($vars['searchbar'] ?? '', "hide")) {
     $navbar['options_right']['searchbar'] = ['text' => 'Show Search', 'url' => generate_url($vars, ['searchbar' => NULL])];
 } else {
     $navbar['options_right']['searchbar'] = ['text' => 'Hide Search', 'url' => generate_url($vars, ['searchbar' => 'hide'])];
@@ -433,6 +435,13 @@ if (get_var_true($vars['bare'])) {
     $navbar['options_right']['header'] = ['text' => 'Show Header', 'url' => generate_url($vars, ['bare' => NULL])];
 } else {
     $navbar['options_right']['header'] = ['text' => 'Hide Header', 'url' => generate_url($vars, ['bare' => 'yes'])];
+}
+
+//if (isset($vars['pagination']) && (!$vars['pagination'] || $vars['pagination'] == 'no')) {
+if (get_var_false($vars['pagination'] ?? '')) {
+    $navbar['options_right']['pagination'] = ['text' => 'Enable Pagination', 'url' => generate_url($vars, ['pagination' => NULL])];
+} else {
+    $navbar['options_right']['pagination'] = ['text' => 'Disable Pagination', 'url' => generate_url($vars, ['pagination' => '0', 'pageno' => NULL, 'pagesize' => NULL])];
 }
 
 $navbar['options_right']['reset'] = ['text' => 'Reset', 'url' => generate_url(['page' => 'devices', 'section' => $vars['section']])];

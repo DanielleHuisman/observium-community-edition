@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -82,7 +82,7 @@ if ($GLOBALS['snmp_status']) {
         }
     }
 
-    $cpu_oids = ['ssCpuRawUser', 'ssCpuRawNice', 'ssCpuRawSystem', 'ssCpuRawIdle', 'ssCpuRawInterrupt', 'ssCpuRawSoftIRQ', 'ssCpuRawKernel', 'ssCpuRawWait'];
+    $cpu_oids = ['ssCpuRawIdle', 'ssCpuRawUser', 'ssCpuRawNice', 'ssCpuRawSystem', 'ssCpuRawInterrupt', 'ssCpuRawSoftIRQ', 'ssCpuRawKernel', 'ssCpuRawWait'];
 
     $ss_cpu_total = 0;
     foreach ($cpu_oids as $oid) {

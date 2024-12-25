@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -35,7 +35,7 @@ function generate_box_open($args = [])
         if (isset($args['icon'])) {
             $return .= get_icon($args['icon']);
         }
-        $return .= '<' . ($args['title-element'] ?? 'h3') . ' class="box-title"';
+        $return .= '    <' . ($args['title-element'] ?? 'h3') . ' class="box-title"';
         $return .= isset($args['title-style']) ? ' style="' . $args['title-style'] . '"' : '';
         $return .= '>';
         $return .= escape_html($args['title']) . '</' . ($args['title-element'] ?? 'h3') . '>' . PHP_EOL;
@@ -94,6 +94,10 @@ function generate_box_open($args = [])
             }
 
             $return .= '    </div>';
+        } elseif (!safe_empty($args['header-navbar'])) {
+
+            //print_navbar($args['header-navbar']);
+            $return .= generate_navbar($args['header-navbar']);
         }
         $return .= '  </div>' . PHP_EOL;
     }
@@ -394,7 +398,7 @@ SCRIPT;
     echo('    <td class="state-marker"></td>');
     //echo('    <td style="width: 0px;"></td>');
     echo('    <td style="width: 40%; padding-left: 15px;"><strong style="color: #0a5f7f; font-size: 1.6rem">' . $variable['name'] . '</strong>');
-    echo('<br /><small>' . escape_html($variable['shortdesc']) . '</small>' . PHP_EOL);
+    echo('<br /><small>' . get_markdown_extra($variable['shortdesc']) . '</small>' . PHP_EOL);
     echo('      </td>' . PHP_EOL);
     echo('      <td class="text-nowrap" style="width: 50px">' . PHP_EOL);
     echo('<div class="pull-right">');
@@ -502,6 +506,13 @@ SCRIPT;
 
             register_html_resource('script', $switchdescr);
             break;
+        case 'enum-list':
+            // Same as key-value clone, but key is numeric iterator
+            if (!isset($params['value']['class'])) {
+                // force longer value input
+                $params['value']['class'] = 'input-xxlarge';
+            }
+            // no break
         case 'enum-key-value':
             //r($content);
             $target_id = $htmlname . '[';
@@ -518,25 +529,27 @@ SCRIPT;
             $i = 0;
             foreach ($content as $key => $value) {
                 echo('<div id="' . $htmlname . '_clone_row" class="control-group text-nowrap" style="margin: 10px 0 10px 0;">' . PHP_EOL);
-                $item = [
-                  'id'          => "{$htmlname}[key][]",
-                  'name'        => 'Key',
-                  //'width'    => '500px',
-                  'class'       => 'input-large',
-                  'type'        => 'text',
-                  'readonly'    => $readonly,
-                  'disabled'    => (bool)$locked,
-                  'placeholder' => TRUE,
-                  'value'       => $key
-                ];
-                if (isset($params['key'])) {
-                    $item = array_merge($item, (array)$params['key']);
+                if ($vartype !== 'enum-list') {
+                    $item = [
+                        'id'          => "{$htmlname}[key][]",
+                        'name'        => 'Key',
+                        //'width'    => '500px',
+                        'class'       => 'input-large',
+                        'type'        => 'text',
+                        'readonly'    => $readonly,
+                        'disabled'    => (bool)$locked,
+                        'placeholder' => TRUE,
+                        'value'       => $key
+                    ];
+                    if (isset($params['key'])) {
+                        $item = array_merge($item, (array)$params['key']);
+                    }
+                    echo(generate_form_element($item));
                 }
-                echo(generate_form_element($item));
                 $item = [
                   'id'          => "{$htmlname}[value][]",
                   'name'        => 'Value',
-                  //'width'    => '500px',
+                  //'width'       => '100%',
                   'class'       => 'input-xlarge',
                   'type'        => 'text',
                   'readonly'    => $readonly,

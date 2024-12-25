@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -48,7 +48,7 @@ if ($inlet_count = snmp_get_oid($device, 'pduPwrMonitoringInletNum.0', 'PWTv1-MI
             'limit_high'      => $entry['inletCfgLoadCritical'] * 1000 * $scale,
             'limit_high_warn' => $entry['inletCfgLoadWarning'] * 1000 * $scale
         ];
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Inlet Total" . $name;
         $oid_num  = ".1.3.6.1.4.1.42610.1.4.4.1.6.1.2.1.4.$index";
@@ -79,7 +79,7 @@ if ($inlet_count = snmp_get_oid($device, 'pduPwrMonitoringInletNum.0', 'PWTv1-MI
                 'limit_high'      => $entry['inletCfgTotalCurrCritPhase' . $phase] * $scale,
                 'limit_high_warn' => $entry['inletCfgTotalCurrWarnPhase' . $phase] * $scale
             ];
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
             $descr    = "Inlet" . $name . $phase_name;
             $oid_name = 'inletVoltPhase' . $phase;
@@ -90,7 +90,7 @@ if ($inlet_count = snmp_get_oid($device, 'pduPwrMonitoringInletNum.0', 'PWTv1-MI
                 'limit_high'      => $entry['inletCfgVoltCritPhase' . $phase] * $scale,
                 'limit_high_warn' => $entry['inletCfgVoltWarnPhase' . $phase] * $scale
             ];
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
             $descr    = "Inlet" . $name . $phase_name;
             $oid_name = 'inletFreqPhase' . $phase;
@@ -98,7 +98,7 @@ if ($inlet_count = snmp_get_oid($device, 'pduPwrMonitoringInletNum.0', 'PWTv1-MI
             $value    = $entry[$oid_name];
             $scale    = 0.01;
             $options  = [];
-            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
             if ($phase_count > 1) {
                 // Three Phase
@@ -108,7 +108,7 @@ if ($inlet_count = snmp_get_oid($device, 'pduPwrMonitoringInletNum.0', 'PWTv1-MI
                 $value    = $entry[$oid_name];
                 $scale    = 0.1;
                 $options  = [];
-                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
                 $descr    = "Inlet" . $name . $phase_name;
                 $oid_name = 'inletStatusPhase' . $phase;
@@ -183,7 +183,7 @@ foreach ([ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H' ] as $char) {
               'limit_high'      => $entry["outletCfgPdu{$char}OverCurrCritical"] * 0.1,
               'limit_high_warn' => $entry["outletCfgPdu{$char}OverCurrWarning"] * 0.1
             ];
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
             $descr    = "Outlet $index ($name)";
             $oid_name = "outletPdu{$char}Power";
@@ -194,7 +194,7 @@ foreach ([ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H' ] as $char) {
               'limit_high'      => $entry["outletCfgPdu{$char}OverPwrCritical"],
               'limit_high_warn' => $entry["outletCfgPdu{$char}OverPwrWarning"]
             ];
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
             $descr    = "Outlet $index ($name)";
             $oid_name = "outletPdu{$char}Energy";

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -18,26 +18,29 @@
  *
  * @return boolean TRUE if peer array valid
  */
-function is_bgp_peer_valid($peer, $device)
-{
-    $valid = TRUE;
+function is_bgp_peer_valid($peer, $device) {
+
+    // if ($peer['ip'] === '95.130.232.3') {
+    //     print_debug("Peer ignored (DEVEL).");
+    //     return FALSE;
+    // }
 
     if (isset($peer['admin_status']) && empty($peer['admin_status'])) {
-        $valid = FALSE;
         print_debug("Peer ignored (by empty Admin Status).");
+        return FALSE;
     }
 
     if ($valid && !(is_numeric($peer['as']) && $peer['as'] != 0)) {
-        $valid = FALSE;
         print_debug("Peer ignored (by invalid AS number '" . $peer['as'] . "').");
+        return FALSE;
     }
 
     if ($valid && !get_ip_version($peer['ip'])) {
-        $valid = FALSE;
         print_debug("Peer ignored (by invalid Remote IP '" . $peer['ip'] . "').");
+        return FALSE;
     }
 
-    return $valid;
+    return TRUE;
 }
 
 /**
@@ -123,8 +126,8 @@ function bgp_asdot_to_asplain($as)
  *
  * @return array
  */
-function get_bgp_localas_array($device)
-{
+function get_bgp_localas_array($device) {
+
     global $config, $attribs;
 
     if (OBS_PROCESS_NAME === 'poller') {
@@ -282,7 +285,13 @@ function get_bgp_localas_array($device)
 
                 // Common LocalAs before all
                 $bgp4_local_as = snmp_get_oid($device_vrf, 'bgpLocalAs.0', 'BGP4-MIB');
-                if (!snmp_status() && $device['os'] === 'fortigate') {
+                if (snmp_status()) {
+                    if ($device['os'] === 'nxos' &&
+                        safe_empty(snmp_getnext_oid($device_vrf, 'bgpPeerRemoteAs', 'BGP4-MIB'))) {
+                        // Cisco NXOS report in each VRF table bgpLocalAs, but without any real peer inside (only paths)
+                        $bgp4_local_as = FALSE;
+                    }
+                } elseif ($device['os'] === 'fortigate') {
                     // Strange case on Fortigate devices
                     // BGP4-MIB::bgpVersion.1 = Hex-STRING: 10
                     // BGP4-MIB::bgpLocalAs.1 = INTEGER: 65403
@@ -456,10 +465,13 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
         case 'BGP4V2-MIB': // FRR
             // BGP4V2-MIB::bgp4V2PeerRemoteAddr.1.4.95.130.232.2 = Hex-STRING: 5F 82 E8 02
             // BGP4V2-MIB::bgp4V2PeerRemoteAddr.2.16.42.2.11.112.0.0.5.3.0.0.0.0.0.0.0.2 = Hex-STRING: 2A 02 0B 70 00 00 05 03 00 00 00 00 00 00 00 02
+
+            // BGP4V2-MIB::bgp4V2PeerRemoteAddr.1.ipv6.254.128.0.0.0.0.0.0.142.71.190.255.254.109.54.145 = Hex-STRING: FE 80 00 00 00 00 00 00 8E 47 BE FF FE 6D 36 91
             // 1. bgp4V2PeerInstance
             $peer['bgp4V2PeerInstance'] = array_shift($index_parts);
             // 2. length of the IP address
-            $ip_len = array_shift($index_parts);
+            array_shift($index_parts);
+            $ip_len = safe_count($index_parts);
             // 3. bgp4V2PeerRemoteAddr
             $peer_ip = implode('.', $index_parts);
             if ((int)$ip_len === 16) {
@@ -469,6 +481,9 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
                 $peer['bgp4V2PeerRemoteAddr']     = $peer_ip;
                 $peer['bgp4V2PeerRemoteAddrType'] = 'ipv' . $peer_addr_type;
             }
+            // print_debug_vars($ip_len);
+            // print_debug_vars($peer_ip);
+            // print_debug_vars($peer);
             break;
 
         case 'FOUNDRY-BGP4V2-MIB': // BGP4V2-MIB draft
@@ -529,7 +544,7 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
 
             // 2. hwBgpPeerAddrFamilyAfi
             $afi  = array_shift($index_parts);
-            $afis = [1 => 'ipv4', 2 => 'ipv6', 25 => 'vpls', 196 => 'l2vpn']; // Huawei specific AFI numbers (HWBgpAfi)
+            $afis = [ 1 => 'ipv4', 2 => 'ipv6', 25 => 'vpls', 196 => 'l2vpn' ]; // Huawei specific AFI numbers (HWBgpAfi)
             if (isset($afis[$afi])) {
                 $peer['hwBgpPeerAddrFamilyAfi'] = $afis[$afi];
             } else {
@@ -539,7 +554,8 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
 
             // 3. hwBgpPeerAddrFamilySafi
             $safi  = array_shift($index_parts);
-            $safis = [1 => 'unicast', 2 => 'multicast', 4 => 'mpls', 5 => 'mcast-vpn', 65 => 'vpls', 66 => 'mdt', 128 => 'vpn', 132 => 'route-target']; // Huawei specific SAFI numbers (HWBgpSafi)
+            $safis = [ 1 => 'unicast', 2 => 'multicast', 4 => 'mpls', 5 => 'mcast-vpn',
+                       65 => 'vpls', 66 => 'mdt', 128 => 'vpn', 132 => 'route-target']; // Huawei specific SAFI numbers (HWBgpSafi)
             if (isset($safis[$safi])) {
                 $peer['hwBgpPeerAddrFamilySafi'] = $safis[$safi];
             } else {
@@ -894,7 +910,18 @@ function get_astext($asn) {
  * @return string|false
  */
 function get_ipas($ip) {
+    global $config, $cache;
+
     $ip_type = get_ip_type($ip);
+
+    // Can set custom ASN associations for private nets
+    if (!safe_empty($config['asnet'])) {
+        foreach ($config['asnet'] as $asn => $as_nets) {
+            if (match_network($ip, (array)$as_nets)) {
+                return $asn;
+            }
+        }
+    }
 
     if (!$ip_type || in_array($ip_type,  [ 'unspecified', 'loopback', 'private' ])) {
         return FALSE;
@@ -998,7 +1025,7 @@ function discover_vrf($device, $vrf)
 
     $insert_array = ['device_id' => $device['device_id']];
     foreach ($params_main as $param) {
-        $insert_array[$param] = isset($vrf[$param]) ? $vrf[$param] : '';
+        $insert_array[$param] = $vrf[$param] ?? '';
     }
 
     // Set added/changed params

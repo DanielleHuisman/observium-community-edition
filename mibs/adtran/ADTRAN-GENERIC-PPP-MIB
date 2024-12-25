@@ -1,0 +1,2971 @@
+ADTRAN-GENERIC-PPP-MIB
+
+-- TITLE:     The ADTRAN GENERIC PPP MIB
+-- PRODUCT:
+-- VERSION:   1.1
+-- DATE:      07/08/2009
+-- AUTHOR:    Gilbert Fernandez
+-- STATUS:    PRELIMINARY
+--
+-- This MIB defines the object identifiers (OID) for the
+-- ADTRAN GENERIC PPP MIB objects
+--
+-- HISTORY:
+-- 09/25/08 glf created.
+-- 10/28/08 glf added OIDs to provision alarm severity for the PPP alarms.
+--				Modified alarms to add varbind for the alarm severity
+-- 11/18/08 glf added more group provisioning OIDs for restart timer, max-terminate counter,
+--				max-configure counter, max-failure counter, keep alive rate (echo request polls)
+-- 05/22/09  cb CHAP configuration
+-- 05/04/09  cb DHCP Client Support
+-- 07/01/08 dcc add support for multilink PPP
+-- 07/08/09  cb Final IP Address Support
+-- 11/03/09 akd added Rx/TX L3 Packet Count Support to PPP Group Current, Interval, and Running Counts
+-- 11/19/09 glf added OIDs to provision LCP and NCP alarm enable and suppression
+-- 11/08/10 nra added OIDs for IPv6 support
+-- 03/02/11 nra added adGenPppGroupIpv6NCPState OID
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        TimeTicks, Integer32,IpAddress,Unsigned32,NOTIFICATION-TYPE,
+        Counter32,Gauge32
+            FROM SNMPv2-SMI
+        sysName
+            FROM SNMPv2-MIB
+        DisplayString, RowStatus, TruthValue, TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+        InetAddressIPv6
+            FROM INET-ADDRESS-MIB
+        ifIndex,
+        InterfaceIndex
+            FROM IF-MIB
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+        adGenPpp, adGenPppID
+            FROM ADTRAN-GENTA5K-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adTAeSCUTrapAlarmLevel
+            FROM ADTRAN-TAeSCUEXT1-MIB
+        adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB
+        ;
+
+    adGenPppMIB MODULE-IDENTITY
+        LAST-UPDATED "200911190000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Generic PPP MIB"
+        ::= {adGenPppID 1}
+
+-- OBJECT IDENTIFIERS
+
+adGenPppMIBObjects   OBJECT IDENTIFIER ::= {adGenPpp 1}
+adGenPppLinkObjects  OBJECT IDENTIFIER ::= {adGenPppMIBObjects 1}
+adGenPppLinkProv	 OBJECT IDENTIFIER ::= {adGenPppLinkObjects 1}
+adGenPppLinkStatus	 OBJECT IDENTIFIER ::= {adGenPppLinkObjects 2}
+adGenPppLinkPerfStats OBJECT IDENTIFIER ::= {adGenPppLinkObjects 3}
+
+adGenPppGroupObjects OBJECT IDENTIFIER ::= {adGenPppMIBObjects 2}
+adGenPppGroupProv	 OBJECT IDENTIFIER ::= {adGenPppGroupObjects 1}
+adGenPppGroupStatus	 OBJECT IDENTIFIER ::= {adGenPppGroupObjects 2}
+adGenPppGroupPerfStats OBJECT IDENTIFIER ::= {adGenPppGroupObjects 3}
+
+adGenPppAlarmsPrefix OBJECT IDENTIFIER ::= {adGenPpp 2}
+adGenPppAlarms       OBJECT IDENTIFIER ::= {adGenPppAlarmsPrefix 0}
+
+
+-- **********************************************************************
+-- PPP Link Alarm Provision Table
+-- **********************************************************************
+
+	adGenPppLinkAlarmProvTable                  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenPppLinkAlarmProvEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "..."
+    ::= { adGenPppLinkProv 1 }
+
+    adGenPppLinkAlarmProvEntry                  OBJECT-TYPE
+        SYNTAX          AdGenPppLinkAlarmProvEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            ""
+        INDEX { adGenSlotInfoIndex }
+    ::= { adGenPppLinkAlarmProvTable 1 }
+
+   AdGenPppLinkAlarmProvEntry ::=
+        SEQUENCE {
+	        adGenPppLinkAlarmProvLCPAlarmSeverity  		INTEGER,
+	        adGenPppLinkAlarmProvLCPAlarmSuppression	INTEGER,
+	        adGenPppLinkAlarmProvLCPAlarmEnable			TruthValue
+
+
+        }
+   adGenPppLinkAlarmProvLCPAlarmSeverity  OBJECT-TYPE
+        SYNTAX      INTEGER     {
+                                info(2),
+								alert(3),
+								minor(4),
+								major(5),
+								critical(6)
+                                }
+
+        MAX-ACCESS      read-write
+        STATUS      current
+        DESCRIPTION
+            "Sets the LCP Down Alarm Severity"
+        DEFVAL    { major }
+        ::= { adGenPppLinkAlarmProvEntry 1 }
+        
+	adGenPppLinkAlarmProvLCPAlarmSuppression OBJECT-TYPE
+        SYNTAX INTEGER (0..3) 
+        
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 LCP Alarm suppression (affects all Links 
+        	on the card). With suppression enabled, the alarm will still appear in the alarm log.
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adGenPppLinkAlarmProvEntry 2 }
+
+    adGenPppLinkAlarmProvLCPAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all Links on the card). False - deactivates the 
+        	alarm, meaning it will not go out via any protocol AND it will not appear in the
+        	alarm log."
+
+        DEFVAL {true}
+        ::= { adGenPppLinkAlarmProvEntry 3 }
+
+-- **********************************************************************
+-- PPP Link Status Table
+-- **********************************************************************
+
+	adGenPppLinkStatusTable                  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenPppLinkStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "..."
+    ::= { adGenPppLinkStatus 1 }
+
+    adGenPppLinkStatusEntry                  OBJECT-TYPE
+        SYNTAX          AdGenPppLinkStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Table indexed using the Link ifIndex"
+        INDEX { ifIndex }
+    ::= { adGenPppLinkStatusTable 1 }
+
+   AdGenPppLinkStatusEntry ::=
+        SEQUENCE {
+	        adGenPppLinkOperStatus  		INTEGER,
+	        adGenPppLinkCurrentLCPState		INTEGER,
+			adGenPppLinkNegotiatedStatus    DisplayString
+        }
+
+   adGenPppLinkOperStatus  OBJECT-TYPE
+        SYNTAX          INTEGER {
+                					opened(1),
+                                                        notopened(2)
+                                }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "The operational status of the LCP
+ 			 protocol."
+
+    ::= { adGenPppLinkStatusEntry 1 }
+
+   adGenPppLinkCurrentLCPState  OBJECT-TYPE
+        SYNTAX      INTEGER     {
+                                initial(1),
+                                starting(2),
+                                closed(3),
+                                stopped(4),
+                                closing(5),
+                                stopping(6),
+                                reqsent(7),
+                                ackrcvd(8),
+                                acksent(9),
+                                opened(10)
+                                }
+
+        MAX-ACCESS      read-only
+        STATUS      current
+        DESCRIPTION
+            "Returns the current LCP state"
+
+        ::= { adGenPppLinkStatusEntry 2 }
+
+   adGenPppLinkNegotiatedStatus OBJECT-TYPE
+        SYNTAX         DisplayString
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+           "A String Displaying Negotiated Information at the Link Level
+            The format of the string is split into records that are strings themselves
+            split using the ASCII character record separator (hex 0x1E, decimal 30)
+            Each Record is formatted: 'Record Name:Record Value'
+              ex)   LCP State:OPENED<RS>Local/Remote FCS Size:16/16<RS>
+
+            This string response can grow over-time for future debug information."
+       ::= { adGenPppLinkStatusEntry 3 }
+
+-- **********************************************************************
+-- PPP Link Stats Table
+-- **********************************************************************
+--
+-- The PPP Link Performance subtree
+--
+-- The PPP Link Performance subtree consists of a table of PPP links.  Each entry
+-- in the table contains status information about a link which is part
+-- of an PPP group, and also contains a configuration object to select
+-- which PPP group the link belongs.
+--
+
+adGenPppLinkPerfTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppLinkPerfEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Link Performance table."
+      ::= { adGenPppLinkPerfStats 1 }
+
+adGenPppLinkPerfEntry OBJECT-TYPE
+      SYNTAX      AdGenPppLinkPerfEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Link Performance table.
+        This table is index using the ifIndex of the PPP Link"
+      INDEX       { ifIndex }
+      ::= { adGenPppLinkPerfTable 1 }
+
+AdGenPppLinkPerfEntry ::= SEQUENCE {
+                        adGenPppLinkInOctets                    Counter32,
+			adGenPppLinkInGoodOctets		Counter32,
+                        adGenPppLinkInPkts                      Counter32,
+			adGenPppLinkInDiscards			Counter32,
+			adGenPppLinkInErrors			Counter32,
+			adGenPppLinkOutOctets			Counter32,
+                        adGenPppLinkOutPkts                     Counter32,
+			adGenPppLinkOutDiscards			Counter32,
+			adGenPppLinkOutErrors			Counter32,
+                        adGenPppLinkValidIntervals              INTEGER,
+                        adGenPppLinkInvalidIntervals            INTEGER,
+                        adGenPppLinkTimeElapsed                 INTEGER,
+                        adGenPppLinkResetStats                  INTEGER,
+                        adGenPppLinkResetPerfHistory            INTEGER
+			}
+
+adGenPppLinkInOctets OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Link"
+      ::= { adGenPppLinkPerfEntry 1 }
+
+adGenPppLinkInGoodOctets OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of good bytes received from the PPP Link"
+      ::= { adGenPppLinkPerfEntry 2 }
+
+adGenPppLinkInPkts OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Link"
+      ::= { adGenPppLinkPerfEntry 3 }
+
+adGenPppLinkInDiscards OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded"
+      ::= { adGenPppLinkPerfEntry 4 }
+
+adGenPppLinkInErrors OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors"
+      ::= { adGenPppLinkPerfEntry 5 }
+
+adGenPppLinkOutOctets OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Link"
+      ::= { adGenPppLinkPerfEntry 6 }
+
+adGenPppLinkOutPkts OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Link"
+      ::= { adGenPppLinkPerfEntry 7 }
+
+adGenPppLinkOutDiscards OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded"
+      ::= { adGenPppLinkPerfEntry 8 }
+
+adGenPppLinkOutErrors OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted because of errors."
+      ::= { adGenPppLinkPerfEntry 9 }
+
+adGenPppLinkValidIntervals OBJECT-TYPE
+      SYNTAX      INTEGER (0..96)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The number of previous 15 minute intervals for which valid data
+        was collected. "
+      ::= { adGenPppLinkPerfEntry 10 }
+
+adGenPppLinkInvalidIntervals OBJECT-TYPE
+      SYNTAX      INTEGER (0..96)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The number of intervals in the range for which no data is
+ 		available. "
+      ::= { adGenPppLinkPerfEntry 11 }
+
+adGenPppLinkTimeElapsed OBJECT-TYPE
+      SYNTAX      INTEGER (0..899)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The number of seconds that have elapsed since the beginning of
+        the current measurement period."
+      ::= { adGenPppLinkPerfEntry 12 }
+
+adGenPppLinkResetStats OBJECT-TYPE
+      SYNTAX      INTEGER { reset(1) }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "Writing a value of 1 resets the statistics in this table for this
+        link.  It does not affect performance history in other tables."
+
+      ::= { adGenPppLinkPerfEntry 13 }
+
+adGenPppLinkResetPerfHistory OBJECT-TYPE
+      SYNTAX      INTEGER { reset(1) }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "Writing a value of 1 resets the performance history for this link
+        in adGenPppLinkCurrentTable, adGenPppLinkIntervalTable, and
+        adGenPppLinkTotalTable.  It does not affect the statistics
+        in adGenPppLinkPerfTable."
+
+      ::= { adGenPppLinkPerfEntry 14 }
+
+-- The PPP Link Current Statistics subtree consists of a single table:
+-- the PPP Link Current Table.  This table contains various statistics
+-- collected by each PPP link for the current 15 minute interval.
+
+adGenPppLinkCurrentTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppLinkCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Link Current table."
+      ::= { adGenPppLinkPerfStats 2 }
+
+adGenPppLinkCurrentEntry OBJECT-TYPE
+      SYNTAX      AdGenPppLinkCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Link Current table."
+      INDEX       { ifIndex }
+      ::= { adGenPppLinkCurrentTable 1 }
+
+AdGenPppLinkCurrentEntry ::= SEQUENCE {
+      	adGenPppLinkCurrentInOctets     	Gauge32,
+      	adGenPppLinkCurrentInGoodOctets		Gauge32,
+  	  	adGenPppLinkCurrentInPkts			Gauge32,
+	  	adGenPppLinkCurrentInDiscards		Gauge32,
+	  	adGenPppLinkCurrentInErrors			Gauge32,
+	 	adGenPppLinkCurrentOutOctets		Gauge32,
+		adGenPppLinkCurrentOutPkts			Gauge32,
+		adGenPppLinkCurrentOutDiscards		Gauge32,
+		adGenPppLinkCurrentOutErrors		Gauge32
+
+      }
+adGenPppLinkCurrentInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Link, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 1 }
+
+adGenPppLinkCurrentInGoodOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of good bytes received from the PPP Link, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 2 }
+
+adGenPppLinkCurrentInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Link, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 3 }
+
+adGenPppLinkCurrentInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 4 }
+
+adGenPppLinkCurrentInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 5 }
+
+adGenPppLinkCurrentOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Link, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 6 }
+
+adGenPppLinkCurrentOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Link, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 7 }
+
+adGenPppLinkCurrentOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 8 }
+
+adGenPppLinkCurrentOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in the current 15 minute interval."
+
+      ::= { adGenPppLinkCurrentEntry 9 }
+
+-- The PPP Link Interval Statistics subtree consists of a single table:
+-- the PPP Link Interval Table.  This table contains various statistics
+-- collected by each PPP link over the previous 24 hours of operation.
+-- The past 24 hours are broken into 96 completed 15 minute intervals.
+
+adGenPppLinkIntervalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppLinkIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Link Interval table."
+      ::= { adGenPppLinkPerfStats 3 }
+
+adGenPppLinkIntervalEntry OBJECT-TYPE
+      SYNTAX      AdGenPppLinkIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Link Interval table."
+      INDEX       { ifIndex, adGenPppLinkIntervalNumber }
+      ::= { adGenPppLinkIntervalTable 1 }
+
+AdGenPppLinkIntervalEntry ::= SEQUENCE {
+        adGenPppLinkIntervalNumber              INTEGER,
+        adGenPppLinkIntervalInOctets            Gauge32,
+        adGenPppLinkIntervalInGoodOctets        Gauge32,
+        adGenPppLinkIntervalInPkts              Gauge32,
+        adGenPppLinkIntervalInDiscards          Gauge32,
+        adGenPppLinkIntervalInErrors            Gauge32,
+        adGenPppLinkIntervalOutOctets           Gauge32,
+        adGenPppLinkIntervalOutPkts             Gauge32,
+        adGenPppLinkIntervalOutDiscards         Gauge32,
+        adGenPppLinkIntervalOutErrors           Gauge32,
+        adGenPppLinkIntervalTimeStamp       DisplayString
+
+}
+adGenPppLinkIntervalNumber OBJECT-TYPE
+      SYNTAX      INTEGER (1..96)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "A number between 1 and 96, where 1 is the most
+         recently completed 15 minute interval and 96 is the least
+         recently completed 15 minutes interval (assuming that all
+         96 intervals are valid)."
+      ::= { adGenPppLinkIntervalEntry 1 }
+
+adGenPppLinkIntervalInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Link, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 2 }
+
+adGenPppLinkIntervalInGoodOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of good bytes received from the PPP Link, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 3 }
+
+adGenPppLinkIntervalInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Link, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 4 }
+
+adGenPppLinkIntervalInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 5 }
+
+adGenPppLinkIntervalInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 6 }
+
+adGenPppLinkIntervalOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Link, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 7 }
+
+adGenPppLinkIntervalOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Link, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 8 }
+
+adGenPppLinkIntervalOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 9 }
+
+adGenPppLinkIntervalOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppLinkIntervalEntry 10 }
+
+adGenPppLinkIntervalTimeStamp OBJECT-TYPE
+      SYNTAX          DisplayString
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+        "Timestamp of the 15-minute interval"
+
+      ::= { adGenPppLinkIntervalEntry 11 }
+
+--
+-- The PPP Link Total Statistics subtree consists of a single table:
+-- the PPP Link Total Table.  This table contains the cumulative sum
+-- of the various statistics collected by each PPP link for the 24 hour
+-- period preceding the current interval.
+
+adGenPppLinkTotalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppLinkTotalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Link Total table."
+      ::= { adGenPppLinkPerfStats 4 }
+
+adGenPppLinkTotalEntry OBJECT-TYPE
+      SYNTAX      AdGenPppLinkTotalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Link Total table."
+      INDEX       { ifIndex }
+      ::= { adGenPppLinkTotalTable 1 }
+
+AdGenPppLinkTotalEntry ::= SEQUENCE {
+		adGenPppLinkTotalInOctets     		Gauge32,
+      	adGenPppLinkTotalInGoodOctets		Gauge32,
+  	  	adGenPppLinkTotalInPkts				Gauge32,
+	  	adGenPppLinkTotalInDiscards			Gauge32,
+	  	adGenPppLinkTotalInErrors			Gauge32,
+	 	adGenPppLinkTotalOutOctets			Gauge32,
+		adGenPppLinkTotalOutPkts			Gauge32,
+		adGenPppLinkTotalOutDiscards		Gauge32,
+		adGenPppLinkTotalOutErrors			Gauge32
+}
+
+adGenPppLinkTotalInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Link, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 1 }
+
+adGenPppLinkTotalInGoodOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of good bytes received from the PPP Link, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 2 }
+
+adGenPppLinkTotalInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Link, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 3 }
+
+adGenPppLinkTotalInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 4 }
+
+adGenPppLinkTotalInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 5 }
+
+adGenPppLinkTotalOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Link, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 6 }
+
+adGenPppLinkTotalOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Link, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 7 }
+
+adGenPppLinkTotalOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 8 }
+
+adGenPppLinkTotalOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in the previous 24 hour interval."
+
+      ::= { adGenPppLinkTotalEntry 9 }
+
+
+-- The PPP Link Current Day Statistics subtree consists of a single table:
+-- the PPP Link Current Day Table.  This table contains the cumulative sum
+-- of the various statistics collected by each PPP link for the current
+-- 24 hour period.
+
+adGenPppLinkDayCurrentTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppLinkDayCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Link Current Day table."
+      ::= { adGenPppLinkPerfStats 5 }
+
+adGenPppLinkDayCurrentEntry OBJECT-TYPE
+      SYNTAX      AdGenPppLinkDayCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Link Current Day table."
+      INDEX       { ifIndex }
+      ::= { adGenPppLinkDayCurrentTable 1 }
+
+AdGenPppLinkDayCurrentEntry ::= SEQUENCE {
+		adGenPppLinkDayCurrentInOctets     		Gauge32,
+      	adGenPppLinkDayCurrentInGoodOctets		Gauge32,
+  	  	adGenPppLinkDayCurrentInPkts			Gauge32,
+	  	adGenPppLinkDayCurrentInDiscards		Gauge32,
+	  	adGenPppLinkDayCurrentInErrors			Gauge32,
+	 	adGenPppLinkDayCurrentOutOctets			Gauge32,
+		adGenPppLinkDayCurrentOutPkts			Gauge32,
+		adGenPppLinkDayCurrentOutDiscards		Gauge32,
+		adGenPppLinkDayCurrentOutErrors			Gauge32
+}
+
+adGenPppLinkDayCurrentInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Link, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 1 }
+
+adGenPppLinkDayCurrentInGoodOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of good bytes received from the PPP Link, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 2 }
+
+adGenPppLinkDayCurrentInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Link, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 3 }
+
+adGenPppLinkDayCurrentInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 4 }
+
+adGenPppLinkDayCurrentInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 5 }
+
+adGenPppLinkDayCurrentOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Link, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 6 }
+
+adGenPppLinkDayCurrentOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Link, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 7 }
+
+adGenPppLinkDayCurrentOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 8 }
+
+adGenPppLinkDayCurrentOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in the current 24 hour interval."
+
+      ::= { adGenPppLinkDayCurrentEntry 9 }
+
+-- The PPP Link Daily Interval Statistics subtree consists of a single table:
+-- the PPP Link Daily Interval Table.  This table contains the cumulative sum
+-- of the various statistics collected by each PPP link for the 24 hour
+-- period preceding the current interval.
+
+adGenPppLinkDayIntervalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppLinkDayIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Link Daily Interval table."
+      ::= { adGenPppLinkPerfStats 6 }
+
+adGenPppLinkDayIntervalEntry OBJECT-TYPE
+      SYNTAX      AdGenPppLinkDayIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Link Daily Interval table."
+      INDEX       { ifIndex, adGenPppLinkDayIntervalNumber }
+      ::= { adGenPppLinkDayIntervalTable 1 }
+
+AdGenPppLinkDayIntervalEntry ::= SEQUENCE {
+        adGenPppLinkDayIntervalNumber           INTEGER,
+		adGenPppLinkDayIntervalInOctets     	Gauge32,
+      	adGenPppLinkDayIntervalInGoodOctets		Gauge32,
+  	  	adGenPppLinkDayIntervalInPkts			Gauge32,
+	  	adGenPppLinkDayIntervalInDiscards		Gauge32,
+	  	adGenPppLinkDayIntervalInErrors			Gauge32,
+	 	adGenPppLinkDayIntervalOutOctets		Gauge32,
+		adGenPppLinkDayIntervalOutPkts			Gauge32,
+		adGenPppLinkDayIntervalOutDiscards		Gauge32,
+		adGenPppLinkDayIntervalOutErrors		Gauge32,
+      	adGenPppLinkDayIntervalTimeStamp        DisplayString
+      	}
+
+adGenPppLinkDayIntervalNumber OBJECT-TYPE
+      SYNTAX      INTEGER (1..7)
+      MAX-ACCESS  not-accessible
+	  STATUS      current
+      DESCRIPTION
+        "A number between 1 and 7, where 1 is the most
+         recently completed 24 hour interval and 7 is the least
+         recently completed 24 hour interval (assuming that all
+         7 intervals are valid)."
+      ::= { adGenPppLinkDayIntervalEntry 1 }
+
+adGenPppLinkDayIntervalInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Link, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 2 }
+
+adGenPppLinkDayIntervalInGoodOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of good bytes received from the PPP Link, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 3 }
+
+adGenPppLinkDayIntervalInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Link, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 4 }
+
+adGenPppLinkDayIntervalInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 5 }
+
+adGenPppLinkDayIntervalInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 6 }
+
+adGenPppLinkDayIntervalOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Link, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 7 }
+
+adGenPppLinkDayIntervalOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Link, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 8 }
+
+adGenPppLinkDayIntervalOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 9 }
+
+adGenPppLinkDayIntervalOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in 24 hour intervals."
+
+      ::= { adGenPppLinkDayIntervalEntry 10 }
+
+adGenPppLinkDayIntervalTimeStamp OBJECT-TYPE
+      SYNTAX          DisplayString
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+        "Timestamp of 24 hour period (Date)"
+      ::= { adGenPppLinkDayIntervalEntry 11 }
+
+
+-- **********************************************************************
+-- Configuration
+-- **********************************************************************
+
+    -- PPP Group Provisioning
+    --
+    adGenPppGroupProvTable  OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenPppGroupProvEntry
+        MAX-ACCESS      not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The Ppp Group Provisioning Table."
+        ::= { adGenPppGroupProv 1 }
+
+    adGenPppGroupProvEntry  OBJECT-TYPE
+        SYNTAX      AdGenPppGroupProvEntry
+        MAX-ACCESS      not-accessible
+        STATUS      current
+        DESCRIPTION
+            "An entry in the PPP Group Provisioning Table.  This table contains
+            provisioning for the links that are in the group.
+            This table is indexed by the PPP Group ifIndex"
+
+        INDEX       {ifIndex }
+        ::= { adGenPppGroupProvTable 1 }
+
+    AdGenPppGroupProvEntry ::=
+        SEQUENCE {
+            adGenPppGroupSubscriberIpAddress   	        IpAddress,
+            adGenPppGroupGatewayIpAddress      	        IpAddress,
+            adGenPppGroupPrimaryDNSIpAddress   	        IpAddress,
+            adGenPppGroupSecondaryDNSIpAddress 	        IpAddress,
+            adGenPppGroupConfigInitialMRU	   	        INTEGER,
+            adGenPppGroupConfigMagicNumber     	        TruthValue,
+            adGenPppGroupConfigFcsSize		   	        INTEGER,
+            adGenPppGroupConfigACCompression	        TruthValue,
+            adGenPppGroupConfigPFCompression	        TruthValue,
+            adGenPppGroupConfigLQM				        TruthValue,
+            adGenPppGroupConfigRestartTimer		        INTEGER,
+            adGenPppGroupConfigMaxTerminate		        INTEGER,
+            adGenPppGroupConfigMaxConfigure		        INTEGER,
+            adGenPppGroupConfigMaxFailure		        INTEGER,
+            adGenPppGroupConfigKeepAliveRate	        INTEGER,
+            adGenPppGroupChapEnabled                    TruthValue,
+            adGenPppGroupLocalUserName                  OCTET STRING,
+            adGenPppGroupLocalPassword                  OCTET STRING,
+            adGenPppGroupPeerUserName                   OCTET STRING,
+            adGenPppGroupPeerPassword                   OCTET STRING,
+            adGenPppGroupIpAddressAssignment            INTEGER,
+            adGenPppGroupDhcpClientIdentfier            OCTET STRING,
+            adGenPppGroupDhcpHostname                   DisplayString,
+            adGenPppGroupConfigMultilink                TruthValue,
+            adGenPppGroupSubscriberIPv6Address          InetAddressIPv6,
+            adGenPppGroupGatewayIPv6AddressAssignment   INTEGER,
+            adGenPppGroupGatewayIPv6Address             InetAddressIPv6,
+            adGenPppGroupIpEnabled                      TruthValue,
+            adGenPppGroupIpv6Enabled                    TruthValue
+        }
+
+     adGenPppGroupSubscriberIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-write
+          	STATUS         current
+          	DESCRIPTION
+                "The IP address to be assigned to the Subscriber on the far end
+                 of this PPP Group."
+          ::= { adGenPppGroupProvEntry 1 }
+
+     adGenPppGroupGatewayIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-write
+          	STATUS         current
+          	DESCRIPTION
+                "The IP address of the Gateway assigned to this PPP Group"
+          ::= { adGenPppGroupProvEntry 2 }
+
+
+     adGenPppGroupPrimaryDNSIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-write
+          	STATUS         current
+          	DESCRIPTION
+                "The IP address of the Primary DNS Server."
+          ::= { adGenPppGroupProvEntry 3 }
+
+     adGenPppGroupSecondaryDNSIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-write
+          	STATUS         current
+          	DESCRIPTION
+                "The IP address of the Secondary DNS Server."
+          ::= { adGenPppGroupProvEntry 4 }
+
+	 adGenPppGroupConfigInitialMRU OBJECT-TYPE
+          	SYNTAX         INTEGER(0..2147483647)
+          	MAX-ACCESS     read-write
+          	STATUS         current
+          	DESCRIPTION
+                "The initial Maximum Receive Unit (MRU) that
+ 				the local PPP entity will advertise to the
+ 				remote entity. If the value of this variable is
+ 				0 then the local PPP entity will not advertise
+ 				any MRU to the remote entity and the default
+ 				MRU will be assumed. Changing this object will
+ 				have effect when the link is next restarted."
+ 			DEFVAL    { 1500 }
+          ::= { adGenPppGroupProvEntry 5 }
+
+	 adGenPppGroupConfigMagicNumber OBJECT-TYPE
+          	SYNTAX    TruthValue
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "If true then the local node will attempt to
+                         perform Magic Number negotiation with the
+                         remote node. If false then this negotiation
+                         is not performed. In any event, the local node
+                         will comply with any magic number negotiations
+                         attempted by the remote node, per the PPP
+                         specification. Changing this object will have
+                         effect when the link is next restarted."
+            DEFVAL    { false }
+          ::= { adGenPppGroupProvEntry 6 }
+
+	 adGenPppGroupConfigFcsSize OBJECT-TYPE
+          	SYNTAX    INTEGER {
+                                        zerobits(1),
+                                        sixteenbits(2),
+                                        thirtytwobits(3)
+          				}
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "The size of the FCS, in bits, the local node
+                         will attempt to negotiate for use with the
+                         remote node. Regardless of the value of this
+                         object, the local node will comply with any FCS
+                         size negotiations initiated by the remote node,
+                         per the PPP specification. Changing this object
+                         will have effect when the link is next
+                         restarted."
+            DEFVAL    { sixteenbits }
+          ::= { adGenPppGroupProvEntry 7 }
+
+	adGenPppGroupConfigACCompression OBJECT-TYPE
+          	SYNTAX    TruthValue
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "If true, ACFC negotiation is enabled"
+            DEFVAL    { false }
+          ::= { adGenPppGroupProvEntry 8 }
+
+	adGenPppGroupConfigPFCompression OBJECT-TYPE
+            SYNTAX    TruthValue
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "If true, PFC negotiation is enabled"
+            DEFVAL    { false }
+
+          ::= { adGenPppGroupProvEntry 9 }
+
+	adGenPppGroupConfigLQM OBJECT-TYPE
+            SYNTAX    TruthValue
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "If true, Link Quality Reports will be sent
+                         when LQRs are received"
+
+            DEFVAL    { true }
+
+          ::= { adGenPppGroupProvEntry 10 }
+
+	adGenPppGroupConfigRestartTimer OBJECT-TYPE
+            SYNTAX    INTEGER    (1..30)
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "The Restart timer is used to time transmissions of
+                         Configure-Request and Terminate-Request packets.  Expiration
+                         of the Restart Timer causes a retransmission of the corresponding
+                         Configure-Request or Terminate-Request packet"
+
+            DEFVAL    { 3 }
+
+          ::= { adGenPppGroupProvEntry 11 }
+
+	adGenPppGroupConfigMaxTerminate OBJECT-TYPE
+            SYNTAX    INTEGER     (2..30)
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "Max-Terminate indicates the number of Terminate-Request
+                         packets sent without receiving a Terminate-Ack before assuming
+                         that the peer is unable to respond"
+
+            DEFVAL    { 2 }
+
+          ::= { adGenPppGroupProvEntry 12 }
+
+	adGenPppGroupConfigMaxConfigure OBJECT-TYPE
+            SYNTAX    INTEGER     (2..30)
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "Max-Configure indicates the number of Configure-Request
+                         packets sent without receiving a valid Configure-Ack, Configure-Nak,
+                         or Configure-Reject before assuming that the peer is unable to respond"
+
+            DEFVAL    { 10 }
+
+          ::= { adGenPppGroupProvEntry 13 }
+
+	adGenPppGroupConfigMaxFailure OBJECT-TYPE
+            SYNTAX    INTEGER     (2..30)
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "Max-Failure indicates the number of Configure-Nak packets sent without
+                         sending a Configure-Ack before assuming that configuration is not converging.
+                    	 Any further Configure-Nak packets for peeer requested options are converted to
+                    	 Configure-Reject packets, and locally desired options are no longer appended."
+
+            DEFVAL    { 5 }
+
+          ::= { adGenPppGroupProvEntry 14 }
+
+	adGenPppGroupConfigKeepAliveRate OBJECT-TYPE
+            SYNTAX    INTEGER    (1..60)
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "Keep Alive Rate sets the time between Echo Request transmissions"
+
+            DEFVAL    { 10 }
+
+          ::= { adGenPppGroupProvEntry 15 }
+
+	 adGenPppGroupChapEnabled OBJECT-TYPE
+            SYNTAX    TruthValue
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION "Enables the PPP/CHAP AuthenticationProtocol."
+            DEFVAL    { false }
+          ::= { adGenPppGroupProvEntry 16 }
+
+     adGenPppGroupLocalUserName OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE(0..80))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The host/username provided to remote peer as this
+                         system's host/username for PPP Authentication purposes."
+            DEFVAL      { ''h }
+         ::= { adGenPppGroupProvEntry 17 }
+
+     adGenPppGroupLocalPassword OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE(0..80))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The password/secret provided to remote peer as this
+                         system's password/secret for PPP Authentication purposes."
+            DEFVAL      { ''h }
+         ::= { adGenPppGroupProvEntry 18 }
+
+     adGenPppGroupPeerUserName OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE(0..80))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The host/username expected to be received from the remote
+                         peer as it's host/username for PPP Authentication purposes."
+            DEFVAL      { ''h }
+         ::= { adGenPppGroupProvEntry 19 }
+
+     adGenPppGroupPeerPassword OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE(0..80))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The password/secret expected to be received from the remote
+                         peer as it's password/secret for PPP Authentication purposes."
+            DEFVAL      { ''h }
+         ::= { adGenPppGroupProvEntry 20 }
+
+     adGenPppGroupIpAddressAssignment OBJECT-TYPE
+        	SYNTAX      INTEGER {
+                                staticIpv4(1),
+                                dhcpv4(2)
+                                }
+            MAX-ACCESS      read-write
+            STATUS      current
+            DESCRIPTION "Sets the IP Address assignment policy for the peer.  The value
+                         can be one of the following:
+
+                         staticIpv4    Statically provisioned IPv4 address are assigned.
+                         dhcpv4        A DHCP client is used to obtain the peer IP address, default
+                                       gateway (router) IP address(es), and DNS name server
+                                       address(es)."
+        DEFVAL    { staticIpv4 }
+        ::= { adGenPppGroupProvEntry 21 }
+
+        adGenPppGroupDhcpClientIdentfier OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE(2..80))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Specifies the client identifier (DHCP Option 61) used when obtaining
+                         an IP address from a DHCP server."
+         ::= { adGenPppGroupProvEntry 22 }
+
+        adGenPppGroupDhcpHostname OBJECT-TYPE
+            SYNTAX      DisplayString  (SIZE (1..35))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Specifies the text string used as the name in the DHCP option 12 field.
+                         The can consist of up to 35 characters.  To reset the hostname to it's
+                         system generated (non-empty) default, write a zero-length (empty)
+                         string to this location."
+         ::= { adGenPppGroupProvEntry 23 }
+
+	adGenPppGroupConfigMultilink OBJECT-TYPE
+          	SYNTAX    TruthValue
+            MAX-ACCESS    read-write
+            STATUS    current
+            DESCRIPTION
+                         "Enable Multilink PPP operation.  This includes utilizing all
+                          configured and operational links and fragmenting PPP frames
+                          to reduce latency."
+
+            DEFVAL    { false }
+
+          ::= { adGenPppGroupProvEntry 24 }
+
+    adGenPppGroupSubscriberIPv6Address OBJECT-TYPE
+            SYNTAX      InetAddressIPv6
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION 
+                "The IPv6 address of the subscriber on the far end
+                 of this PPP Group."
+        ::= { adGenPppGroupProvEntry 25 }
+        
+    adGenPppGroupGatewayIPv6AddressAssignment OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                static(1),
+                                auto(2)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+                "The IPv6 address assignment policy for the default gateway.  The value
+                 can be one of the following:
+
+                 static        Gateway address is statically provisioned.
+                 auto          Gateway address will be automatically learned via NDP."
+        ::= { adGenPppGroupProvEntry 26 }
+        
+    adGenPppGroupGatewayIPv6Address OBJECT-TYPE
+            SYNTAX      InetAddressIPv6
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+                "The IPv6 address of the gateway assigned to this PPP Group.  The meaning
+                is dependent on current value of adGenPppGroupGatewayIPv6AddressAssignment.
+                For static mode, this OID is read/write and indicates the manually-assigned
+                IPv6 gateway address.  For auto mode, this OID is read-only and indicates
+                the IPv6 address of the default gateway learned through NDP. Sets to this
+                OID in auto mode will return an error."
+        ::= { adGenPppGroupProvEntry 27 }
+        
+    adGenPppGroupIpEnabled OBJECT-TYPE
+            SYNTAX      TruthValue
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+                "Specifies whether or not IPv4 operation is enabled for this PPP Group."
+        ::= { adGenPppGroupProvEntry 28 }
+        
+    adGenPppGroupIpv6Enabled OBJECT-TYPE
+            SYNTAX      TruthValue
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+                "Specifies whether or not IPv6 operation is enabled for this PPP Group."
+        ::= { adGenPppGroupProvEntry 29 }
+        
+-- **********************************************************************
+-- PPP Group Alarm Provision Table
+-- **********************************************************************
+
+	adGenPppGroupAlarmProvTable                  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenPppGroupAlarmProvEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "..."
+    ::= { adGenPppGroupProv 2 }
+
+    adGenPppGroupAlarmProvEntry                  OBJECT-TYPE
+        SYNTAX          AdGenPppGroupAlarmProvEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            ""
+        INDEX { adGenSlotInfoIndex }
+    ::= { adGenPppGroupAlarmProvTable 1 }
+
+   AdGenPppGroupAlarmProvEntry ::=
+        SEQUENCE {
+	        adGenPppGroupAlarmProvNCPAlarmSeverity  		                INTEGER,
+   	        adGenPppGroupAlarmProvNCPAlarmSuppression		                INTEGER,
+	        adGenPppGroupAlarmProvNCPAlarmEnable			                TruthValue,
+            adGenPppGroupAlarmProvIpv6NcpAlarmSeverity                      INTEGER,
+            adGenPppGroupAlarmProvIpv6NcpAlarmSuppression                   INTEGER,
+            adGenPppGroupAlarmProvIpv6NcpAlarmEnable                        TruthValue,
+            adGenPppGroupAlarmProvIpv6AddrMismatchAlarmSeverity             INTEGER,
+            adGenPppGroupAlarmProvIpv6AddrMismatchAlarmSuppression          INTEGER,
+            adGenPppGroupAlarmProvIpv6AddrMismatchAlarmEnable               TruthValue,
+            adGenPppGroupAlarmProvIpv6GatewayAddrMismatchAlarmSeverity      INTEGER,
+            adGenPppGroupAlarmProvIpv6GatewayAddrMismatchAlarmSuppression   INTEGER,
+            adGenPppGroupAlarmProvIpv6GatewayAddrMismatchAlarmEnable        TruthValue
+        }
+        
+   adGenPppGroupAlarmProvNCPAlarmSeverity  OBJECT-TYPE
+        SYNTAX      INTEGER     {
+								info(2),
+								alert(3),
+								minor(4),
+								major(5),
+								critical(6)
+                                }
+
+        MAX-ACCESS      read-write
+        STATUS      current
+        DESCRIPTION
+            "Sets the NCP Down Alarm Active Severity"
+        DEFVAL    { major }
+        ::= { adGenPppGroupAlarmProvEntry 1 }
+
+	adGenPppGroupAlarmProvNCPAlarmSuppression OBJECT-TYPE
+        SYNTAX INTEGER (0..3) 
+        
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 NCP Alarm suppression (affects all Groups 
+        	on the card).  With suppression enabled, the alarm will still appear in the alarm log.
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adGenPppGroupAlarmProvEntry 2 }
+
+    adGenPppGroupAlarmProvNCPAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all Groups on the card). False - deactivates the 
+        	alarm, meaning it will not go out via any protocol AND it will not appear in the
+        	alarm log."
+
+        DEFVAL {true}
+        ::= { adGenPppGroupAlarmProvEntry 3 }
+
+   adGenPppGroupAlarmProvIpv6NcpAlarmSeverity  OBJECT-TYPE
+        SYNTAX      INTEGER {
+							info(2),
+							alert(3),
+							minor(4),
+							major(5),
+							critical(6)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Sets the IPv6 NCP Down Alarm Active Severity"
+        DEFVAL    { major }
+        ::= { adGenPppGroupAlarmProvEntry 4 }
+
+	adGenPppGroupAlarmProvIpv6NcpAlarmSuppression OBJECT-TYPE
+        SYNTAX      INTEGER (0..3) 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 IPv6 NCP Alarm suppression (affects all Groups 
+        	on the card).  With suppression enabled, the alarm will still appear in the alarm log.
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adGenPppGroupAlarmProvEntry 5 }
+
+    adGenPppGroupAlarmProvIpv6NcpAlarmEnable OBJECT-TYPE
+        SYNTAX      TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all Groups on the card). False - deactivates the 
+        	alarm, meaning it will not go out via any protocol AND it will not appear in the
+        	alarm log."
+
+        DEFVAL {true}
+        ::= { adGenPppGroupAlarmProvEntry 6 }
+        
+   adGenPppGroupAlarmProvIpv6AddrMismatchAlarmSeverity  OBJECT-TYPE
+        SYNTAX      INTEGER {
+							info(2),
+							alert(3),
+							minor(4),
+							major(5),
+							critical(6)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Sets the IPv6 Peer Address Mismatch Alarm Active Severity"
+        DEFVAL    { major }
+        ::= { adGenPppGroupAlarmProvEntry 7 }
+
+	adGenPppGroupAlarmProvIpv6AddrMismatchAlarmSuppression OBJECT-TYPE
+        SYNTAX      INTEGER (0..3) 
+        MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 IPv6 Peer Address Mismatch Alarm
+            suppression (affects all Groups on the card).  With suppression enabled, the
+            alarm will still appear in the alarm log.
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adGenPppGroupAlarmProvEntry 8 }
+
+    adGenPppGroupAlarmProvIpv6AddrMismatchAlarmEnable OBJECT-TYPE
+        SYNTAX      TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all Groups on the card). False - deactivates the 
+        	alarm, meaning it will not go out via any protocol AND it will not appear in the
+        	alarm log."
+
+        DEFVAL {true}
+        ::= { adGenPppGroupAlarmProvEntry 9 }
+
+   adGenPppGroupAlarmProvIpv6GatewayAddrMismatchAlarmSeverity  OBJECT-TYPE
+        SYNTAX      INTEGER {
+							info(2),
+							alert(3),
+							minor(4),
+							major(5),
+							critical(6)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Sets the IPv6 Gateway Address Mismatch Alarm Active Severity"
+        DEFVAL    { major }
+        ::= { adGenPppGroupAlarmProvEntry 10 }
+
+	adGenPppGroupAlarmProvIpv6GatewayAddrMismatchAlarmSuppression OBJECT-TYPE
+        SYNTAX      INTEGER (0..3) 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 IPv6 Gateway Address Mismatch Alarm
+            suppression (affects all Groups on the card).  With suppression enabled, the
+            alarm will still appear in the alarm log.
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adGenPppGroupAlarmProvEntry 11 }
+
+    adGenPppGroupAlarmProvIpv6GatewayAddrMismatchAlarmEnable OBJECT-TYPE
+        SYNTAX      TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all Groups on the card). False - deactivates the 
+        	alarm, meaning it will not go out via any protocol AND it will not appear in the
+        	alarm log."
+
+        DEFVAL {true}
+        ::= { adGenPppGroupAlarmProvEntry 12 }
+        
+-- **********************************************************************
+-- PPP Group Status Table
+-- **********************************************************************
+	adGenPppGroupStatusTable                  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenPppGroupStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "..."
+    ::= { adGenPppGroupStatus 1 }
+
+    adGenPppGroupStatusEntry                  OBJECT-TYPE
+        SYNTAX          AdGenPppGroupStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Table indexed using the PPP Group ifIndex"
+        INDEX { ifIndex }
+    ::= { adGenPppGroupStatusTable 1 }
+
+   AdGenPppGroupStatusEntry ::=
+        SEQUENCE {
+	        adGenPppGroupNCPState                       INTEGER,
+            adGenPppGroupCurrentSubscriberIpAddress     IpAddress,
+            adGenPppGroupCurrentGatewayIpAddress        IpAddress,
+            adGenPppGroupCurrentPrimaryDNSIpAddress     IpAddress,
+            adGenPppGroupCurrentSecondaryDNSIpAddress   IpAddress,
+			adGenPppGroupNegotiatedStatus               DisplayString,
+            adGenPppGroupIPv6AddressStatus              INTEGER,
+            adGenPppGroupIPv6GatewayAddressStatus       INTEGER,
+			adGenPppGroupIPv6NCPState                   INTEGER
+        }
+
+   adGenPppGroupNCPState  OBJECT-TYPE
+        SYNTAX      INTEGER     {
+                                initial(1),
+                                starting(2),
+                                closed(3),
+                                stopped(4),
+                                closing(5),
+                                stopping(6),
+                                reqsent(7),
+                                ackrcvd(8),
+                                acksent(9),
+                                opened(10)
+                                }
+        MAX-ACCESS      read-only
+        STATUS      current
+        DESCRIPTION
+            "The current PPP Group NCP state"
+        ::= { adGenPppGroupStatusEntry 1 }
+
+     adGenPppGroupCurrentSubscriberIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-only
+          	STATUS         current
+          	DESCRIPTION
+                "The current IP address assigned to the Subscriber on the far end
+                 of this PPP Group."
+          ::= { adGenPppGroupStatusEntry 2 }
+
+     adGenPppGroupCurrentGatewayIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-only
+          	STATUS         current
+          	DESCRIPTION
+                "The current IP address of the Gateway assigned to this PPP Group"
+          ::= { adGenPppGroupStatusEntry 3 }
+
+     adGenPppGroupCurrentPrimaryDNSIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-only
+          	STATUS         current
+          	DESCRIPTION
+                "The current IP address of the Primary DNS Server."
+          ::= { adGenPppGroupStatusEntry 4 }
+
+     adGenPppGroupCurrentSecondaryDNSIpAddress OBJECT-TYPE
+          	SYNTAX         IpAddress
+          	MAX-ACCESS     read-only
+          	STATUS         current
+          	DESCRIPTION
+                "The current IP address of the Secondary DNS Server."
+          ::= { adGenPppGroupStatusEntry 5 }
+
+	adGenPppGroupNegotiatedStatus OBJECT-TYPE
+          	SYNTAX         DisplayString
+          	MAX-ACCESS     read-only
+          	STATUS         current
+          	DESCRIPTION
+                "A String Displaying Negotiated Information at the Group Level
+				The format of the string is split into records that are strings themselves
+				split using the ASCII character record separator (hex 0x1E, decimal 30)
+					Each Record is formatted: 'Record Name:Record Value'
+				ex)   Multilink:accepted<RS>Number of Active Links:1<RS>
+
+				This string response can grow over-time for future debug information."
+          ::= { adGenPppGroupStatusEntry 6 }
+
+    adGenPppGroupIPv6AddressStatus OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                unverified(1),
+                                verified(2),
+                                mismatch(3)
+                                }
+            MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION
+                "Indicates the status of the provisioned IPv6 address of the peer and the
+                 auto-detected IPv6 address of the peer.  It can take 3 values:
+                 
+                 unverified     The IPv6 address of the peer has not been successfully
+                                detected, so the current status is unknown.
+                 verified       The IPv6 address of the peer has been successfully detected
+                                and verified to match the provisioned address.
+                 mismatch       The IPv6 address of the peer has been successfully detected
+                                and it does not match the provisioned address."
+          ::= { adGenPppGroupStatusEntry 7 }
+                                
+    adGenPppGroupIPv6GatewayAddressStatus OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                unverified(1),
+                                verified(2),
+                                mismatch(3),
+                                na(4)
+                                }
+            MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION
+                "Indicates the status of the provisioned IPv6 default gatweay address
+                 and the auto-detected IPv6 default gateway address.  It can take 4 values:
+                 
+                 unverified     The IPv6 address of the default gateway has not been
+                                successfully detected, so the current status is unknown.
+                 verified       The IPv6 address of the default gateway has been
+                                successfully detected and verified to match the provisioned
+                                address.
+                 mismatch       The IPv6 address of the default gateway has been
+                                successfully detected and it does not match the provisioned
+                                address.
+                 na             This OID is not applicable because the
+                                adGenPppGroupGatewayIPv6AddressAssignment mode is set to
+                                auto."
+                                
+          ::= { adGenPppGroupStatusEntry 8 }
+	
+	adGenPppGroupIPv6NCPState  OBJECT-TYPE
+        SYNTAX      INTEGER     {
+                                initial(1),
+                                starting(2),
+                                closed(3),
+                                stopped(4),
+                                closing(5),
+                                stopping(6),
+                                reqsent(7),
+                                ackrcvd(8),
+                                acksent(9),
+                                opened(10)
+                                }
+        MAX-ACCESS      read-only
+        STATUS      current
+        DESCRIPTION
+            "The current PPP Group IPv6 NCP (IPv6CP) state"
+        ::= { adGenPppGroupStatusEntry 9 }
+
+-- **********************************************************************
+-- PPP Group Performance Stats
+-- **********************************************************************
+
+--
+-- The PPP Group Performance Table
+--
+-- The PPP Group Performance subtree consists of a table of PPP groups.
+-- Each entry in the table of PPP groups contains performance information
+-- specific to each group.
+--
+
+adGenPppGroupPerfTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppGroupPerfEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Group Performance table."
+      ::= { adGenPppGroupPerfStats 1 }
+
+adGenPppGroupPerfEntry OBJECT-TYPE
+      SYNTAX      AdGenPppGroupPerfEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Group Performance table."
+      INDEX       { ifIndex }
+      ::= { adGenPppGroupPerfTable 1 }
+
+AdGenPppGroupPerfEntry ::= SEQUENCE {
+
+        adGenPppGroupInOctets        	Counter32,
+  	  	adGenPppGroupInPkts				Counter32,
+	  	adGenPppGroupInDiscards			Counter32,
+	  	adGenPppGroupInErrors			Counter32,
+	  	adGenPppGroupOutOctets			Counter32,
+		adGenPppGroupOutPkts			Counter32,
+		adGenPppGroupOutDiscards		Counter32,
+		adGenPppGroupOutErrors			Counter32,
+        adGenPppGroupValidIntervals     INTEGER,
+        adGenPppGroupInvalidIntervals   INTEGER,
+        adGenPppGroupTimeElapsed        INTEGER,
+      	adGenPppGroupResetStats         INTEGER,
+      	adGenPppGroupResetPerfHistory   INTEGER,
+        adGenPppGroupInL3Pkts           Counter32,
+        adGenPppGroupOutL3Pkts          Counter32
+      	}
+
+adGenPppGroupInOctets OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Group"
+      ::= { adGenPppGroupPerfEntry 1 }
+
+adGenPppGroupInPkts OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group"
+      ::= { adGenPppGroupPerfEntry 2 }
+
+adGenPppGroupInDiscards OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded"
+      ::= { adGenPppGroupPerfEntry 3 }
+
+adGenPppGroupInErrors OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors"
+      ::= { adGenPppGroupPerfEntry 4 }
+
+adGenPppGroupOutOctets OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Group"
+      ::= { adGenPppGroupPerfEntry 5 }
+
+adGenPppGroupOutPkts OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Group"
+      ::= { adGenPppGroupPerfEntry 6 }
+
+adGenPppGroupOutDiscards OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded"
+      ::= { adGenPppGroupPerfEntry 7 }
+
+adGenPppGroupOutErrors OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted because of errors."
+      ::= { adGenPppGroupPerfEntry 8 }
+
+adGenPppGroupValidIntervals OBJECT-TYPE
+      SYNTAX      INTEGER (0..96)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The number of previous 15 minute intervals for which valid data
+        was collected. "
+      ::= { adGenPppGroupPerfEntry 9 }
+
+adGenPppGroupInvalidIntervals OBJECT-TYPE
+      SYNTAX      INTEGER (0..96)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The number of intervals for which no data is
+ 		available. "
+      ::= { adGenPppGroupPerfEntry 10 }
+
+adGenPppGroupTimeElapsed OBJECT-TYPE
+      SYNTAX      INTEGER (0..899)
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "The number of seconds that have elapsed since the beginning of
+        the current measurement period."
+      ::= { adGenPppGroupPerfEntry 11 }
+
+adGenPppGroupResetStats OBJECT-TYPE
+      SYNTAX      INTEGER { reset(1) }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "Writing a value of 1 resets the statistics in this table for this
+        group.  It does not affect performance history in other tables."
+
+      ::= { adGenPppGroupPerfEntry 12 }
+
+adGenPppGroupResetPerfHistory OBJECT-TYPE
+      SYNTAX      INTEGER { reset(1) }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "Writing a value of 1 resets the performance history for this link
+        in adGenPppGroupCurrentTable, adGenPppGroupIntervalTable, and
+        adGenPppGroupTotalTable.  It does not affect the statistics
+        in adGenPppGroupPerfTable."
+
+      ::= { adGenPppGroupPerfEntry 13 }
+
+adGenPppGroupInL3Pkts OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets received from the PPP Group"
+      ::= { adGenPppGroupPerfEntry 14 }
+
+adGenPppGroupOutL3Pkts OBJECT-TYPE
+      SYNTAX      Counter32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets transmitted from the PPP Group"
+      ::= { adGenPppGroupPerfEntry 15 }
+
+--
+-- The PPP Group Current Statistics subtree consists of a single table:
+-- the PPP Group Current Table.  This table contains various statistics
+-- collected by each PPP link for the current 15 minute interval.
+
+adGenPppGroupCurrentTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppGroupCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Group Current table."
+      ::= { adGenPppGroupPerfStats 2 }
+
+adGenPppGroupCurrentEntry OBJECT-TYPE
+      SYNTAX      AdGenPppGroupCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Group Current table."
+      INDEX       { ifIndex }
+      ::= { adGenPppGroupCurrentTable 1 }
+
+AdGenPppGroupCurrentEntry ::= SEQUENCE {
+		adGenPppGroupCurrentInOctets        Gauge32,
+  	  	adGenPppGroupCurrentInPkts			Gauge32,
+	  	adGenPppGroupCurrentInDiscards		Gauge32,
+	  	adGenPppGroupCurrentInErrors		Gauge32,
+	  	adGenPppGroupCurrentOutOctets		Gauge32,
+		adGenPppGroupCurrentOutPkts			Gauge32,
+		adGenPppGroupCurrentOutDiscards		Gauge32,
+		adGenPppGroupCurrentOutErrors		Gauge32,
+		adGenPppGroupCurrentInL3Pkts		Gauge32,
+		adGenPppGroupCurrentOutL3Pkts		Gauge32
+      }
+
+adGenPppGroupCurrentInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 1 }
+
+adGenPppGroupCurrentInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 2 }
+
+adGenPppGroupCurrentInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 3 }
+
+adGenPppGroupCurrentInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 4 }
+
+adGenPppGroupCurrentOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Group, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 5 }
+
+adGenPppGroupCurrentOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Group, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 6 }
+
+adGenPppGroupCurrentOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 7 }
+
+adGenPppGroupCurrentOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 8 }
+
+adGenPppGroupCurrentInL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets received from the PPP Group, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 9 }
+
+adGenPppGroupCurrentOutL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets transmitted from the PPP Group, in
+        the current 15 minute interval."
+
+      ::= { adGenPppGroupCurrentEntry 10 }
+
+
+-- The PPP Group Interval Statistics subtree consists of a single table:
+-- the PPP Group Interval Table.  This table contains various statistics
+-- collected by each PPP Group over the previous 24 hours of operation.
+-- The past 24 hours are broken into 96 completed 15 minute intervals.
+
+adGenPppGroupIntervalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppGroupIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Group Interval table."
+      ::= { adGenPppGroupPerfStats 3 }
+
+adGenPppGroupIntervalEntry OBJECT-TYPE
+      SYNTAX      AdGenPppGroupIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Group Interval table."
+      INDEX       { ifIndex, adGenPppGroupIntervalNumber }
+      ::= { adGenPppGroupIntervalTable 1 }
+
+AdGenPppGroupIntervalEntry ::= SEQUENCE {
+        adGenPppGroupIntervalNumber         INTEGER,
+      	adGenPppGroupIntervalInOctets		Gauge32,
+  	  	adGenPppGroupIntervalInPkts			Gauge32,
+	  	adGenPppGroupIntervalInDiscards		Gauge32,
+	  	adGenPppGroupIntervalInErrors		Gauge32,
+	  	adGenPppGroupIntervalOutOctets		Gauge32,
+		adGenPppGroupIntervalOutPkts		Gauge32,
+		adGenPppGroupIntervalOutDiscards	Gauge32,
+		adGenPppGroupIntervalOutErrors		Gauge32,
+		adGenPppGroupIntervalTimeStamp      DisplayString,
+        adGenPppGroupIntervalInL3Pkts       Gauge32,
+        adGenPppGroupIntervalOutL3Pkts      Gauge32
+
+}
+adGenPppGroupIntervalNumber OBJECT-TYPE
+      SYNTAX      INTEGER (1..96)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "A number between 1 and 96, where 1 is the most
+         recently completed 15 minute interval and 96 is the least
+         recently completed 15 minutes interval (assuming that all
+         96 intervals are valid)."
+      ::= { adGenPppGroupIntervalEntry 1 }
+
+adGenPppGroupIntervalInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Group, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 2 }
+
+adGenPppGroupIntervalInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 3 }
+
+adGenPppGroupIntervalInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 4 }
+
+adGenPppGroupIntervalInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 5 }
+
+adGenPppGroupIntervalOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Group, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 6 }
+
+adGenPppGroupIntervalOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Group, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 7 }
+
+adGenPppGroupIntervalOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 8 }
+
+adGenPppGroupIntervalOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in one of the previous 96, individual 15 minute, intervals."
+
+      ::= { adGenPppGroupIntervalEntry 9 }
+
+adGenPppGroupIntervalTimeStamp OBJECT-TYPE
+      SYNTAX          DisplayString
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+        "Timestamp of the 15-minute interval"
+
+      ::= { adGenPppGroupIntervalEntry 10 }
+
+adGenPppGroupIntervalInL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+    "Count of the number of L3 packets received from the PPP Group, in
+    one of the previous 96, individual 15 minute, intervals."
+    ::= { adGenPppGroupIntervalEntry 11 }
+
+adGenPppGroupIntervalOutL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+    "Count of the number of L3 packets transmitted out the PPP Group, in
+    one of the previous 96, individual 15 minute, intervals."
+    ::= { adGenPppGroupIntervalEntry 12 }
+
+
+--
+-- The PPP Group Total Statistics subtree consists of a single table:
+-- the PPP Group Total Table.  This table contains the cumulative sum
+-- of the various statistics collected by each PPP Group for the 24 hour
+-- period preceding the current interval.
+
+adGenPppGroupTotalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppGroupTotalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Group Total table."
+      ::= { adGenPppGroupPerfStats 4 }
+
+adGenPppGroupTotalEntry OBJECT-TYPE
+      SYNTAX      AdGenPppGroupTotalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Group Total table."
+      INDEX       { ifIndex }
+      ::= { adGenPppGroupTotalTable 1 }
+
+AdGenPppGroupTotalEntry ::= SEQUENCE {
+  	  	adGenPppGroupTotalInOctets			Gauge32,
+  	  	adGenPppGroupTotalInPkts			Gauge32,
+	  	adGenPppGroupTotalInDiscards		Gauge32,
+	  	adGenPppGroupTotalInErrors			Gauge32,
+	  	adGenPppGroupTotalOutOctets			Gauge32,
+		adGenPppGroupTotalOutPkts			Gauge32,
+		adGenPppGroupTotalOutDiscards		Gauge32,
+		adGenPppGroupTotalOutErrors			Gauge32,
+  	  	adGenPppGroupTotalInL3Pkts			Gauge32,
+		adGenPppGroupTotalOutL3Pkts			Gauge32
+}
+
+adGenPppGroupTotalInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Group, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 1 }
+
+adGenPppGroupTotalInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 2 }
+
+adGenPppGroupTotalInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 3 }
+
+adGenPppGroupTotalInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 4 }
+
+adGenPppGroupTotalOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Group, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 5 }
+
+adGenPppGroupTotalOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Group, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 6 }
+
+adGenPppGroupTotalOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 7 }
+
+adGenPppGroupTotalOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 8 }
+
+adGenPppGroupTotalInL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets received from the PPP Group, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 9 }
+
+adGenPppGroupTotalOutL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets transmitted from the PPP Group, in
+        the previous 24 hour interval."
+
+      ::= { adGenPppGroupTotalEntry 10 }
+
+
+-- The PPP Group Current Day Statistics subtree consists of a single table:
+-- the PPP Group Current Day Table.  This table contains the cumulative sum
+-- of the various statistics collected by each PPP Group for the current
+-- 24 hour period.
+
+adGenPppGroupDayCurrentTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppGroupDayCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Group Current Day table."
+      ::= { adGenPppGroupPerfStats 5 }
+
+adGenPppGroupDayCurrentEntry OBJECT-TYPE
+      SYNTAX      AdGenPppGroupDayCurrentEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Group Current Day table."
+      INDEX       { ifIndex }
+      ::= { adGenPppGroupDayCurrentTable 1 }
+
+AdGenPppGroupDayCurrentEntry ::= SEQUENCE {
+  	  	adGenPppGroupDayCurrentInOctets			Gauge32,
+  	  	adGenPppGroupDayCurrentInPkts			Gauge32,
+	  	adGenPppGroupDayCurrentInDiscards		Gauge32,
+	  	adGenPppGroupDayCurrentInErrors			Gauge32,
+  	  	adGenPppGroupDayCurrentOutOctets		Gauge32,
+		adGenPppGroupDayCurrentOutPkts			Gauge32,
+        adGenPppGroupDayCurrentOutDiscards      Gauge32,
+        adGenPppGroupDayCurrentOutErrors        Gauge32,
+        adGenPppGroupDayCurrentInL3Pkts         Gauge32,
+        adGenPppGroupDayCurrentOutL3Pkts        Gauge32
+}
+
+adGenPppGroupDayCurrentInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of octets received from the PPP Group, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 1 }
+
+adGenPppGroupDayCurrentInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 2 }
+
+adGenPppGroupDayCurrentInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 3 }
+
+adGenPppGroupDayCurrentInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 4 }
+
+adGenPppGroupDayCurrentOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Group, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 5 }
+
+adGenPppGroupDayCurrentOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Group, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 6 }
+
+adGenPppGroupDayCurrentOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 7 }
+
+adGenPppGroupDayCurrentOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 8 }
+
+adGenPppGroupDayCurrentInL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets received out the PPP Group, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 9 }
+
+  adGenPppGroupDayCurrentOutL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets transmitted out the PPP Group, in
+        the current 24 hour interval."
+
+      ::= { adGenPppGroupDayCurrentEntry 10 }
+
+
+-- The PPP Group Daily Interval Statistics subtree consists of a single table:
+-- the PPP Group Daily Interval Table.  This table contains the cumulative sum
+-- of the various statistics collected by each PPP Group for the 24 hour
+-- period preceding the current interval.
+
+adGenPppGroupDayIntervalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF AdGenPppGroupDayIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "The PPP Group Daily Interval table."
+      ::= { adGenPppGroupPerfStats 6 }
+
+adGenPppGroupDayIntervalEntry OBJECT-TYPE
+      SYNTAX      AdGenPppGroupDayIntervalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+        "An entry in the PPP Group Daily Interval table."
+      INDEX       { ifIndex, adGenPppGroupDayIntervalNumber }
+      ::= { adGenPppGroupDayIntervalTable 1 }
+
+AdGenPppGroupDayIntervalEntry ::= SEQUENCE {
+        adGenPppGroupDayIntervalNumber          INTEGER,
+      	adGenPppGroupDayIntervalInOctets		Gauge32,
+  	  	adGenPppGroupDayIntervalInPkts			Gauge32,
+	  	adGenPppGroupDayIntervalInDiscards		Gauge32,
+	  	adGenPppGroupDayIntervalInErrors		Gauge32,
+		adGenPppGroupDayIntervalOutOctets		Gauge32,
+		adGenPppGroupDayIntervalOutPkts			Gauge32,
+		adGenPppGroupDayIntervalOutDiscards		Gauge32,
+		adGenPppGroupDayIntervalOutErrors		Gauge32,
+      	adGenPppGroupDayIntervalTimeStamp       DisplayString,
+        adGenPppGroupDayIntervalInL3Pkts        Gauge32,
+        adGenPppGroupDayIntervalOutL3Pkts       Gauge32
+     }
+
+adGenPppGroupDayIntervalNumber OBJECT-TYPE
+      SYNTAX      INTEGER (1..7)
+      MAX-ACCESS  not-accessible
+	  STATUS      current
+      DESCRIPTION
+        "A number between 1 and 7, where 1 is the most
+         recently completed 24 hour interval and 7 is the least
+         recently completed 24 hour interval (assuming that all
+         7 intervals are valid)."
+      ::= { adGenPppGroupDayIntervalEntry 1 }
+
+adGenPppGroupDayIntervalInOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes received from the PPP Group, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 2 }
+
+adGenPppGroupDayIntervalInPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets received from the PPP Group, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 3 }
+
+adGenPppGroupDayIntervalInDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets chosen to be discarded, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 4 }
+
+adGenPppGroupDayIntervalInErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of rx packets that contained errors, in
+        hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 5 }
+
+adGenPppGroupDayIntervalOutOctets OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of bytes transmitted out the PPP Group, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 6 }
+
+adGenPppGroupDayIntervalOutPkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of packets transmitted out the PPP Group, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 7 }
+
+adGenPppGroupDayIntervalOutDiscards OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of out bound packets chosen to be discarded, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 8 }
+
+adGenPppGroupDayIntervalOutErrors OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of outbound packets that could not be transmitted
+        because of errors, in 24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 9 }
+
+adGenPppGroupDayIntervalTimeStamp OBJECT-TYPE
+      SYNTAX          DisplayString
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+        "Timestamp of 24 hour period (Date)"
+      ::= { adGenPppGroupDayIntervalEntry 10 }
+
+adGenPppGroupDayIntervalInL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets received from the PPP Group, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 11 }
+
+adGenPppGroupDayIntervalOutL3Pkts OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Count of the number of L3 packets transmitted from the PPP Group, in
+        24 hour intervals."
+
+      ::= { adGenPppGroupDayIntervalEntry 12 }
+
+
+-- **********************************************************************
+-- Alarms
+-- **********************************************************************
+
+
+    adGenPppLinkLcpDownAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPPPLinkLcpDownAlarm Clear is sent when the LCP state
+                 machine is in the Opened (up) state."
+
+         	--#TYPE         "Major - PPP Lcp Down - Cleared"
+    	 	--#SUMMARY      "PPP Lcp Down - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 2 }
+
+    adGenPppLinkLcpDownAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPPPLinkLcpDownAlarm Active is sent when the LCP state
+                 machine is not in the Opened (up) state."
+
+         	--#TYPE         "Major - PPP Lcp Down - Active"
+    	 	--#SUMMARY      "PPP Lcp Down - Active"
+    	 	--#SUMMARY      "active at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    	 	--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 3 }
+
+    adGenPppGroupNcpDownAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupNcpDownAlarm Clear is sent when the NCP state
+                 machine is in the Opened state.  An IPCP state machine
+                 instance exists for each defined PPP Group."
+
+            --#TYPE         "Major - PPP Ncp Down - Cleared"
+    	 	--#SUMMARY      "PPP Ncp Down - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 4 }
+
+    adGenPppGroupNcpDownAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupNcpDownAlarm Active is sent when the NCP state
+                 machine is not in the Opened state.  An NCP state machine
+                 instance exists for each defined PPP Group."
+
+            --#TYPE         "Major - PPP Ncp Down - Active"
+    	 	--#SUMMARY      "PPP Ncp Down - Active"
+    	 	--#SUMMARY      "active at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    	 	--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 5 }
+
+    adGenPppGroupIpv6NcpDownAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupIpv6NcpDownAlarm Clear is sent when IPv6
+                 operation is enabled for the PPP Group and the IPv6 NCP (IPv6CP)
+                 state machine is in the Opened state."
+
+            --#TYPE         "Major - PPP IPv6 Ncp Down - Cleared"
+    	 	--#SUMMARY      "PPP IPv6 Ncp Down - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 6 }
+
+    adGenPppGroupIpv6NcpDownAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupIpv6NcpDownAlarm Active is sent when IPv6
+                 operation is enabled for the PPP Group but the IPv6 NCP (IPv6CP)
+                 state machine is not in the Opened state."
+
+            --#TYPE         "Major - PPP IPv6 Ncp Down - Active"
+    	 	--#SUMMARY      "PPP IPv6 Ncp Down - Active"
+    	 	--#SUMMARY      "active at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    	 	--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 7 }
+          
+    adGenPppGroupIpv6AddrMismatchAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupIpv6AddrMismatchAlarm Clear is sent when the
+                 IPv6 address of the peer has been successfully autodetected
+                 and the address now matches the provisioned address of the
+                 peer after previously being declared a mismatch."
+
+            --#TYPE         "Major - PPP Peer IPv6 Address Mismatch - Cleared"
+    	 	--#SUMMARY      "PPP Peer IPv6 Address Mismatch - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 8 }
+
+    adGenPppGroupIpv6AddrMismatchAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupIpv6AddrMismatchAlarm Active is sent when the
+                 IPv6 address of the peer has been successfully autodetected
+                 and it does not match the provisioned IPv6 address of the peer."
+
+            --#TYPE         "Major - PPP Peer IPv6 Address Mismatch - Active"
+    	 	--#SUMMARY      "PPP Peer IPv6 Address Mismatch - Active"
+    	 	--#SUMMARY      "active at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    	 	--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 9 }
+          
+    adGenPppGroupIpv6GatewayAddrMismatchAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupIpv6GatewayAddrMismatchAlarm Clear is sent when
+                 the IPv6 address of the default gateway has been successfully
+                 autodetected and the address now matches the provisioned address
+                 of the default gateway after previously being declared a mismatch.
+                 A clear will also be issued if the gateway assignment mode
+                 (adGenPppGroupGatewayIPv6AddressAssignment) is changed to auto
+                 after previously being declared a mismatch."
+                 
+
+            --#TYPE         "Major - PPP IPv6 Default Gateway Address Mismatch - Cleared"
+    	 	--#SUMMARY      "PPP IPv6 Default Gateway Address Mismatch - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 10 }
+
+    adGenPppGroupIpv6GatewayAddrMismatchAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifIndex,
+                    adTAeSCUTrapAlarmLevel
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenPppGroupIpv6GatewayAddrMismatchAlarm Clear is sent when
+                 the IPv6 address of the default gateway has been successfully
+                 autodetected and the address does not match the provisioned address
+                 of the default gateway.  This trap is not used if the IPv6 default
+                 gateway assignment mode (adGenPppGroupGatewayIPv6AddressAssignment)
+                 is set to auto."
+
+            --#TYPE         "Major - PPP IPv6 Default Gateway Address Mismatch - Active"
+    	 	--#SUMMARY      "PPP IPv6 Default Gateway Address Mismatch - Active"
+    	 	--#SUMMARY      "active at shelf: %s, slot: %d, interface %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    	 	--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenPppAlarms 11 }
+END

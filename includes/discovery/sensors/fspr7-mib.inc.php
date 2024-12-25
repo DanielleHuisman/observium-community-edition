@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -38,7 +37,7 @@ foreach ($oids as $index => $entry) {
         $value = $entry['currentPmSnapshotOutputPower'];
 
         $options['rename_rrd'] = "adva-output-power-$index";
-        discover_sensor_ng($device, 'dbm', $mib, 'currentPmSnapshotOutputPower', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'dbm', $mib, 'currentPmSnapshotOutputPower', $oid, $index, $descr, $scale, $value, $options);
     }
 
     // Input Power
@@ -51,7 +50,7 @@ foreach ($oids as $index => $entry) {
         $value = $entry['currentPmSnapshotInputPower'];
 
         $options['rename_rrd'] = "adva-input-power-$index";
-        discover_sensor_ng($device, 'dbm', $mib, 'currentPmSnapshotInputPower', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'dbm', $mib, 'currentPmSnapshotInputPower', $oid, $index, $descr, $scale, $value, $options);
     }
 
     // Rx Line Attenuation
@@ -63,7 +62,7 @@ foreach ($oids as $index => $entry) {
         $value = $entry['currentPmSnapshotRxLineAttenuation'];
 
         $options['rename_rrd'] = "adva-rx-attenuation-$index";
-        discover_sensor_ng($device, 'snr', $mib, 'currentPmSnapshotRxLineAttenuation', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'snr', $mib, 'currentPmSnapshotRxLineAttenuation', $oid, $index, $descr, $scale, $value, $options);
     }
 
     // Tx Line Attenuation
@@ -75,7 +74,7 @@ foreach ($oids as $index => $entry) {
         $value = $entry['currentPmSnapshotTxLineAttenuation'];
 
         $options['rename_rrd'] = "adva-tx-attenuation-$index";
-        discover_sensor_ng($device, 'snr', $mib, 'currentPmSnapshotTxLineAttenuation', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'snr', $mib, 'currentPmSnapshotTxLineAttenuation', $oid, $index, $descr, $scale, $value, $options);
     }
 }
 

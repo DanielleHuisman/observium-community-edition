@@ -1,0 +1,442 @@
+ADTRAN-GENERIC-PACKET-TIMING-MIB  DEFINITIONS ::= BEGIN
+
+   -- TITLE:      The ADTRAN Generic Packet Timing MIB
+   -- PRODUCT:    1188801G1.
+   -- VERSION:    1.0
+   -- DATE:       10/08/12 (yy/mm/dd)
+   -- AUTHOR:     Shobana Rao <shobana.rao@adtran.com>
+   -- SNMP:       SNMPv2
+   -- MIB ARC:    adtran.adShared.adGenCndSystem.adGenPacketTiming
+
+   -- DESCRIPTION:
+         -- This MIB defines the object identifiers (OIDs) for the
+         -- ADTRAN GENERIC PACKET TIMING objects
+
+   -- HISTORY: (yy/mm/dd)
+         -- 10/08/12 - Preliminary Draft.
+         -- 10/10/04 - Changed enum values for adGenPacketTimingStatRxState
+         --          - Removed Packet Timing Histogram Packet and Weighted Table.
+         --	     - Added table adGenPacketTimingResetTable to reset counters.
+         --	     - Added Packet Timing Client Loss of Packet State (LOPS) active and clear alarms.
+         -- 10/12/21 - Updated the Alarm Trap OID to include a 0.
+         -- 11/03/07 - Added adGenPacketTimingErrorInfo
+
+   -- NOTES:
+         -- Created to support TA5000 Packet Timing configurations.
+
+   IMPORTS
+            MODULE-IDENTITY,
+            OBJECT-TYPE,
+            NOTIFICATION-TYPE,
+            Integer32,
+            Unsigned32,
+            IpAddress,
+            Counter64                           FROM SNMPv2-SMI
+
+            adGenPacketTiming,
+            adGenPacketTimingID                 FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+
+            TruthValue,
+            MacAddress,
+            DisplayString,
+            TEXTUAL-CONVENTION                  FROM SNMPv2-TC
+
+            adTrapInformSeqNum					FROM ADTRAN-GENTRAPINFORM-MIB
+
+            sysName								FROM SNMPv2-MIB
+
+            adGenSlotInfoIndex					FROM ADTRAN-GENSLOT-MIB
+
+            ifIndex                  			FROM IF-MIB;
+
+-- Module ID ==================================================================
+
+   adGenPacketTimingModuleIdentity         MODULE-IDENTITY
+         LAST-UPDATED    "201106010000Z"
+         ORGANIZATION
+            "ADTRAN, Inc."
+         CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+         DESCRIPTION
+            "This MIB defines the objects for the Generic Packet Timing MIB."
+
+         REVISION "201106010000Z"
+         DESCRIPTION  "Added adGenPacketTimingStatHiCapTxPackets, adGenPacketTimingStatHiCapRxGoodPackets,
+                       and adGenPacketTimingStatHiCapRxBadPackets"
+
+         ::= { adGenPacketTimingID 1 }
+
+-- OBJECT IDENTIFIERS =========================================================
+
+   adGenPacketTimingProv		OBJECT IDENTIFIER ::= {adGenPacketTiming 1}
+
+   adGenPacketTimingStatus	        OBJECT IDENTIFIER ::= {adGenPacketTiming 2}
+   adGenPacketTimingClientStatus	OBJECT IDENTIFIER ::= {adGenPacketTimingStatus 1}
+
+   adGenPacketTimingAlarms		OBJECT IDENTIFIER ::= {adGenPacketTiming 3}
+   adGenPacketTimingEvents              OBJECT IDENTIFIER ::= {adGenPacketTimingAlarms 0}
+
+-- OBJECT IDENTIFIERS - Packet Timing Provisioning Table =========================
+
+   -- Packet Timing Provisioning Table
+   adGenPacketTimingProvTable OBJECT-TYPE
+         SYNTAX         SEQUENCE OF AdGenPacketTimingProvTableEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+            "The Generic Packet Timing Provisioning Table."
+         ::= { adGenPacketTimingProv 1 }
+
+   adGenPacketTimingProvTableEntry OBJECT-TYPE
+         SYNTAX         AdGenPacketTimingProvTableEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+            "An entry in Generic Packet Timing Provisioning Table."
+         INDEX   { ifIndex }
+         ::= { adGenPacketTimingProvTable 1 }
+
+   AdGenPacketTimingProvTableEntry ::=
+         SEQUENCE {
+            adGenPacketTimingMode                   INTEGER,
+            adGenPacketTimingDscp                   Integer32,
+            adGenPacketTimingServerIPAddress        IpAddress,
+            adGenPacketTimingServerMacAddress       MacAddress,
+            adGenPacketTimingType                   INTEGER,
+            adGenPacketTimingUncorrelate            TruthValue,
+            adGenPacketTimingServiceState           INTEGER,
+            adGenPacketTimingErrorInfo              DisplayString
+         }
+
+   adGenPacketTimingMode OBJECT-TYPE
+        SYNTAX INTEGER {
+                server(1),
+                client(2)
+                }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION
+           "Packet Timing Mode. This object supports two enumerations.
+           - 'client', client mode.
+           - 'server', server mode."
+        ::= {adGenPacketTimingProvTableEntry 1}
+
+   adGenPacketTimingDscp OBJECT-TYPE
+        SYNTAX          Integer32 (0..63)
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "Differentiated Services Code Point."
+        ::= {adGenPacketTimingProvTableEntry 2}
+
+   adGenPacketTimingServerIPAddress OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "The IP address of the Packet Timing Server. This OID is applicable only in the Client mode.
+           In the Server mode, the Server-IP comes from IP-Host MIB."
+        ::= {adGenPacketTimingProvTableEntry 3}
+
+   adGenPacketTimingServerMacAddress OBJECT-TYPE
+        SYNTAX          MacAddress
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+           "The MAC address of the Packet Timing Server. This OID is applicable in both Server and Client modes.
+           Server-MAC is the server module’s MAC address."
+        ::= {adGenPacketTimingProvTableEntry 4}
+
+   adGenPacketTimingType OBJECT-TYPE
+        SYNTAX          INTEGER {
+                                inband(1),
+                                sntp(2),
+                                sntpInband(3)
+                                }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "The packet timing type specifies the method of transmitting
+           or receiving timing information so that packet timing end-points
+           may synchronize their system clocks. This object supports three
+           enumerations.
+           - 'inband', timing information is transmitted or received within
+                       the packet timing packets.
+           - 'sntp', timing information is transmitted or received utilizing
+                     an SNTP client or server
+           - 'sntpInband', timing information is transmitted or received within
+                           the packet timing packets and also from an SNTP client or
+                           server."
+        ::= {adGenPacketTimingProvTableEntry 5}
+
+   adGenPacketTimingUncorrelate OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "Enables/disables transmit frequency variation to the packet timing interface.
+           Applicable only in server mode."
+        ::= {adGenPacketTimingProvTableEntry 6}
+
+   adGenPacketTimingServiceState OBJECT-TYPE
+        SYNTAX          INTEGER {
+                                inService(1),
+                                oosUnassigned(2)
+                                }
+         MAX-ACCESS   read-write
+         STATUS       current
+         DESCRIPTION
+            "This object sets the service state of the packet timing interface."
+         ::= { adGenPacketTimingProvTableEntry 7 }
+
+   adGenPacketTimingErrorInfo OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+            "This object displays the detailed errors for the packet timing interface."
+         ::= { adGenPacketTimingProvTableEntry 8 }
+
+
+-- OBJECT IDENTIFIERS - Packet Timing Status Table =========================
+
+   -- Packet Timing Client Status Table
+   adGenPacketTimingStatTable OBJECT-TYPE
+         SYNTAX         SEQUENCE OF AdGenPacketTimingStatTableEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+            "The Generic Packet Timing Client Status Table."
+         ::= { adGenPacketTimingClientStatus 1 }
+
+   adGenPacketTimingStatTableEntry OBJECT-TYPE
+         SYNTAX         AdGenPacketTimingStatTableEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+            "An entry in Generic Packet Timing Client Status Table."
+         INDEX   { ifIndex }
+         ::= { adGenPacketTimingStatTable 1 }
+
+   AdGenPacketTimingStatTableEntry ::=
+         SEQUENCE {
+            adGenPacketTimingStatRxState			INTEGER,
+            adGenPacketTimingStatReset				Unsigned32,
+            adGenPacketTimingStatTxPackets			Unsigned32,
+            adGenPacketTimingStatRxGoodPackets	                Unsigned32,
+            adGenPacketTimingStatRxBadPackets	                Unsigned32,
+            adGenPacketTimingStatFreqOffset			Unsigned32,
+            adGenPacketTimingStatPDV				Unsigned32,
+            adGenPacketTimingStatMaxDelay			Unsigned32,
+            adGenPacketTimingStatMinDelay			Unsigned32,
+            adGenPacketTimingStatHiCapTxPackets		        Counter64,
+            adGenPacketTimingStatHiCapRxGoodPackets	        Counter64,
+            adGenPacketTimingStatHiCapRxBadPackets	        Counter64
+         }
+
+   adGenPacketTimingStatRxState OBJECT-TYPE
+		SYNTAX INTEGER {
+				  init(1),
+				  savePhaseError(2),
+				  wait(3),
+				  frequencyEstimate(4),
+				  jamPhaseBuildout(5),
+				  locked(7)
+		}
+		MAX-ACCESS read-only
+                STATUS current
+                DESCRIPTION
+                "Rx State of Packet Timing Client. These are the states of an internal state machine.
+                A brief description of the states is given below -
+
+                Init - initializing the packet timing client
+				SavePhaseError - save initial phase error
+				Wait - waiting for next frequency estimate
+				FrequencyEstimate - estimate frequency offset and jam hardware frequency
+				JamPhaseBuildout - jam phase buildout
+				Locked - acquisition, refining, tracking."
+        ::= { adGenPacketTimingStatTableEntry 1 }
+
+   adGenPacketTimingStatReset OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+        	"Number of times Packet Timing Client was reset"
+		::= { adGenPacketTimingStatTableEntry 2 }
+
+   adGenPacketTimingStatTxPackets OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Number of Tx Packets in client mode. Applicable only for packet timing types
+                sntp and sntpInband."
+		::= { adGenPacketTimingStatTableEntry 3 }            	
+
+   adGenPacketTimingStatRxGoodPackets OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Number of Rx Good Packets in client mode. Good packets are packets whose receive timestamp
+                matches the transmit timestamp."
+		::= { adGenPacketTimingStatTableEntry 4 }
+		
+   adGenPacketTimingStatRxBadPackets OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Number of Rx Bad Packets in client mode. Bad packets are packets whose receive timestamp
+                does not match the transmit timestamp."
+		::= { adGenPacketTimingStatTableEntry 5 }
+		
+   adGenPacketTimingStatFreqOffset OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Packet Timing Frequency Offset(in parts per billion) in client mode."
+		::= { adGenPacketTimingStatTableEntry 6 }
+		
+   adGenPacketTimingStatPDV OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Packet Timing Path Delay Value(us) in client mode."
+		::= { adGenPacketTimingStatTableEntry 7 }
+		
+   adGenPacketTimingStatMaxDelay OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Packet Timing Maximum Delay(us) in client mode."
+		::= { adGenPacketTimingStatTableEntry 8 }
+		
+   adGenPacketTimingStatMinDelay OBJECT-TYPE
+   		SYNTAX  Unsigned32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Packet Timing Minimum Delay(us) in client mode."
+		::= { adGenPacketTimingStatTableEntry 9 }
+
+   adGenPacketTimingStatHiCapTxPackets OBJECT-TYPE
+   		SYNTAX  Counter64
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Number of Tx Packets in client mode. Applicable only for packet timing types
+                sntp and sntpInband.  This is a 64 bit integer value."
+		::= { adGenPacketTimingStatTableEntry 10 }            	
+
+   adGenPacketTimingStatHiCapRxGoodPackets OBJECT-TYPE
+   		SYNTAX  Counter64
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Number of Rx Good Packets in client mode. Good packets are packets whose receive timestamp
+                matches the transmit timestamp.  This is a 64 bit integer value."
+		::= { adGenPacketTimingStatTableEntry 11 }
+		
+   adGenPacketTimingStatHiCapRxBadPackets OBJECT-TYPE
+   		SYNTAX  Counter64
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION
+                "Number of Rx Bad Packets in client mode. Bad packets are packets whose receive timestamp
+                does not match the transmit timestamp.  This is a 64 bit integer value."
+		::= { adGenPacketTimingStatTableEntry 12 }
+
+-- Packet Timing Client Reset Table
+
+   adGenPacketTimingResetTable OBJECT-TYPE
+         SYNTAX         SEQUENCE OF AdGenPacketTimingResetTableEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+            "This table supports the resetting of Packet Timing Client stats."
+         ::= { adGenPacketTimingClientStatus 3 }
+
+   adGenPacketTimingResetTableEntry OBJECT-TYPE
+         SYNTAX         AdGenPacketTimingResetTableEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+            "An entry in Packet Timing Reset Table."
+         INDEX   { ifIndex }
+         ::= { adGenPacketTimingResetTable 1 }
+
+    AdGenPacketTimingResetTableEntry ::=
+		SEQUENCE {
+            adGenPacketTimingResetCounters			INTEGER
+		}
+		
+	adGenPacketTimingResetCounters OBJECT-TYPE
+		SYNTAX       INTEGER
+   				{
+				reset(1)
+				}
+   		MAX-ACCESS   read-write
+   		STATUS       current
+   		DESCRIPTION
+     		"Resets the client statistics including Histogram buckets on the selected interface."
+   		::= { adGenPacketTimingResetTableEntry 1 }
+   		
+-- ******************************************************************************************
+-- Alarms
+-- ******************************************************************************************
+
+adGenPacketTimingClientLOPSClear    NOTIFICATION-TYPE
+   OBJECTS  {
+                adTrapInformSeqNum,
+                sysName,                   -- Shelf
+                adGenSlotInfoIndex,        -- Slot
+                ifIndex
+            }
+    STATUS          current
+    DESCRIPTION     "Indicates that the Packet Timing Client Loss Of Packet State has been cleared."
+
+    --#TYPE         "Status - Loss of Packet State Cleared"
+    --#SUMMARY      "Packet Timing Client Loss of Packet State Cleared"
+    --#SUMMARY      "Cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     MAJOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenPacketTimingEvents 1}
+
+adGenPacketTimingClientLOPSActive   NOTIFICATION-TYPE
+   OBJECTS  {
+                adTrapInformSeqNum,
+                sysName,                    -- Shelf
+                adGenSlotInfoIndex,         -- Slot
+                ifIndex
+            }
+    STATUS          current
+    DESCRIPTION     "Indicates that the Packet Timing Client is in Loss of Packet State. LOPS is entered after 10 missed packets."
+
+    --#TYPE         "Status - Loss of Packet State Active"
+    --#SUMMARY      "Packet Timing Client Loss of Packet State Active"
+    --#SUMMARY      "Activated at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,3}
+    --#SEVERITY     MAJOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenPacketTimingEvents 2}
+  		
+					
+END

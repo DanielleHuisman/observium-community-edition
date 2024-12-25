@@ -1,0 +1,803 @@
+    ADTRAN-TA5K-TREE-NETWORKING-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN Total Access TA5000 Tree Networking MIB
+    -- PRODUCT:   TA5000 SMs and AMs
+    -- VERSION:   1.0
+    -- DATE:      November 4, 2008
+
+    -- This MIB Contains tables specific to the TA5000 Tree Networking
+    --
+
+    -- MIBs supported:
+
+    -- HISTORY:
+    --     11/04/2008   aed     First draft
+    --     11/23/2009   Andria Dyess    Added Loss of Heartbeat trap
+    --                  Also added an OID for the port mode.
+    --     08/04/2010   Rehan Shamsi
+    --                  Added erps, subtendedHost values to port mode,
+    --                  added varbinds to LossOfHeartbeat traps,
+    --                  added adTa5kTreeNetworkingPortModeMismatch traps
+    --     09/24/2010   Rajesh Perumal Added adTa5kTreeNetworkingStatNodeInformationTable under the adTa5kTreeNetworkingStatus.
+    --     10/5/2010    twc    Changed description of adTa5kNodeInformationTargetID
+    --     10/11/2010   twc    Fixed description of adTa5kNodeInformationTargetID
+    -- 	   10/12/2010   Rajesh Perumal Added adTa5kNodeInformationManagementVLANID OID
+    --          *** DO NOT ADD REVISION COMMENTS HERE ***
+
+
+
+    IMPORTS
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE,
+        OBJECT-TYPE,
+        Integer32,
+        Counter32,
+        IpAddress
+            FROM SNMPv2-SMI
+        sysName
+            FROM SNMPv2-MIB
+        ifIndex,
+        ifDescr
+            FROM IF-MIB
+
+        adTa5kTreeNetworking,
+        adTa5kTreeNetworkingID
+            FROM ADTRAN-GENTA5K-MIB
+
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+
+        adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB
+
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+
+        DisplayString,
+        MacAddress,
+        TEXTUAL-CONVENTION,
+        TruthValue
+            FROM SNMPv2-TC
+
+        adTAeSCUTrapAlarmLevel
+            FROM ADTRAN-TAeSCUEXT1-MIB;
+
+
+-- *********************************************************************************************************
+
+    adTa5kTreeNetworkingModuleIdentity MODULE-IDENTITY
+        LAST-UPDATED "201402170000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Total Access 5000 Tree Networking MIB"
+
+        REVISION "201402170000Z"
+        DESCRIPTION "Add a notification for Node Alarm level"
+
+        REVISION "201111012300Z"
+        DESCRIPTION "Add Node Information Advertisement Statistics."
+
+        REVISION "201110261800Z"
+        DESCRIPTION "Add provisioning for alarm enable/disable"
+
+        REVISION "201110120000Z"
+        DESCRIPTION "Added UNI to adTa5kTreeNetworkingPortMode."
+
+        REVISION "201104122112Z"
+        DESCRIPTION "Added adTa5kTreeNetworkingStatDuplicateNodeInformationTable."
+
+        ::= { adTa5kTreeNetworkingID 1 }
+
+-- OBJECT IDENTIFIERS
+    adTa5kTreeNetworkingAlarmPrefix     OBJECT IDENTIFIER ::= { adTa5kTreeNetworking 1 }
+    adTa5kTreeNetworkingAlarms          OBJECT IDENTIFIER ::= { adTa5kTreeNetworkingAlarmPrefix 0}
+    adTa5kTreeNetworkingProvisioning    OBJECT IDENTIFIER ::= { adTa5kTreeNetworking 2 }
+    adTa5kTreeNetworkingStatus          OBJECT IDENTIFIER ::= { adTa5kTreeNetworking 3 }
+
+-- ******************************************************************************************
+-- Provisioning
+-- ******************************************************************************************
+
+   adTa5kTreeNetworkingProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kTreeNetworkingProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table contains provisioning for TA5000 tree networking."
+       ::= { adTa5kTreeNetworkingProvisioning 1 }
+
+    adTa5kTreeNetworkingProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kTreeNetworkingProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table is indexed by the ifIndex of the port used
+            to chain TA5000 shelves"
+       INDEX { ifIndex }
+       ::= { adTa5kTreeNetworkingProvTable 1 }
+
+    AdTa5kTreeNetworkingProvEntry ::=
+       SEQUENCE {
+           adTa5kTreeNetworkingPortMode         INTEGER
+       }
+
+   adTa5kTreeNetworkingPortMode       OBJECT-TYPE
+        SYNTAX                  INTEGER {
+            unused (1),
+            networkInterface (2),
+            uplink (3),
+            downlink (4),
+            erps (5),
+            subtendedHost (6),
+            uni (7)
+            }
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+           "This value determines the how this port affects redundancy decisions.
+            Only unused(1) and downlink(4) are allowed on a set.  Switch Module ports
+            may return networkInterface(2) or uplink(3), when that port is selected as
+            the ethernet default interface for the system.
+            Unused (1) - this port is ignored in redundancy decisions.
+            Network Interface (2) - Indicates that this port is connected to an upstream router
+                                    or other non-TA5000 networking equipment.
+            Uplink (3) - Indicates that this port is connected to an upstream TA5000 Node.
+            Downlink (4) - Indicates that this port is connected to a downstream TA5000 Node.
+            erps (5) - Indicates that this port participates in an ERPS ring, and thus
+                       supports ERPS timing, but is ignored for redundancy decisions.
+                       This value is read only and cannot be set.
+            subtendedHost (6) - Indicates that this port has a subtended host.
+                                This value is read only and cannot be set.
+            uni (7) - Indicates that this port is being used as a UNI port and cannot
+                      be used for any other services such as EVC MEN connections,
+                      network, uplink, downlink, erps, or subtended host.
+                      This value is read only and cannot be set."
+        ::= {adTa5kTreeNetworkingProvEntry 1}
+
+-- ******************************************************************************************
+-- Alarm Provisioning
+-- ******************************************************************************************
+
+    adTa5kTreeNetworkingAlarmProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kTreeNetworkingAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kTreeNetworkingProvisioning 2 }
+
+    adTa5kTreeNetworkingAlarmProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kTreeNetworkingAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { ifIndex }
+       ::= { adTa5kTreeNetworkingAlarmProvTable 1 }
+
+   AdTa5kTreeNetworkingAlarmProvEntry ::=
+       SEQUENCE {
+           adTa5kSmPortModeMismatchAlarmEnable                  TruthValue,
+           adTa5kSmUpstreamShelfNotReadyAlarmEnable             TruthValue,
+           adTa5kSmDownstreamShelfFaultAlarmEnable              TruthValue,
+           adTa5kTreeNetworkingLossOfHeartbeatAlarmEnable       TruthValue,
+           adTa5kTreeNetworkingPortModeMismatchAlarmEnable      TruthValue
+       }
+
+   adTa5kSmPortModeMismatchAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kTreeNetworkingAlarmProvEntry 1 }
+
+   adTa5kSmUpstreamShelfNotReadyAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kTreeNetworkingAlarmProvEntry 2 }
+
+   adTa5kSmDownstreamShelfFaultAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kTreeNetworkingAlarmProvEntry 3 }
+
+   adTa5kTreeNetworkingLossOfHeartbeatAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kTreeNetworkingAlarmProvEntry 4 }
+
+   adTa5kTreeNetworkingPortModeMismatchAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kTreeNetworkingAlarmProvEntry 5 }
+
+   adTa5kTreeNetworkingNodeAlarmLevelEnable OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                "Enable/disable the adTa5kTreeNetworkingNodeAlarmLevelActive trap.
+                 True - alarm is enabled"
+        DEFVAL {true}
+        ::= { adTa5kTreeNetworkingProvisioning 3}
+
+--==================================================================================================================
+-- Status
+
+   adTa5kTreeNetworkingStatNodeInformationTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdTa5kTreeNetworkingStatNodeInformationEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The Node Information Advertisement table provides information for a RT about all the other nodes on the network.
+         The RT will have access to the node number, management IP address, management MAC address, number of NIA messages
+         received from a node and the target-ID of a node for all the nodes in that network.
+         Each SM advertises its node management information to all other nodes in the system.
+         Each node collects all this information so that it can be displayed."
+      ::= { adTa5kTreeNetworkingStatus 1 }
+
+   adTa5kTreeNetworkingStatNodeInformationEntry OBJECT-TYPE
+      SYNTAX  AdTa5kTreeNetworkingStatNodeInformationEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the Node Information Advertisement table."
+      INDEX   { adTa5kNodeInformationNodeNumber }
+      ::= { adTa5kTreeNetworkingStatNodeInformationTable 1 }
+
+   AdTa5kTreeNetworkingStatNodeInformationEntry  ::=
+      SEQUENCE {
+         adTa5kNodeInformationNodeNumber
+         Integer32,
+         adTa5kNodeInformationManagementIP
+         IpAddress,
+         adTa5kNodeInformationManagementVLANID
+         Integer32,
+         adTa5kNodeInformationManagementMAC
+         MacAddress,
+         adTa5kNodeInformationReceivedMessageCount
+         Counter32,
+         adTa5kNodeInformationTargetID
+         DisplayString
+      }
+
+   adTa5kNodeInformationNodeNumber OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The node number that is present in the node-information advertisement table."
+      ::= { adTa5kTreeNetworkingStatNodeInformationEntry 1 }
+
+   adTa5kNodeInformationManagementIP OBJECT-TYPE
+      SYNTAX  IpAddress
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The management IP address of the selected node."
+      ::= { adTa5kTreeNetworkingStatNodeInformationEntry 2 }
+
+   adTa5kNodeInformationManagementVLANID OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The management VLAN ID of the selected node."
+      ::= { adTa5kTreeNetworkingStatNodeInformationEntry 3 }
+
+   adTa5kNodeInformationManagementMAC OBJECT-TYPE
+      SYNTAX  MacAddress
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The management MAC address of the selected node."
+      ::= { adTa5kTreeNetworkingStatNodeInformationEntry 4 }
+
+   adTa5kNodeInformationReceivedMessageCount OBJECT-TYPE
+      SYNTAX  Counter32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "A number that represents the total number of node-information-advertisement messages that were received by this node."
+      ::= { adTa5kTreeNetworkingStatNodeInformationEntry 5 }
+
+   adTa5kNodeInformationTargetID OBJECT-TYPE
+      SYNTAX  DisplayString
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The TL1 target identifier(TID) of the selected node."
+      ::= { adTa5kTreeNetworkingStatNodeInformationEntry 6 }
+
+-- *******************************************************************************
+
+   adTa5kTreeNetworkingStatDuplicateNodeInformationTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdTa5kTreeNetworkingStatDuplicateNodeInformationEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The Duplicate Node Information Advertisement table provides information for a RT about all
+         Duplicate nodes on the network. The RT will have access to the node number, management
+         IP address, management MAC address, and the target-ID of a node for all the nodes in that network.
+         Each node collects all this information so that it can be displayed."
+      ::= { adTa5kTreeNetworkingStatus 2 }
+
+   adTa5kTreeNetworkingStatDuplicateNodeInformationEntry OBJECT-TYPE
+      SYNTAX  AdTa5kTreeNetworkingStatDuplicateNodeInformationEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the Duplicate Node Information Advertisement table."
+      INDEX   { adTa5kDuplicateNodeInformationNodeNumber, adTa5kDuplicateNodeInformationManagementMAC }
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationTable 1 }
+
+   AdTa5kTreeNetworkingStatDuplicateNodeInformationEntry  ::=
+      SEQUENCE {
+         adTa5kDuplicateNodeInformationNodeNumber
+         Integer32,
+         adTa5kDuplicateNodeInformationManagementIP
+         IpAddress,
+         adTa5kDuplicateNodeInformationManagementVLANID
+         Integer32,
+         adTa5kDuplicateNodeInformationManagementMAC
+         MacAddress,
+         adTa5kDuplicateNodeInformationReceivedMessageCount
+         Counter32,
+         adTa5kDuplicateNodeInformationTargetID
+         DisplayString
+      }
+
+   adTa5kDuplicateNodeInformationNodeNumber OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The node number that is present in the node-information advertisement table."
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationEntry 1 }
+
+   adTa5kDuplicateNodeInformationManagementIP OBJECT-TYPE
+      SYNTAX  IpAddress
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The management IP address of the selected node."
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationEntry 2 }
+
+   adTa5kDuplicateNodeInformationManagementVLANID OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The management VLAN ID of the selected node."
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationEntry 3 }
+
+   adTa5kDuplicateNodeInformationManagementMAC OBJECT-TYPE
+      SYNTAX  MacAddress
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The management MAC address of the selected node."
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationEntry 4 }
+
+   adTa5kDuplicateNodeInformationReceivedMessageCount OBJECT-TYPE
+      SYNTAX  Counter32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "A number that represents the total number of node-information-advertisement messages that were received by this node."
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationEntry 5 }
+
+    adTa5kDuplicateNodeInformationTargetID OBJECT-TYPE
+      SYNTAX  DisplayString
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The TL1 target identifier(TID) of the selected node."
+      ::= { adTa5kTreeNetworkingStatDuplicateNodeInformationEntry 6 }
+
+   adTa5kTreeNetworkingNodeInformationStatistics OBJECT IDENTIFIER
+      ::= { adTa5kTreeNetworkingStatus 3 }
+
+   adTa5kNodeInformationTotalReceivedCount OBJECT-TYPE
+      SYNTAX  Counter32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of node information advertisement packets received"
+      ::= { adTa5kTreeNetworkingNodeInformationStatistics 1 }
+
+   adTa5kInformationTotalTransmitCount OBJECT-TYPE
+      SYNTAX  Counter32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of node information advertisement packets transmitted"
+      ::= { adTa5kTreeNetworkingNodeInformationStatistics 2 }
+
+   adTa5kInformationTotalDiscardCount OBJECT-TYPE
+      SYNTAX  Counter32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of node information advertisement packets discarded"
+      ::= { adTa5kTreeNetworkingNodeInformationStatistics 3 }
+
+   adTa5kTreeNetworkingTopologyTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdTa5kTreeNetworkingTopologyEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The topology table contains information about all of the nodes subtended from this system.
+          This table only contains information about nodes beneath this one in the hierarchy."
+      ::= { adTa5kTreeNetworkingStatus 4 }
+
+   adTa5kTreeNetworkingTopologyEntry OBJECT-TYPE
+      SYNTAX  AdTa5kTreeNetworkingTopologyEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The topology entry for a subtended node.  New nodes are added to the table as they are discovered."
+      INDEX   { adTa5kTopologyNodeNumber }
+      ::= { adTa5kTreeNetworkingTopologyTable 1 }
+
+   AdTa5kTreeNetworkingTopologyEntry  ::=
+      SEQUENCE {
+         adTa5kTopologyNodeNumber               Integer32,
+         adTa5kTopologyManagementIP             IpAddress,
+         adTa5kTopologyHopCount                 Integer32
+      }
+
+   adTa5kTopologyNodeNumber OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "Node number of the subtended system."
+      ::= { adTa5kTreeNetworkingTopologyEntry 1 }
+
+   adTa5kTopologyManagementIP OBJECT-TYPE
+      SYNTAX  IpAddress
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The out of band IP address for the subtended system."
+      ::= { adTa5kTreeNetworkingTopologyEntry 2 }
+
+   adTa5kTopologyHopCount OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "Number of hops to traverse the network to this subtended node."
+      ::= { adTa5kTreeNetworkingTopologyEntry 3 }
+
+
+-- ******************************************************************************************
+-- Alarms
+-- ******************************************************************************************
+
+   adTa5kSmPortModeMismatchClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that Port Mode Mismatch alarm cleared"
+
+         --#TYPE         "Status - Port Mode Mismatch Clear"
+         --#SUMMARY      "TA5000 Tree Networking: Port Mode Mismatch Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 2 }
+
+   adTa5kSmPortModeMismatch         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Port Mode Mismatch alarm is active"
+
+         --#TYPE         "Status - Port Mode Mismatch Alarm Active"
+         --#SUMMARY      "TA5000 Tree Networking: Port Mode Mismatch Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 3 }
+
+
+   adTa5kSmUpstreamShelfNotReadyClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that Upstream Shelf Not Ready alarm cleared"
+
+         --#TYPE         "Status - Upstream Shelf Not Ready Clear"
+         --#SUMMARY      "TA5000Tree Networking: Upstream Shelf Not Ready Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 4 }
+
+   adTa5kSmUpstreamShelfNotReadyActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that Upstream Shelf Not Ready alarm is active"
+
+         --#TYPE         "Status - Upstream Shelf Not Ready Alarm Active"
+         --#SUMMARY      "TA5000 Tree Networking: Upstream Shelf Not Ready Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 5 }
+
+   adTa5kSmDownstreamShelfFaultClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that Downstream Shelf Fault alarm cleared"
+
+         --#TYPE         "Status - Downstream Shelf Fault Clear"
+         --#SUMMARY      "TA5000 Tree Networking: Downstream Shelf Fault Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 6 }
+
+   adTa5kSmDownstreamShelfFaultActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that Downstream Shelf Fault alarm is active"
+
+         --#TYPE         "Status - Downstream Shelf Fault Alarm Active"
+         --#SUMMARY      "TA5000 Tree Networking: Downstream Shelf Fault Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 7 }
+
+   adTa5kTreeNetworkingLossOfHeartbeatClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            ifIndex,
+            ifDescr
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the loss of heartbeat alarm cleared"
+
+         --#TYPE         "Status - Loss of Heartbeat Clear"
+         --#SUMMARY      "TA5000 Tree Networking: Loss of Heartbeat Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 8 }
+
+   adTa5kTreeNetworkingLossOfHeartbeatActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            ifIndex,
+            ifDescr
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the loss of heartbeat alarm is active"
+
+         --#TYPE         "Status - Loss of Heartbeat Alarm Active"
+         --#SUMMARY      "TA5000 Tree Networking: Loss of Heartbeat Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 9 }
+
+   adTa5kTreeNetworkingPortModeMismatchClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            ifIndex,
+            ifDescr
+        }
+        STATUS  current
+          DESCRIPTION
+           "Indicates that Port Mode Mismatch alarm cleared"
+
+         --#TYPE         "Status - Port Mode Mismatch Clear"
+         --#SUMMARY      "TA5000 Tree Networking: Port Mode Mismatch Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 10 }
+
+   adTa5kTreeNetworkingPortModeMismatchActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            ifIndex,
+            ifDescr
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Port Mode Mismatch alarm is active"
+
+         --#TYPE         "Status - Port Mode Mismatch Alarm Active"
+         --#SUMMARY      "TA5000 Tree Networking: Port Mode Mismatch Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 11 }
+
+   adTa5kTreeNetworkingNodeAlarmLevelClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adTa5kTopologyNodeNumber,
+            adTa5kTopologyManagementIP,
+            adTAeSCUTrapAlarmLevel
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Node Alarm Level alarm has cleared.
+            This alarm is only generated by the Switch Module in the COT node (node 1).
+            Each subtended RT node shares its alarm status with the COT.
+            adTa5kTreeNetworkingNodeAlarmLevelClear indicates that there all active
+            alarms on the RT node have been cleared."
+
+         --#TYPE         "Status - Node Alarm Level Alarm Cleared"
+         --#SUMMARY      "TA5000 Tree Networking: Node Alarm Level Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s  Node: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 12 }
+
+   adTa5kTreeNetworkingNodeAlarmLevelActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adTa5kTopologyNodeNumber,
+            adTa5kTopologyManagementIP,
+            adTAeSCUTrapAlarmLevel
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Node Alarm Level alarm is active.
+            This alarm is only generated by the Switch Module in the COT node (node 1).
+            Each subtended RT node shares its alarm status with the COT.
+            The value of adTaeSCUTrapAlarmLevel represents the most severe active alarm on the RT."
+
+         --#TYPE         "Status - Node Alarm Level Alarm Active"
+         --#SUMMARY      "TA5000 Tree Networking: Node Alarm Level Alarm Active on"
+         --#SUMMARY      "Shelf: %s  Node: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kTreeNetworkingAlarms 13 }
+
+   END
+

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -44,7 +44,7 @@ foreach ($huawei['temp'] as $index => $entry) {
         $options               = ['limit_high' => snmp_get_oid($device, "hwEntityTemperatureThreshold.$index", 'HUAWEI-ENTITY-EXTENT-MIB')];
         $options['rename_rrd'] = "huawei-$index";
 
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
     }
 }
 
@@ -69,7 +69,7 @@ foreach ($huawei['voltage'] as $index => $entry) {
                     'limit_low'  => snmp_get_oid($device, "hwEntityVoltageLowThreshold.$index", 'HUAWEI-ENTITY-EXTENT-MIB')];
 
         $options['rename_rrd'] = "huawei-$index";
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
     }
 }
 
@@ -86,7 +86,7 @@ foreach ($huawei['fan'] as $index => $entry) {
 
     if ($entry['hwEntityFanSpeed'] > 0) {
         $options = ['rename_rrd' => "huawei-$index"];
-        discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
     }
 
     $oid_name = 'hwEntityFanState';
@@ -185,10 +185,10 @@ foreach ($entity_array as $index => $entry) {
     } else {
         $trans = '';
     }
-    discover_sensor_ng($device, 'temperature', $mib, 'hwEntityOpticalTemperature', $temperatureoid, $index, NULL, $entry['ifDescr'] . ' Temperature' . $trans, 1, $entry['hwEntityOpticalTemperature'], $options);
-    discover_sensor_ng($device, 'voltage', $mib, 'hwEntityOpticalVoltage', $voltageoid, $index, NULL, $entry['ifDescr'] . ' Voltage' . $trans, 0.001, $entry['hwEntityOpticalVoltage'], $options);
+    discover_sensor_ng($device, 'temperature', $mib, 'hwEntityOpticalTemperature', $temperatureoid, $index, $entry['ifDescr'] . ' Temperature' . $trans, 1, $entry['hwEntityOpticalTemperature'], $options);
+    discover_sensor_ng($device, 'voltage', $mib, 'hwEntityOpticalVoltage', $voltageoid, $index, $entry['ifDescr'] . ' Voltage' . $trans, 0.001, $entry['hwEntityOpticalVoltage'], $options);
     if ($entry['hwEntityOpticalBiasCurrent'] != -1) {
-        discover_sensor_ng($device, 'current', $mib, 'hwEntityOpticalBiasCurrent', $biascurrentoid, $index, NULL, $entry['ifDescr'] . ' Bias Current' . $trans, 0.000001, $entry['hwEntityOpticalBiasCurrent'], $options);
+        discover_sensor_ng($device, 'current', $mib, 'hwEntityOpticalBiasCurrent', $biascurrentoid, $index, $entry['ifDescr'] . ' Bias Current' . $trans, 0.000001, $entry['hwEntityOpticalBiasCurrent'], $options);
     }
 
     // MultiLane transceivers
@@ -245,40 +245,40 @@ foreach ($entity_array as $index => $entry) {
 
             $rxoptions['sensor_unit'] = 'split1';
             $lane_descr               = $entry['ifDescr'] . ' Lane 1 Rx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
 
             $rxoptions['sensor_unit'] = 'split2';
             $lane_descr               = $entry['ifDescr'] . ' Lane 2 Rx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
 
             $rxoptions['sensor_unit'] = 'split3';
             $lane_descr               = $entry['ifDescr'] . ' Lane 3 Rx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
 
             $rxoptions['sensor_unit'] = 'split4';
             $lane_descr               = $entry['ifDescr'] . ' Lane 4 Rx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
         } else {
             $rxoptions['rename_rrd'] = "HUAWEI-ENTITY-EXTENT-MIB-hwEntityOpticalRxPower-$index";
             $lane_descr              = $entry['ifDescr'] . ' Rx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
         }
     } elseif ($entry['hwEntityOpticalRxPower'] != -1) {
         // Huawei does not follow their own MIB for some devices and instead reports Rx/Tx Power as dBm converted to mW then multiplied by 1000
         $rxpoweroid = '.1.3.6.1.4.1.2011.5.25.31.1.1.3.1.8.' . $index;
 
         // Limits always as dBm
+        if ($power_class === 'power') {
+            $rxoptions['limit_unit'] = 'dBm'; // Limit in dBm, convert to W
+        }
         foreach ($rx_limit_oids as $limit => $limit_oid) {
             if (isset($entry[$limit_oid]) && $entry[$limit_oid] != -1) {
                 $rxoptions[$limit] = $entry[$limit_oid] * 0.01;
-                if ($power_class === 'power') {
-                    $rxoptions[$limit] = value_to_si($rxoptions[$limit], 'dBm', 'power'); // Limit in dBm, convert to W
-                }
             }
         }
 
         $rxoptions['rename_rrd'] = "huawei-hwEntityOpticalRxPower.$index";
-        discover_sensor_ng($device, $power_class, $mib, 'hwEntityOpticalRxPower', $rxpoweroid, $index, NULL, $entry['ifDescr'] . ' Rx Power' . $trans, $power_scale, $entry['hwEntityOpticalRxPower'], $rxoptions);
+        discover_sensor_ng($device, $power_class, $mib, 'hwEntityOpticalRxPower', $rxpoweroid, $index, $entry['ifDescr'] . ' Rx Power' . $trans, $power_scale, $entry['hwEntityOpticalRxPower'], $rxoptions);
     }
 
     // Tx power
@@ -312,39 +312,39 @@ foreach ($entity_array as $index => $entry) {
 
             $txoptions['sensor_unit'] = 'split1';
             $lane_descr               = $entry['ifDescr'] . ' Lane 1 Tx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
 
             $txoptions['sensor_unit'] = 'split2';
             $lane_descr               = $entry['ifDescr'] . ' Lane 2 Tx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
 
             $txoptions['sensor_unit'] = 'split3';
             $lane_descr               = $entry['ifDescr'] . ' Lane 3 Tx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
 
             $txoptions['sensor_unit'] = 'split4';
             $lane_descr               = $entry['ifDescr'] . ' Lane 4 Tx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
         } else {
             $txoptions['rename_rrd'] = "HUAWEI-ENTITY-EXTENT-MIB-hwEntityOpticalTxPower-$index";
             $lane_descr              = $entry['ifDescr'] . ' Tx Power' . $trans;
-            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+            discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, $lane_descr, 0.01, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
         }
     } elseif ($entry['hwEntityOpticalTxPower'] != -1) {
         // Huawei does not follow their own MIB for some devices and instead reports Rx/Tx Power as dBm converted to mW then multiplied by 1000
         $txpoweroid = '.1.3.6.1.4.1.2011.5.25.31.1.1.3.1.9.' . $index;
 
+        if ($power_class === 'power') {
+            $txoptions['limit_unit'] = 'dBm'; // Limit in dBm, convert to W
+        }
         foreach ($tx_limit_oids as $limit => $limit_oid) {
             if (isset($entry[$limit_oid]) && $entry[$limit_oid] != -1) {
                 $txoptions[$limit] = $entry[$limit_oid] * 0.01;
-                if ($power_class === 'power') {
-                    $txoptions[$limit] = value_to_si($txoptions[$limit], 'dBm', 'power'); // Limit in dBm, convert to W
-                }
             }
         }
 
         $txoptions['rename_rrd'] = "huawei-hwEntityOpticalTxPower.$index";
-        discover_sensor_ng($device, $power_class, $mib, 'hwEntityOpticalTxPower', $txpoweroid, $index, NULL, $entry['ifDescr'] . ' Tx Power' . $trans, $power_scale, $entry['hwEntityOpticalTxPower'], $txoptions);
+        discover_sensor_ng($device, $power_class, $mib, 'hwEntityOpticalTxPower', $txpoweroid, $index, $entry['ifDescr'] . ' Tx Power' . $trans, $power_scale, $entry['hwEntityOpticalTxPower'], $txoptions);
     }
 
 }

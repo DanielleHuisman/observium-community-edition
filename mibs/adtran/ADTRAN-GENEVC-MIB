@@ -1,0 +1,571 @@
+ADTRAN-GENEVC-MIB
+
+-- TITLE:     The ADTRAN EVC MIB
+-- PRODUCT:   Metro Ethernet Products
+-- VERSION:   1.0
+-- DATE:      02/04/09
+-- AUTHOR:    Andria Dyess
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifiers (OIDs) for the
+-- ADTRAN GENEVC MIB objects
+
+-- HISTORY:
+-- 2009/02/04 aed   STATUS: PRELIMINARY.
+-- 2009/02/09 aed   Updated to add IGMP version and priority.  Also fixed S-Tag and C-Tag ranges.
+--             	 	Corrected comments on adGenEVCPreserveCEVlanId.
+-- 2009/02/16 aed   Added a quick up/down query for the status of an EVC.  Changed EVC status to
+--             		a string rather than an integer.  Added an error string for the MEN port table.
+--             		Also corrected the indexing scheme for the MEN port table.
+-- 2009/02/16 aed   More than one IP Multicast Group can be connected to an EVC.  Added a new table
+--             		for the purpose of adding/removing IP Multicast Groups.
+-- 2009/02/18 aed   Corrected errors found in the comments and by the smic compiler.
+--             		Added EVC/slot table.
+-- 2009/02/23 aed   Corrected max-access for adGenEVCNumberOfIpMulticastGroups.
+--             		Added 'transparent' as an option for IGMP mode.
+-- 2009/03/03 jlb   Added 4097 as the s-tag value for priority tagged traffic.
+-- 2009/03/05 sgs   Added adGenMenPortStagDei.
+-- 2009/03/13 aed   Modified indexing for the adGenEVCMenPortTable.  The first index is now a
+--             		fixed-length octet stream.  Made adGenEVCAlias read-only in adGenEVCTable.
+--             		Corrected description for adGenEVCIGMPLastMemberQueryCount.
+-- 2009/03/19 aed   Remove C-Tag from the EVC.  It will now be a part of the Ethernet Flow.
+-- 2009/03/24 aed   Remove everything related to IGMP.  (Will not be supported in SR4.8)
+-- 2009/05/20 aed   Add IMPLIED keyword to variable-length string indexes.  Make the indexes not-accessible.
+-- 2009/06/02 twc	Added 1..50 SIZE modifier to adGenEVCName.
+-- 2009/10/09 twc	Added 50 SIZE modifier to adGenEVCNameFixedLen.
+-- 2009/10/20 crh	Added adGenEVCNumberOfEvcs and adGenEVCLastChange.
+-- 2009/02/10 jlb 	Added adGenEVCSysMgmtEVCScalars and adGenEVCSysMgmtEVCInterfaceTable.
+-- 2010/07/20 dcc   Added adGenEVCDoubleTagSwitching.
+
+-- ******************************************************************************************
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+   adGenEVC,
+   adGenEVCID
+      FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+
+   OBJECT-TYPE,
+   MODULE-IDENTITY,
+   Integer32,
+   Unsigned32
+      FROM SNMPv2-SMI
+
+   DisplayString,
+   RowStatus,
+   TimeStamp
+      FROM SNMPv2-TC
+
+   InterfaceIndex,
+   ifIndex
+      FROM IF-MIB
+
+   adGenIpHostEntryIndex
+   	FROM ADTRAN-GENIPHOST-MIB
+   	
+   GenSystemInterfaceType
+      FROM ADTRAN-SHARED-CND-SYSTEM-TC-MIB
+   ;
+
+adGenEVCMIB MODULE-IDENTITY
+   LAST-UPDATED "201309060000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO
+     "CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+                 Tel: +1 800 726-8663
+                 Fax: +1 256 963 6217
+                 E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the EVC MIB."
+
+   REVISION "201309060000Z"
+   DESCRIPTION "Added adGenEVCIPHostTable."
+
+   REVISION "201203210000Z"
+   DESCRIPTION "Added adGenMenPortInterfaceType."
+   
+   REVISION "201002100000Z"
+   DESCRIPTION "Added adGenEVCSysMgmtEVCScalars and adGenEVCSysMgmtEVCInterfaceTable."
+
+   REVISION "200904020000Z"
+   DESCRIPTION "Created"
+::= { adGenEVCID 1 }
+
+adGenEVCEvents                      OBJECT IDENTIFIER ::= {adGenEVC 0}
+adGenEVCProvisioning                OBJECT IDENTIFIER ::= {adGenEVC 1}
+
+--==================================================================================================================
+
+   adGenEVCTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenEVCEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The EVC provisioning table."
+      ::= { adGenEVCProvisioning 1 }
+
+   adGenEVCEntry OBJECT-TYPE
+      SYNTAX  AdGenEVCEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the EVC provisioning table.  EVC entries
+          are uniquely identified by their name as well as by
+          the S-Tag VLAN Id."
+      INDEX  { IMPLIED adGenEVCName }
+      ::= { adGenEVCTable 1 }
+
+   AdGenEVCEntry ::=
+      SEQUENCE {
+         adGenEVCName
+            DisplayString,
+         adGenEVCRowStatus
+            RowStatus,
+         adGenEVCOperStatus
+            INTEGER,
+         adGenEVCStatus
+            DisplayString,
+         adGenEVCSTagVID
+            Integer32,
+         adGenEVCPreserveCEVlanId
+            INTEGER,
+         adGenEVCMacSwitching
+            INTEGER,
+         adGenEVCNumberOfInterfaces
+            Integer32,
+         adGenEVCLastError
+            DisplayString,
+         adGenEVCDoubleTagSwitching
+            INTEGER
+      }
+
+      adGenEVCName OBJECT-TYPE
+         SYNTAX  DisplayString (SIZE (1..50))
+         MAX-ACCESS  not-accessible
+         STATUS  current
+         DESCRIPTION
+            "A user configurable name for the EVC.  Upon creation of the EVC,
+             the associated name will default to a unique value."
+         ::= { adGenEVCEntry 1}
+
+      adGenEVCRowStatus OBJECT-TYPE
+         SYNTAX  RowStatus
+         MAX-ACCESS  read-create
+         STATUS  current
+         DESCRIPTION
+           "This object is used to create a new row or modify or delete an
+            existing row in the EVC table."
+         ::= { adGenEVCEntry 2}
+
+      adGenEVCOperStatus OBJECT-TYPE
+         SYNTAX INTEGER  {
+            up(1),
+            down(2)
+         }
+         MAX-ACCESS read-only
+         STATUS current
+         DESCRIPTION
+            "Returns the current operational status of the EVC."
+         ::= { adGenEVCEntry 3}
+
+      adGenEVCStatus OBJECT-TYPE
+         SYNTAX  DisplayString
+         MAX-ACCESS  read-only
+         STATUS  current
+         DESCRIPTION
+            "This variable provides the EVC status.  If there is no error, the EVC
+             status will be 'running'.  If there is an error and the EVC cannot be
+             applied, then adGenEVCStatus will provide more details about the error."
+         ::= { adGenEVCEntry 4}
+
+      adGenEVCSTagVID OBJECT-TYPE
+         SYNTAX  Integer32
+         MAX-ACCESS  read-create
+         STATUS  current
+         DESCRIPTION
+            "This variable specifies the outermost VLAN S-Tag VID for
+             frames on this EVC. No two entries in the EVC Table may
+             have the same S-Tag VID.
+             S-Tag values 0 and 4095 are reserved and should not be used.
+             Set the S-Tag to 4096 for untagged traffic and to 4097 for
+             priority tagged traffic."
+         ::= { adGenEVCEntry 5}
+
+      adGenEVCPreserveCEVlanId OBJECT-TYPE
+         SYNTAX  INTEGER  {
+            disabled(1),
+            enabled(2)
+         }
+         MAX-ACCESS  read-create
+         STATUS  current
+         DESCRIPTION
+            "This option provisions whether to preserve the CE VLAN tag
+             received at the UNI port. Select enabled to push the EVC tag
+             onto the CE tag for frames destined for this EVC. Select
+             disabled to remove the CE VLAN tag and to add the EVC tag
+             for the frames destined for this EVC."
+         ::= { adGenEVCEntry 6}
+
+      adGenEVCMacSwitching OBJECT-TYPE
+         SYNTAX INTEGER  {
+            disabled(1),
+            enabled(2)
+         }
+         MAX-ACCESS read-create
+         STATUS current
+         DESCRIPTION
+            "This option provisions whether MAC Switching should be
+             performed on this EVC."
+         ::= { adGenEVCEntry 7}
+
+      adGenEVCNumberOfInterfaces OBJECT-TYPE
+          SYNTAX Integer32
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+             "Returns the number of interfaces connected to this EVC."
+          ::= {adGenEVCEntry 8}
+
+      adGenEVCLastError OBJECT-TYPE
+          SYNTAX         DisplayString
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+             "This string describes the last error experienced
+              for this particular entry in the table."
+          ::= { adGenEVCEntry 9 }
+
+      adGenEVCDoubleTagSwitching OBJECT-TYPE
+         SYNTAX INTEGER  {
+            disabled(1),
+            enabled(2)
+         }
+         MAX-ACCESS read-create
+         STATUS current
+         DESCRIPTION
+            "This option provisions whether Double Tag Switching 
+             should be performed on this EVC."
+         ::= { adGenEVCEntry 10}
+
+--==================================================================================================================
+
+   adGenEVCLookupTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenEVCLookupEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The EVC lookup table."
+      ::= { adGenEVCProvisioning 2 }
+
+   adGenEVCLookupEntry OBJECT-TYPE
+      SYNTAX  AdGenEVCLookupEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the EVC lookup table.  This table has one
+          entry for each row in the adGenEVCTable.  This table is
+          used to find the EVC name for a given S-Tag VLAN Id."
+      INDEX  { adGenEVCLookupSTag }
+      ::= { adGenEVCLookupTable 1 }
+
+   AdGenEVCLookupEntry ::=
+      SEQUENCE {
+         adGenEVCLookupSTag
+            Integer32,
+         adGenEVCLookupName
+            DisplayString
+      }
+
+      adGenEVCLookupSTag OBJECT-TYPE
+         SYNTAX  Integer32
+         MAX-ACCESS  read-only
+         STATUS  current
+         DESCRIPTION
+            "The S-Tag VLAN Id.
+             S-Tag values 0, 1, and 4095 are reserved and should not be used.
+             Set the S-Tag to 4096 for untagged traffic and to 4097 for
+             priority tagged traffic."
+         ::= { adGenEVCLookupEntry 1}
+
+      adGenEVCLookupName OBJECT-TYPE
+         SYNTAX  DisplayString
+         MAX-ACCESS  read-only
+         STATUS  current
+         DESCRIPTION
+            "Returns the EVC name associated with the given S-Tag VID."
+         ::= { adGenEVCLookupEntry 2}
+
+--==================================================================================================================
+
+   adGenEVCMenPortTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenEVCMenPortEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The EVC MEN Port table."
+      ::= { adGenEVCProvisioning 3 }
+
+   adGenEVCMenPortEntry OBJECT-TYPE
+      SYNTAX  AdGenEVCMenPortEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the EVC MEN Port table.  This table can be
+          used to add or remove MEN Port connections for an EVC.
+          The first index, adGenEVCNameFixedLen, identifies the EVC.
+          The second index is the ifIndex for the MEN port."
+      INDEX  { adGenEVCNameFixedLen, adGenMenPortIfIndex }
+      ::= { adGenEVCMenPortTable 1 }
+
+   AdGenEVCMenPortEntry ::=
+      SEQUENCE {
+         adGenEVCNameFixedLen
+            OCTET STRING,
+         adGenMenPortIfIndex
+            InterfaceIndex,
+         adGenMenPortRowStatus
+            RowStatus,
+         adGenMenPortConnectionType
+            INTEGER,
+         adGenMenPortInterfaceType
+            GenSystemInterfaceType
+      }
+
+      adGenEVCNameFixedLen OBJECT-TYPE
+         SYNTAX  OCTET STRING (SIZE (50))
+         MAX-ACCESS not-accessible
+         STATUS current
+         DESCRIPTION
+           "The name of the EVC to which the MEN Port should be added.
+            This string matches adGenEvcName from adGenEVCTable, but it is
+            padded at the end with 0x00 so that the table index has a fixed
+            length of 50 characters."
+         ::= { adGenEVCMenPortEntry 1}
+
+      adGenMenPortIfIndex OBJECT-TYPE
+         SYNTAX  InterfaceIndex
+         MAX-ACCESS  not-accessible
+         STATUS  current
+         DESCRIPTION
+           "This interface index of the MEN port to be connected to this EVC."
+         ::= { adGenEVCMenPortEntry 2}
+
+      adGenMenPortRowStatus OBJECT-TYPE
+         SYNTAX  RowStatus
+         MAX-ACCESS  read-create
+         STATUS  current
+         DESCRIPTION
+           "This object is used to create or destroy a MEN Port
+            connection for an EVC."
+         ::= { adGenEVCMenPortEntry 3}
+
+      adGenMenPortConnectionType OBJECT-TYPE
+         SYNTAX INTEGER  {
+            root(1),
+            leaf(2)
+         }
+         MAX-ACCESS  read-create
+         STATUS  current
+         DESCRIPTION
+            "This option provisions whether the MEN port is a root
+             or leaf of the given EVC."
+         DEFVAL  { root }
+         ::= { adGenEVCMenPortEntry 4}
+         
+       adGenMenPortInterfaceType OBJECT-TYPE
+         SYNTAX GenSystemInterfaceType
+         MAX-ACCESS  read-only
+         STATUS  current
+         DESCRIPTION
+            "Returns the Interface type of the men port. The following are valid interfaces:
+               unknown                  (1),
+               gigabitEthernet          (6),
+               tenGigabitEthernet       (9),
+               erps                     (10),
+               efmGroup                 (14),
+               lagGroup                 (17),
+               defaultInterface         (37),
+               genericBridge            (38)"
+         ::= { adGenEVCMenPortEntry 5}
+
+   adGenEVCMenPortConnectionError OBJECT-TYPE
+      SYNTAX  DisplayString
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "Returns information about the last error for the EVC MEN Port table.
+          If row creation fails, this string will provide details about why
+          the row could not be created."
+      ::= { adGenEVCProvisioning 4 }
+--==================================================================================================================
+
+   adGenEVCMenPortProvisioningTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdGenEVCMenPortProvisioningEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The EVC MEN Port Provisioning table."
+      ::= { adGenEVCProvisioning 5 }
+
+   adGenEVCMenPortProvisioningEntry OBJECT-TYPE
+      SYNTAX  AdGenEVCMenPortProvisioningEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the EVC MEN Port Provisioning table.
+         This table can be used to provision a MEN port.  The
+         index for this table is the ifIndex of the MEN port."
+      INDEX  { ifIndex }
+      ::= { adGenEVCMenPortProvisioningTable 1 }
+
+   AdGenEVCMenPortProvisioningEntry ::=
+      SEQUENCE {
+         adGenMenPortStagDei
+            INTEGER
+      }
+
+      adGenMenPortStagDei OBJECT-TYPE
+         SYNTAX INTEGER  {
+            disabled (1),
+            enabled (2)
+         }
+         MAX-ACCESS read-write
+         STATUS current
+         DESCRIPTION
+            "This option provisions the marking of the DEI bit.
+             When enabled, the bit functions as the Drop Eligible Indicator.
+             When disabled, the bit functions as the Canonical Format Indicator."
+         ::= { adGenEVCMenPortProvisioningEntry 1 }
+
+
+--==================================================================================================================
+
+    adGenEVCProvScalars             OBJECT IDENTIFIER ::= {adGenEVCProvisioning 6}
+
+    adGenEVCNumberOfEvcs OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the number of EVCs that have been created on this system."
+      ::= { adGenEVCProvScalars 1 }
+
+    adGenEVCLastChange OBJECT-TYPE
+      SYNTAX      TimeStamp
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "Returns the time of the last configuration change to any EVC on this system."
+      ::= { adGenEVCProvScalars 2 }
+
+--==================================================================================================================
+
+	adGenEVCSysMgmtEVCScalars 			OBJECT IDENTIFIER ::= {adGenEVCProvisioning 7}
+
+    adGenEVCSysMgmtEVCSTagVID OBJECT-TYPE
+      SYNTAX      Integer32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+        "This variable specifies the outermost VLAN S-Tag VID for
+         frames on this EVC."
+      ::= { adGenEVCSysMgmtEVCScalars 1 }
+
+    adGenEVCSysMgmtEVCSTagPriority OBJECT-TYPE
+      SYNTAX  	  INTEGER (0..7)
+      MAX-ACCESS  read-only
+      STATUS  	  current
+      DESCRIPTION
+        "This option controls how the frames are classified for this EVC."
+      ::= { adGenEVCSysMgmtEVCScalars 2 }
+
+    adGenEVCSysMgmtEVCNumberOfInterfaces OBJECT-TYPE
+      SYNTAX 	  Integer32
+      MAX-ACCESS  read-only
+      STATUS 	  current
+      DESCRIPTION
+         "Returns the number of interfaces connected to the System Management EVC."
+      ::= { adGenEVCSysMgmtEVCScalars 3 }
+
+
+--==================================================================================================================
+
+   	adGenEVCSysMgmtEVCInterfaceTable OBJECT-TYPE
+      SYNTAX  	  SEQUENCE OF AdGenEVCSysMgmtEVCInterfaceEntry
+      MAX-ACCESS  not-accessible
+      STATUS  	  current
+      DESCRIPTION
+         "The System Management EVC table."
+      ::= { adGenEVCProvisioning 8 }
+
+   	adGenEVCSysMgmtEVCInterfaceEntry OBJECT-TYPE
+      SYNTAX      AdGenEVCSysMgmtEVCInterfaceEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "An entry in the System Management EVC interface table."
+      INDEX  { ifIndex  }
+      ::= { adGenEVCSysMgmtEVCInterfaceTable 1 }
+
+   	AdGenEVCSysMgmtEVCInterfaceEntry ::=
+      SEQUENCE {
+         adGenSysMgmtEVCInterfaceConnectionType
+            INTEGER
+      }
+
+    adGenSysMgmtEVCInterfaceConnectionType OBJECT-TYPE
+      SYNTAX 	  INTEGER
+				  {
+         			menPort(1),
+         			uni(2)
+      			  }
+      MAX-ACCESS  read-only
+      STATUS 	  current
+      DESCRIPTION
+            "Returns the connection type for this interface.  menPort(1)
+			 implies the management interface is tagged.  uni(2) implies
+			 that the management interface is untagged."
+      ::= { adGenEVCSysMgmtEVCInterfaceEntry 1}
+
+
+--==================================================================================================================
+
+      adGenEVCIPHostTable OBJECT-TYPE
+      		SYNTAX            SEQUENCE OF AdGenEVCIPHostEntry
+      		MAX-ACCESS  not-accessible
+      		STATUS             current
+      		DESCRIPTION
+         		"The EVC IPHost table."
+      ::= { adGenEVCProvisioning 9 }
+
+      adGenEVCIPHostEntry OBJECT-TYPE
+      		SYNTAX      AdGenEVCIPHostEntry
+     	 	MAX-ACCESS  not-accessible
+      		STATUS      current
+      		DESCRIPTION
+         		"An entry in the EVC IP Host table."
+      		INDEX  { adGenEVCNameFixedLen, ifIndex, IMPLIED adGenIpHostEntryIndex }
+      ::= { adGenEVCIPHostTable 1 }
+
+      AdGenEVCIPHostEntry ::=
+      SEQUENCE {
+                      adGenEVCIPHostRowStatus                                  RowStatus
+      }
+
+      adGenEVCIPHostRowStatus OBJECT-TYPE
+         SYNTAX  RowStatus
+         MAX-ACCESS  read-create
+         STATUS  current
+         DESCRIPTION
+           "This object is used to createAndGo or destroy a IP Host
+            connection for an EVC."
+         ::= { adGenEVCIPHostEntry 1}
+
+--==================================================================================================================
+
+END
+

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -68,10 +68,10 @@ $navbar['options']['export']['userlevel'] = 7;
 print_navbar($navbar);
 
 // Generate contacts cache array for use in table
-$contacts    = [];
-$sql         = "SELECT * FROM `alert_contacts_assoc` LEFT JOIN `alert_contacts` ON `alert_contacts`.`contact_id` = `alert_contacts_assoc`.`contact_id`";
-$contacts_db = dbFetchRows($sql, $params);
-foreach ($contacts_db as $db_contact) {
+$contacts = [];
+$sql      = "SELECT * FROM `alert_contacts_assoc` LEFT JOIN `alert_contacts` USING(`contact_id`) WHERE `aca_type` = ?";
+$params   = [ 'alert' ];
+foreach (dbFetchRows($sql, $params) as $db_contact) {
     $contacts[$db_contact['alert_checker_id']][] = $db_contact;
 }
 

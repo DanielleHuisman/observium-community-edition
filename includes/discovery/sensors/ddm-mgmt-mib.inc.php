@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -131,7 +131,7 @@ foreach ($oids as $index => $entry) {
         $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
     }
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // Voltage
     $descr    = $name . ' Voltage';
@@ -154,7 +154,7 @@ foreach ($oids as $index => $entry) {
         $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
     }
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // Tx Bias
     $descr    = $name . ' Tx Bias';
@@ -177,7 +177,7 @@ foreach ($oids as $index => $entry) {
         $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
     }
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // Tx Power
     $descr    = $name . ' Tx Power';
@@ -200,7 +200,7 @@ foreach ($oids as $index => $entry) {
         $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
     }
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 
     // Rx Power
     $descr    = $name . ' Rx Power';
@@ -223,7 +223,7 @@ foreach ($oids as $index => $entry) {
         $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
     }
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, array_merge($options, $limits));
 }
 
 // EOF

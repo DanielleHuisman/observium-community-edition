@@ -1,31 +1,28 @@
 CISCOSB-Physicaldescription-MIB DEFINITIONS ::= BEGIN
 
--- Version:              7.46
--- Date:                 15-Jan-2007
-
 IMPORTS
     OBJECT-TYPE, MODULE-IDENTITY, TimeTicks,
-    NOTIFICATION-TYPE                                       FROM SNMPv2-SMI
+    NOTIFICATION-TYPE, Unsigned32                           FROM SNMPv2-SMI
     DisplayString, PhysAddress, RowStatus, TruthValue       FROM SNMPv2-TC
     JackType                                                FROM MAU-MIB
-    switch001, rndNotifications                             FROM CISCOSB-MIB
+	rndNotifications                                        FROM CISCOSB-TRAPS-MIB
     RlEnvMonState                                           FROM CISCOSB-HWENVIROMENT
     EntitySensorStatus, EntitySensorValue                   FROM ENTITY-SENSOR-MIB
     InterfaceIndexOrZero,ifIndex,InterfaceIndex             FROM IF-MIB
     rndErrorDesc, rndErrorSeverity                          FROM CISCOSB-DEVICEPARAMS-MIB
-    PortList                                  				FROM Q-BRIDGE-MIB;
+	PortList                                  				FROM Q-BRIDGE-MIB
+    switch001                                   FROM CISCOSB-MIB;
 
 rlPhysicalDescription  MODULE-IDENTITY
                        LAST-UPDATED "200602120000Z"
-                       ORGANIZATION "Cisco Systems, Inc."
+                ORGANIZATION "Cisco Systems, Inc."
+                CONTACT-INFO
+                "Postal: 170 West Tasman Drive
+                San Jose , CA 95134-1706
+                USA
 
-                       CONTACT-INFO
-                       "Postal: 170 West Tasman Drive
-                       San Jose , CA 95134-1706
-                       USA
-
-                       
-                       Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
+                
+                Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
 
                        DESCRIPTION
                             "The private MIB module definition for physical
@@ -55,7 +52,8 @@ CascadePortSpeed ::= INTEGER {
    port-speed-20G                     (8),
    port-speed-40G                     (9),
    port-speed-100G                    (13),
-   port-speed-auto                    (14)
+   port-speed-auto                    (14),
+   port-speed-25G                     (21)
 }
 
 LedLocatorPattern ::= INTEGER {
@@ -386,7 +384,7 @@ rlPhdStackConnect2 OBJECT-TYPE
     ::= { rlPhdStackEntry 4 }
 
 rlPhdStackSofrwareVer OBJECT-TYPE
-    SYNTAX      DisplayString (SIZE (1..20))
+    SYNTAX      DisplayString (SIZE (1..31))
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -639,7 +637,8 @@ RlPhdUnitGenParamEntry ::= SEQUENCE {
     rlPhdUnitGenParamMd5ChksumImage2 DisplayString,
     rlPhdUnitGenParamRegistrationDone          TruthValue,
     rlPhdUnitGenParamRegistrationSuppressed    TruthValue,
-	rlPhdUnitGenParamCpldVersion	 DisplayString
+    rlPhdUnitGenParamCpldVersion     DisplayString,
+    rlPhdUnitGenParamMcuVersion      DisplayString
 }
 
 rlPhdUnitGenParamStackUnit OBJECT-TYPE
@@ -761,6 +760,12 @@ rlPhdUnitGenParamCpldVersion OBJECT-TYPE
        DESCRIPTION "CPLD version"
        ::= { rlPhdUnitGenParamEntry 17 }
 
+rlPhdUnitGenParamMcuVersion OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION "MCU version"
+       ::= { rlPhdUnitGenParamEntry 18 }
 
 	   
 
@@ -805,7 +810,8 @@ RlPhdUnitEnvParamEntry ::= SEQUENCE {
     rlPhdUnitEnvParamFan3Speed                                     Unsigned32,
     rlPhdUnitEnvParamFan4Speed                                     Unsigned32,
     rlPhdUnitEnvParamFan5Speed                                     Unsigned32,
-    rlPhdUnitEnvParamFan6Speed                                     Unsigned32
+    rlPhdUnitEnvParamFan6Speed                                     Unsigned32,
+    rlPhdUnitEnvParamLedColor                                      INTEGER
 }
 
 rlPhdUnitEnvParamStackUnit OBJECT-TYPE
@@ -997,6 +1003,14 @@ rlPhdUnitEnvParamFan6Speed OBJECT-TYPE
                "Rotation speed of FAN 6 in RPM. Value 4294967295 means the measurement of speed is not supported."
         ::= { rlPhdUnitEnvParamEntry 23 }
 
+rlPhdUnitEnvParamLedColor OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+               "Informs the color of the LED on the Unit."
+        ::= { rlPhdUnitEnvParamEntry 24 }
+
 rlPhdStackOrderTopUnit OBJECT-TYPE
     SYNTAX      INTEGER
     MAX-ACCESS  read-write
@@ -1012,6 +1026,7 @@ rlPhdStackOrderBottomUnit OBJECT-TYPE
     DESCRIPTION
         "This scalar mib holds the Bottom unit for the stack order command"
     ::= { rlPhysicalDescription 17 }
+	
 rlPhdStackOrderPermutation OBJECT-TYPE
     SYNTAX      OCTET STRING(SIZE(1..32))
     MAX-ACCESS  read-write
@@ -1312,6 +1327,12 @@ rlStackLinkChange NOTIFICATION-TYPE
         "Trap indicating that Link has change in one of the Stacking Ports."
     ::= { rndNotifications 195 }
 
+rlPhdBeaconLightChange NOTIFICATION-TYPE
+    OBJECTS   { rndErrorDesc, rndErrorSeverity }
+    STATUS  current
+    DESCRIPTION
+        "Informational trap is indicating that interface beacon is activated or terminated."
+    ::=  { rndNotifications 196 }
 
 ----------------------
 -- rlPhdUnitStackTable
@@ -1475,6 +1496,70 @@ rlPhdResetButtonStatus OBJECT-TYPE
         "This scalar mib holds the Reset button status configuration."
     DEFVAL { enabled }
     ::= { rlPhysicalDescription 29 }
+
+-- Port Locate - Beacon Light --
+
+PhdBeaconLightMode ::= INTEGER {
+   mode-blink                   (1),
+   mode-solid                   (2)
+}
+
+rlPhdBeaconLightTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF RlPhdBeaconLightEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains one entry. The entry contains port list and duration of interfaces that have configured beacon light (port locate)."
+    ::= { rlPhysicalDescription 30}
+
+rlPhdBeaconLightEntry OBJECT-TYPE
+    SYNTAX RlPhdBeaconLightEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The entry contains port list, mode, and duration of interfaces that have configured beacon light (port locate)."
+    INDEX { rlPhdBeaconLightIndex }
+    ::= { rlPhdBeaconLightTable 1 }
+
+RlPhdBeaconLightEntry::= SEQUENCE {
+        rlPhdBeaconLightIndex              INTEGER,
+        rlPhdBeaconLightPortList           PortList,
+        rlPhdBeaconLightMode               PhdBeaconLightMode,
+        rlPhdBeaconLightDuration           Unsigned32
+    }
+
+rlPhdBeaconLightIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Index in the table. Always 1."
+    ::= { rlPhdBeaconLightEntry 1 }
+
+rlPhdBeaconLightPortList OBJECT-TYPE
+    SYNTAX PortList
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Beacon light Port List."
+    ::= { rlPhdBeaconLightEntry 2 }
+
+rlPhdBeaconLightMode OBJECT-TYPE
+    SYNTAX PhdBeaconLightMode
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Beacon light LED mode."
+    ::= { rlPhdBeaconLightEntry 3 }
+
+rlPhdBeaconLightDuration OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "Beacon light duration in seconds. 0 means disable."
+       DEFVAL  { 300 } 
+    ::= { rlPhdBeaconLightEntry 4 }
 
 
 END

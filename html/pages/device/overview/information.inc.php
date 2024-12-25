@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -16,6 +16,21 @@ echo('<table class="table table-condensed table-striped table-hover">');
 
 if ($config['overview_show_sysDescr']) {
     echo('<tr><td colspan=2 style="padding: 10px;"><strong><i>' . escape_html($device['sysDescr']) . "</i></strong></td></tr>");
+}
+
+// Groups
+if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5 &&
+    $groups = get_entity_group_names('device', $device['device_id'])) {
+
+    echo('<tr>
+        <td class="entity">Groups</td>
+        <td>');
+    foreach ($groups as $group_id => $group) {
+        $link = generate_link($group, [ 'page' => 'group', 'group_id' => $group_id ]); // always escaped (as default)
+        echo '<span class="label">' . $link . '</span> ';
+    }
+    echo('</td>
+      </tr>');
 }
 
 if ($device['purpose']) {
@@ -57,14 +72,6 @@ if ($device['sysName']) {
         <td class="entity">System name</td>');
     echo('
         <td>' . escape_html($device['sysName']) . '</td>
-      </tr>');
-}
-
-if ($_SESSION['userlevel'] >= 5 && $device['ip']) {
-    echo('<tr>
-        <td class="entity">Cached IP</td>');
-    echo('
-        <td>' . escape_html($device['ip']) . '</td>
       </tr>');
 }
 
@@ -123,6 +130,14 @@ if ($device['state']['la']['5min']) {
         <td class="' . $la_class . '">' . number_format((float)$device['state']['la']['1min'], 2) . ', ' .
          number_format((float)$device['state']['la']['5min'], 2) . ', ' .
          number_format((float)$device['state']['la']['15min'], 2) . '</td>
+      </tr>');
+}
+
+if ($_SESSION['userlevel'] >= 5 && $device['ip']) {
+    echo('<tr>
+        <td class="entity">Cached IP</td>');
+    echo('
+        <td>' . escape_html($device['ip']) . '</td>
       </tr>');
 }
 

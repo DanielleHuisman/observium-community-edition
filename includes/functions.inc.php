@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -26,10 +26,10 @@ include_once($config['install_dir'] . "/includes/geolocation.inc.php");
 include_once($config['install_dir'] . "/includes/alerts.inc.php");
 
 $fincludes = [
-  'groups', 'billing', // Not exist in a community edition
-  'distributed',       // Not exist in a community edition, distributed poller functions
-  'community',         // community edition specific
-  'custom',            // custom functions i.e., short_hostname
+    'groups', 'billing', // Not exist in a community edition
+    'distributed',       // Not exist in a community edition, distributed poller functions
+    'community',         // community edition specific
+    'custom',            // custom functions i.e., short_hostname
 ];
 foreach ($fincludes as $entry) {
     $file = $config['install_dir'] . '/includes/' . $entry . '.inc.php';
@@ -638,17 +638,16 @@ function match_oid_num($oid, $needle)
 /**
  * Compares complex sysObjectID/sysDescr and any other MIB::Oid combination with definition.
  * Can check some device params (os, os_group, vendor, hardware, version)
- * Return TRUE if match.
+ * Return TRUE if matched.
  *
  * @param array  $device      Device array
  * @param array  $needle      Compare with this definition array
- * @param string $sysObjectID Walked sysObjectID from device
- * @param string $sysDescr    Walked sysDescr from device
+ * @param string $sysObjectID Walked sysObjectID from a device
+ * @param string $sysDescr    Walked sysDescr from a device
  *
- * @return boolean            TRUE if match, otherwise FALSE
+ * @return boolean            TRUE if matched, otherwise FALSE
  */
-function match_discovery_oids($device, $needle, $sysObjectID = NULL, $sysDescr = NULL)
-{
+function match_discovery_oids($device, $needle, $sysObjectID = NULL, $sysDescr = NULL) {
     global $table_rows;
 
     // Count required conditions
@@ -712,6 +711,10 @@ function match_discovery_oids($device, $needle, $sysObjectID = NULL, $sysDescr =
                 break;
 
             case 'sysObjectID':
+                if (safe_empty($sysObjectID)) {
+                    print_debug("Skip sysObjectID definition match, because it is empty.");
+                    break;
+                }
                 foreach ((array)$needle[$oid] as $def) {
                     //var_dump($def);
                     //var_dump($sysObjectID);
@@ -1038,77 +1041,84 @@ function set_value_param_definition($param, $def, $entry)
 // Rename a device
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function renamehost($id, $new, $source = 'console', $options = [])
-{
+function renamehost($device_id, $new, $source = 'console', $options = []) {
     global $config;
 
     $new = strtolower(trim($new));
 
-    // Test if new host exists in database
-    //if (dbFetchCell('SELECT COUNT(`device_id`) FROM `devices` WHERE `hostname` = ?', array($new)) == 0)
-    if (!dbExist('devices', '`hostname` = ?', [$new])) {
-        $flags     = OBS_DNS_ALL;
-        $transport = strtolower(dbFetchCell("SELECT `snmp_transport` FROM `devices` WHERE `device_id` = ?", [$id]));
-
-        // Try detect if hostname is IP
-        switch (get_ip_version($new)) {
-            case 6:
-            case 4:
-                if ($config['require_hostname']) {
-                    print_error("Hostname should be a valid resolvable FQDN name. Or set config option \$config['require_hostname'] as FALSE.");
-                    return FALSE;
-                }
-                $ip = ip_compress($new); // Always use compressed IPv6 name
-                break;
-            default:
-                if ($transport === 'udp6' || $transport === 'tcp6') { // Exclude IPv4 if used transport 'udp6' or 'tcp6'
-                    $flags ^= OBS_DNS_A;                              // exclude A
-                }
-                // Test DNS lookup.
-                $ip = gethostbyname6($new, $flags);
-        }
-
-        if ($ip) {
-            $options['ping_skip'] = (isset($options['ping_skip']) && $options['ping_skip']) || get_entity_attrib('device', $id, 'ping_skip');
-            if ($options['ping_skip']) {
-                // Skip ping checks
-                $flags |= OBS_PING_SKIP;
-            }
-
-            // Test reachability
-            if (is_pingable($new, $flags)) {
-                // Test directory mess in /rrd/
-                if (!file_exists($config['rrd_dir'] . '/' . $new)) {
-                    $host = dbFetchCell("SELECT `hostname` FROM `devices` WHERE `device_id` = ?", [$id]);
-                    if (!file_exists($config['rrd_dir'] . '/' . $host)) {
-                        print_warning("Old RRD directory does not exist, rename skipped.");
-                    } elseif (!rename($config['rrd_dir'] . '/' . $host, $config['rrd_dir'] . '/' . $new)) {
-                        print_error("NOT renamed. Error while renaming RRD directory.");
-                        return FALSE;
-                    }
-                    $return = dbUpdate(['hostname' => $new], 'devices', '`device_id` = ?', [$id]);
-                    if ($options['ping_skip']) {
-                        set_entity_attrib('device', $id, 'ping_skip', 1);
-                    }
-                    log_event("Device hostname changed: $host -> $new", $id, 'device', $id, 5); // severity 5, for logging user/console info
-                    return TRUE;
-                }
-                // directory already exists
-                print_error("NOT renamed. Directory rrd/$new already exists");
-            } else {
-                // failed Reachability
-                print_error("NOT renamed. Could not ping $new");
-            }
-        } else {
-            // Failed DNS lookup
-            print_error("NOT renamed. Could not resolve $new");
-        }
-    } else {
-        // found in database
+    // Test if new host exists in a database
+    if (dbExist('devices', '`hostname` = ?', [ $new ])) {
+        // found in a database
         print_error("NOT renamed. Already got host $new");
+
+        return FALSE;
     }
 
-    return FALSE;
+    // Try to detect if hostname is IP
+    switch (get_ip_version($new)) {
+        case 6:
+        case 4:
+            if ($config['require_hostname']) {
+                print_error("Hostname should be a valid resolvable FQDN name. Or set config option \$config['require_hostname'] as FALSE.");
+                return FALSE;
+            }
+            $ip = ip_compress($new); // Always use compressed IPv6 name
+            break;
+        default:
+            // Test DNS lookup.
+            $snmp_transport = strtolower(dbFetchCell("SELECT `snmp_transport` FROM `devices` WHERE `device_id` = ?", [ $device_id ]));
+            if ($snmp_transport === 'udp6' || $snmp_transport === 'tcp6') {
+                // Exclude IPv4 if used transport 'udp6' or 'tcp6'
+                $ip = gethostbyname6($new, 'ipv6');
+            } else {
+                $ip = gethostbyname6($new);
+            }
+    }
+
+    if (!$ip) {
+        // Failed DNS lookup
+        print_error("NOT renamed. Could not resolve $new");
+
+        return FALSE;
+    }
+
+    $options['ping_skip'] = (isset($options['ping_skip']) && $options['ping_skip']) || get_entity_attrib('device', $device_id, 'ping_skip');
+
+    // Test reachability
+    if (!is_pingable($ip, 'all', $options['ping_skip'])) {
+        // failed Reachability
+        print_error("NOT renamed. Could not ping $new");
+        return FALSE;
+    }
+
+    // get old hostname
+    $old = dbFetchCell("SELECT `hostname` FROM `devices` WHERE `device_id` = ?", [ $device_id ]);
+
+    // Test directory mess in /rrd/
+    if (!OBS_RRD_NOLOCAL) {
+        if (file_exists($config['rrd_dir'] . '/' . $new)) {
+            // directory already exists
+            print_error("NOT renamed. Directory rrd/$new already exists");
+
+            return FALSE;
+        }
+
+        if (!file_exists($config['rrd_dir'] . '/' . $old)) {
+            print_warning("Old RRD directory does not exist, rename skipped.");
+        } elseif (!rename($config['rrd_dir'] . '/' . $old, $config['rrd_dir'] . '/' . $new)) {
+            print_error("NOT renamed. Error while renaming RRD directory.");
+            return FALSE;
+        }
+    }
+
+    // FIXME. Not supported rename for remote pollers
+    $return = dbUpdate([ 'hostname' => $new ], 'devices', '`device_id` = ?', [ $device_id ]);
+    if ($options['ping_skip']) {
+        set_entity_attrib('device', $device_id, 'ping_skip', 1);
+    }
+    log_event("Device hostname changed: $old -> $new", $device_id, 'device', $device_id, 5); // severity 5, for logging user/console info
+
+    return (bool)$return;
 }
 
 /**
@@ -1462,43 +1472,63 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE) {
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 // MOVEME to includes/common.inc.php
-function scan_port($host, $port, $proto = 'udp', $timeout = 1.0)
-{
-    if (is_float($timeout)) {
-        $msec = fmod($timeout, 1) * 1000;
-    } else {
-        $msec = 0;
-    }
+function scan_port($host, $port, $proto = 'udp', $timeout = 1.0) {
     if (!(get_ip_version($host) || is_valid_hostname($host))) {
         // not valid hostname/ip
         print_error("Invalid host $host passed.");
         return 0;
     }
-    if (!str_istarts($proto, 'tcp')) {
-        // default scan udp
-        $host = 'udp://' . $host;
-    }
     if (!is_valid_param($port, 'port')) {
         print_error("Invalid port $port passed.");
         return 0;
     }
-    if ($handle = fsockopen($host, $port, $errno, $errstr, (float)$timeout)) {
+    if (!is_numeric($timeout) || $timeout <= 0) {
+        // default timeout if passed invalid number
+        $timeout = 1.0;
+    }
+    if ($udp = !str_istarts($proto, 'tcp')) {
+        // default scan udp
+        $host = 'udp://' . $host;
+    }
+
+    $handle = fsockopen($host, $port, $errno, $errstr, (float)$timeout);
+    if (!$handle) {
+        print_debug("Failed to connect to $host:$port socket ($errno - $errstr).");
+        return 0;
+    }
+
+    if ($udp) {
+        // UDP port check
+        // Based on read timeout from udp port
+        $msec = is_float($timeout) ? fmod($timeout, 1) * 1000 : 0;
         stream_set_timeout($handle, (int)$timeout, (int)$msec);
+        // Non-blocking I/O
+        //stream_set_blocking($handle, 0);
+
         $write = fwrite($handle, "\x00");
         if (!$write) {
+            print_debug("Failed to write to $host:$port socket.");
+            fclose($handle);
+
             return 0;
         }
 
-        $startTime = time();
-        $header    = fread($handle, 1);
-        $endTime   = time();
-        $timeDiff  = $endTime - $startTime;
+        $start = microtime(TRUE);
+        print_debug(fread($handle, 1));
+        $timediff = elapsed_time($start);
+        print_debug("Read from socket $host:$port ${timediff}s.");
 
         fclose($handle);
-        if ($timeDiff >= $timeout) {
-            return $timeDiff;
+        if ($timediff >= $timeout) {
+            return $timediff;
         }
+    } else {
+        // TCP port check
+        // When socket already opened - tcp port is open
+        fclose($handle);
+        return (float)$timeout;
     }
+
     return 0;
 }
 
@@ -1510,16 +1540,16 @@ function scan_port($host, $port, $proto = 'udp', $timeout = 1.0)
  * @return float SNMP query runtime in milliseconds
  */
 // TESTME needs unit testing
-function is_snmpable($device)
-{
+function is_snmpable($device) {
+
     // device cached dns ip
-    if (isset_status_var('dns_ip') &&
-        $device['ip'] !== get_status_var('dns_ip')) {
+    $cached_ip = is_pingable_cache_dns(strtolower($device['hostname']));
+    if ($cached_ip && $device['ip'] !== $cached_ip) {
         // Temporary override cached device IP (right after is_pingable() when IP changed)
-        $device['ip'] = get_status_var('dns_ip');
+        $device['ip'] = $cached_ip;
     }
 
-    if (isset($device['snmpable']) && !empty($device['snmpable'])) {
+    if (!empty($device['snmpable'])) {
         // Custom OID for check snmpable (can be multiple OIDs by space)
         $oids = [];
         foreach (explode(' ', $device['snmpable']) as $oid) {
@@ -1571,12 +1601,12 @@ function is_snmpable($device)
  * If flag OBS_PING_SKIP passed, pings skipped and returns 0.001 (1ms)
  *
  * @param string|array $hostname Device hostname or IP address or device array
- * @param int Flags. Supported OBS_DNS_A, OBS_DNS_AAAA and OBS_PING_SKIP
+ * @param string|array $options all - request any record ipv4/ipv6, ipv4 or a - only ipv4, ipv6 or aaaa - only ipv6
+ * @param bool $ping_skip Do not ping,
  *
  * @return float Average response time for used retries count (default retries is 3)
  */
-function is_pingable($hostname, $flags = OBS_DNS_ALL)
-{
+function is_pingable($hostname, $options = 'all', $ping_skip = FALSE) {
     global $config;
 
     // Compat with $device array
@@ -1586,82 +1616,40 @@ function is_pingable($hostname, $flags = OBS_DNS_ALL)
             $hostname = $device['hostname'];
         }
     } else {
-        $device = ['hostname' => $hostname];
+        $device = [ 'hostname' => $hostname ];
     }
 
-    $ping_debug = isset($config['ping']['debug']) && $config['ping']['debug'];
-    $try_a      = is_flag_set(OBS_DNS_A, $flags);
-
-    set_status_var('ping_dns', 'ok'); // Set initially dns status as ok
-    set_status_var('dns_ip', '');     // reset
-
-    if ($ip_version = get_ip_version($hostname)) {
-        // Cache IP address
-        set_status_var('dns_ip', ip_compress($hostname));
-
-        // Ping by IP
-        if ($ip_version === 6) {
-            $tags = ['fping' => $config['fping6'], 'host' => $hostname];
-            //$cmd = $config['fping6'] . " -t $timeout -c 1 -q $hostname 2>&1";
+    if ($ip = is_pingable_cache_dns($hostname, $options, TRUE)) {
+        // Hostname resolved or already IP
+        if (str_contains($ip, ':')) {
+            // IPv6 need different fping cmd
+            $fping_params = [ 'cmd' => $config['fping6'], 'ip' => $ip ];
         } else {
-            if (!$try_a) {
-                if ($ping_debug) {
-                    logfile('debug.log', __FUNCTION__ . "() | DEVICE: $hostname | Passed IPv4 address but device use IPv6 transport");
-                }
-                print_debug('Into function ' . __FUNCTION__ . '() passed IPv4 address (' . $hostname . 'but device use IPv6 transport');
-                set_status_var('ping_dns', 'incorrect'); // Incorrect
-                return 0;
-            }
-
-            // Forced check for actual IPv4 address
-            $tags = ['fping' => $config['fping'], 'host' => $hostname];
-            //$cmd = $config['fping'] . " -t $timeout -c 1 -q $hostname 2>&1";
+            $fping_params = [ 'cmd' => $config['fping'],  'ip' => $ip ];
         }
     } else {
-        // First try IPv4
-        $ip = $try_a ? gethostbyname6($hostname, OBS_DNS_A) : FALSE; // Do not check IPv4 if transport IPv6
-        if ($ip && $ip != $hostname) {
-            $ip = ip_compress($ip);
-
-            // Cache IP address
-            set_status_var('dns_ip', $ip);
-
-            $tags = ['fping' => $config['fping'], 'host' => $ip];
-            //$cmd = $config['fping'] . " -t $timeout -c 1 -q $ip 2>&1";
-        } else {
-            $ip = gethostbyname6($hostname, OBS_DNS_AAAA);
-            // Second try IPv6
-            if ($ip) {
-                $ip = ip_compress($ip);
-
-                // Cache IP address
-                set_status_var('dns_ip', $ip);
-
-                $tags = ['fping' => $config['fping6'], 'host' => $ip];
-                //$cmd = $config['fping6'] . " -t $timeout -c 1 -q $ip 2>&1";
-            } else {
-                // No DNS records
-                if ($ping_debug) {
-                    logfile('debug.log', __FUNCTION__ . "() | DEVICE: $hostname | NO DNS record found");
-                }
-                set_status_var('ping_dns', 'alert');
-                return 0;
-            }
-        }
+        // Not resolved
+        return 0;
     }
 
-    if (is_flag_set(OBS_PING_SKIP, $flags)) {
+
+    if ($ping_skip) {
         return 0.001; // Ping is skipped, just return 1ms
     }
 
     // Timeout, default is 500ms (as in fping)
-    $timeout = isset($config['ping']['timeout']) ? (int)$config['ping']['timeout'] : 500;
-    if ($timeout < 50) {
-        $timeout = 50;
-    } elseif ($timeout > 2000) {
-        $timeout = 2000;
+    if (isset($config['ping']['timeout'])) {
+        if (!is_numeric($config['ping']['timeout'])) {
+            // with units, ie 2000ms or 2s
+            $timeout = age_to_seconds($config['ping']['timeout'], TRUE) * 1000;
+        } else {
+            $timeout = $config['ping']['timeout'];
+        }
+    } else {
+        // Default fping 500ms
+        $timeout = 500;
     }
-    $tags['timeout'] = $timeout;
+    $fping_params['timeout'] = (int) max(50, min($timeout, 2000)); // between 50 and 2000 ms
 
     // Retries, default is 3
     $retries = isset($config['ping']['retries']) ? (int)$config['ping']['retries'] : 3;
@@ -1672,17 +1660,18 @@ function is_pingable($hostname, $flags = OBS_DNS_ALL)
     }
 
     // Fping always requested by IP address
-    $cmd = array_tag_replace($tags, '%fping% -t %timeout% -c 1 -q %host% 2>&1');
+    $cmd = array_tag_replace($fping_params, '%cmd% -t %timeout% -c 1 -q %ip% 2>&1');
 
     // Sleep interval between retries, max 1 sec, min 333ms (1s/3),
-    // next retry will increase interval by 1.5 Backoff factor (see fping -B option)
+    // next retry will increase an interval by 1.5 Backoff factor (see fping -B option)
     // We not use fping native retries, because fping waiting for all responses, but we wait only first OK
     $sleep = floor(1000000 / $retries);
     if ($sleep < 333000) {
         $sleep = 333000;
     }
 
-    $ping = 0; // Init false
+    $ping_debug = isset($config['ping']['debug']) && $config['ping']['debug'];
+    $ping       = 0; // Init false
     for ($i = 1; $i <= $retries; $i++) {
         $output = external_exec($cmd, $exec_status);
         if ($exec_status['exitcode'] === 0) {
@@ -1699,6 +1688,7 @@ function is_pingable($hostname, $flags = OBS_DNS_ALL)
         if ($ping_debug) {
             $ping_times = format_unixtime($exec_status['endtime'] - $exec_status['runtime'], 'H:i:s.v') . ', ' . round($exec_status['runtime'], 3) . 's';
             logfile('debug.log', "is_pingable() | DEVICE: $hostname | $ping_times | FPING OUT ($i): " . $output);
+
             // WARNING, this is very long operation, increase polling time up to 10s
             if ($i == $retries && is_executable($config['mtr'])) {
                 $mtr = $config['mtr'] . " -r -n -c 3 $ip";
@@ -1714,6 +1704,115 @@ function is_pingable($hostname, $flags = OBS_DNS_ALL)
     }
 
     return $ping;
+}
+
+/**
+ * Resolve host and cache to ip by all ways (hosts/dns) for all possible cases IPv4/IPv6.
+ * Additionally, set dns status cache var for use in poller (is_snmpable()) for reduce dns queries.
+ *
+ * @param string       $host
+ * @param string|array $options all - request any record ipv4/ipv6, ipv4 or a - only ipv4, ipv6 or aaaa - only ipv6
+ *
+ * @return string|false
+ */
+function is_pingable_cache_dns($host, $options = 'all', $update = FALSE) {
+    global $cache;
+
+    $host = strtolower($host);
+
+    // Return cached for is_snmpable() / device_status_array() / poll_device()
+    if (!$update) {
+        $ip = $cache['is_pingable'][$host]['dns_ip'] ?? '';
+
+        print_debug("Return cached '$host' = '$ip'\n");
+        print_debug_vars($cache['is_pingable'][$host]);
+
+        return $ip;
+    }
+
+    $ping_debug = isset($config['ping']['debug']) && $config['ping']['debug'];
+    $try_a      = array_value_exist($options, [ 'all', 'ipv4', 'a' ]);
+    $try_aaaa   = array_value_exist($options, [ 'all', 'ipv6', 'aaaa' ]);
+
+    if (OBS_DEBUG > 1) {
+        if ($try_a && $try_aaaa) {
+            $debug_msg = 'IPv4/IPv6';
+        } elseif ($try_a) {
+            $debug_msg = 'IPv4 only';
+        } else {
+            $debug_msg = 'IPv6 only';
+        }
+        print_cli("Try resolve '$host' in DNS as $debug_msg..\n");
+    }
+
+    // Set initially dns status as ok and ip reset
+    $cache['is_pingable'][$host] = [ 'dns_status' => 'ok',
+                                     'dns_ip'     => '' ];
+
+    // First, check that host is already IP address
+    if ($ip_version = get_ip_version($host)) {
+
+        // Ping by IP
+        if ($ip_version === 4 && !$try_a) {
+            if ($ping_debug) {
+                logfile('debug.log', __FUNCTION__ . "() | DEVICE: $host | Passed IPv4 address but device use IPv6 transport");
+            }
+            print_debug('Into function ' . __FUNCTION__ . '() passed IPv4 address ('.$host.'but device use IPv6 transport');
+
+            // Set dns status incorrect, because resolved IPv4 but requested IPv6
+            $cache['is_pingable'][$host]['dns_status'] = 'incorrect';
+
+            return FALSE;
+        }
+
+        // Cache IP address
+        $ip = ip_compress($host);
+        $cache['is_pingable'][$host]['dns_ip'] = $ip;
+
+        return $ip;
+    }
+
+    // Simple validate hostname is valid (no FQDN here)
+    if (!is_valid_hostname($host)) {
+        // Set dns status incorrect, because resolved IPv4 but requested IPv6
+        $cache['is_pingable'][$host]['dns_status'] = 'incorrect';
+
+        return FALSE;
+    }
+
+    // Now resolve host
+
+    // First try resolve as IPv4, because we prefer it
+    $ip = $try_a ? gethostbyname6($host, 'ipv4') : FALSE; // Do not check IPv4 if transport IPv6
+
+    if ($ip && $ip != $host) {
+        $ip = ip_compress($ip);
+
+        // Cache IP address
+        $cache['is_pingable'][$host]['dns_ip'] = $ip;
+
+        return $ip;
+    }
+
+    // Now try resolve as IPv6
+    if ($try_aaaa && $ip = gethostbyname6($host, 'ipv6')) {
+        $ip = ip_compress($ip);
+
+        // Cache IP address
+        $cache['is_pingable'][$host]['dns_ip'] = $ip;
+
+        return $ip;
+    }
+
+    // No DNS records
+    if ($ping_debug) {
+        logfile('debug.log', __FUNCTION__ . "() | DEVICE: $host | NO DNS record found");
+    }
+
+    // Set DNS status alert
+    $cache['is_pingable'][$host]['dns_status'] = 'alert';
+
+    return FALSE;
 }
 
 /**
@@ -2159,8 +2258,7 @@ function parse_email($emails)
  * @return string
  */
 // MOVEME to includes/common.inc.php
-function str2hex($string)
-{
+function str2hex($string) {
     $hex = '';
     $len = strlen($string);
     for ($i = 0; $i < $len; $i++) {
@@ -2188,14 +2286,13 @@ function str2hex($string)
  */
 // TESTME needs unit testing
 // MOVEME to includes/common.inc.php
-function hex2str($hex, $eol = "\n")
-{
+function hex2str($hex, $eol = "\n") {
     $string = '';
 
     $hex = str_replace(' ', '', $hex);
     for ($i = 0; $i < strlen($hex) - 1; $i += 2) {
         $hex_chr = $hex[$i] . $hex[$i + 1];
-        if ($hex_chr == '00') {
+        if ($hex_chr === '00') {
             // 00 is EOL
             $string .= $eol;
         } else {
@@ -2215,15 +2312,14 @@ function hex2str($hex, $eol = "\n")
  *
  * @return string
  */
-function convert_ord_char($ord)
-{
+function convert_ord_char($ord) {
     if (is_array($ord)) {
         $ord = array_shift($ord);
     }
     if (preg_match('/^(?:<|x)([0-9a-f]+)>?$/i', $ord, $match)) {
         $ord = hexdec($match[1]);
     } elseif (is_numeric($ord)) {
-        $ord = intval($ord);
+        $ord = (int)$ord;
     } elseif (preg_match('/^[\p{L}]+$/u', $ord)) {
         // Unicode chars
         return $ord;
@@ -2232,34 +2328,25 @@ function convert_ord_char($ord)
         $ord = ord($ord);
     }
 
-    $no_bytes = 0;
-    $byte     = [];
-
     if ($ord < 128) {
         return chr($ord);
-    } elseif ($ord < 2048) {
+    }
+    if ($ord < 2048) {
         $no_bytes = 2;
+        $prefix   = [ 31, 192 ];
     } elseif ($ord < 65536) {
         $no_bytes = 3;
+        $prefix   = [ 15, 224 ];
     } elseif ($ord < 1114112) {
         $no_bytes = 4;
+        $prefix   = [ 7, 240 ];
     } else {
-        return;
-    }
-    switch ($no_bytes) {
-        case 2:
-            $prefix = [31, 192];
-            break;
-        case 3:
-            $prefix = [15, 224];
-            break;
-        case 4:
-            $prefix = [7, 240];
-            break;
+        return '';
     }
 
+    $byte = [];
     for ($i = 0; $i < $no_bytes; $i++) {
-        $byte[$no_bytes - $i - 1] = (($ord & (63 * pow(2, 6 * $i))) / pow(2, 6 * $i)) & 63 | 128;
+        $byte[$no_bytes - $i - 1] = (($ord & (63 * (2 ** (6 * $i)))) / (2 ** (6 * $i))) & 63 | 128;
     }
 
     $byte[0] = ($byte[0] & $prefix[0]) | $prefix[1];
@@ -2310,53 +2397,6 @@ function include_dir($dir, $regex = "")
     } else {
         print_debug("Failed to open directory: " . $directory_path);
     }
-}
-
-# Parse CSV files with or without header, and return a multidimensional array
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/common.inc.php
-function parse_csv($content, $has_header = 1, $separator = ",")
-{
-    $lines  = explode("\n", $content);
-    $result = [];
-
-    # If the CSV file has a header, load up the titles into $headers
-    if ($has_header) {
-        $headcount = 1;
-        $header    = array_shift($lines);
-        foreach (explode($separator, $header) as $heading) {
-            if (trim($heading) != "") {
-                $headers[$headcount] = trim($heading);
-                $headcount++;
-            }
-        }
-    }
-
-    # Process every line
-    foreach ($lines as $line) {
-        if ($line != "") {
-            $entrycount = 1;
-            foreach (explode($separator, $line) as $entry) {
-                # If we use header, place the value inside the named array entry
-                # Otherwise, just stuff it in numbered fields in the array
-                if (trim($entry) != "") {
-                    if ($has_header) {
-                        $line_array[$headers[$entrycount]] = trim($entry);
-                    } else {
-                        $line_array[] = trim($entry);
-                    }
-                }
-                $entrycount++;
-            }
-
-            # Add resulting line array to final result
-            $result[] = $line_array;
-            unset($line_array);
-        }
-    }
-
-    return $result;
 }
 
 function get_defined_settings($key = NULL)
@@ -2573,18 +2613,17 @@ function del_sql_config($key)
  *
  * @return float
  */
-function si_to_scale($si = 'units', $precision = NULL)
-{
+function si_to_scale($si = 'units', $precision = NULL) {
     // See all scales here: http://tools.cisco.com/Support/SNMP/do/BrowseOID.do?local=en&translate=Translate&typeName=SensorDataScale
     $si       = strtolower($si);
     $si_array = [
-      'yocto' => -24, 'zepto' => -21, 'atto' => -18,
-      'femto' => -15, 'pico' => -12, 'nano' => -9,
-      'micro' => -6, 'milli' => -3, 'centi' => -2,
-      'deci'  => -1, 'units' => 0, 'deca' => 1,
-      'hecto' => 2, 'kilo' => 3, 'mega' => 6,
-      'giga'  => 9, 'tera' => 12, 'peta' => 15,
-      'exa'   => 18, 'zetta' => 21, 'yotta' => 24
+        'yocto' => -24, 'zepto' => -21, 'atto'  => -18,
+        'femto' => -15, 'pico'  => -12, 'nano'  => -9,
+        'micro' => -6,  'milli' => -3,  'centi' => -2,
+        'deci'  => -1,  'units' => 0,   'deca'  => 1,
+        'hecto' => 2,   'kilo'  => 3,   'mega'  => 6,
+        'giga'  => 9,   'tera'  => 12,  'peta'  => 15,
+        'exa'   => 18,  'zetta' => 21,  'yotta' => 24
     ];
 
     $exp = 0;
@@ -2618,8 +2657,7 @@ function si_to_scale($si = 'units', $precision = NULL)
  *
  * @return integer $compare
  */
-function float_cmp($a, $b, $epsilon = NULL)
-{
+function float_cmp($a, $b, $epsilon = NULL) {
     $epsilon = (is_numeric($epsilon) ? abs((float)$epsilon) : 0.00001); // Default epsilon for float compare
     $compare = FALSE;
     $both    = 0;
@@ -2688,17 +2726,33 @@ function float_div($a, $b) {
     return $div;
 }
 
+function float_pow($a, $b) {
+
+    if (PHP_VERSION_ID < 80400) {
+        $pow = clean_number($a) ** clean_number($b);
+    } else {
+        // PHP 8.4+
+        // https://wiki.php.net/rfc/raising_zero_to_power_of_negative_number
+        $pow = fpow(clean_number($a), clean_number($b));
+    }
+
+    if (!is_finite($pow)) {
+        $pow = 0;
+    }
+
+    return $pow;
+}
+
 /**
  * Add integer numbers.
- * This function better to use with big Counter64 numbers
+ * This function is better to use with big Counter64 numbers
  *
  * @param int|string $a The first number
  * @param int|string $b The second number
  *
  * @return string       A number representing the sum of the arguments.
  */
-function int_add($a, $b)
-{
+function int_add($a, $b) {
     //print_vars(\Brick\Math\Internal\Calculator::get());
     $a = \Brick\Math\BigInteger::of(bigfloat_to_int($a));
     $b = \Brick\Math\BigInteger::of(bigfloat_to_int($b));
@@ -2715,8 +2769,7 @@ function int_add($a, $b)
  *
  * @return string       A number representing the subtract of the arguments.
  */
-function int_sub($a, $b)
-{
+function int_sub($a, $b) {
     //print_vars(\Brick\Math\Internal\Calculator::get());
     $a = \Brick\Math\BigInteger::of(bigfloat_to_int($a));
     $b = \Brick\Math\BigInteger::of(bigfloat_to_int($b));
@@ -3182,9 +3235,7 @@ function config_get_auth_modules()
  * @return mixed Status of added or not force device discovery
  */
 // TESTME needs unit testing
-function force_discovery($device, $modules = [])
-{
-    $return = FALSE;
+function force_discovery($device, $modules = []) {
 
     if (safe_empty($modules)) {
         // Modules not passed, just full rediscover device
@@ -3192,9 +3243,8 @@ function force_discovery($device, $modules = [])
     }
 
     // Modules passed, check if modules valid and enabled
-    $modules        = (array)$modules;
-    $forced_modules = get_entity_attrib('device', $device['device_id'], 'force_discovery_modules');
-    if ($forced_modules) {
+    $modules = (array)$modules;
+    if ($forced_modules = get_entity_attrib('device', $device['device_id'], 'force_discovery_modules')) {
         // Already forced modules exist, merge it with new
         $modules = array_unique(array_merge($modules, safe_json_decode($forced_modules)));
     }
@@ -3208,11 +3258,11 @@ function force_discovery($device, $modules = [])
     }
 
     if (count($valid_modules)) {
-        $return = dbUpdate(['force_discovery' => 1], 'devices', '`device_id` = ?', [$device['device_id']]);
         set_entity_attrib('device', $device['device_id'], 'force_discovery_modules', safe_json_encode($valid_modules));
+        return dbUpdate(['force_discovery' => 1], 'devices', '`device_id` = ?', [ $device['device_id'] ]);
     }
 
-    return $return;
+    return FALSE;
 }
 
 /**
@@ -3667,8 +3717,8 @@ function parse_agent_data($agent_raw)
             // Split section name into parts (sa, sb, sc)
             $section_parts = explode('-', $section, 3);
             $sa            = $section_parts[0];
-            $sb            = isset($section_parts[1]) ? $section_parts[1] : '';
-            $sc            = isset($section_parts[2]) ? $section_parts[2] : '';
+            $sb            = $section_parts[1] ?? '';
+            $sc            = $section_parts[2] ?? '';
 
             if (!empty($sa) && !empty($sb)) {
                 if (!empty($sc)) {

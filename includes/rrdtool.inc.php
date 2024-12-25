@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     rrdtool
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage rrdtool
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -80,6 +80,7 @@ function rename_rrd($device, $old_rrd, $new_rrd, $overwrite = FALSE)
             // Currently external rrd(cached) not support rename (also dump/restore), see:
             // https://github.com/oetiker/rrdtool-1.x/issues/1141
             // https://github.com/oetiker/rrdtool-1.x/issues/1142
+            print_debug("RRD rename unsupported for rrdcached!");
             $renamed = FALSE;
         } else {
             $renamed = rename($old_rrd, $new_rrd);

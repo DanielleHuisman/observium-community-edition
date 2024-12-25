@@ -9,7 +9,7 @@
  *
  * @author                        Jens Brueckner <Discord: JTC#3678>
  * @copyright                     'aruba-cppm.inc.php'    (C) 2022 Jens Brueckner
- * @copyright                     'Observium'            (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 

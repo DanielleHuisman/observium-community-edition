@@ -6,15 +6,19 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
+
+global $config, $cache;
 
 $cache_data_start = microtime(TRUE);
 $cache_item       = get_cache_item('data');
 //print_vars($cache_item->isHit());
 
 if (!ishit_cache_item($cache_item)) {
+
+    $microtime_start = microtime(TRUE);
 
     // Devices
     $cache['devices'] = [
@@ -52,7 +56,7 @@ if (!ishit_cache_item($cache_item)) {
 
     $select = "`device_id`, `hostname`, `status`, `disabled`, `type`, `ignore`, `ignore_until`, `last_polled_timetaken`, `last_discovered_timetaken`, `devices`.`location`";
 
-    if ($GLOBALS['config']['geocoding']['enable']) {
+    if ($config['geocoding']['enable']) {
         $select .= ', `devices_locations`.`location_country`, `devices_locations`.`location_state`, `devices_locations`.`location_county`, `devices_locations`.`location_city`';
         $devices_query = "SELECT " . $select . " FROM `devices` LEFT JOIN `devices_locations` USING (`device_id`) ORDER BY `hostname`;";
     } else {
@@ -78,7 +82,7 @@ if (!ishit_cache_item($cache_item)) {
         if ($device['disabled']) {
             $cache['devices']['stat']['disabled']++;
             $cache['devices']['disabled'][] = (int)$device['device_id']; // Collect IDs for disabled
-            if (!$GLOBALS['config']['web_show_disabled']) {
+            if (!$config['web_show_disabled']) {
                 continue;
             }
             // Stat for disabled collect after web_show_disabled
@@ -156,10 +160,19 @@ if (!ishit_cache_item($cache_item)) {
         }
     }
 
+    // Common permission sql query
+    //r(range_to_list($cache['devices']['permitted']));
+    //unset($cache['devices']['permitted']);
+
+    $cache['where']['devices_permitted'] = generate_query_permitted_ng(['device']);
+    $cache['where']['devices_enabled']   = !empty($cache['devices']['disabled']) ? generate_query_values($cache['devices']['disabled'], 'device_id', '!=') : '';
     //dump($cache['device_locations']);
     //dump($cache['locations']['entries']);
 
     sort($cache['graphs']);
+
+    $time_elapsed = elapsed_time($microtime_start);
+    bdump("Devices Cache: " . round($time_elapsed, 5) . "s");
 
     // Ports
 
@@ -198,10 +211,10 @@ if (!ishit_cache_item($cache_item)) {
     $cache['ports']['stat']['deleted'] = safe_count($cache['ports']['deleted']);
 
     // Devices disabled
-    if (isset($cache['devices']['disabled']) && !safe_empty($cache['devices']['disabled'])) {
+    if (!safe_empty($cache['devices']['disabled'])) {
         $cache['ports']['device_disabled'] = dbFetchColumn("SELECT `port_id` FROM `ports` " . generate_where_clause($where_permitted, generate_query_values($cache['devices']['disabled'], 'device_id')));
-        if (!$config['web_show_disabled']) {
-            $where_permitted_hide[] = generate_query_values($cache['devices']['disabled'], 'device_id', '!=');
+        if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+            $where_permitted_hide[] = $cache['where']['devices_enabled'];
         }
     }
 
@@ -234,9 +247,12 @@ if (!ishit_cache_item($cache_item)) {
     $cache['ports']['stat']['down']     = dbFetchCell("SELECT COUNT(*) FROM `ports`" . generate_where_clause($where_permitted_hide, "`ifAdminStatus` = 'up' AND `ifOperStatus` IN ('down', 'lowerLayerDown') AND `ports`.`disabled` = '0' AND `ports`.`deleted` = '0'"));
     $cache['ports']['stat']['up']       = dbFetchCell("SELECT COUNT(*) FROM `ports`" . generate_where_clause($where_permitted_hide, "`ifAdminStatus` = 'up' AND `ifOperStatus` IN ('up', 'testing', 'monitoring')"));
 
+    //$cache['where']['devices_ports_permitted'] = generate_query_permitted(array('device', 'port'));
+    // This needs to do both, otherwise it only permits ports and not ports on permitted devices.
+    $cache['where']['ports_permitted'] = generate_query_permitted_ng(['port', 'device']);
+
     $time_elapsed = elapsed_time($microtime_start);
     bdump("Port Cache: " . round($time_elapsed, 5) . "s");
-
 
     // Sensors
 
@@ -425,43 +441,34 @@ if (!ishit_cache_item($cache_item)) {
     $microtime_start = microtime(TRUE);
 
     $query_where   = [];
-    $query_where[] = generate_query_permitted_ng([ 'device', 'sensor' ]);
     $query_where[] = "`sensor_deleted` = 0";
 
-    if (!$config['web_show_disable']) {
-        $query_where[] = "`device_id` NOT IN (SELECT `device_id` FROM `devices` WHERE `disabled` = 1)";
+    if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+        // not required with generate_query_permitted_ng(['device'])
+        //$query_where[] = $cache['where']['devices_enabled'];
+        //$query_where[] = "`device_id` NOT IN (SELECT `device_id` FROM `devices` WHERE `disabled` = 1)";
         //$query_where[] = "`disable` = 0";
     }
 
-    $where = generate_where_clause($query_where);
-
     $sensor_query = "
     SELECT
-        device_id,
-        sensor_class,
-        COUNT(*) AS count,
-        SUM(sensor_deleted) AS deleted_count,
-        SUM(sensor_disable) AS disabled_count,
-        COUNT(sensor_event = 'ok' OR NULL) AS ok_count,
-        COUNT(sensor_event = 'warning' OR NULL) AS warning_count,
-        COUNT(sensor_event = 'alert' OR NULL) AS alert_count,
-        COUNT(sensor_event = 'ignore' OR NULL) AS ignored_count
-    FROM `sensors`    
-    " . $where . "
-    GROUP BY
-        device_id,
-        sensor_class
-";
+        `device_id`,
+        `sensor_class`,
+        COUNT(*) AS `count`,
+        SUM(`sensor_deleted`) AS `deleted_count`,
+        SUM(`sensor_disable`) AS `disabled_count`,
+        COUNT(`sensor_event` = 'ok' OR NULL) AS `ok_count`,
+        COUNT(`sensor_event` = 'warning' OR NULL) AS `warning_count`,
+        COUNT(`sensor_event` = 'alert' OR NULL) AS `alert_count`,
+        COUNT(`sensor_event` = 'ignore' OR NULL) AS `ignored_count`
+    FROM `sensors` " . generate_where_clause($query_where, generate_query_permitted_ng([ 'device', 'sensor' ])) . "
+    GROUP BY `device_id`, `sensor_class`";
 
-    $sensor_results = dbFetchRows($sensor_query);
-
-    //r($sensorStatsQuery);
-
-    $cache['sensors']['stat']    = ['count' => 0, 'ok' => 0, 'alert' => 0, 'warning' => 0, 'ignored' => 0, 'disabled' => 0, 'deleted' => 0];
+    $cache['sensors']['stat']    = [ 'count' => 0, 'ok' => 0, 'alert' => 0, 'warning' => 0, 'ignored' => 0, 'disabled' => 0, 'deleted' => 0 ];
     $cache['sensors']['devices'] = [];
     $cache['sensor_types']       = [];
 
-    foreach ($sensor_results as $row) {
+    foreach (dbFetchRows($sensor_query) as $row) {
         $device_id    = $row['device_id'];
         $sensor_class = $row['sensor_class'];
 
@@ -507,33 +514,26 @@ if (!ishit_cache_item($cache_item)) {
     $microtime_start = microtime(TRUE);
 
     // Statuses
-    $cache['statuses']['stat']    = ['count'    => 0,
-                                     'ok'       => 0,
-                                     'alert'    => 0,
-                                     'warning'  => 0,
-                                     'ignored'  => 0,
-                                     'disabled' => 0,
-                                     'deleted'  => 0];
+
+    $cache['statuses']['stat'] = [ 'count' => 0, 'ok' => 0, 'alert' => 0, 'warning' => 0, 'ignored' => 0, 'disabled' => 0, 'deleted' => 0 ];
     $cache['statuses']['devices'] = [];      // Stats per device id
     $cache['status_classes']      = [];      // FIXME -> $cache['statuses']['classes']
 
-    $status_array = dbFetchRows('SELECT `device_id`, `status_id`, `entPhysicalClass`, `status_ignore`, `status_disable`,
-                                      `status_deleted`, `status_event` FROM `status`' . generate_where_clause(generate_query_permitted_ng(['device', 'status'])));
+    $query_where   = [];
+    $query_where[] = "`status_deleted` = 0";
 
+    if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+        // not required with generate_query_permitted_ng(['device'])
+        //$query_where[] = $cache['where']['devices_enabled'];
+    }
+
+    $status_query = '
+    SELECT `device_id`, `status_id`, `entPhysicalClass`, `status_ignore`, `status_disable`, `status_deleted`, `status_event`
+    FROM `status`' . generate_where_clause($query_where, generate_query_permitted_ng(['device', 'status']));
 
     //r($cache['devices']);
 
-    foreach ($status_array as $status) {
-
-        if (!$config['web_show_disabled']) {
-            if (in_array($status['device_id'], $cache['devices']['disabled'])) {
-                continue;
-            }
-        }
-        if ($status['status_deleted']) {
-            $cache['statuses']['stat']['deleted']++;
-            continue;
-        }
+    foreach (dbFetchRows($status_query) as $status) {
 
         // Initialize devices and status_classes for this status if not already set
         if (!isset($cache['statuses']['devices'][$status['device_id']])) {
@@ -589,29 +589,21 @@ if (!ishit_cache_item($cache_item)) {
     $microtime_start = microtime(TRUE);
 
     // Counters
-    $cache['counters']['stat']    = ['count'    => 0,
-                                     'ok'       => 0,
-                                     'alert'    => 0,
-                                     'warning'  => 0,
-                                     'ignored'  => 0,
-                                     'disabled' => 0,
-                                     'deleted'  => 0];
+    $cache['counters']['stat'] = [ 'count' => 0, 'ok' => 0, 'alert' => 0, 'warning' => 0, 'ignored' => 0, 'disabled' => 0, 'deleted' => 0 ];
     $cache['counters']['devices'] = [];                              // Stats per device ids
 
-    $counters_array = dbFetchRows('SELECT `device_id`, `counter_id`, `counter_class`, `counter_ignore`, `counter_disable`,
-                                       `counter_value`, `counter_deleted`, `counter_event` FROM `counters`' . generate_where_clause(generate_query_permitted_ng(['device', 'counter'])));
+    $query_where   = [];
+    $query_where[] = "`counter_deleted` = 0";
 
-    foreach ($counters_array as $counter) {
+    if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+        // not required with generate_query_permitted_ng(['device'])
+        //$query_where[] = $cache['where']['devices_enabled'];
+    }
+    $counters_query = '
+    SELECT `device_id`, `counter_id`, `counter_class`, `counter_ignore`, `counter_disable`, `counter_value`, `counter_deleted`, `counter_event`
+    FROM `counters`' . generate_where_clause($query_where, generate_query_permitted_ng([ 'device', 'counter' ]));
 
-        if (!$config['web_show_disabled'] &&
-            in_array($counter['device_id'], (array)$cache['devices']['disabled'])) {
-            continue;
-        }
-
-        if ($counter['counter_deleted']) {
-            $cache['counters']['stat']['deleted']++;
-            continue;
-        }
+    foreach (dbFetchRows($counters_query) as $counter) {
 
         $cache['counters']['stat']['count']++;
         $cache['counters']['devices'][$counter['device_id']]['count']++;
@@ -665,59 +657,33 @@ if (!ishit_cache_item($cache_item)) {
 
     $query = "
 SELECT 
-  SUM(CASE WHEN alert_status = 0 THEN 1 ELSE 0 END) as down,
-  SUM(CASE WHEN alert_status = 1 THEN 1 ELSE 0 END) as up,
-  SUM(CASE WHEN alert_status = 2 THEN 1 ELSE 0 END) as delay,
-  SUM(CASE WHEN alert_status = 3 THEN 1 ELSE 0 END) as suppress,
-  SUM(CASE WHEN alert_status NOT IN (0, 1, 2, 3) THEN 1 ELSE 0 END) as unknown
-FROM alert_table
-";
-    $query .= generate_where_clause(generate_query_permitted_ng(['alert']));
+  SUM(CASE WHEN `alert_status` = 0 THEN 1 ELSE 0 END) AS `down`,
+  SUM(CASE WHEN `alert_status` = 1 THEN 1 ELSE 0 END) AS `up`,
+  SUM(CASE WHEN `alert_status` = 2 THEN 1 ELSE 0 END) AS `delay`,
+  SUM(CASE WHEN `alert_status` = 3 THEN 1 ELSE 0 END) AS `suppress`,
+  SUM(CASE WHEN `alert_status` NOT IN (0, 1, 2, 3) THEN 1 ELSE 0 END) AS `unknown`
+FROM `alert_table` ";
 
-    $alert_entries = dbFetchRow($query);
+    $query_where = [];
+    if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+        // not required with generate_query_permitted_ng(['device'])
+        $query_where[] = $cache['where']['devices_enabled'];
+        //$query .= " AND `device_id` NOT IN (SELECT `device_id` FROM `devices` WHERE `disabled` = 1)";
+    }
+
+    $alert_entries = dbFetchRow($query . generate_where_clause($query_where, generate_query_permitted_ng([ 'alert' ])));
 
     $cache['alert_entries'] = [
-      'count'    => array_sum($alert_entries),
-      'up'       => $alert_entries['up'],
-      'down'     => $alert_entries['down'],
-      'unknown'  => $alert_entries['unknown'],
-      'delay'    => $alert_entries['delay'],
-      'suppress' => $alert_entries['suppress']
+        'count'    => array_sum($alert_entries),
+        'up'       => $alert_entries['up'],
+        'down'     => $alert_entries['down'],
+        'delay'    => $alert_entries['delay'],
+        'suppress' => $alert_entries['suppress'],
+        'unknown'  => $alert_entries['unknown']   // -1 mean never polled (default)
     ];
 
-    /*
-    $query = 'SELECT `alert_status` FROM `alert_table`';
-    $query .= generate_where_clause(generate_query_permitted_ng( ['alert'] ));
-
-    $alert_entries = dbFetchRows($query);
-    $cache['alert_entries'] = array('count'    => safe_count($alert_entries),
-                                    'up'       => 0,
-                                    'down'     => 0,
-                                    'unknown'  => 0,
-                                    'delay'    => 0,
-                                    'suppress' => 0);
-
-    foreach ($alert_entries as $alert_table_id => $alert_entry) {
-      switch ($alert_entry['alert_status']) {
-        case '0':
-          ++$cache['alert_entries']['down'];
-          break;
-        case '1':
-          ++$cache['alert_entries']['up'];
-          break;
-        case '2':
-          ++$cache['alert_entries']['delay'];
-          break;
-        case '3':
-          ++$cache['alert_entries']['suppress'];
-          break;
-        case '-1': // FIXME, what mean status '-1'?
-        default:
-          ++$cache['alert_entries']['unknown'];
-      }
-    }
-    */
-
+    $time_elapsed = elapsed_time($microtime_start);
+    bdump("Alerts Cache: " . round($time_elapsed, 5) . "s");
 
     // Routing
 
@@ -766,20 +732,22 @@ FROM alert_table
     if (isset($config['enable_bgp']) && $config['enable_bgp']) {
         $query = "
     SELECT
-        COUNT(*) as count,
-        SUM(CASE WHEN bgpPeerAdminStatus IN ('start', 'running') THEN 1 ELSE 0 END) as up,
-        SUM(CASE WHEN bgpPeerAdminStatus NOT IN ('start', 'running') THEN 1 ELSE 0 END) as down,
-        SUM(CASE WHEN local_as = bgpPeerRemoteAs THEN 1 ELSE 0 END) as internal,
-        SUM(CASE WHEN local_as <> bgpPeerRemoteAs THEN 1 ELSE 0 END) as external,
-        SUM(CASE WHEN bgpPeerAdminStatus IN ('start', 'running') AND bgpPeerState != 'established' THEN 1 ELSE 0 END) as alerts
-    FROM bgpPeers
-    " . generate_where_clause(generate_query_permitted_ng(['device']));
+        COUNT(*) AS `count`,
+        SUM(CASE WHEN `bgpPeerAdminStatus` IN ('start', 'running') THEN 1 ELSE 0 END) AS `up`,
+        SUM(CASE WHEN `bgpPeerAdminStatus` NOT IN ('start', 'running') THEN 1 ELSE 0 END) AS `down`,
+        SUM(CASE WHEN `local_as` = `bgpPeerRemoteAs` THEN 1 ELSE 0 END) AS `internal`,
+        SUM(CASE WHEN `local_as` <> `bgpPeerRemoteAs` THEN 1 ELSE 0 END) AS `external`,
+        SUM(CASE WHEN `bgpPeerAdminStatus` IN ('start', 'running') AND `bgpPeerState` != 'established' THEN 1 ELSE 0 END) AS `alerts`
+    FROM `bgpPeers` ";
 
-        if (!$config['web_show_disabled']) {
-            $query .= " AND device_id NOT IN (SELECT device_id FROM devices WHERE disabled = 1)";
+        $query_where = [];
+        if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+            // not required with generate_query_permitted_ng(['device'])
+            $query_where[] = $cache['where']['devices_enabled'];
+            //$query .= " AND `device_id` NOT IN (SELECT `device_id` FROM `devices` WHERE `disabled` = 1)";
         }
 
-        $bgp_data = dbFetchRow($query);
+        $bgp_data = dbFetchRow($query . generate_where_clause(generate_query_permitted_ng(['device'])));
 
         $cache['routing']['bgp']['count']    = $bgp_data['count'];
         $cache['routing']['bgp']['up']       = $bgp_data['up'];
@@ -794,16 +762,19 @@ FROM alert_table
     if (isset($config['enable_ospf']) && $config['enable_ospf']) {
         $query = "
     SELECT
-        COUNT(*) as count,
-        SUM(CASE WHEN ospfAdminStat = 'enabled' THEN 1 ELSE 0 END) as up,
-        SUM(CASE WHEN ospfAdminStat = 'disabled' THEN 1 ELSE 0 END) as down
-    FROM ospf_instances" . generate_where_clause(generate_query_permitted_ng(['device']));
+        COUNT(*) AS `count`,
+        SUM(CASE WHEN `ospfAdminStat` = 'enabled' THEN 1 ELSE 0 END) AS `up`,
+        SUM(CASE WHEN `ospfAdminStat` = 'disabled' THEN 1 ELSE 0 END) AS `down`
+    FROM `ospf_instances`";
 
-        if (!$config['web_show_disabled']) {
-            $query .= " AND device_id NOT IN (SELECT device_id FROM devices WHERE disabled = 1)";
+        $query_where = [];
+        if (!$config['web_show_disabled'] && $cache['where']['devices_enabled']) {
+            // not required with generate_query_permitted_ng(['device'])
+            $query_where[] = $cache['where']['devices_enabled'];
+            //$query .= " AND `device_id` NOT IN (SELECT `device_id` FROM `devices` WHERE `disabled` = 1)";
         }
 
-        $ospf_data = dbFetchRow($query);
+        $ospf_data = dbFetchRow($query . generate_where_clause(generate_query_permitted_ng(['device'])));
 
         $cache['routing']['ospf']['count']     = $ospf_data['count'];
         $cache['routing']['ospf']['up']        = $ospf_data['up'];
@@ -839,7 +810,7 @@ FROM alert_table
     }
     */
 
-//  if (isset($config['enable_eigrp']) && $config['enable_eigrp']) {
+    // if (isset($config['enable_eigrp']) && $config['enable_eigrp']) {
     $cache['routing']['eigrp']['last_seen'] = get_time();
     foreach (dbFetchRows("SELECT `device_id` FROM `eigrp_vpns`" . generate_where_clause(generate_query_permitted_ng([ 'device', 'eigrp' ]))) as $eigrp) {
         if (!$config['web_show_disabled'] &&
@@ -851,16 +822,6 @@ FROM alert_table
         }
     }
     // }
-
-    // Common permission sql query
-    //r(range_to_list($cache['devices']['permitted']));
-    //unset($cache['devices']['permitted']);
-
-    //$cache['where']['devices_ports_permitted'] = generate_query_permitted(array('device', 'port'));
-    $cache['where']['devices_permitted'] = generate_query_permitted_ng(['device']);
-
-    // This needs to do both, otherwise it only permits permitted ports and not ports on permitted devices.s
-    $cache['where']['ports_permitted'] = generate_query_permitted_ng(['port', 'device']);
 
     // CEF
     $cache['routing']['cef']['count'] = dbFetchCell("SELECT COUNT(`cef_switching_id`) FROM `cef_switching`" . generate_where_clause($cache['where']['devices_permitted']) . " GROUP BY `device_id`, `afi`;");

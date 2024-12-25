@@ -1,0 +1,4031 @@
+    ADTRAN-GENCSM2-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The Generic enterprise CSM MIB (SNMPV2)
+    -- PRODUCT:   All the ATM products for the TA3000 shelf
+    -- VERSION:   1.3
+    -- DATE:      07/11/30
+
+    -- This MIB defines the object identifier (OID) for the Total Access
+    -- 3000 ATM Mux. It also defines product specific objects.
+    -- This MIB was created to support the product specific objects requiring SNMPv2 support.
+
+    -- HISTORY:
+       -- 02/08/02 glf Created from adtads3csm2.mib
+       -- 02/08/06 glf added Chip's changes on the adtads3csm2.mib
+       -- 02/08/19 pnb convert adidentity to adIdentityShared
+       -- 02/08/28 cb  added monitoring session support
+       -- 02/10/14 cb  added PVC/PVP/SPVC/SPVP last change and PVC/TD name lookup
+       -- 02/10/28 cb  added shaping support
+       -- 02/11/21 glf added support for OAM loopback on a VCL/VPL
+       -- 02/11/21 cb  added VCL/VPL loopback support
+       -- 02/12/12 glf added PVC/PVP status message
+       -- 03/01/28 glf added enhanced OAM loopback tables for VCL/VPLs
+       -- 03/03/24 cb  added Fixed Index enable/disable
+       -- 06/05/16 glf added support for the adGenCSMVclInfo and adGenCSMVplInfo OID
+       -- 07/10/26 cb  added VCL error status message
+       -- 07/11/30 dcc added VCL extended encapsulation type
+       -- 08/02/05 glf fixed counters used Integer32 instead of INTEGER
+       -- 08/02/06 pnb Change read-create access to read-write in table adGenCSMVclTable OIDs
+       -- 09/05/12 djb added sub interface index to indicate the CLI's logical interface index associated with the VCL
+       -- 08/14/09 aed Changed adGenCSMSubInterfaceIndex to Integer32 to correct warning found during SMICng compile.
+
+    IMPORTS
+
+        MODULE-IDENTITY, OBJECT-TYPE,
+        Counter32, Counter64, Unsigned32, TimeTicks, Integer32
+        -- enterprises
+            FROM SNMPv2-SMI
+        adIdentityShared,
+        adShared
+            FROM ADTRAN-MIB         -- v2 version
+        TEXTUAL-CONVENTION,
+        DisplayString,
+        TruthValue,
+        RowStatus,
+        TimeStamp
+            FROM SNMPv2-TC
+
+        ifIndex
+            FROM IF-MIB
+
+        AtmServiceCategory,
+        AtmTrafficDescrParamIndex
+            FROM ATM-TC-MIB
+
+        atmTrafficDescrParamIndex,
+        atmVpCrossConnectIndex,
+        atmVpCrossConnectLowIfIndex,
+        atmVpCrossConnectLowVpi,
+        atmVpCrossConnectHighIfIndex,
+        atmVpCrossConnectHighVpi,
+        atmVcCrossConnectIndex,
+        atmVcCrossConnectLowIfIndex,
+        atmVcCrossConnectLowVpi,
+        atmVcCrossConnectLowVci,
+        atmVcCrossConnectHighIfIndex,
+        atmVcCrossConnectHighVpi,
+        atmVcCrossConnectHighVci,
+        atmVplVpi, atmVclVpi, atmVclVci
+            FROM ATM-MIB;
+
+  adGENCSM2ID MODULE-IDENTITY
+         LAST-UPDATED "200802051000Z"
+         ORGANIZATION "ADTRAN, Inc."
+         CONTACT-INFO
+           "CND Tech Support
+            Postal: ADTRAN, Inc.
+                    901 Explorer Blvd.
+                    Huntsville, AL  35806
+                    Tel: +1 800 726-8663
+                    Fax: +1 256 963 6217
+                    E-mail: support@adtran.com"
+         DESCRIPTION
+              "The is the MIB module that describes
+               CSM SMIv2 objects."
+         ::= {  adIdentityShared 36 }
+
+    -- TEXTUAL CONVENTIONS
+
+    AdGenCSMDirection ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Specifies either the WAN (Network) or Loop Direction"
+        SYNTAX   INTEGER {
+           wan(1),   -- WAN direction
+           loop(2)   -- Subscriber loops
+           }
+
+    AdGenCsmOamIdv2 ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "1x"
+        STATUS        current
+        DESCRIPTION
+            "A 16 octet identification string that uniquely describes
+            an ATM switch."
+        SYNTAX        OCTET STRING (SIZE(16))
+
+    AdGenCSMClassScheduling ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "The output algorythm used to schedule traffic classes on a
+             port.  Mixing both modifiedStrictPriority and roundRobin
+             on a port is not allowed.  However mixing either of these
+             with strictPriority is allowed.  In order to change ports
+             to/from modifiedStrictPriority from/to roundRobin, first
+             change all ports to strictPriority, then to the final
+             scheduling scheme you wish to use.
+
+             Changing the scheduling algorythms is a significant event
+             and requires a restart of the CSM to take effect."
+        SYNTAX   INTEGER {
+           modifiedStrictPriority(1), -- Guarantees with starvation avoidance
+           roundRobin(2),             -- Equal Access, may not acheive guarantees
+           strictPriority(3)          -- Always yield to higher priority classes
+           }
+
+    AdGenCSMMonitorScope ::= TEXTUAL-CONVENTION
+        STATUS        current
+        DESCRIPTION
+            "The scope/level monitoring should take place at."
+        SYNTAX   INTEGER {
+           shelf(1),   -- Shelf
+           port(2),    -- Individual port
+           vp(3),      -- VP endpoint
+           vc(4)       -- VC endpoint
+           }
+
+    AdGenCSMMonitorCounterType ::= TEXTUAL-CONVENTION
+        STATUS        current
+        DESCRIPTION
+            "The type of monitoring counter present.  These values are used to
+             organize the Monitor Counter table into groups of counter types."
+        SYNTAX   INTEGER {
+           absolute(1),   -- Counts since system start
+           cumulative(2), -- Counts since session start
+           average(3),    -- Average counts since session start
+           minimum(4),    --
+           maximum(5),    --
+           last(6)        --
+           }
+
+    -- OBJECT IDENTIFIERS
+
+    adGenCSMmg                  OBJECT IDENTIFIER ::= { adShared 36 }
+    adGenCSMAtmExtension        OBJECT IDENTIFIER ::= { adGenCSMmg 4}
+
+    --
+    -- The CSM ATM Traffic Descriptor Extensions
+    --
+
+    adGenCSMTrafficDescrTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMTrafficDescrEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "The Adtran CSM ATM Traffic Descriptor Table contains vendor specific extensions
+            to the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 1 }
+
+    adGenCSMTrafficDescrEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMTrafficDescrEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM traffic descriptor associated parameters."
+          INDEX          { atmTrafficDescrParamIndex }
+          ::= { adGenCSMTrafficDescrTable 1 }
+
+     AdGenCSMTrafficDescrEntry ::= SEQUENCE {
+         adGenCSMTrafficDescrName
+             DisplayString
+     }
+
+     adGenCSMTrafficDescrName OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A unique name for the Traffic Descriptor"
+         ::= { adGenCSMTrafficDescrEntry 1 }
+
+    --
+    -- The CSM ATM Virtual Path Extensions
+    --
+
+    adGenCSMVpCrossConnectTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVpCrossConnectEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "The Adtran CSM ATM Virtual Path Cross Connect Table contains vendor specific
+            extensions to the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 2 }
+
+    adGenCSMVpCrossConnectEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVpCrossConnectEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Path associated parameters."
+          INDEX { atmVpCrossConnectIndex,
+                  atmVpCrossConnectLowIfIndex,
+                  atmVpCrossConnectLowVpi,
+                  atmVpCrossConnectHighIfIndex,
+                  atmVpCrossConnectHighVpi }
+          ::= { adGenCSMVpCrossConnectTable 1 }
+
+     AdGenCSMVpCrossConnectEntry ::= SEQUENCE {
+         adGenCSMVpCrossConnectName
+             DisplayString,
+         adGenCSMVpCrossConnectStatus
+             DisplayString
+
+     }
+
+     adGenCSMVpCrossConnectName OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A name for the Virtual Path Connection.  Names may be composed of
+             a combination of alphanumeric characters, spaces, and the underscore
+             '_' character.  Blank names are allowed.  Names beginning with the
+             underscore character '_' are reserved for use by the system."
+         ::= { adGenCSMVpCrossConnectEntry 1 }
+
+     adGenCSMVpCrossConnectStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A status for the Virtual Path Connection."
+
+         ::= { adGenCSMVpCrossConnectEntry 2 }
+    --
+    -- The CSM ATM Virtual Circuit Extensions
+    --
+
+    adGenCSMVcCrossConnectTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVcCrossConnectEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM Virtual Circuit Cross Connect Table contains vendor specific
+        extensions to the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 3 }
+
+    adGenCSMVcCrossConnectEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVcCrossConnectEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Circuit associated parameters."
+          INDEX { atmVcCrossConnectIndex,
+                  atmVcCrossConnectLowIfIndex,
+                  atmVcCrossConnectLowVpi,
+                  atmVcCrossConnectLowVci,
+                  atmVcCrossConnectHighIfIndex,
+                  atmVcCrossConnectHighVpi,
+                  atmVcCrossConnectHighVci }
+          ::= { adGenCSMVcCrossConnectTable 1 }
+
+     AdGenCSMVcCrossConnectEntry ::= SEQUENCE {
+         adGenCSMVcCrossConnectName
+             DisplayString,
+         adGenCSMVcCrossConnectStatus
+             DisplayString
+
+     }
+
+     adGenCSMVcCrossConnectName OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A name for the Virtual Channel Connection.  Names may be composed of
+             a combination of alphanumeric characters, spaces, and the underscore
+             '_' character.  Blank names are allowed.  Names beginning with the
+             underscore character '_' are reserved for use by the system."
+         ::= { adGenCSMVcCrossConnectEntry 1 }
+
+     adGenCSMVcCrossConnectStatus OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A status for the Virtual Channel Connection."
+
+         ::= { adGenCSMVcCrossConnectEntry 2 }
+
+    --
+    -- The CSM Buffer, CAC, and Policing Option Extensions
+    --
+    -- since we can't import from the version 1 mib, this is the same as
+    -- {adGenCSMmg 6} for the OBJECT IDENTIFIER
+    --
+
+    adGenCSMOptionsExtension   OBJECT IDENTIFIER ::= {adGenCSMmg 6}
+
+    --
+    -- Shelf Specific Options
+    --
+    -- Many of the shelf options listed below, such as Policing Disable, will
+    -- automatically be propagated to the next heirarchy level (Direction) if
+    -- the direction's corresponding override flag is 'false'.  Note that the
+    -- management port is not part of a 'direction' heirarchy and will not
+    -- have its value set by the recursive nature of this implementation.
+    --
+    -- Unless otherwise noted, changed values will take effect immediately.
+    --
+    adGenCSMOptionMenuLevel OBJECT-TYPE
+         SYNTAX         INTEGER  (0..2)
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Defines the number of additional levels provided by the shelf,
+              direction, port, and class buffer/CAC/Policing menus.  Menu
+              levels above 0 are intended for very advanced users and it is
+              strongly suggested that the user not modify this value"
+         DEFVAL { 1 }
+         ::= { adGenCSMOptionsExtension 1 }
+
+    adGenCSMOptionMenuDisplayDirection OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Specifies whether or not the per-direction buffer/CAC/policing
+              menues are displayed.  If this value is set from true to false,
+              the option display values for the port and class menues will also
+              be set to false.  This menu is intended for very advanced users
+              and it is strongly suggested that the user not modify this value."
+         DEFVAL { true }
+         ::= { adGenCSMOptionsExtension 2 }
+
+    adGenCSMOptionMenuDisplayPort OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Specifies whether or not the per-port buffer/CAC/policing
+              menues are displayed.  If this value is set from true to false,
+              the option display value for the per-class menu will also be set
+              to false.  If this value is set from false to true, the option
+              display value for the per-direction menu will also be set to true.
+              This menu is intended for very advanced users and it is strongly
+              suggested that the user not modify this value."
+         DEFVAL { true }
+         ::= { adGenCSMOptionsExtension 3 }
+
+    adGenCSMOptionMenuDisplayClass OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Specifies whether or not the per-traffic class buffer/CAC/policing
+              menues are displayed.  If this value is set from false to true,
+              the option display value for the per-port and per-direction menu
+              will also be set to true.  This menu is intended for very
+              advanced users and it is strongly suggested that the user not
+              modify this value."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 4 }
+
+    adGenCSMShelfPolicingDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if ingress policing should be disabled on a
+              shelf-wide basis.  Per-direction, per-port, and per-traffic
+              class settings may override this variable for a specific
+              direction, port, or traffic class if enabled and available."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 5 }
+
+    adGenCSMShelfCellRateCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to Cell Rate calculations
+              should be disabled on a shelf-wide basis.  Per-direction,
+              per-port, and per-traffic class settings may override this
+              variable for a specific direction, port, or traffic class if
+              enabled and available.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 6 }
+
+    adGenCSMShelfBufferCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to buffer threshold
+              calculations should be disabled on a shelf-wide basis.
+              Per-direction, per-port, and per-traffic class settings may
+              override this variable for a specific direction, port, or traffic
+              class if enabled and available.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { true }
+         ::= { adGenCSMOptionsExtension 7 }
+
+    adGenCSMShelfCbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide overbooking/oversubscription percentage for the CBR
+              traffic class.  Per-direction, per-port, and per-traffic class
+              settings may override this variable for a specific direction,
+              port, or traffic class if enabled and available.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+
+         DEFVAL { 100 }
+         ::= { adGenCSMOptionsExtension 8 }
+
+    adGenCSMShelfRtVbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide overbooking/oversubscription percentage for the rtVBR
+              traffic class.  Per-direction, per-port, and per-traffic class
+              settings may override this variable for a specific direction,
+              port, or traffic class if enabled and available.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMOptionsExtension 9 }
+
+    adGenCSMShelfNrtVbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide overbooking/oversubscription percentage for the nrtVBR
+              traffic class.  Per-direction, per-port, and per-traffic class
+              settings may override this variable for a specific direction,
+              port, or traffic class if enabled and available.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMOptionsExtension 10 }
+
+    adGenCSMShelfNrtVbrSharing OBJECT-TYPE
+         SYNTAX         INTEGER  (0..100)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide spare buffer sharing percentage for the nrtVBR traffic
+              class.  Per-direction settings may override this variable for a
+              specific direction if enabled and available.  If the
+              adGenCSMOptionMenuLevel variable is less than 1, this object is
+              treated as read-only."
+         DEFVAL { 0 }
+         ::= { adGenCSMOptionsExtension 11 }
+
+    adGenCSMShelfUbrSharing OBJECT-TYPE
+         SYNTAX         INTEGER  (0..100)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide spare buffer sharing percentage for the UBR traffic
+              class.  Per-direction settings may override this variable for a
+              specific direction if enabled and available.  If the
+              adGenCSMOptionMenuLevel variable is less than 1, this object is
+              treated as read-only."
+         DEFVAL { 95 }
+         ::= { adGenCSMOptionsExtension 12 }
+
+    adGenCSMShelfUbrMaxClp1Thrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide maximum CLP-1 Cell Buffer Theshold the UBR traffic
+              class.  Per-direction and per-port settings may override this
+              variable for a specific direction or port if enabled and
+              available.  If the adGenCSMOptionMenuLevel variable is less than 2,
+              this object is treated as read-only."
+         DEFVAL { 32 }
+         ::= { adGenCSMOptionsExtension 13 }
+
+    adGenCSMShelfUbrMaxClp0Thrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide maximum CLP-0 Cell Buffer Theshold the UBR traffic
+              class.  Per-direction and per-port settings may override this
+              variable for a specific direction or port if enabled and
+              available.  If the adGenCSMOptionMenuLevel variable is less than 2,
+              this object is treated as read-only."
+         DEFVAL { 512 }
+         ::= { adGenCSMOptionsExtension 14 }
+
+    adGenCSMShelfUbrMaxMaxThrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide maximum Max Cell Buffer Threshold the UBR traffic
+              class.  Per-direction and per-port settings may override this
+              variable for a specific direction or port if enabled and
+              available.  If the adGenCSMOptionMenuLevel variable is less than 2,
+              this object is treated as read-only."
+         DEFVAL { 544 }
+         ::= { adGenCSMOptionsExtension 15 }
+
+    adGenCSMShelfUbrMaxFrameMultiplier OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide multiplier to use for the UBR traffic class when
+              determining the CLP-0 threshold.  This factor is multiplied by
+              the UBR frame size to determine the CLP-0 threshold.
+              Per-direction and per-port settings may override this variable
+              for a specific direction or port if enabled and available.
+              available.  If the adGenCSMOptionMenuLevel variable is less than 2,
+              this object is treated as read-only."
+         DEFVAL { 4 }
+         ::= { adGenCSMOptionsExtension 16 }
+
+    adGenCSMShelfDefaultCDVT OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "100 nanoseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide default input CDVT setting.  If this value is non-zero
+              and the traffic descriptor for does not explicitly state a
+              CDVT value, this value is used as the 'implied' CDVT.  If this
+              value is zero, a calculated valued based on the PCR of the
+              Traffic descriptor is used instead.  Currently, this calculated
+              value is 100 * PCR of the circuit being admitted.
+
+              Changing the default input CDVT value will not affect any VC or
+              VP cross connects that are currently in the 'active' state.
+              These VC/VP cross Connects will continue to use the CDVT value
+              that was in effect when the VC/VP cross connect was made active.
+              The new input CDVT value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 0 }
+         ::= { adGenCSMOptionsExtension 20 }
+
+    adGenCSMShelfAisRdiDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide flag indicating if AIS/RDI events should be
+              generated on VC/VPs by the CSM when an out-of-cell delineation
+              event occurs.  If AIS/RDI is disabled, AIS/RDI cells received
+              from neighboring nodes will still be propagated on the
+              appropriate VC/VP.
+
+              Currently, the disabling of AIS/RDI on a shelf-wide basis will
+              also result in ignoring cell delineation events on all ports.
+              This will result in the CSM ports displaying that they are in
+              Cell Delineation at all times, even when they are not actually
+              in cell delineation."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 21 }
+
+    adGenCSMShelfInputCdv OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide input Cell Delay Variation value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system."
+         DEFVAL { 1 }
+         ::= { adGenCSMOptionsExtension 22 }
+
+    adGenCSMShelfOutputCdv OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide output Cell Delay Variation value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system."
+         DEFVAL { 1 }
+         ::= { adGenCSMOptionsExtension 23 }
+
+    adGenCSMShelfInputMaxCtd OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide input Maximum Cell Transfer Delay value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system."
+         DEFVAL { 21 }
+         ::= { adGenCSMOptionsExtension 24 }
+
+    adGenCSMShelfOutputMaxCtd OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide output Maximum Cell Transfer Delay value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system."
+         DEFVAL { 21 }
+         ::= { adGenCSMOptionsExtension 25 }
+
+    adGenCSMShelfCbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide scheduling algorythm to use for the CBR class of
+              service.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMOptionsExtension 26 }
+
+    adGenCSMShelfRtVbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide scheduling algorythm to use for the rtVBR class of
+              service.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMOptionsExtension 27 }
+
+    adGenCSMShelfNrtVbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide scheduling algorythm to use for the nrtVBR class of
+              service.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMOptionsExtension 28 }
+
+    adGenCSMShelfUbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide scheduling algorythm to use for the UBR class of
+              service.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect.
+
+              The UBR class can only be set to roundRobin or strictPriority"
+         DEFVAL { strictPriority }
+         ::= { adGenCSMOptionsExtension 29 }
+
+    adGenCSMShelfCbrShaping OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide flag enabling/disabling traffic shaping for the CBR
+              traffic class.  If enabled (true), traffic shaping will limit
+              and shape cell egress (transmission) on the network (WAN)
+              interface to the traffic descriptor that describes the requested
+              QOS in that direction.
+
+              Note that traffic shaping is only available on the network (WAN)
+              interface and is not currently available for loop (subscriber)
+              slots.
+
+              The setting or clearing of this flag requires a CSM reboot
+              before the setting takes effect."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 30 }
+
+    adGenCSMShelfRtVbrShaping OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide flag enabling/disabling traffic shaping for the rtVBR
+              traffic class.  If enabled (true), traffic shaping will limit
+              and shape cell egress (transmission) on the network (WAN)
+              interface to the traffic descriptor that describes the requested
+              QOS in that direction.
+
+              Note that traffic shaping is only available on the network (WAN)
+              interface and is not currently available for loop (subscriber)
+              slots.
+
+              The setting or clearing of this flag requires a CSM reboot
+              before the setting takes effect."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 31 }
+
+    adGenCSMShelfNrtVbrShaping OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide flag enabling/disabling traffic shaping for the nrtVBR
+              traffic class.  If enabled (true), traffic shaping will limit
+              and shape cell egress (transmission) on the network (WAN)
+              interface to the traffic descriptor that describes the requested
+              QOS in that direction.
+
+              Note that traffic shaping is only available on the network (WAN)
+              interface and is not currently available for loop (subscriber)
+              slots.
+
+              The setting or clearing of this flag requires a CSM reboot
+              before the setting takes effect."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 32 }
+
+    adGenCSMShelfUbrShaping OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide flag enabling/disabling traffic shaping for the UBR
+              traffic class.  If enabled (true), traffic shaping will limit
+              and shape cell egress (transmission) on the network (WAN)
+              interface to the traffic descriptor that describes the requested
+              QOS in that direction.
+
+              Note that traffic shaping is only available on the network (WAN)
+              interface and is not currently available for loop (subscriber)
+              slots.
+
+              The setting or clearing of this flag requires a CSM reboot
+              before the setting takes effect."
+         DEFVAL { false }
+         ::= { adGenCSMOptionsExtension 33 }
+
+     --
+     -- Direction specific options
+     --
+     -- Per-direction options are inherited from the settings at the shelf
+     -- level for all variables except for adGenCSMDirectionMaximumThreshold if
+     -- the associated override flag is false.   All variables are read-write
+     -- only if the override flag is set to true and the
+     -- adGenCSMOptionMenuDisplayDirection is true.  Otherwise, the variables are
+     -- read-only.  Some variables may also only be read-only depending upon
+     -- the setting of the adGenCSMOptionMenuLevel object
+     --
+
+     adGenCSMDirectionOptionTable    OBJECT-TYPE
+         SYNTAX         SEQUENCE OF AdGenCSMDirectionOptionEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+          "This table contains information on per-direction buffer, CAC,
+           and policing options."
+         ::= { adGenCSMOptionsExtension 17 }
+
+     adGenCSMDirectionOptionEntry    OBJECT-TYPE
+         SYNTAX         AdGenCSMDirectionOptionEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+          "This list contains per-direction buffer, CAC, and policing option
+           parameters."
+         INDEX  {adGenCSMDirection}
+         ::= { adGenCSMDirectionOptionTable 1 }
+
+     AdGenCSMDirectionOptionEntry   ::= SEQUENCE  {
+       adGenCSMDirection                           AdGenCSMDirection,
+       adGenCSMDirectionPolicingDisable               TruthValue,
+       adGenCSMDirectionCellRateCACDisable            TruthValue,
+       adGenCSMDirectionBufferCACDisable              TruthValue,
+       adGenCSMDirectionCbrOverbooking                INTEGER,
+       adGenCSMDirectionRtVbrOverbooking              INTEGER,
+       adGenCSMDirectionMaximumThreshold              INTEGER,
+       adGenCSMDirectionNrtVbrOverbooking             INTEGER,
+       adGenCSMDirectionNrtVbrSharing                 INTEGER,
+       adGenCSMDirectionUbrSharing                    INTEGER,
+       adGenCSMDirectionUbrMaxClp1Thrsh               INTEGER,
+       adGenCSMDirectionUbrMaxClp0Thrsh               INTEGER,
+       adGenCSMDirectionUbrMaxMaxThrsh                INTEGER,
+       adGenCSMDirectionUbrMaxFrameMultiplier         INTEGER,
+
+       adGenCSMDirectionPolicingDisableOverride       TruthValue,
+       adGenCSMDirectionCellRateCACDisableOverride    TruthValue,
+       adGenCSMDirectionBufferCACDisableOverride      TruthValue,
+       adGenCSMDirectionCbrOverbookingOverride        TruthValue,
+       adGenCSMDirectionRtVbrOverbookingOverride      TruthValue,
+       adGenCSMDirectionNrtVbrOverbookingOverride     TruthValue,
+       adGenCSMDirectionNrtVbrSharingOverride         TruthValue,
+       adGenCSMDirectionUbrSharingOverride            TruthValue,
+       adGenCSMDirectionUbrMaxClp1ThrshOverride       TruthValue,
+       adGenCSMDirectionUbrMaxClp0ThrshOverride       TruthValue,
+       adGenCSMDirectionUbrMaxMaxThrshOverride        TruthValue,
+       adGenCSMDirectionUbrMaxFrameMultiplierOverride TruthValue,
+
+       adGenCSMDirectionDefaultCDVT                   Unsigned32,
+       adGenCSMDirectionAisRdiDisable                 TruthValue,
+       adGenCSMDirectionInputCdv                      Unsigned32,
+       adGenCSMDirectionOutputCdv                     Unsigned32,
+       adGenCSMDirectionInputMaxCtd                   Unsigned32,
+       adGenCSMDirectionOutputMaxCtd                  Unsigned32,
+       adGenCSMDirectionCbrClassScheduling            AdGenCSMClassScheduling,
+       adGenCSMDirectionRtVbrClassScheduling          AdGenCSMClassScheduling,
+       adGenCSMDirectionNrtVbrClassScheduling         AdGenCSMClassScheduling,
+       adGenCSMDirectionUbrClassScheduling            AdGenCSMClassScheduling,
+
+       adGenCSMDirectionDefaultCDVTOverride           TruthValue,
+       adGenCSMDirectionAisRdiDisableOverride         TruthValue,
+       adGenCSMDirectionInputCdvOverride              TruthValue,
+       adGenCSMDirectionOutputCdvOverride             TruthValue,
+       adGenCSMDirectionInputMaxCtdOverride           TruthValue,
+       adGenCSMDirectionOutputMaxCtdOverride          TruthValue,
+       adGenCSMDirectionCbrClassSchedulingOverride    TruthValue,
+       adGenCSMDirectionRtVbrClassSchedulingOverride  TruthValue,
+       adGenCSMDirectionNrtVbrClassSchedulingOverride TruthValue,
+       adGenCSMDirectionUbrClassSchedulingOverride    TruthValue
+                    }
+
+    adGenCSMDirection OBJECT-TYPE
+         SYNTAX         AdGenCSMDirection
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+             "Used as the index to specify either the WAN or loop direction."
+         ::= { adGenCSMDirectionOptionEntry 1 }
+
+    adGenCSMDirectionPolicingDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if ingress policing should be disabled for
+              this direction if the associated direction override flag is
+              set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfPolicingDisable variable."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 2 }
+
+    adGenCSMDirectionCellRateCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to Cell Rate calculations
+              should be disabled if the associated direction override flag is
+              set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfCellRateCACDisable variable.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 3 }
+
+    adGenCSMDirectionBufferCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to buffer threshold
+              calculations should be disabled if the associated direction
+              override flag is set to true.  If the override flag is set to
+              false, then this value is read-only and is inherited from the
+              setting of the adGenCSMShelfBufferCACDisable variable.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { true }
+         ::= { adGenCSMDirectionOptionEntry 4 }
+
+    adGenCSMDirectionCbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific overbooking/oversubscription percentage for
+              the CBR traffic class if the associated direction override flag
+              is set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfCbrOverbooking variable.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMDirectionOptionEntry 5 }
+
+    adGenCSMDirectionRtVbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific overbooking/oversubscription percentage for
+              the rtVBR traffic class if the associated direction override flag
+              is set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfRtVbrOverbooking variable.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMDirectionOptionEntry 6 }
+
+    adGenCSMDirectionNrtVbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific overbooking/oversubscription percentage for
+              the nrtVBR traffic class if the associated direction override flag
+              is set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfNrtVbrOverbooking variable.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMDirectionOptionEntry 7 }
+
+    adGenCSMDirectionMaximumThreshold OBJECT-TYPE
+         SYNTAX         INTEGER  (1..262143)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific setting that controls the maximum value that
+              the direction Cell Buffer Maximum Threshold register can contain.
+              class.  A user may wish to modify this value for both directions
+              available on a shelf (WAN and Loop) if they know in advance where
+              the majority of cell buffering may be required.  One possible use
+              for setting the WAN Direction maximum threshold would be to set it
+              to a small value if the DS3 interface is not expected to be used.
+              In this case, the user could increase the Loop Directions setting
+              to the maximum value."
+         DEFVAL { 131072 }
+         ::= { adGenCSMDirectionOptionEntry 8 }
+
+    adGenCSMDirectionNrtVbrSharing OBJECT-TYPE
+         SYNTAX         INTEGER  (0..100)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific buffer sharing percentage for the nrtVBR
+              traffic class if the associated direction override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfNrtVbrSharing variable."
+         DEFVAL { 0 }
+         ::= { adGenCSMDirectionOptionEntry 9 }
+
+    adGenCSMDirectionUbrSharing OBJECT-TYPE
+         SYNTAX         INTEGER  (0..100)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific buffer sharing percentage for the UBR
+              traffic class if the associated direction override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfUbrSharing variable."
+         DEFVAL { 95 }
+         ::= { adGenCSMDirectionOptionEntry 10 }
+
+    adGenCSMDirectionUbrMaxClp1Thrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific maximum CLP-1 Cell Buffer Theshold the UBR
+              traffic class if the associated direction override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfUbrMaxClp1Thrsh variable."
+         DEFVAL { 32 }
+         ::= { adGenCSMDirectionOptionEntry 11 }
+
+    adGenCSMDirectionUbrMaxClp0Thrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific maximum CLP-0 Cell Buffer Theshold the UBR
+              traffic class if the associated direction override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfUbrMaxClp0Thrsh variable."
+         DEFVAL { 512 }
+         ::= { adGenCSMDirectionOptionEntry 12 }
+
+    adGenCSMDirectionUbrMaxMaxThrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific maximum max Cell Buffer Theshold the UBR
+              traffic class if the associated direction override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMShelfUbrMaxMaxThrsh variable."
+         DEFVAL { 544 }
+         ::= { adGenCSMDirectionOptionEntry 13 }
+
+    adGenCSMDirectionUbrMaxFrameMultiplier OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction specific multiplier to use for the UBR traffic class to
+              use when determining the CLP-0 threshold if the associated
+              direction override flag is set to true.  If the override flag is
+              set to false, then this value is read-only and is inherited from
+              the setting of the adGenCSMShelfUbrMaxMaxThrsh variable."
+         DEFVAL { 4 }
+         ::= { adGenCSMDirectionOptionEntry 14 }
+
+    adGenCSMDirectionPolicingDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Direction Policing Disable value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 15 }
+
+    adGenCSMDirectionCellRateCACDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Cell Rate CAC Disable value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 16 }
+
+    adGenCSMDirectionBufferCACDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Buffer CAC Disable value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 17 }
+
+    adGenCSMDirectionCbrOverbookingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CBR Overbooking value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 18 }
+
+    adGenCSMDirectionRtVbrOverbookingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if rtVBR Overbooking value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 19 }
+
+    adGenCSMDirectionNrtVbrOverbookingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if nrtVBR Overbooking value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 20 }
+
+    adGenCSMDirectionNrtVbrSharingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if nrtVBR spare buffer sharing value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 21 }
+
+    adGenCSMDirectionUbrSharingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR spare buffer sharing value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 22 }
+
+    adGenCSMDirectionUbrMaxClp1ThrshOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR Maximum CLP-0 buffer threshold value
+              should override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 23 }
+
+    adGenCSMDirectionUbrMaxClp0ThrshOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR Maximum CLP-1 buffer threshold value
+              should override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 24 }
+
+    adGenCSMDirectionUbrMaxMaxThrshOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR Maximum max buffer threshold value
+              should override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 25 }
+
+    adGenCSMDirectionUbrMaxFrameMultiplierOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR frame multiplyer value should override
+              the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 26 }
+
+    adGenCSMDirectionDefaultCDVT OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "100 nanoseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide default input CDVT setting.  If this value is non-zero
+              and the traffic descriptor for does not explicitly state a
+              CDVT value, this value is used as the 'implied' CDVT.  If this
+              value is zero, a calculated valued based on the PCR of the
+              Traffic descriptor is used instead.  Currently, this calculated
+              value is 100 * PCR of the circuit being admitted.
+
+              Changing the default input CDVT value will not affect any VC or
+              VP cross connects that are currently in the 'active' state.
+              These VC/VP cross Connects will continue to use the CDVT value
+              that was in effect when the VC/VP cross connect was made active.
+              The new input CDVT value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfDefaultCDVT
+              variable."
+
+         DEFVAL { 0 }
+         ::= { adGenCSMDirectionOptionEntry 27 }
+
+    adGenCSMDirectionAisRdiDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide flag indicating if AIS/RDI events should be
+              generated on VC/VPs by the CSM when an out-of-cell delineation
+              event occurs.  If AIS/RDI is disabled, AIS/RDI cells received
+              from neighboring nodes will still be propagated on the
+              appropriate VC/VP.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfAisRdiDisable
+              variable."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 28 }
+
+    adGenCSMDirectionInputCdv OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide input Cell Delay Variation value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfInputCdv
+              variable."
+         DEFVAL { 1 }
+         ::= { adGenCSMDirectionOptionEntry 29 }
+
+    adGenCSMDirectionOutputCdv OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide output Cell Delay Variation value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfOutputCdv
+              variable."
+         DEFVAL { 1 }
+         ::= { adGenCSMDirectionOptionEntry 30 }
+
+    adGenCSMDirectionInputMaxCtd OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide input Maximum Cell Transfer Delay value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfInputMaxCtd
+              variable."
+         DEFVAL { 21 }
+         ::= { adGenCSMDirectionOptionEntry 31 }
+
+    adGenCSMDirectionOutputMaxCtd OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide output Maximum Cell Transfer Delay value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfOutputMaxCtd
+              variable."
+         DEFVAL { 21 }
+         ::= { adGenCSMDirectionOptionEntry 32 }
+
+    adGenCSMDirectionCbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide scheduling algorythm to use for the CBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfCbrClassScheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMDirectionOptionEntry 33 }
+
+    adGenCSMDirectionRtVbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide scheduling algorythm to use for the rtVBR class of
+              service.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfRtVbrClassSheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMDirectionOptionEntry 34 }
+
+    adGenCSMDirectionNrtVbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide scheduling algorythm to use for the nrtVBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfNrtVbrClassScheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMDirectionOptionEntry 35 }
+
+    adGenCSMDirectionUbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Direction-wide scheduling algorythm to use for the UBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMShelfUbrClassScheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect.
+
+              The UBR class can only be set to roundRobin or strictPriority"
+         DEFVAL { strictPriority }
+         ::= { adGenCSMDirectionOptionEntry 36 }
+
+    adGenCSMDirectionDefaultCDVTOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the default CDVT value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 37 }
+
+    adGenCSMDirectionAisRdiDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the AIS/RDI Disable value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 38 }
+
+    adGenCSMDirectionInputCdvOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Input CDV value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 39 }
+
+    adGenCSMDirectionOutputCdvOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Output CDV value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 40 }
+
+    adGenCSMDirectionInputMaxCtdOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Input Max CTD value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 41 }
+
+    adGenCSMDirectionOutputMaxCtdOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Output Max CTD value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 42 }
+
+    adGenCSMDirectionCbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the CBR Class Scheduling value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 43 }
+
+    adGenCSMDirectionRtVbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the rtVBR Class Scheduling value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 44 }
+
+    adGenCSMDirectionNrtVbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the nrtVBR Class Scheduling value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 45 }
+
+    adGenCSMDirectionUbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the UBR Class Scheduling value should
+              override the setting of the associated Shelf value."
+         DEFVAL { false }
+         ::= { adGenCSMDirectionOptionEntry 46 }
+
+     --
+     -- Port specific options
+     --
+     -- Per-Port options are inherited from the settings at the Direction
+     -- level for all variables if the associated override flag is false.
+     -- All variables are read-write if and only if the override flag is set
+     -- to true and the adGenCSMOptionMenuDisplayPort is true.  Otherwise, the
+     -- variables are read-only.  Some variables may also only be read-only
+     -- depending upon the setting of the adGenCSMOptionMenuLevel object
+     --
+
+     adGenCSMPortOptionTable    OBJECT-TYPE
+         SYNTAX         SEQUENCE OF AdGenCSMPortOptionEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+          "This table contains information on per-Port buffer, CAC,
+           and policing options."
+         ::= { adGenCSMOptionsExtension 18 }
+
+     adGenCSMPortOptionEntry    OBJECT-TYPE
+         SYNTAX         AdGenCSMPortOptionEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+          "This list contains per-Port buffer, CAC, and policing option
+           parameters."
+         INDEX  {ifIndex}
+         ::= { adGenCSMPortOptionTable 1 }
+
+     AdGenCSMPortOptionEntry   ::= SEQUENCE  {
+       adGenCSMPortPolicingDisable               TruthValue,
+       adGenCSMPortCellRateCACDisable            TruthValue,
+       adGenCSMPortBufferCACDisable              TruthValue,
+       adGenCSMPortCbrOverbooking                INTEGER,
+       adGenCSMPortRtVbrOverbooking              INTEGER,
+       adGenCSMPortNrtVbrOverbooking             INTEGER,
+       adGenCSMPortMaximumThreshold              INTEGER,
+       adGenCSMPortUbrMaxClp1Thrsh               INTEGER,
+       adGenCSMPortUbrMaxClp0Thrsh               INTEGER,
+       adGenCSMPortUbrMaxMaxThrsh                INTEGER,
+       adGenCSMPortUbrMaxFrameMultiplier         INTEGER,
+
+       adGenCSMPortPolicingDisableOverride       TruthValue,
+       adGenCSMPortCellRateCACDisableOverride    TruthValue,
+       adGenCSMPortBufferCACDisableOverride      TruthValue,
+       adGenCSMPortCbrOverbookingOverride        TruthValue,
+       adGenCSMPortRtVbrOverbookingOverride      TruthValue,
+       adGenCSMPortNrtVbrOverbookingOverride     TruthValue,
+       adGenCSMPortMaximumThresholdOverride      TruthValue,
+       adGenCSMPortUbrMaxClp1ThrshOverride       TruthValue,
+       adGenCSMPortUbrMaxClp0ThrshOverride       TruthValue,
+       adGenCSMPortUbrMaxMaxThrshOverride        TruthValue,
+       adGenCSMPortUbrMaxFrameMultiplierOverride TruthValue,
+
+       adGenCSMPortDefaultCDVT                   Unsigned32,
+       adGenCSMPortAisRdiDisable                 TruthValue,
+       adGenCSMPortInputCdv                      Unsigned32,
+       adGenCSMPortOutputCdv                     Unsigned32,
+       adGenCSMPortInputMaxCtd                   Unsigned32,
+       adGenCSMPortOutputMaxCtd                  Unsigned32,
+       adGenCSMPortCbrClassScheduling            AdGenCSMClassScheduling,
+       adGenCSMPortRtVbrClassScheduling          AdGenCSMClassScheduling,
+       adGenCSMPortNrtVbrClassScheduling         AdGenCSMClassScheduling,
+       adGenCSMPortUbrClassScheduling            AdGenCSMClassScheduling,
+
+       adGenCSMPortDefaultCDVTOverride           TruthValue,
+       adGenCSMPortAisRdiDisableOverride         TruthValue,
+       adGenCSMPortInputCdvOverride              TruthValue,
+       adGenCSMPortOutputCdvOverride             TruthValue,
+       adGenCSMPortInputMaxCtdOverride           TruthValue,
+       adGenCSMPortOutputMaxCtdOverride          TruthValue,
+       adGenCSMPortCbrClassSchedulingOverride    TruthValue,
+       adGenCSMPortRtVbrClassSchedulingOverride  TruthValue,
+       adGenCSMPortNrtVbrClassSchedulingOverride TruthValue,
+       adGenCSMPortUbrClassSchedulingOverride    TruthValue
+                    }
+
+    adGenCSMPortPolicingDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if ingress policing should be disabled for
+              this port if the associated Port override flag is
+              set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionPolicingDisable variable."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 1 }
+
+    adGenCSMPortCellRateCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to Cell Rate calculations
+              should be disabled if the associated port override flag is
+              set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionCellRateCACDisable variable.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 2 }
+
+    adGenCSMPortBufferCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to buffer threshold
+              calculations should be disabled if the associated port
+              override flag is set to true.  If the override flag is set to
+              false, then this value is read-only and is inherited from the
+              setting of the adGenCSMDirectionBufferCACDisable variable.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { true }
+         ::= { adGenCSMPortOptionEntry 3 }
+
+    adGenCSMPortCbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific overbooking/oversubscription percentage for
+              the CBR traffic class if the associated ort override flag
+              is set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionCbrOverbooking variable.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMPortOptionEntry 4 }
+
+    adGenCSMPortRtVbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific overbooking/oversubscription percentage for
+              the rtVBR traffic class if the associated ort override flag
+              is set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionRtVbrOverbooking variable.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMPortOptionEntry 5 }
+
+    adGenCSMPortNrtVbrOverbooking OBJECT-TYPE
+         SYNTAX         INTEGER  (1..32767)
+         UNITS          "percent"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific overbooking/oversubscription percentage for
+              the nrtVBR traffic class if the associated port override flag
+              is set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionNrtVbrOverbooking variable.
+
+              Changing the overbooking value will not affect any VC or VP
+              cross connects that are currently in the 'active' state.  These
+              VC/VP cross Connects will continue to use the overbooking rate
+              that was in effect when the VC/VP cross connect was made active.
+              The new overbooking value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted."
+         DEFVAL { 100 }
+         ::= { adGenCSMPortOptionEntry 6 }
+
+    adGenCSMPortMaximumThreshold OBJECT-TYPE
+         SYNTAX         INTEGER  (1..262143)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific setting that controls the maximum value that
+              the Port Cell Buffer Maximum Threshold register can contain.
+              class.  A user may wish to modify this value for both for a port
+              to limit the maximum number of cells for all traffic classes
+              that may be queued at one time for egress on the specific port.
+              If the override flag is set to false, then this value is
+              read-only and is inherited from the setting of the
+              adGenCSMDirectionMaximumThreshold variable."
+         DEFVAL { 131072 }
+         ::= { adGenCSMPortOptionEntry 7 }
+
+    adGenCSMPortUbrMaxClp1Thrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific maximum CLP-1 Cell Buffer Theshold the UBR
+              traffic class if the associated port override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionUbrMaxClp1Thrsh variable."
+         DEFVAL { 32 }
+         ::= { adGenCSMPortOptionEntry 8 }
+
+    adGenCSMPortUbrMaxClp0Thrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific maximum CLP-0 Cell Buffer Theshold the UBR
+              traffic class if the associated port override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionUbrMaxClp0Thrsh variable."
+         DEFVAL { 512 }
+         ::= { adGenCSMPortOptionEntry 9 }
+
+    adGenCSMPortUbrMaxMaxThrsh OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific maximum max Cell Buffer Theshold the UBR
+              traffic class if the associated port override flag is set
+              to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMDirectionUbrMaxMaxThrsh variable."
+         DEFVAL { 544 }
+         ::= { adGenCSMPortOptionEntry 10 }
+
+    adGenCSMPortUbrMaxFrameMultiplier OBJECT-TYPE
+         SYNTAX         INTEGER  (1..8191)
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port specific multiplier to use for the UBR traffic class to
+              use when determining the CLP-0 threshold if the associated
+              port override flag is set to true.  If the override flag is
+              set to false, then this value is read-only and is inherited from
+              the setting of the adGenCSMDirectionUbrMaxMaxThrsh variable."
+         DEFVAL { 4 }
+         ::= { adGenCSMPortOptionEntry 11 }
+
+    adGenCSMPortPolicingDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Port Policing Disable value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 12 }
+
+    adGenCSMPortCellRateCACDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Cell Rate CAC Disable value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 13 }
+
+    adGenCSMPortBufferCACDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Buffer CAC Disable value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 14 }
+
+    adGenCSMPortCbrOverbookingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CBR Overbooking value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 15 }
+
+    adGenCSMPortRtVbrOverbookingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if rtVBR Overbooking value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 16 }
+
+    adGenCSMPortNrtVbrOverbookingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if nrtVBR Overbooking value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 17 }
+
+    adGenCSMPortMaximumThresholdOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if maximum buffer threshold value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 18 }
+
+    adGenCSMPortUbrMaxClp1ThrshOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR Maximum CLP-0 buffer threshold value
+              should override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 19 }
+
+    adGenCSMPortUbrMaxClp0ThrshOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR Maximum CLP-1 buffer threshold value
+              should override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 20 }
+
+    adGenCSMPortUbrMaxMaxThrshOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR Maximum max buffer threshold value
+              should override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 21 }
+
+    adGenCSMPortUbrMaxFrameMultiplierOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if UBR frame multiplyer value should override
+              the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 22 }
+
+    adGenCSMPortDefaultCDVT OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "100 nanoseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide default input CDVT setting.  If this value is non-zero
+              and the traffic descriptor for does not explicitly state a
+              CDVT value, this value is used as the 'implied' CDVT.  If this
+              value is zero, a calculated valued based on the PCR of the
+              Traffic descriptor is used instead.  Currently, this calculated
+              value is 100 * PCR of the circuit being admitted.
+
+              Changing the default input CDVT value will not affect any VC or
+              VP cross connects that are currently in the 'active' state.
+              These VC/VP cross Connects will continue to use the CDVT value
+              that was in effect when the VC/VP cross connect was made active.
+              The new input CDVT value will be used on these VC/VP cross
+              connects the next time they are placed in a notInService state
+              or the CSM is rebooted.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionDefaultCDVT
+              variable."
+         DEFVAL { 0 }
+         ::= { adGenCSMPortOptionEntry 23 }
+
+    adGenCSMPortAisRdiDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide flag indicating if AIS/RDI events should be
+              generated on VC/VPs by the CSM when an out-of-cell delineation
+              event occurs.  If AIS/RDI is disabled, AIS/RDI cells received
+              from neighboring nodes will still be propagated on the
+              appropriate VC/VP.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionAisRdiDisable
+              variable."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 24 }
+
+    adGenCSMPortInputCdv OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide input Cell Delay Variation value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionInputCdv
+              variable."
+         DEFVAL { 1 }
+         ::= { adGenCSMPortOptionEntry 25 }
+
+    adGenCSMPortOutputCdv OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide output Cell Delay Variation value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionOutputCdv
+              variable."
+         DEFVAL { 1 }
+         ::= { adGenCSMPortOptionEntry 26 }
+
+    adGenCSMPortInputMaxCtd OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide input Maximum Cell Transfer Delay value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionInputMaxCtd
+              variable."
+         DEFVAL { 21 }
+         ::= { adGenCSMPortOptionEntry 27 }
+
+    adGenCSMPortOutputMaxCtd OBJECT-TYPE
+         SYNTAX         Unsigned32
+         UNITS          "microseconds"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide output Maximum Cell Transfer Delay value for ports.
+              Typically this value is only useful if Signaling/PNNI is
+              enabled on the system.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionMaxCtd
+              variable."
+         DEFVAL { 21 }
+         ::= { adGenCSMPortOptionEntry 28 }
+
+    adGenCSMPortCbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide scheduling algorythm to use for the CBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionCbrClassSheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMPortOptionEntry 29 }
+
+    adGenCSMPortRtVbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide scheduling algorythm to use for the rtVBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionRtVbrClassScheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMPortOptionEntry 30 }
+
+    adGenCSMPortNrtVbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide scheduling algorythm to use for the nrtVBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionNrtVbrClassSheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect."
+         DEFVAL { modifiedStrictPriority }
+         ::= { adGenCSMPortOptionEntry 31 }
+
+    adGenCSMPortUbrClassScheduling OBJECT-TYPE
+         SYNTAX         AdGenCSMClassScheduling
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Port-wide scheduling algorythm to use for the UBR class of
+              service.
+
+              If the override flag is set to false, then this value is read-only
+              and is inherited from the setting of the adGenCSMDirectionUbrClassScheduling
+              variable.  Changing the scheduling algorythms is a significant event
+              and requires a restart of the CSM to take effect.
+
+              The UBR class can only be set to roundRobin or strictPriority"
+         DEFVAL { strictPriority }
+         ::= { adGenCSMPortOptionEntry 32 }
+
+    adGenCSMPortDefaultCDVTOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the default CDVT value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 33 }
+
+    adGenCSMPortAisRdiDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the AIS/RDI Disable value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 34 }
+
+    adGenCSMPortInputCdvOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Input CDV value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 35 }
+
+    adGenCSMPortOutputCdvOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Output CDV value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 36 }
+
+    adGenCSMPortInputMaxCtdOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Input Max CTD value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 37 }
+
+    adGenCSMPortOutputMaxCtdOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the Output Max CTD value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 38 }
+
+    adGenCSMPortCbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the CBR Class Scheduling value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 39 }
+
+    adGenCSMPortRtVbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the rtVBR Class Scheduling value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 40 }
+
+    adGenCSMPortNrtVbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the nrtVBR Class Scheduling value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 41 }
+
+    adGenCSMPortUbrClassSchedulingOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if the UBR Class Scheduling value should
+              override the setting of the associated Direction value."
+         DEFVAL { false }
+         ::= { adGenCSMPortOptionEntry 42 }
+
+     --
+     -- Class specific options
+     --
+     -- Per-class options are inherited from the settings at the port level
+     -- for all variables if the associated override flag is false.  Note that
+     -- each port has its own set of per-class options.
+     --
+     -- All variables are read-write if and only if the override flag is set
+     -- to true and the adGenCSMOptionMenuDisplayClass is true.  Otherwise, the
+     -- variables are read-only.  Some variables may also only be read-only
+     -- depending upon the setting of the adGenCSMOptionMenuLevel object
+     --
+     -- Only cbr, rtVbr, nrtVbr, and ubr classes are supported at this time.
+     --
+
+     adGenCSMClassOptionTable    OBJECT-TYPE
+         SYNTAX         SEQUENCE OF AdGenCSMClassOptionEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+          "This table contains information on per-class buffer, CAC,
+           and policing options."
+         ::= { adGenCSMOptionsExtension 19 }
+
+     adGenCSMClassOptionEntry    OBJECT-TYPE
+         SYNTAX         AdGenCSMClassOptionEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+          "This list contains per-Class buffer, CAC, and policing option
+           parameters.  Only cbr, rtVbr, nrtVbr, and ubr classes are
+           supported at this time."
+         INDEX  {ifIndex,
+                 adGenAtmServiceCategory}
+         ::= { adGenCSMClassOptionTable 1 }
+
+    AdGenCSMClassOptionEntry   ::= SEQUENCE  {
+       adGenAtmServiceCategory                    AtmServiceCategory,
+       adGenCSMClassPolicingDisable               TruthValue,
+       adGenCSMClassCellRateCACDisable            TruthValue,
+       adGenCSMClassBufferCACDisable              TruthValue,
+       adGenCSMClassMaximumThreshold              INTEGER,
+
+       adGenCSMClassPolicingDisableOverride       TruthValue,
+       adGenCSMClassCellRateCACDisableOverride    TruthValue,
+       adGenCSMClassBufferCACDisableOverride      TruthValue,
+       adGenCSMClassMaximumThresholdOverride      TruthValue
+                    }
+
+    adGenAtmServiceCategory OBJECT-TYPE
+         SYNTAX         AtmServiceCategory
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION
+             "Index of valid service categories."
+         ::= { adGenCSMClassOptionEntry 1 }
+
+    adGenCSMClassPolicingDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if ingress policing should be disabled for
+              this class if the associated Class override flag is
+              set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMPortPolicingDisable variable."
+         DEFVAL { false }
+         ::= { adGenCSMClassOptionEntry 2 }
+
+    adGenCSMClassCellRateCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to Cell Rate calculations
+              should be disabled if the associated class override flag is
+              set to true.  If the override flag is set to false, then this
+              value is read-only and is inherited from the setting of the
+              adGenCSMPortCellRateCACDisable variable.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { false }
+         ::= { adGenCSMClassOptionEntry 3 }
+
+    adGenCSMClassBufferCACDisable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if CAC failures due to buffer threshold
+              calculations should be disabled if the associated class
+              override flag is set to true.  If the override flag is set to
+              false, then this value is read-only and is inherited from the
+              setting of the adGenCSMPortBufferCACDisable variable.
+
+              For VC or VP cross connects already in the 'active' state, CAC
+              has already taken place and modifying this objects value will
+              not force CAC to run again on these VC/VP cross connects unless
+              they are set to a notInService state and then set to 'active'
+              or if a CSM reboot is performed."
+         DEFVAL { true }
+         ::= { adGenCSMClassOptionEntry 4 }
+
+    adGenCSMClassMaximumThreshold OBJECT-TYPE
+         SYNTAX         INTEGER  (1..262143)
+         UNITS          "cells"
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Class specific setting that controls the maximum value that
+              the Class Cell Buffer Maximum Threshold register can contain.
+              class.  A user may wish to modify this value for both for a class
+              to limit the maximum number of cells for a given traffic class
+              an a specific port that may be queued at one time for egress
+              on the specific class.  If the override flag is set to false,
+              then this value is read-only and is inherited from the setting
+              of the adGenCSMPortClassMaximumThreshold variable."
+         DEFVAL { 8091 }
+         ::= { adGenCSMClassOptionEntry 5 }
+
+    adGenCSMClassPolicingDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Class Policing Disable value should
+              override the setting of the associated Port value."
+         DEFVAL { false }
+         ::= { adGenCSMClassOptionEntry 6 }
+
+    adGenCSMClassCellRateCACDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Cell Rate CAC Disable value should
+              override the setting of the associated Port value."
+         DEFVAL { false }
+         ::= { adGenCSMClassOptionEntry 7 }
+
+    adGenCSMClassBufferCACDisableOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if Buffer CAC Disable value should
+              override the setting of the associated Port value."
+         DEFVAL { false }
+         ::= { adGenCSMClassOptionEntry 8 }
+
+    adGenCSMClassMaximumThresholdOverride OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Flag indicating if maximum buffer threshold value should
+              override the setting of the associated Port value."
+         DEFVAL { false }
+         ::= { adGenCSMClassOptionEntry 9 }
+
+    --
+    -- The CSM ATM VPL Extensions
+    --
+
+    adGenCSMVplTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVplEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM VPL Table contains vendor specific extensions to
+        the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 4 }
+
+    adGenCSMVplEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVplEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Circuit Link (VPL) associated
+              parameters and statistics."
+          INDEX { ifIndex, atmVplVpi }
+          ::= { adGenCSMVplTable 1 }
+
+     AdGenCSMVplEntry ::= SEQUENCE {
+         adGenCSMVplDisableAisRdiGeneration   TruthValue,
+         adGenCSMVplDisablePolicing           TruthValue,
+         adGenCSMVplDisableCAC                TruthValue,
+         adGenCSMVplResetATMStats             INTEGER,
+         adGenCSMVplTxCells                   Counter32,
+         adGenCSMVplRxCells                   Counter32,
+         adGenCSMVplRxOamCells                Counter32,
+         adGenCSMVplDiscardedClp0Cells        Counter32,
+         adGenCSMVplDiscardedClp01Cells       Counter32,
+         adGenCSMVplTaggedClp0Cells           Counter32,
+         adGenCSMVplAisStateActive            TruthValue,
+         adGenCSMVplRdiStateActive            TruthValue,
+         adGenCSMVplLastE2EAisOamId           AdGenCsmOamIdv2,
+         adGenCSMVplTxOamLpbkReq              Counter32,
+         adGenCSMVplTxOamLpbkRsp              Counter32,
+         adGenCSMVplRxOamLpbkReq              Counter32,
+         adGenCSMVplRxOamLpbkRsp              Counter32,
+         adGenCSMVplOamLpbkPassed             Counter32,
+         adGenCSMVplOamLpbkFailed             Counter32,
+         adGenCSMVplLoopbackEnable            TruthValue,
+         adGenCSMVplInfo                      OCTET STRING,
+         adGenCSMVplLastError                 DisplayString,
+         adGenCSMVplAal5EncapsType            INTEGER
+     }
+
+     adGenCSMVplDisableAisRdiGeneration OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "When this entry is true(1), the VPL endpoint will not generate an
+              AIS or RDI OAM cell when cell delination is lost on the port that
+              ifIndex refers too.  Note that received AIS/RDI cells will be
+              forwarded by this endpoint."
+         ::= { adGenCSMVplEntry 1 }
+
+     adGenCSMVplDisablePolicing OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "When this entry is true(1), the VPL endpoint will not perform
+              policing on the VPL's cells that are received on the port that
+              ifIndex refers too."
+         ::= { adGenCSMVplEntry 2 }
+
+     adGenCSMVplDisableCAC OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "When this entry is true(1), the VPL endpoint will not perform
+              policing on the VPL's cells that are received on the port that
+              ifIndex refers too."
+         ::= { adGenCSMVplEntry 3 }
+
+    adGenCSMVplResetATMStats    OBJECT-TYPE
+        SYNTAX          INTEGER {
+                                    reset(1)
+                                }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+        "Set will reset atms stats on the VPL, Gets will return 1"
+        ::= { adGenCSMVplEntry 4 }
+
+     adGenCSMVplTxCells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells transmitted on this VPL."
+         ::= { adGenCSMVplEntry 5 }
+
+     adGenCSMVplRxCells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells received on this VPL."
+         ::= { adGenCSMVplEntry 6 }
+
+     adGenCSMVplRxOamCells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of OAM cells successfully received on this VPL."
+         ::= { adGenCSMVplEntry 7 }
+
+     adGenCSMVplDiscardedClp0Cells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells with CLP=0 that were received by
+             this VPL and were discarded due to being deemed non-conformant to
+             the contracted QOS requirements of the VPL."
+         ::= { adGenCSMVplEntry 8 }
+
+     adGenCSMVplDiscardedClp01Cells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells with CLP=0 and CLP=1 that were
+             received by this VPL and were discarded due to being deemed
+             non-conformant to the contracted QOS requirements of the VPL."
+         ::= { adGenCSMVplEntry 9 }
+
+     adGenCSMVplTaggedClp0Cells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells with CLP=0 that were received by
+             this VPL and were tagged (but not discarded) due to being deemed
+             non-conformant to the contracted QOS requirements of the VPL."
+         ::= { adGenCSMVplEntry 10 }
+
+     adGenCSMVplAisStateActive OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Indicates if this VPL is current sending AIS cells toward any
+             other VPL that belongs to the same VC Cross connect.  To determine
+             if this VPL is forwarding a received AIS cell, or if it generating
+             an AIS cell, examine the cell delineation state of the port that
+             is referred to by ifIndex."
+         ::= { adGenCSMVplEntry 11 }
+
+     adGenCSMVplRdiStateActive OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Indicates if this VPL is current sending RDI cells toward any
+             other VPL that belongs to the same VC Cross connect.  To determine
+             if this VPL is forwarding a received AIS cell, or if it generating
+             an RDI cell, examine the cell delineation state of the port that
+             is referred to by ifIndex."
+         ::= { adGenCSMVplEntry 12 }
+
+     adGenCSMVplLastE2EAisOamId OBJECT-TYPE
+         SYNTAX         AdGenCsmOamIdv2
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "This field contains the OAM location ID of the last End-to-End
+             AIS OAM cell on this endpoint.  The OAM location ID field within
+             and AIS cell is an optional feature that not all ATM switches and
+             hosts support.  If the feature is not supported by the ATM node
+             that is originating the end-to-end AIS cells, the OAM location ID
+             will often be composed of 16 octets of 0x6A.  If the endpoint has
+             never received an AIS cell, then this field will be composed of
+             16 octets of 0x00."
+         ::= { adGenCSMVplEntry 13 }
+
+     adGenCSMVplTxOamLpbkReq OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Tx OAM Loopback request on this VPL."
+         ::= { adGenCSMVplEntry 14 }
+
+     adGenCSMVplTxOamLpbkRsp OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Tx OAM Loopback response on this VPL."
+         ::= { adGenCSMVplEntry 15 }
+
+     adGenCSMVplRxOamLpbkReq OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Rx OAM Loopback request on this VPL."
+         ::= { adGenCSMVplEntry 16 }
+
+     adGenCSMVplRxOamLpbkRsp OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Rx OAM Loopback response on this VPL."
+         ::= { adGenCSMVplEntry 17 }
+
+     adGenCSMVplOamLpbkPassed OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Passed attempts for OAM Loopback on this VPL."
+         ::= { adGenCSMVplEntry 18 }
+
+     adGenCSMVplOamLpbkFailed OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Failed attempts for OAM Loopback on this VPL."
+         ::= { adGenCSMVplEntry 19 }
+
+     adGenCSMVplLoopbackEnable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "This object can be used to enable (true) or disable (false)
+              data loopback at the ATM cell level on the specified VPL.  The
+              VPL must be active and part of a Virtual Path cross-connect in
+              order for this flag to be set.  The Virtual Path cross-connect
+              does not have to be in the active state.
+
+              For the TA3000 CSM, enabling VPL level loopback on a Virtual
+              Path cross-connect will also enable loopback on all other VPL
+              endpoints of the cross connect."
+         ::= { adGenCSMVplEntry 20 }
+
+     adGenCSMVplInfo OBJECT-TYPE
+         SYNTAX         OCTET STRING (SIZE (0..32))
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "octet string that contains the following :
+              TxTDIndex(4 BYTES).RxTDIndex(4 BYTES).VplLoopbackStatus(4 BYTES).VplRowStatus(4 BYTES)"
+         ::= { adGenCSMVplEntry 21 }   
+         
+     adGenCSMVplLastError OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Error message explaining why the VPL is not operational.  Operational
+              VPLs should contain an empty string."
+         ::= { adGenCSMVplEntry 22 }
+
+     adGenCSMVplAal5EncapsType  OBJECT-TYPE
+          SYNTAX         INTEGER {
+                         vcMultiplexRoutedProtocol(1),
+                         vcMultiplexBridgedProtocol8023(2),
+                         vcMultiplexBridgedProtocol8025(3),
+                         vcMultiplexBridgedProtocol8026(4),
+                         vcMultiplexLANemulation8023(5),
+                         vcMultiplexLANemulation8025(6),
+                         llcEncapsulation(7),
+                         multiprotocolFrameRelaySscs(8),
+                         other(9),
+                         unknown(10),
+
+                          -- Additions to RFC 2515 enumerations (atmVccAal5EncapsType)
+                         vcMultiplexPppoa(11),           -- PPPoA
+                         llcEncapsulatedPppoa(12),       -- PPPoA, no SNAP header
+                         llcEncapsulatedAutoDiscover(13)
+                            }
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+            "The enumeration maps exactly to those used for atmVccAal5EncapsType
+            in RFC 2515 except that additions are added to the end. However, the 
+            types here reflect a VPL's Encapsulation type.  The atmVplTable doesn't
+            list anything like this so it needed to be created here"
+          DEFVAL { vcMultiplexBridgedProtocol8023 }
+         ::= { adGenCSMVplEntry 23 }
+
+    --
+    -- The CSM ATM VCL Extensions
+    --
+
+    adGenCSMVclTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVclEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM VCL Table contains vendor specific extensions to
+        the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 5 }
+
+    adGenCSMVclEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVclEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Circuit Link (VCL) associated
+              parameters and statistics."
+          INDEX { ifIndex, atmVclVpi, atmVclVci }
+          ::= { adGenCSMVclTable 1 }
+
+     AdGenCSMVclEntry ::= SEQUENCE {
+         adGenCSMVclDisableAisRdiGeneration   TruthValue,
+         adGenCSMVclDisablePolicing           TruthValue,
+         adGenCSMVclDisableCAC                TruthValue,
+         adGenCSMVclResetATMStats             INTEGER,
+         adGenCSMVclTxCells                   Counter32,
+         adGenCSMVclRxCells                   Counter32,
+         adGenCSMVclRxOamCells                Counter32,
+         adGenCSMVclDiscardedClp0Cells        Counter32,
+         adGenCSMVclDiscardedClp01Cells       Counter32,
+         adGenCSMVclTaggedClp0Cells           Counter32,
+         adGenCSMVclAisStateActive            TruthValue,
+         adGenCSMVclRdiStateActive            TruthValue,
+         adGenCSMVclLastE2EAisOamId           AdGenCsmOamIdv2,
+         adGenCSMVclTxOamLpbkReq              Counter32,
+         adGenCSMVclTxOamLpbkRsp              Counter32,
+         adGenCSMVclRxOamLpbkReq              Counter32,
+         adGenCSMVclRxOamLpbkRsp              Counter32,
+         adGenCSMVclOamLpbkPassed             Counter32,
+         adGenCSMVclOamLpbkFailed             Counter32,
+         adGenCSMVclLoopbackEnable            TruthValue,
+         adGenCSMVclInfo                      OCTET STRING,
+         adGenCSMVclLastError                 DisplayString,
+         adGenCSMVclAal5EncapsType            INTEGER,
+         adGenCSMSubInterfaceIndex            Integer32
+     }
+
+     adGenCSMVclDisableAisRdiGeneration OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "When this entry is true(1), the VCL endpoint will not generate an
+              AIS or RDI OAM cell when cell delination is lost on the port that
+              ifIndex refers too.  Note that received AIS/RDI cells will be
+              forwarded by this endpoint."
+         ::= { adGenCSMVclEntry 1 }
+
+     adGenCSMVclDisablePolicing OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "When this entry is true(1), the VCL endpoint will not perform
+              policing on the VCL's cells that are received on the port that
+              ifIndex refers too."
+         ::= { adGenCSMVclEntry 2 }
+
+     adGenCSMVclDisableCAC OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "When this entry is true(1), the VCL endpoint will not perform
+              policing on the VCL's cells that are received on the port that
+              ifIndex refers too."
+         ::= { adGenCSMVclEntry 3 }
+
+    adGenCSMVclResetATMStats    OBJECT-TYPE
+        SYNTAX          INTEGER {
+                                    reset(1)
+                                }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+        "Set will reset atms stats on the VCL, Gets will return 1"
+        ::= { adGenCSMVclEntry 4 }
+
+     adGenCSMVclTxCells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells transmitted on this VCL."
+         ::= { adGenCSMVclEntry 5 }
+
+     adGenCSMVclRxCells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells received on this VCL."
+         ::= { adGenCSMVclEntry 6 }
+
+     adGenCSMVclRxOamCells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of OAM cells successfully received on this VCL."
+         ::= { adGenCSMVclEntry 7 }
+
+     adGenCSMVclDiscardedClp0Cells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells with CLP=0 that were received by
+             this VCL and were discarded due to being deemed non-conformant to
+             the contracted QOS requirements of the VCL."
+         ::= { adGenCSMVclEntry 8 }
+
+     adGenCSMVclDiscardedClp01Cells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells with CLP=0 and CLP=1 that were
+             received by this VCL and were discarded due to being deemed
+             non-conformant to the contracted QOS requirements of the VCL."
+         ::= { adGenCSMVclEntry 9 }
+
+     adGenCSMVclTaggedClp0Cells OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of User and OAM cells with CLP=0 that were received by
+             this VCL and were tagged (but not discarded) due to being deemed
+             non-conformant to the contracted QOS requirements of the VCL."
+         ::= { adGenCSMVclEntry 10 }
+
+     adGenCSMVclAisStateActive OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Indicates if this VCL is current sending AIS cells toward any
+             other VCL that belongs to the same VC Cross connect.  To determine
+             if this VCL is forwarding a received AIS cell, or if it generating
+             an AIS cell, examine the cell delineation state of the port that
+             is referred to by ifIndex."
+         ::= { adGenCSMVclEntry 11 }
+
+     adGenCSMVclRdiStateActive OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Indicates if this VCL is current sending RDI cells toward any
+             other VCL that belongs to the same VC Cross connect.  To determine
+             if this VCL is forwarding a received AIS cell, or if it generating
+             an RDI cell, examine the cell delineation state of the port that
+             is referred to by ifIndex."
+         ::= { adGenCSMVclEntry 12 }
+
+     adGenCSMVclLastE2EAisOamId OBJECT-TYPE
+         SYNTAX         AdGenCsmOamIdv2
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "This field contains the OAM location ID of the last End-to-End
+             AIS OAM cell on this endpoint.  The OAM location ID field within
+             and AIS cell is an optional feature that not all ATM switches and
+             hosts support.  If the feature is not supported by the ATM node
+             that is originating the end-to-end AIS cells, the OAM location ID
+             will often be composed of 16 octets of 0x6A.  If the endpoint has
+             never received an AIS cell, then this field will be composed of
+             16 octets of 0x00."
+         ::= { adGenCSMVclEntry 13 }
+
+     adGenCSMVclTxOamLpbkReq OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Tx OAM Loopback request on this VCL."
+         ::= { adGenCSMVclEntry 14 }
+
+     adGenCSMVclTxOamLpbkRsp OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Tx OAM Loopback response on this VCL."
+         ::= { adGenCSMVclEntry 15 }
+
+     adGenCSMVclRxOamLpbkReq OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Rx OAM Loopback request on this VCL."
+         ::= { adGenCSMVclEntry 16 }
+
+     adGenCSMVclRxOamLpbkRsp OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Rx OAM Loopback response on this VCL."
+         ::= { adGenCSMVclEntry 17 }
+
+     adGenCSMVclOamLpbkPassed OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Passed attempts for OAM Loopback on this VCL."
+         ::= { adGenCSMVclEntry 18 }
+
+     adGenCSMVclOamLpbkFailed OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "The number of Failed attempts for OAM Loopback on this VCL."
+         ::= { adGenCSMVclEntry 19 }
+
+     adGenCSMVclLoopbackEnable OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "This object can be used to enable (true) or disable (false)
+              data loopback at the ATM cell level on the specified VCL.  The
+              VCL must be active and part of a Virtual Circuit cross-connect in
+              order for this flag to be set.  The Virtual Circuit cross-connect
+              does not have to be in the active state.
+
+              For the TA3000 CSM, enabling VCL level loopback on a Virtual
+              Circuit cross-connect will also enable loopback on all other VCL
+              endpoints of the cross connect."
+         ::= { adGenCSMVclEntry 20 }
+
+     adGenCSMVclInfo OBJECT-TYPE
+         SYNTAX         OCTET STRING (SIZE (0..32))
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "octet string that contains the following :
+              TxTDIndex(4 BYTES).RxTDIndex(4 BYTES).VclLoopbackStatus(4 BYTES).VclRowStatus(4 BYTES)"
+         ::= { adGenCSMVclEntry 21 }
+
+     adGenCSMVclLastError OBJECT-TYPE
+         SYNTAX         DisplayString
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Error message explaining why the VCL is not operational.  Operational
+              VCLs should contain an empty string."
+         ::= { adGenCSMVclEntry 22 }
+
+     adGenCSMVclAal5EncapsType  OBJECT-TYPE
+          SYNTAX         INTEGER {
+                         vcMultiplexRoutedProtocol(1),
+                         vcMultiplexBridgedProtocol8023(2),
+                         vcMultiplexBridgedProtocol8025(3),
+                         vcMultiplexBridgedProtocol8026(4),
+                         vcMultiplexLANemulation8023(5),
+                         vcMultiplexLANemulation8025(6),
+                         llcEncapsulation(7),
+                         multiprotocolFrameRelaySscs(8),
+                         other(9),
+                         unknown(10),
+
+                          -- Additions to RFC 2515 enumerations (atmVccAal5EncapsType)
+                         vcMultiplexPppoa(11),           -- PPPoA
+                         llcEncapsulatedPppoa(12),       -- PPPoA, no SNAP header
+                         llcEncapsulatedAutoDiscover(13)
+                            }
+          MAX-ACCESS     read-write
+          STATUS         current
+          DESCRIPTION
+            "The enumeration maps exactly to those used for atmVccAal5EncapsType
+            in RFC 2515 except that additions are added to the end.  If the value
+            of this object is one of the added enumerations, atmVccAal5EncapsType
+            will return a value of 'other'.  Otherwise the two objects can be
+            used interchangeably."
+          DEFVAL { vcMultiplexBridgedProtocol8023 }
+         ::= { adGenCSMVclEntry 23 }
+
+	adGenCSMSubInterfaceIndex  OBJECT-TYPE
+          SYNTAX         Integer32
+          MAX-ACCESS     read-only
+          STATUS         current
+          DESCRIPTION
+            "This index specificies the sub interface index associated with this VCL.
+             The CLI is indexed by interface.sub while the ATM VCL table is indexed
+             by interface.vpi.vci."
+         ::= { adGenCSMVclEntry 24 }
+    --
+    -- The CSM ATM VCCC/VPCC Name lookup Extensions
+    --
+
+    adGenCSMCcNameLookupTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMCcNameLookupEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The ADTRAN CSM ATM Cross-Connect Name Lookup Table a method
+         to look up VC or VP Cross-connects (PVC, SPVC, SVC, PVP,
+         SPVP, or SVP) by name.  During the name lookup process names
+         are treated as case-insensitive.  Cross connects that do not
+         have a name cannot be searched for through this table since
+         multiple matches could occur.
+
+         Due to the complexity of the search, only the Vccc (PVC) table
+         will return valid values to GetNext requests."
+        ::={ adGenCSMAtmExtension 6 }
+
+    adGenCSMCcNameLookupEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMCcNameLookupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "Currently, only the index exists as an entry to this table.
+               This allows the ADTRAN EMS to perform a PVC/PVP lookup based
+               on a name."
+          INDEX { adGenCSMCcName }
+          ::= { adGenCSMCcNameLookupTable 1 }
+
+    AdGenCSMCcNameLookupEntry ::= SEQUENCE {
+        adGenCSMCcName         DisplayString,
+        adGenCSMCcFindIndex    INTEGER
+    }
+
+    adGenCSMCcName OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Display name of the the PVC, SPVC, SVC, PVP, SPVP, or SVP
+             that is the index to the rows of this table."
+       ::={ adGenCSMCcNameLookupEntry 1 }
+
+    adGenCSMCcFindIndex OBJECT-TYPE
+        SYNTAX      INTEGER (1..2147483647)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of this object identifies the Vc (or Vp) Cross-
+             Connect Index to the PVC, SPVC, SVC, PVP, SPVP, or SVP with
+             the name supplied as an index."
+       ::={ adGenCSMCcNameLookupEntry 2 }
+
+    --
+    -- The CSM ATM Traffic Descriptor Name lookup Extensions
+    --
+
+    adGenCSMTdNameLookupTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMTdNameLookupEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The ADTRAN CSM ATM Traffic Descriptor Name Lookup Table a method
+         to look up traffic descriptors by name.  During the name lookup
+         process names are treated as case-insensitive.  Traffic Descriptors
+         that do not have a name cannot be searched for through this table
+         since multiple matches could occur."
+        ::={ adGenCSMAtmExtension 7 }
+
+    adGenCSMTdNameLookupEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMTdNameLookupEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "Currently, only the index exists as an entry to this table.
+               This allows the ADTRAN EMS to perform a TD lookup based
+               on a name."
+          INDEX { adGenCSMTdName }
+          ::= { adGenCSMTdNameLookupTable 1 }
+
+    AdGenCSMTdNameLookupEntry ::= SEQUENCE {
+        adGenCSMTdName         DisplayString,
+        adGenCSMTdFindIndex    AtmTrafficDescrParamIndex
+    }
+
+    adGenCSMTdName OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Display name of the the Traffic Descriptor that is the index to
+             the rows of this table."
+       ::={ adGenCSMTdNameLookupEntry 1 }
+
+    adGenCSMTdFindIndex OBJECT-TYPE
+        SYNTAX      AtmTrafficDescrParamIndex
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of this object identifies the traffic descriptor
+             index corresponding to the name supplied as an index to this row."
+       ::={ adGenCSMTdNameLookupEntry 2 }
+
+    --
+    -- The CSM ATM Cross-connect last change entries
+    --
+
+    adGenCsmPvpLastChange OBJECT-TYPE
+        SYNTAX      TimeTicks
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of sysUpTime at the time of the last creation, deletion,
+             or change to/from an enabled state for a PVP (non-switched) entry
+             in the atmVpCrossConnectTable."
+       ::={ adGenCSMAtmExtension 8 }
+
+    adGenCsmSvpLastChange OBJECT-TYPE
+        SYNTAX      TimeTicks
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of sysUpTime at the time of the last creation, deletion,
+             or change to/from an enabled state for a SPVP or SVP (switched) entry
+             in the atmVpCrossConnectTable."
+       ::={ adGenCSMAtmExtension 9 }
+
+    adGenCsmPvcLastChange OBJECT-TYPE
+        SYNTAX      TimeTicks
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of sysUpTime at the time of the last creation, deletion,
+             or change to/from an enabled state for a PVC (non-switched) entry
+             in the atmVcCrossConnectTable."
+       ::={ adGenCSMAtmExtension 10 }
+
+    adGenCsmSvcLastChange OBJECT-TYPE
+        SYNTAX      TimeTicks
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The value of sysUpTime at the time of the last creation, deletion,
+             or change to/from an enabled state for a SPVC or SVC (switched) entry
+             in the atmVcCrossConnectTable."
+       ::={ adGenCSMAtmExtension 11 }
+
+    adGenCSMUseFixedIndexes OBJECT-TYPE
+         SYNTAX         TruthValue
+         MAX-ACCESS     read-write
+         STATUS         current
+         DESCRIPTION
+             "Shelf-wide flag enabling/disabling the use of fixed indexes for
+              Traffic Descriptors, VC Cross Connects, and VP Cross Connects."
+         DEFVAL { false }
+         ::= { adGenCSMAtmExtension 16 }
+
+    --
+    -- The CSM Monitoring Extensions
+    --
+
+    adGenCSMMonitor             OBJECT IDENTIFIER ::= {adGenCSMmg 7}
+
+    --
+    --  The Adtran CSM monitoring extensions provide a means to
+    --  gather performance monitoring information at the shelf,
+    --  port, VP, and VC levels over a series of user defined
+    --  intervals.   Besides specifying the scope of the data
+    --  collection, various levels also allow for restricting the
+    --  data to specific traffic classes.
+    --
+    --  The adGenCSMMonitorSessionTable can be used to create these
+    --  monitoring sessions through read-create access.  A step-wise
+    --  description of the procedure to create the monitoring sessions
+    --  is provided in the adGenCSMMonitorSessionEntry description
+    --  below
+    --
+
+    adGenCSMMonitorSessionIndexNext  OBJECT-TYPE
+        SYNTAX         Unsigned32 (0..4294967295)
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION
+           "This object contains an appropriate value to
+            be used for adGenCSMMonitorSessionId when creating
+            entries in the adGenCSMMonitorSessionTable.  The value
+            0 indicates that no unassigned entries are
+            available. To obtain the adGenCSMMonitorSessionId
+            value for a new entry, the manager issues a
+            management protocol retrieval operation to obtain
+            the current value of this object.  After each
+            retrieval, the agent should modify the value to
+            the next unassigned index.
+            After a manager retrieves a value the agent will
+            determine through its local policy when this index
+            value will be made available for reuse."
+        ::= { adGenCSMMonitor 1 }
+
+    adGenCSMMonitorSessionTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMMonitorSessionEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "The Adtran CSM monitoring extensions provide a means to
+             gather performance monitoring information at the shelf,
+             direction, port, VP, and VC levels over a series of
+             user defined intervals.   Besides specifying the scope
+             of the data collection, various levels also allow for
+             restricting the data to specific traffic classes."
+        ::={ adGenCSMMonitor 2 }
+
+    adGenCSMMonitorSessionEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMMonitorSessionEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "An entry in the adGenCSMMonitorSessionTable.  An entry
+               in this table is used to model a data collection interval
+               that has specific levels of scope.   Depending upon the
+               capabilities of the particular CSM, only a limited
+               number of Monitoring Sessions (table rows) may be active
+               at any given time.   Typically there can be many more
+               rows defined in the table if they are not active.  This
+               will allow the administrator to store sessions when they
+               are not needed but may be needed in the future.
+
+               Step-wise Procedures to set up a Monitoring Session
+
+               (1) The manager obtains a unique adGenCSMMonitorSessionId
+                   by reading the adGenCSMMonitorSessionIndexNext object.
+
+               (2) Next, the manager creates a row in the Monitor Session
+                   Table.  Each row is indexed by the
+                   adGenCSMMonigorSessionId obtained in step 1 of this
+                   procedure.  The row can be created in this type by
+                   setting the adGenCSMMonitorSessionRowStatus to
+                   createAndWait(5).  Row creation fails if:
+                   - A row already exists with the specified index.
+                   - Insufficient memory resources exist within the CSM.
+
+               (3) The manager sets any column values, besides the rowStatus
+                   to specify the scope and duration of the monitor session.
+                   The adGenCSMMonitorSessionRowStatus can be monitored to
+                   determine if the row has valid parameters.  When the
+                   rowStatus is notReady(3), one or more parameters are
+                   invalid for the scope level specified.   When the rowStatus
+                   is notInService(2), all columns are valid and the row is
+                   ready to be made active(1).
+
+               (4) The manager sets the adGenCSMMonitorSessionRowStatus
+                   object to active(1).  This will initiate the monitoring
+                   session and it will continue until the maximum number of
+                   intervals, specified by adGenCSMMonitorSessionMaxIntervals,
+                   is reached.  If adGenCSMMonitorSessionMaxIntervals is
+                   zero, the monitor session will continue to run until the
+                   manager sets the adGenCSMMonitorSessionRowStatus object
+                   to notInService(2) or destroy(6).  If a power cycle/reset
+                   occurs, the monitoring session will begin again at the
+                   first interval upon restart of the CSM.  If the maximum
+                   number of active monitoring sessions has already been
+                   reached, the setting of the adGenCSMMonitorSessionRowStatus
+                   object to active(1) will fail.
+
+               *** It should be noted that data collected during a
+                   monitoring session is not preserved across protection
+                   switches at this time."
+          INDEX          { adGenCSMMonitorSessionId }
+          ::= { adGenCSMMonitorSessionTable 1 }
+
+     AdGenCSMMonitorSessionEntry ::= SEQUENCE {
+         adGenCSMMonitorSessionId                Unsigned32,
+         adGenCSMMonitorSessionName              OCTET STRING,
+         adGenCSMMonitorSessionDescription       OCTET STRING,
+         adGenCSMMonitorSessionRowStatus         RowStatus,
+         adGenCSMMonitorSessionStartTimeStamp    TimeStamp,
+         adGenCSMMonitorSessionScope             AdGenCSMMonitorScope,
+         adGenCSMMonitorSessionMaxIntervals      Unsigned32,
+         adGenCSMMonitorSessionIntervalDuration  INTEGER,
+         adGenCSMMonitorSessionCacheInterval     INTEGER,
+         adGenCSMMonitorSessionElapsedIntervals  Counter32,
+         adGenCSMMonitorSessionClasses           INTEGER,
+         adGenCSMMonitorSessionParam1            Unsigned32,
+         adGenCSMMonitorSessionParam2            Unsigned32,
+         adGenCSMMonitorSessionParam3            Unsigned32
+     }
+     adGenCSMMonitorSessionId OBJECT-TYPE
+        SYNTAX        Unsigned32 (1..4294967295)
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "Session index that uniquely identifies a monitoring session.
+             Typically a session index is obtained by reading the
+             adGenCSMMonitorSessionIndexNext object."
+         ::= { adGenCSMMonitorSessionEntry 1 }
+
+     adGenCSMMonitorSessionName OBJECT-TYPE
+         SYNTAX         OCTET STRING (SIZE (0..32))
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A short name for the monitor session."
+         DEFVAL { "" }
+         ::= { adGenCSMMonitorSessionEntry 2 }
+
+     adGenCSMMonitorSessionDescription OBJECT-TYPE
+         SYNTAX         OCTET STRING (SIZE (0..236))
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "A description for the monitor session.  This field can be
+              used by the manager to store additional information of
+              importance to a particular monitor session."
+         DEFVAL { "" }
+         ::= { adGenCSMMonitorSessionEntry 3 }
+
+     adGenCSMMonitorSessionRowStatus OBJECT-TYPE
+         SYNTAX         RowStatus
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "Used to start/stop/destroy the session.  Please refer to
+              the procedures listed in the adGenCSMMonitorSessionEntry
+              object for the proper use of object."
+         ::= { adGenCSMMonitorSessionEntry 4 }
+
+     adGenCSMMonitorSessionStartTimeStamp OBJECT-TYPE
+         SYNTAX         TimeStamp
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "Provides the system time with which the monitoring session
+              was made active.  A manager can monitor this object for
+              change in an active session to identify if a CSM restart
+              has occured."
+         ::= { adGenCSMMonitorSessionEntry 5 }
+
+     adGenCSMMonitorSessionScope OBJECT-TYPE
+         SYNTAX         AdGenCSMMonitorScope
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object provides the level of scope of the monitoring
+              session.  Depending upon the scope, different minimum and
+              maximum values for the adGenCSMMonitorSessionIntervalDuration
+              may apply.  In addition, the port(2), vp(3), and vc(4)
+              levels require the setting of the Session Parameter values.
+              Please refer to the parameter value objects below for more
+              information."
+         DEFVAL { shelf }
+         ::= { adGenCSMMonitorSessionEntry 6 }
+
+     adGenCSMMonitorSessionMaxIntervals OBJECT-TYPE
+         SYNTAX         Unsigned32
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object defines the maximum number of samples intervals
+              that are to be collected.  When the maximum value is reached,
+              an active(1) monitor session will automatically halt and
+              enter the notInService(2) state.  A value of zero (0) can
+              be used to specify that the monitoring session should run
+              until specifically requested to stop by a manager setting
+              the adGenCSMMonitorSessionRowStatus object."
+         DEFVAL { 0 }
+         ::= { adGenCSMMonitorSessionEntry 7 }
+
+     adGenCSMMonitorSessionIntervalDuration OBJECT-TYPE
+         SYNTAX         INTEGER(10..3600)
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object specifies the duration, in seconds, of each
+              sample interval.  The minimum value of 10 seconds applies
+              for the port(2), vp(3), and vc(4) levels of scope.  The
+              shelf(1) scope level has a minimum value of 60 seconds."
+         DEFVAL { 3600 }
+         ::= { adGenCSMMonitorSessionEntry 8 }
+
+     adGenCSMMonitorSessionCacheInterval OBJECT-TYPE
+         SYNTAX         INTEGER(0..24)
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object specifies the number of samples to maintain
+              in a local cache for later retrieval by a manager.  Each
+              monitor session displays accumulated, average, maximum,
+              minimum, and last sample data through the
+              adGenCSMMonitorCounterTable.  If the manager wishes to
+              collect a history of 'last' sample data, they can either
+              contiually poll the adGenCSMMonitorCounterTable and save
+              the last sample data, or they can specify that the monitor
+              session should maintain a cache of previous intervals in
+              the adGenCSMMonitorCounterHistoryTable and poll that
+              table at a reduced frequency."
+         DEFVAL { 0 }
+         ::= { adGenCSMMonitorSessionEntry 9 }
+
+     adGenCSMMonitorSessionElapsedIntervals OBJECT-TYPE
+         SYNTAX         Counter32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "This object records the number of intervals that have
+              elapsed for an active(1) monitor session.  This object can
+              be monitored by a manager to determine if new data is
+              available in either the adGenCSMMonitorCounterTable or
+              adGenCSMMonitorCounterHistoryTable tables."
+         ::= { adGenCSMMonitorSessionEntry 10 }
+
+     adGenCSMMonitorSessionClasses OBJECT-TYPE
+         SYNTAX         INTEGER(0..31)
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object specifies the ATM traffic classes of interest
+              for a monitor session.  If a particular bit is set, then
+              counter data for the indicated traffic class will be included
+              in the collection data.  This object is only significant for
+              the shelf(1) and port(2) scopes.  The bitmask for each ATM
+              traffic class is as follows:
+                    CBR    -  0x01
+                    rtVBR  -  0x02
+                    nrtVBR -  0x04
+                    UBR    -  0x08"
+         DEFVAL { '0F'h }
+         ::= { adGenCSMMonitorSessionEntry 11 }
+
+     adGenCSMMonitorSessionParam1 OBJECT-TYPE
+         SYNTAX         Unsigned32
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object specifies the ifIndex parameter if the session
+              scope adGenCSMMonitorSessionScope is set to port(2), vp(3),
+              or vc(4)."
+         DEFVAL { 0 }
+         ::= { adGenCSMMonitorSessionEntry 12 }
+
+     adGenCSMMonitorSessionParam2 OBJECT-TYPE
+         SYNTAX         Unsigned32
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object specifies the VPI parameter if the session
+              scope adGenCSMMonitorSessionScope is set to vp(3) or vc(4)."
+         DEFVAL { 0 }
+         ::= { adGenCSMMonitorSessionEntry 13 }
+
+     adGenCSMMonitorSessionParam3 OBJECT-TYPE
+         SYNTAX         Unsigned32
+         MAX-ACCESS     read-create
+         STATUS         current
+         DESCRIPTION
+             "This object specifies the VCI parameter if the session
+              scope adGenCSMMonitorSessionScope is set to vc(4)."
+         DEFVAL { 0 }
+         ::= { adGenCSMMonitorSessionEntry 14 }
+
+    --
+    -- Counter Monitoring
+    --
+    --
+    -- Counter Values
+    --
+    adGenCSMMonitorCounterTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMMonitorCounterEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table provides session counter information for a monitoring
+             session defined in the adGenCSMMonitorSessionTable.  The data
+             provided in this table is only valid if the session has been
+             made active since the last CSM reboot or protection switch."
+        ::={ adGenCSMMonitor 3 }
+
+    adGenCSMMonitorCounterEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMMonitorCounterEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "Counter session data can be accessed through an entry in the
+               adGenCSMMonitorCounterTable.  The first index provides the
+               type of data while the second index provides the
+               adGenCSMMonitorSessionId of the corresponding row in the
+               adGenCSMMonitorSessionTable.
+
+               Depending upon the adGenCSMMonitorCounterType, the values
+               of the objects within this table may have slightly different
+               meanings.  Please read the description for each object in
+               the table closely for more specific information and
+               behaviours.
+
+               Currently only 32-bit counters are provided.  No indication
+               of counter rollover or high-capacity 64-bit counters are
+               available."
+          INDEX      { adGenCSMMonitorCounterType,
+                       adGenCSMMonitorSessionId }
+          ::= { adGenCSMMonitorCounterTable 1 }
+
+     AdGenCSMMonitorCounterEntry ::= SEQUENCE {
+         adGenCSMMonitorCounterType                   AdGenCSMMonitorCounterType,
+         adGenCSMMonitorCounterTimeStamp              TimeStamp,
+         adGenCSMMonitorCounterInterval               Integer32,
+         adGenCSMMonitorCounterTxCells                Counter32,
+         adGenCSMMonitorCounterTxErrors               Counter32,
+         adGenCSMMonitorCounterRxCells                Counter32,
+         adGenCSMMonitorCounterRxOAM                  Counter32,
+         adGenCSMMonitorCounterRxDiscardPolicingClp0  Counter32,
+         adGenCSMMonitorCounterRxDiscardPolicingClp01 Counter32,
+         adGenCSMMonitorCounterRxTaggedClp0           Counter32,
+         adGenCSMMonitorCounterRxErrors               Counter32
+     }
+
+     adGenCSMMonitorCounterType OBJECT-TYPE
+        SYNTAX        AdGenCSMMonitorCounterType
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This object provides the overall type of counters provided by
+             a particular row in the adGenCSMMonitorCounterTable."
+         ::= { adGenCSMMonitorCounterEntry 1 }
+
+     adGenCSMMonitorCounterTimeStamp OBJECT-TYPE
+        SYNTAX        TimeStamp
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "For the absolute(1) counter type, this object provides the
+             current system time sysTime of the CSM.  For the cumulative(2)
+             counter type, this object provides the total number of seconds
+             that have elapsed since the corresponding session row was set
+             to the active(1) state.  For the average(3) counter type, this
+             value gives the average time between sample intervals for the
+             number of samples to data.  For the minimum(4) and maximum(5)
+             counter types, this object provides the system time of the CSM
+             when one of the counters within this counter type was set to a
+             new value.  For the last(6) counter type, this value provides
+             the system time that the last sample was collected."
+         ::= { adGenCSMMonitorCounterEntry 2 }
+
+     adGenCSMMonitorCounterInterval OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "For the absolute(1), cumulative(2), and average(3) counter
+             types, this object contains the total number of sample intervals
+             collected.  For the minimum(4) and maximum(5) counter types,
+             this object provides the interval number when one of the counters
+             within this counter type was set to a new value.  For the last(6)
+             counter type, this value provides the interval number for the
+             last collected sample."
+         ::= { adGenCSMMonitorCounterEntry 3 }
+
+     adGenCSMMonitorCounterTxCells OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Transmitted cell count."
+         ::= { adGenCSMMonitorCounterEntry 4 }
+
+     adGenCSMMonitorCounterTxErrors OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Number of cells that failed to be transmitted due to some error."
+         ::= { adGenCSMMonitorCounterEntry 5 }
+
+     adGenCSMMonitorCounterRxCells OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Received (OAM and USER) cells."
+         ::= { adGenCSMMonitorCounterEntry 6 }
+
+     adGenCSMMonitorCounterRxOAM OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Count of OAM cells received."
+         ::= { adGenCSMMonitorCounterEntry 7 }
+
+     adGenCSMMonitorCounterRxDiscardPolicingClp0 OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Count of non-conformant cells with CLP=0 that have been discarded
+             due to policing."
+         ::= { adGenCSMMonitorCounterEntry 8 }
+
+     adGenCSMMonitorCounterRxDiscardPolicingClp01 OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Count of non-conformant cells with CLP=0 or CLP=1 that have
+             been discarded due to policing."
+         ::= { adGenCSMMonitorCounterEntry 9 }
+
+     adGenCSMMonitorCounterRxTaggedClp0 OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Count of non-conformant cells with CLP=0 that have been tagged
+             (CLP set to 1) due to policing."
+         ::= { adGenCSMMonitorCounterEntry 10 }
+
+     adGenCSMMonitorCounterRxErrors OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Count of cells received with errors."
+         ::= { adGenCSMMonitorCounterEntry 11 }
+
+    --
+    -- Session history
+    --
+    adGenCSMMonitorCounterHistoryTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMMonitorCounterHistoryEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "If the manager wishes to collect a history of 'last' sample
+            data, they can either contiually poll the
+            adGenCSMMonitorCounterTable and save the last sample data, or
+            they can specify that the monitor session should maintain a
+            cache of previous intervals in the this table.  The
+            adGenCSMMonitorSessionCacheInterval object in the row of
+            an entry in the adGenCSMMonitorSessionTable controls whether
+            or not historical/cached data is maintained for a monitoring
+            session."
+        ::={ adGenCSMMonitor 4 }
+
+    adGenCSMMonitorCounterHistoryEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMMonitorCounterHistoryEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "Counter history sessions"
+          INDEX          { adGenCSMMonitorSessionId,
+                           adGenCSMMonitorCounterInterval }
+          ::= { adGenCSMMonitorCounterHistoryTable 1 }
+
+     AdGenCSMMonitorCounterHistoryEntry ::= SEQUENCE {
+         adGenCSMMonitorCounterHistoryTxCells                Counter32,
+         adGenCSMMonitorCounterHistoryTxErrors               Counter32,
+         adGenCSMMonitorCounterHistoryRxCells                Counter32,
+         adGenCSMMonitorCounterHistoryRxOAM                  Counter32,
+         adGenCSMMonitorCounterHistoryRxDiscardPolicingClp0  Counter32,
+         adGenCSMMonitorCounterHistoryRxDiscardPolicingClp01 Counter32,
+         adGenCSMMonitorCounterHistoryRxTaggedClp0           Counter32,
+         adGenCSMMonitorCounterHistoryRxErrors               Counter32,
+         adGenCSMMonitorCounterHistoryTimeStamp              TimeStamp
+     }
+
+     adGenCSMMonitorCounterHistoryTxCells OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 1 }
+
+     adGenCSMMonitorCounterHistoryTxErrors OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 2 }
+
+     adGenCSMMonitorCounterHistoryRxCells OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 3 }
+
+     adGenCSMMonitorCounterHistoryRxOAM OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 4 }
+
+     adGenCSMMonitorCounterHistoryRxDiscardPolicingClp0 OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 5 }
+
+     adGenCSMMonitorCounterHistoryRxDiscardPolicingClp01 OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 6 }
+
+     adGenCSMMonitorCounterHistoryRxTaggedClp0 OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 7 }
+
+     adGenCSMMonitorCounterHistoryRxErrors OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 8 }
+
+     adGenCSMMonitorCounterHistoryTimeStamp OBJECT-TYPE
+         SYNTAX         TimeStamp
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+             "x"
+         ::= { adGenCSMMonitorCounterHistoryEntry 11 }
+
+    --
+    --          OAM Tables
+
+    adGenCSMVclOamTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVclOamEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM VCL OAM Table contains vendor specific extensions to
+        the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 12 }
+
+    adGenCSMVclOamEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVclOamEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Circuit Link (VCL) associated
+              OAM test."
+          INDEX { ifIndex, atmVclVpi, atmVclVci }
+          ::= { adGenCSMVclOamTable 1 }
+
+     AdGenCSMVclOamEntry ::= SEQUENCE {
+          adGenCSMVclOamId              OCTET STRING,
+          adGenCSMVclSendSegLoopback    INTEGER,
+          adGenCSMVclSendE2ELoopback    INTEGER,
+          adGenCSMVclOamRowStatus       RowStatus
+     }
+    adGenCSMVclOamId OBJECT-TYPE
+        SYNTAX          OCTET STRING (SIZE(16))
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Card Level OAM Identification"
+        ::= { adGenCSMVclOamEntry 1 }
+
+    adGenCSMVclSendSegLoopback OBJECT-TYPE
+        SYNTAX          INTEGER         ( 0..1)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Set with value = 1, causes the CSM to send a segment OAM Loopback Cell on
+        this Vcl. Get has no meaning and will always return 0"
+        ::= { adGenCSMVclOamEntry 2}
+
+    adGenCSMVclSendE2ELoopback OBJECT-TYPE
+        SYNTAX          INTEGER         ( 0..1)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Set with value = 1, causes the CSM to send a End to End OAM Loopback Cell on
+        this Vcl. Get has no meaning and will always return 0"
+        ::= { adGenCSMVclOamEntry 3}
+
+     adGenCSMVclOamRowStatus     OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create, delete or
+            modify a row in this table.  To create
+            a new VCL Oam, this object is initially set
+            to 'createAndWait' or 'createAndGo'.
+            The rowstatus will be set to NotReady until
+            the VCL exist or until the VCL is used by a Vccc.
+            The rowstatus will be set to NotInService if
+            the Vccc is NotInService.
+            The rowstatus will be set to Active if the
+            the Vccc is Active.
+            Active state in the rowstatus will allow the
+            user to send OAM Loopback cells on this
+            Vcl."
+          DEFVAL { createAndWait }
+                ::= {adGenCSMVclOamEntry 4}
+
+        --
+        --
+        --
+
+    adGenCSMVplOamTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVplOamEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM VPL OAM Table contains vendor specific extensions to
+        the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 13 }
+
+    adGenCSMVplOamEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVplOamEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Path Link (VPL) associated
+              OAM test."
+          INDEX { ifIndex, atmVplVpi}
+          ::= { adGenCSMVplOamTable 1 }
+
+     AdGenCSMVplOamEntry ::= SEQUENCE {
+          adGenCSMVplOamId              OCTET STRING,
+          adGenCSMVplSendSegLoopback    INTEGER,
+          adGenCSMVplSendE2ELoopback    INTEGER,
+          adGenCSMVplOamRowStatus       RowStatus
+     }
+    adGenCSMVplOamId OBJECT-TYPE
+        SYNTAX          OCTET STRING (SIZE(16))
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Card Level OAM Identification"
+        ::= { adGenCSMVplOamEntry 1 }
+
+    adGenCSMVplSendSegLoopback OBJECT-TYPE
+        SYNTAX          INTEGER        ( 0..1)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Set, causes the CSM to send a segment OAM Loopback Cell on
+        this Vpl. Get has no meaning and will always return 0"
+        ::= { adGenCSMVplOamEntry 2}
+
+    adGenCSMVplSendE2ELoopback OBJECT-TYPE
+        SYNTAX          INTEGER        ( 0..1)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Set, causes the CSM to send a End to End OAM Loopback Cell on
+        this Vpl. Get has no meaning and will always return 0"
+        ::= { adGenCSMVplOamEntry 3}
+
+     adGenCSMVplOamRowStatus     OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS         read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create, delete or
+            modify a row in this table.  To create
+            a new VPL Oam, this object is initially set
+            to 'createAndWait' or 'createAndGo'.
+            The rowstatus will be set to NotReady until
+            the VPL exist or until the VPL is used by a Vpcc.
+            The rowstatus will be set to NotInService if
+            the Vpcc is NotInService.
+            The rowstatus will be set to Active if the
+            the Vpcc is Active.
+            Active state in the rowstatus will allow the
+            user to send OAM Loopback cells on this
+            Vpl."
+          DEFVAL { createAndWait }
+                ::= {adGenCSMVplOamEntry 4}
+
+    --
+    -- Enhanced OAM Tables
+    --
+    -- This enhanced tables allow to user to initiate multiple OAM Loopback Request
+    --
+
+    adGenCSMVclEnhOamTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVclEnhOamEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM VCL Enhanced OAM Table contains vendor specific extensions to
+        the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 14 }
+
+    adGenCSMVclEnhOamEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVclEnhOamEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Circuit Link (VCL) associated
+              OAM test."
+          INDEX { ifIndex, atmVclVpi, atmVclVci }
+          ::= { adGenCSMVclEnhOamTable 1 }
+
+     AdGenCSMVclEnhOamEntry ::= SEQUENCE {
+          adGenCSMVclEnhOamId                           OCTET STRING,
+          adGenCSMVclEnhOamLpbkReqCount                 INTEGER,
+          adGenCSMVclEnhOamLpbkTxDelay                  INTEGER,
+          adGenCSMVclEnhOamLpbkTimeout                  INTEGER,
+          adGenCSMVclEnhOamLpbkReqTx                    Integer32,
+          adGenCSMVclEnhOamLpbkRespRx                   Integer32,
+          adGenCSMVclEnhOamLpbkRespTimeout              Integer32,
+          adGenCSMVclEnhOamLpbkReqType                  INTEGER,
+          adGenCSMVclEnhOamRowStatus                    RowStatus
+     }
+    adGenCSMVclEnhOamId OBJECT-TYPE
+        SYNTAX          OCTET STRING (SIZE(16))
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Card Level OAM Identification"
+        ::= { adGenCSMVclEnhOamEntry 1 }
+
+    adGenCSMVclEnhOamLpbkReqCount OBJECT-TYPE
+        SYNTAX          INTEGER         ( 1..1000)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Used to determine how many OAM loopback Request to single"
+        ::= { adGenCSMVclEnhOamEntry 2}
+
+    adGenCSMVclEnhOamLpbkTxDelay OBJECT-TYPE
+        SYNTAX          INTEGER         ( 10..10000)
+        UNITS          "milliseconds"
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Used to determine how far apart to send the OAM Request (milliseconds)"
+        ::= { adGenCSMVclEnhOamEntry 3}
+
+    adGenCSMVclEnhOamLpbkTimeout OBJECT-TYPE
+        SYNTAX          INTEGER         ( 100..10000)
+        UNITS          "milliseconds"
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Used to determine how long to wait for OAM Response (milliseconds)"
+        ::= { adGenCSMVclEnhOamEntry 4}
+
+    adGenCSMVclEnhOamLpbkReqTx OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Count for the number of transmitted Oam Loopback Request"
+        ::= { adGenCSMVclEnhOamEntry 5}
+
+    adGenCSMVclEnhOamLpbkRespRx OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Count for the number of received Oam Loopback Responses"
+        ::= { adGenCSMVclEnhOamEntry 6}
+
+    adGenCSMVclEnhOamLpbkRespTimeout OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Count for the number of Oam Request that did not get a response due to timeout"
+        ::= { adGenCSMVclEnhOamEntry 7}
+
+    adGenCSMVclEnhOamLpbkReqType OBJECT-TYPE
+        SYNTAX          INTEGER      { segment(1), endtoend (2) }
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Selects which type of loopback to send. Cell will be sent when
+        this Vcl's RowStatus becomes Active"
+        ::= { adGenCSMVclEnhOamEntry 8}
+
+     adGenCSMVclEnhOamRowStatus     OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create, delete or
+            modify a row in this table.  To create
+            a new VCL Oam, this object is initially set
+            to 'createAndWait' or 'createAndGo'.
+            The rowstatus will be set to NotReady until
+            the VCL exist or until the VCL is used by a Vccc or
+            if the CSM OAM is set to all 6A.
+            The rowstatus will be set to NotInService if
+            the Vccc is NotInService.
+            To start an OAM Request session, the rowstatus
+            must be set to active."
+          DEFVAL { createAndWait }
+        ::= {adGenCSMVclEnhOamEntry 9}
+
+        --
+        --
+        --
+
+    adGenCSMVplEnhOamTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF AdGenCSMVplEnhOamEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+        "The Adtran CSM ATM VPL Enhanced OAM Table contains vendor specific extensions to
+        the AToM MIB RFC2515."
+        ::={ adGenCSMAtmExtension 15 }
+
+    adGenCSMVplEnhOamEntry OBJECT-TYPE
+          SYNTAX         AdGenCSMVplEnhOamEntry
+          MAX-ACCESS     not-accessible
+          STATUS         current
+          DESCRIPTION
+              "This list contains ATM Virtual Path Link (VPL) associated
+              OAM test."
+          INDEX { ifIndex, atmVplVpi}
+          ::= { adGenCSMVplEnhOamTable 1 }
+
+     AdGenCSMVplEnhOamEntry ::= SEQUENCE {
+          adGenCSMVplEnhOamId                           OCTET STRING,
+          adGenCSMVplEnhOamLpbkReqCount                 INTEGER,
+          adGenCSMVplEnhOamLpbkTxDelay                  INTEGER,
+          adGenCSMVplEnhOamLpbkTimeout                  INTEGER,
+          adGenCSMVplEnhOamLpbkReqTx                    Integer32,
+          adGenCSMVplEnhOamLpbkRespRx                   Integer32,
+          adGenCSMVplEnhOamLpbkRespTimeout              Integer32,
+          adGenCSMVplEnhOamLpbkReqType                  INTEGER,
+          adGenCSMVplEnhOamRowStatus                    RowStatus
+     }
+
+    adGenCSMVplEnhOamId OBJECT-TYPE
+        SYNTAX          OCTET STRING (SIZE(16))
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Card Level OAM Identification"
+        ::= { adGenCSMVplEnhOamEntry 1 }
+
+    adGenCSMVplEnhOamLpbkReqCount OBJECT-TYPE
+        SYNTAX          INTEGER         ( 1..1000)
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Used to determine how many OAM loopback Request to single"
+        ::= { adGenCSMVplEnhOamEntry 2}
+
+    adGenCSMVplEnhOamLpbkTxDelay OBJECT-TYPE
+        SYNTAX          INTEGER         ( 10..10000)
+        UNITS          "milliseconds"
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Used to determine how far apart to send the OAM Request (milliseconds)"
+        ::= { adGenCSMVplEnhOamEntry 3}
+
+    adGenCSMVplEnhOamLpbkTimeout OBJECT-TYPE
+        SYNTAX          INTEGER         ( 100..10000)
+        UNITS          "milliseconds"
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Used to determine how long to wait for OAM Response (milliseconds)"
+        ::= { adGenCSMVplEnhOamEntry 4}
+
+    adGenCSMVplEnhOamLpbkReqTx OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Count for the number of transmitted Oam Loopback Request"
+        ::= { adGenCSMVplEnhOamEntry 5}
+
+    adGenCSMVplEnhOamLpbkRespRx OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Count for the number of received Oam Loopback Responses"
+        ::= { adGenCSMVplEnhOamEntry 6}
+
+    adGenCSMVplEnhOamLpbkRespTimeout OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Count for the number of Oam Request that did not get a response due to timeout"
+        ::= { adGenCSMVplEnhOamEntry 7}
+
+    adGenCSMVplEnhOamLpbkReqType OBJECT-TYPE
+        SYNTAX          INTEGER      { segment(1), endtoend (2) }
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION
+        "Selects which type of loopback to send. Cell will be sent when
+        this Vpl's RowStatus becomes Active"
+        ::= { adGenCSMVplEnhOamEntry 8}
+
+     adGenCSMVplEnhOamRowStatus     OBJECT-TYPE
+          SYNTAX         RowStatus
+          MAX-ACCESS     read-create
+          STATUS         current
+          DESCRIPTION
+           "This object is used to create, delete or
+            modify a row in this table.  To create
+            a new VPL Oam, this object is initially set
+            to 'createAndWait' or 'createAndGo'.
+            The rowstatus will be set to NotReady until
+            the VPL exist or until the VPL is used by a Vpcc or
+            if the CSM OAM ID is set to all 6A.
+            The rowstatus will be set to NotInService if
+            the Vpcc is NotInService.
+            To start an OAM Request session, the rowstatus
+            must be set to active."
+          DEFVAL { createAndWait }
+        ::= {adGenCSMVplEnhOamEntry 9}
+
+
+     END

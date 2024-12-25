@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -348,7 +348,7 @@ if (isset($agent_data['distro']['SCRIPTVER'])) {
 // Detect some distro by kernel strings
 if (!isset($distro)) {
     if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.10' && str_starts_with($poll_device['sysDescr'], 'Linux ')) {
-        if (preg_match('/ \d[\.\d]+(\-\d+)?(\-[a-z]+)? #(\d+\-Ubuntu|\d{12}) /', $poll_device['sysDescr'])) {
+        if (preg_match('/ \d[\.\d]+(\-\d+)?(\-[a-z]+)? #(\d+(~(?<distro_ver>[\d\.]+))?\-Ubuntu|\d{12}) /', $poll_device['sysDescr'], $matches)) {
             // * Ubuntu (old):
             // Linux hostname 3.11.0-13-generic #20-Ubuntu SMP Wed Oct 23 07:38:26 UTC 2013 x86_64
             // * Ubuntu 16.04:
@@ -360,16 +360,24 @@ if (!isset($distro)) {
             // * Ubuntu 20.04
             // Linux hostname 5.10.4-051004-generic #202012301142 SMP Wed Dec 30 11:44:55 UTC 2020 x86_64
             // Linux hostname 5.4.0-42-generic #46-Ubuntu SMP Fri Jul 10 00:24:02 UTC 2020 x86_64
+            // * Ubuntu 22.04
+            // Linux hostname 6.5.0-45-generic #45~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Mon Jul 15 16:40:02 UTC 2 x86_64
 
             $distro = 'Ubuntu';
+            if (!empty($matches['distro_ver'])) {
+                $distro_ver = $matches['distro_ver'];
+            }
         } elseif (preg_match('/ Debian \d[\.\d]+(\-\d+)?([\+\-]\w+)? /', $poll_device['sysDescr'])) {
             // * Debian 9
             // Linux hostname 4.9.0-6-amd64 #1 SMP Debian 4.9.88-1+deb9u1 (2018-05-07) x86_64
             // Linux hostname 4.9.0-14-amd64 #1 SMP Debian 4.9.240-2 (2020-10-30) x86_64
+            // * Debian 12
+            // Linux hostname 6.1.0-25-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.106-3 (2024-08-26) x86_64
 
             $distro = 'Debian';
         } elseif (preg_match('/\d\-pve | PVE /', $poll_device['sysDescr'])) {
             // * Proxmox (Debian)
+            // Linux hostname 6.8.12-1-pve #1 SMP PREEMPT_DYNAMIC PMX 6.8.12-1 (2024-08-05T16:17Z) x86_64
             // Linux hostname 5.11.22-2-pve #1 SMP PVE 5.11.22-4 (Tue, 20 Jul 2021 21:40:02 +0200) x86_64
             // Linux hostname 5.4.78-2-pve #1 SMP PVE 5.4.78-2 (Thu, 03 Dec 2020 14:26:17 +0100) x86_64
             // Linux hostname 5.4.44-1-pve #1 SMP PVE 5.4.44-1 (Fri, 12 Jun 2020 08:18:46 +0200) x86_64
@@ -380,6 +388,7 @@ if (!isset($distro)) {
             $distro = 'Debian';
         } elseif (preg_match('/ \d[\.\d]+(\-v\d+\w*)?\+ #\d+ .* arm/', $poll_device['sysDescr'])) {
             // * Raspbian (Debian)
+            // Linux hostname 6.1.21-v7+ #1642 SMP Mon Apr 3 17:20:52 BST 2023 armv7l
             // Linux hostname 5.10.17-v7+ #1403 SMP Mon Feb 22 11:29:51 GMT 2021 armv7l
             // Linux hostname 5.4.51-v7l+ #1333 SMP Mon Aug 10 16:51:40 BST 2020 armv7l
             // Linux hostname 4.19.97-v7l+ #1294 SMP Thu Jan 30 13:21:14 GMT 2020 armv7l
@@ -389,11 +398,17 @@ if (!isset($distro)) {
             // Linux hostname 3.12.33+ #724 PREEMPT Wed Nov 26 17:55:23 GMT 2014 armv6l
 
             $distro = 'Raspbian';
-        } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-sunxi #(?<distro_ver>\d+\.\d+(\.\d+)?) .* arm/', $poll_device['sysDescr'], $matches)) {
+        } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-sunxi #(?<distro_ver>\d+\.\d+(\.\d+)?) .* (arm|aarch)/', $poll_device['sysDescr'], $matches)) {
             // * Armbian (Ubuntu)
             // Linux hostname 5.10.60-sunxi #21.08.2 SMP Tue Sep 14 16:28:44 UTC 2021 armv7l
 
             $distro     = 'Armbian';
+            $distro_ver = $matches['distro_ver'];
+        } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-sun50iw\d #(?<distro_ver>\d+\.\d+(\.\d+)?) .* (arm|aarch)/', $poll_device['sysDescr'], $matches)) {
+            // * Orange OS
+            // Linux hostname 5.16.17-sun50iw6 #3.0.8 SMP Tue Sep 6 19:09:22 CST 2022 aarch64
+
+            $distro     = 'Orange OS';
             $distro_ver = $matches['distro_ver'];
         } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)? #\d+\-Alpine /', $poll_device['sysDescr'])) {
             // * Alpine

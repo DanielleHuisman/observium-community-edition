@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -62,13 +62,15 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
         // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
         // This needs supporting code in the transport to check for set variable and if not, use the global default
 
-        $form                                  = ['type'  => 'horizontal',
-                                                  'id'    => 'update_contact_status',
-                                                  'title' => 'Contact Information',
-                                                  'space' => '5px',
-                                                  //'fieldset'  => array('edit' => ''),
+        $form = [
+            'type'  => 'horizontal',
+            'id'    => 'update_contact_status',
+            'title' => 'Contact Information',
+            'space' => '5px',
+            //'fieldset'  => array('edit' => ''),
         ];
-        $row                                   = 0;
+
+        $row = 0;
         $form['row'][++$row]['contact_method'] = [
           'type'      => 'html',
           //'fieldset'    => 'edit',
@@ -85,43 +87,47 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
           'html'     => '<a id="contact_doc" href="' . $docs_link . '" target="_blank">See documentation for this Transport (new page)</a>'];
 
         $form['row'][++$row]['contact_enabled'] = [
-          'type'      => 'switch-ng',
-          //'fieldset'    => 'edit',
-          'name'      => 'Contact Status',
-          'size'      => 'small',
-          'on-color'  => 'success',
-          'off-color' => 'danger',
-          'on-text'   => 'Enabled',
-          'off-text'  => 'Disabled',
-          'readonly'  => $readonly,
-          'value'     => !$contact['contact_disabled']];
+            'type'      => 'switch-ng',
+            //'fieldset'    => 'edit',
+            'name'      => 'Contact Status',
+            'size'      => 'small',
+            'on-color'  => 'success',
+            'off-color' => 'danger',
+            'on-text'   => 'Enabled',
+            'off-text'  => 'Disabled',
+            'readonly'  => $readonly,
+            'value'     => !$contact['contact_disabled']
+        ];
 
         $form['row'][++$row]['contact_descr'] = [
-          'type'     => 'text',
-          //'fieldset'    => 'edit',
-          'name'     => 'Description',
-          'width'    => '80%',
-          'readonly' => $readonly || $transport === 'syscontact',
-          'value'    => $contact['contact_descr']];
+            'type'     => 'text',
+            //'fieldset'    => 'edit',
+            'name'     => 'Description',
+            'width'    => '80%',
+            'readonly' => $readonly || $transport === 'syscontact',
+            'value'    => $contact['contact_descr']
+        ];
 
         if (safe_count($data['parameters']['required']) || safe_count($data['parameters']['global'])) {
             // Pseudo item, just for additional title
             $form['row'][++$row]['contact_required'] = [
-              'type' => 'html',
-              //'fieldset'    => 'edit',
-              'html' => '<h3 id="contact_required">Required parameters</h3>'];
+                'type' => 'html',
+                //'fieldset'    => 'edit',
+                'html' => '<h3 id="contact_required">Required parameters</h3>'
+            ];
 
-            foreach (array_merge($data['parameters']['required'], $data['parameters']['global']) as $parameter => $param_data) { // Temporary merge req & global
+            // Temporary merge req & global
+            foreach (array_merge((array)$data['parameters']['required'], (array)$data['parameters']['global']) as $parameter => $param_data) {
                 switch ($param_data['type']) {
                     case 'enum-freeinput':
                         $form_param = [
-                          'type'     => 'tags',
-                          //'fieldset'    => 'edit',
-                          'name'     => $param_data['description'],
-                          'width'    => '100%',
-                          'readonly' => $readonly,
-                          'value'    => $contact['endpoint_parameters'][$parameter],
-                          'values'   => $param_data['params']
+                            'type'     => 'tags',
+                            //'fieldset'    => 'edit',
+                            'name'     => $param_data['description'],
+                            'width'    => '100%',
+                            'readonly' => $readonly,
+                            'value'    => $contact['endpoint_parameters'][$parameter],
+                            'values'   => $param_data['params']
                         ];
                         break;
                     case 'bool':
@@ -142,24 +148,24 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
                             $value = $param_data['default'];
                         }
                         $form_param = [
-                          'type'     => 'select',
-                          //'fieldset'    => 'edit',
-                          'name'     => $param_data['description'],
-                          'width'    => '80%',
-                          'readonly' => $readonly,
-                          'value'    => $value,
-                          'values'   => $param_data['params']
+                            'type'     => 'select',
+                            //'fieldset'    => 'edit',
+                            'name'     => $param_data['description'],
+                            'width'    => '80%',
+                            'readonly' => $readonly,
+                            'value'    => $value,
+                            'values'   => $param_data['params']
                         ];
                         break;
                     case 'textarea':
                         $form_param = [
-                          'type'     => 'textarea',
-                          //'fieldset'    => 'edit',
-                          'name'     => $param_data['description'],
-                          'width'    => '80%',
-                          'rows'     => 5,
-                          'readonly' => $readonly,
-                          'value'    => $contact['endpoint_parameters'][$parameter]
+                            'type'     => 'textarea',
+                            //'fieldset'    => 'edit',
+                            'name'     => $param_data['description'],
+                            'width'    => '80%',
+                            'rows'     => 5,
+                            'readonly' => $readonly,
+                            'value'    => $contact['endpoint_parameters'][$parameter]
                         ];
                         // Prettify JSON
                         if (isset($param_data['format']) && $param_data['format'] === 'json' &&
@@ -169,12 +175,12 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
                         break;
                     default:
                         $form_param = [
-                          'type'     => 'text',
-                          //'fieldset'    => 'edit',
-                          'name'     => $param_data['description'],
-                          'width'    => '80%',
-                          'readonly' => $readonly,
-                          'value'    => $contact['endpoint_parameters'][$parameter]
+                            'type'     => 'text',
+                            //'fieldset'    => 'edit',
+                            'name'     => $param_data['description'],
+                            'width'    => '80%',
+                            'readonly' => $readonly,
+                            'value'    => $contact['endpoint_parameters'][$parameter]
                         ];
                 }
                 $form['row'][++$row]['contact_endpoint_' . $parameter] = $form_param;

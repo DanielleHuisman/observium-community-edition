@@ -1,11 +1,10 @@
 <?php
-/**
- * Flight: An extensible micro-framework.
- *
- * @copyright   Copyright (c) 2013, Mike Cao <mike@mikecao.com>
- * @license     MIT, http://flightphp.com/license
- */
 
-require_once __DIR__.'/core/Loader.php';
+declare(strict_types=1);
 
-\flight\core\Loader::autoload(true, dirname(__DIR__));
+use flight\core\Loader;
+
+require_once __DIR__ . '/Flight.php';
+require_once __DIR__ . '/core/Loader.php';
+
+Loader::autoload(true, [dirname(__DIR__)]);

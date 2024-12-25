@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -69,21 +69,14 @@ foreach ($new_oids as $ifIndex => $entry1) {
             continue;
         }
 
-        switch ($entry['rlPhyTestGetUnits']) {
-            case 'microVolt':
-            case 'microAmper':
-            case 'microOham':
-            case 'microWatt':
-                $scale = si_to_scale('micro');
-                break;
-            case 'milidbm':
-                $scale = si_to_scale('milli');
-                break;
-            case 'decidbm':
-                $scale = si_to_scale('deci');
-                break;
-            default:
-                $scale = 1;
+        if (str_starts_with($entry['rlPhyTestGetUnits'], 'micro')) {
+            $scale = si_to_scale('micro');
+        } elseif (str_starts_with($entry['rlPhyTestGetUnits'], 'mili')) {
+            $scale = si_to_scale('milli');
+        } elseif (str_starts_with($entry['rlPhyTestGetUnits'], 'deci')) {
+            $scale = si_to_scale('deci');
+        } else {
+            $scale = 1;
         }
 
         $entry['ifIndex'] = $ifIndex;
@@ -138,7 +131,7 @@ foreach ($new_oids as $ifIndex => $entry1) {
                 continue 2;
         }
         $value = $entry['rlPhyTestGetResult'];
-        discover_sensor_ng($device, $class, $mib, 'rlPhyTestGetResult', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, 'rlPhyTestGetResult', $oid, $index, $descr, $scale, $value, $options);
     }
 }
 

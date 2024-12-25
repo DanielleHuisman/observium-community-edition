@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -51,9 +51,9 @@ foreach ($sensor_array as $index => $entry) {
 
         $options                 = [];
         $options['rename_rrd']   = "bluecoat-sg-proxy-mib-$index";
-        $options['oid_scale_si'] = "deviceSensorScale"; // need walk this oid on every poll
+        $options['oid_scale_si'] = "deviceSensorScale"; // need to walk this oid on every poll
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid, $index, $descr, $scale, $value, $options);
     }
 }
 

@@ -6,7 +6,7 @@
  *
  * @author    Jens Brueckner <Discord: JTC#3678>
  * @copyright 'map.inc.php'  (C) 2023 Jens Brueckner
- * @copyright 'Observium'    (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -382,13 +382,11 @@ foreach ($devices as $device) {
         } // endif
     } // endif
 
-    // get the group membership from the database
-    $group_sql = "SELECT `group_id` FROM `group_table` WHERE (`entity_type` = 'device' AND `entity_id` = ?);";
+    // Check if the user selects a group
+    if (OBSERVIUM_EDITION !== 'community' && isset($vars['group_id'])) {
+        // get the group membership from the database
+        $device_groups = get_entity_group_ids('device', $local_device_id);
 
-    $device_groups = dbFetchColumn($group_sql, [ $local_device_id ]);
-
-    // Check if a group is selected by the user
-    if (isset($vars['group_id'])) {
         // If the device has no group or doesn't belong to the selected group, continue (skip outer loop)
         if (empty($device_groups) || !in_array($vars['group_id'], $device_groups)) {
             continue;

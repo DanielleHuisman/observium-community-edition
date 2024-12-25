@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -46,8 +46,12 @@ if (!isset($multiplier)) {
 
 // Override graphtype colours
 // FIXME - dumb hack, if it's useful extend it and do it properly later
-if(isset($vars['colours_in']) && is_array($config['graph_colours'][$vars['colours_in']])) { $colours_in = $vars['colours_in']; }
-if(isset($vars['colours_out']) && is_array($config['graph_colours'][$vars['colours_out']])) { $colours_out = $vars['colours_out']; }
+if (isset($vars['colours_in']) && is_array($config['graph_colours'][$vars['colours_in']])) {
+    $colours_in = $vars['colours_in'];
+}
+if (isset($vars['colours_out']) && is_array($config['graph_colours'][$vars['colours_out']])) {
+    $colours_out = $vars['colours_out'];
+}
 
 $rrd_multi = [];
 $stack     = '';

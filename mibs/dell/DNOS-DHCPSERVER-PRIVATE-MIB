@@ -6,7 +6,7 @@
 DNOS-DHCPSERVER-PRIVATE-MIB DEFINITIONS ::= BEGIN
 
 -- DELL NETWORKING OS DHCP Server MIB
--- Copyright 2016 Broadcom.
+-- Copyright 2016-2021 Broadcom.
 -- This SNMP Management Information Specification
 -- embodies Broadcom's confidential and proprietary
 -- intellectual property.  Broadcom retains all title
@@ -30,13 +30,18 @@ IMPORTS
     dnOS                            FROM DELL-REF-MIB;
 
     fastPathDHCPServerPrivate MODULE-IDENTITY
-           LAST-UPDATED "201101260000Z" -- 26 January 2011 12:00:00 GMT
-           ORGANIZATION "Dell EMC"
+           LAST-UPDATED "202103030000Z" -- 03 March 2021 12:00:00 GMT
+           ORGANIZATION "Dell"
            CONTACT-INFO ""
       DESCRIPTION
           "The Broadcom Private MIB for DNOS DHCP Server"
 
       -- Revision history.
+      REVISION
+          "202103030000Z" -- 03 March 2021 12:00:00 GMT
+      DESCRIPTION
+          "Added 'agentDhcpServerPoolClassTable' and 'agentDhcpServerClassConfigGroup' 
+           to support DHCP Class Support and Class binding to Pool."
       REVISION
           "201101260000Z" -- 26 January 2011 12:00:00 GMT
       DESCRIPTION
@@ -49,7 +54,7 @@ IMPORTS
       ::= { dnOS 12 }
 
 
-     --**************************************************************************************
+    --**************************************************************************************
     -- agentDhcpServerGroup -> contains MIB objects displaying various properties of a DHCP server
     --
     --**************************************************************************************
@@ -202,8 +207,9 @@ IMPORTS
 
 --**********************************************************************************
 -- agentDhcpServerPoolConfigGroup
---  This group contains three tables :  agentDhcpServerPoolConfigTable,
---                                      agentDhcpServerBindingTable,
+--  This group contains four tables :  agentDhcpServerPoolConfigTable,
+--                                     agentDhcpServerBindingTable,
+--                                     agentDhcpServerPoolClassTable
 --
 --  agentDhcpServerPoolConfigTable -> This table is used to configure a
 --                                     new DHCP address pool on a DHCP server. This table
@@ -216,6 +222,8 @@ IMPORTS
 --  for a DHCP Server
 --  
 --  agentDhcpServerPoolOptionTable -> Table for DHCP Server options 
+--  
+--  agentDhcpServerPoolClassTable -> This table lists the Classes for Pool for a DHCP Server
 --**********************************************************************************
 
 
@@ -271,7 +279,7 @@ IMPORTS
           agentDhcpServerPoolNetbiosNodeType
               INTEGER,
           agentDhcpServerPoolSNTPServer
-              IpAddress,
+              DisplayString,
           agentDhcpServerPoolNextServer
               IpAddress, 
           agentDhcpServerPoolDomainName
@@ -370,11 +378,15 @@ IMPORTS
          ::= { agentDhcpServerPoolConfigEntry 8 }
          
      agentDhcpServerPoolSNTPServer OBJECT-TYPE
-         SYNTAX      IpAddress
+         SYNTAX      DisplayString
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                      "This configures the SNTP server in the boot-process of a DHCP clients.User should enter zero(0.0.0.0) to remove the current SNTP server address"
+                      "This specifies the SNTP server  list in the boot-process of a DHCP client. 
+                       (each IP address in this list is
+                       separated by comma and the list is terminated by semi-colon),
+                       an example would be 10.10.1.1,192.168.36.1;(no spaces in between).
+                       User should enter  a 'null' or 'NULL' string to remove the current SNTP server address."
          ::= { agentDhcpServerPoolConfigEntry 9 }
 
      agentDhcpServerPoolNextServer OBJECT-TYPE
@@ -457,7 +469,9 @@ IMPORTS
           agentDhcpServerManualPoolIpMask
               IpAddress,
           agentDhcpServerManualPoolIpPrefixLength
-              Unsigned32
+              Unsigned32,
+          agentDhcpServerPoolVrfName
+              DisplayString
           }
 
      agentDhcpServerPoolAllocationName OBJECT-TYPE
@@ -588,7 +602,17 @@ IMPORTS
                       The prefix is an alternative way of specifying the network-mask of the client.The IP address must have been set before.
                       This value shows 0, if the binding type is 'un-allocated',or,'dynamic'."
          ::= { agentDhcpServerPoolAllocationEntry 12 }
-
+ 
+     agentDhcpServerPoolVrfName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..15))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                      "A textual string containing the name of a VRF Instance. This specifies the VRF Instance for whose interfaces 
+                       only this pool is to be used for address allocation. User should enter a 'null' or 'NULL' string to remove 
+                       specified VRF-name.for whose DHCP pools this excluded addres-range is applicable."
+         ::= { agentDhcpServerPoolAllocationEntry 13 }
+     
 
   --***********************************************************************************************
      agentDhcpServerExcludedAddressRangeCreate OBJECT-TYPE
@@ -596,21 +620,21 @@ IMPORTS
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                     "It sets the IP address-ranges(from low to high) that a
-                      DHCP server should not assign to DHCP clients. Each time 
-                      this MIB object is set successfully, one excluded range 
-                      of IP address will be set.
-                      It is given in format - start and end IP address 
-                      separated by '-' and terminated by ';'.
-                      One example would be - 192.168.36.1-200.1.1.1;  .
-                      This sets one excluded range of IP address,which
-                      starts at 192.168.36.1 and ends at 200.1.1.1. 
-                      If only start IP address is given,
-                      end IP address is assumed to be equal to the start IP
+                     "It sets the IP address-ranges(from low to high) for a specific 
+                      VRF instance that a DHCP server should not assign to DHCP clients. 
+                      Each time this MIB object is set successfully, one excluded range 
+                      of IP address will be set to a given VRF instance. 
+                      It is given in the format - start and end IP address separated by 
+                      '-' and followed by '/' and then followed by VRF-Name terminated by ';'. 
+                      One example would be - 192.168.36.1-200.1.1.1/vrfRed;  . 
+                      This sets one excluded range of IP addresses, which starts at 
+                      192.168.36.1 and ends at 200.1.1.1 and is applicable to the VRF instance vrfRed. 
+                      If only start IP address is given (like 20.20.20.1/vrfRed; ), then the 
+                      end IP address is assumed to be equal to the start IP 
                       address. Get operation on this MIB object returns a 
                       null-value, as for the purpose of viewing the 
                       exclude-address ranges, the user should perform the 
-                      traversal of agentDhcpServerExcludedAddressRangeTable.
+                      traversal of agentDhcpServerExcludedAddressRangeTable. 
                       For this reason the get operation on object 
                 agentDhcpServerExcludedAddressRangeCreate becomes insignificant."
          ::= { agentDhcpServerPoolConfigGroup 4 }
@@ -642,7 +666,9 @@ IMPORTS
           agentDhcpServerExcludedEndIpAddress
               IpAddress,
           agentDhcpServerExcludedAddressRangeStatus
-              RowStatus
+              RowStatus,
+          agentDhcpServerExcludedVrfName
+              DisplayString
           }
 
     agentDhcpServerExcludedRangeIndex OBJECT-TYPE
@@ -678,7 +704,16 @@ IMPORTS
                       are - active(1) and destroy(6). For a valid range, the row-satus will return active(1).
                       When it is set to destroy(6), the corresponding address-range is deleted."
          ::= { agentDhcpServerExcludedAddressRangeEntry 4 } 
-         
+
+    agentDhcpServerExcludedVrfName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..64))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                      "A textual string containing the name of a VRF Instance. This specifies the VRF Instance 
+                       for whose DHCP pools this excluded addres-range is applicable."
+         ::= { agentDhcpServerExcludedAddressRangeEntry 5 }
+        
          --***********************************************************************************************
      
      agentDhcpServerPoolOptionCreate OBJECT-TYPE
@@ -807,6 +842,100 @@ IMPORTS
                      "This specifies the row-status of the DHCP Server Pool option."
          ::= { agentDhcpServerPoolOptionEntry 7 }
 
+     --***********************************************************************************************
+     agentDhcpServerPoolClassTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDhcpServerPoolClassEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table for configuring DHCP Server Class Address Range."
+         ::= { agentDhcpServerPoolConfigGroup 8 }
+
+     agentDhcpServerPoolClassEntry OBJECT-TYPE
+         SYNTAX      AgentDhcpServerPoolClassEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a Dhcp server Class Address Range table."
+         INDEX       { agentDhcpServerPoolNameIndex, 
+                       agentDhcpServerPoolClassNameIndex }
+         ::= { agentDhcpServerPoolClassTable 1 }
+
+    AgentDhcpServerPoolClassEntry ::= SEQUENCE {
+          agentDhcpServerPoolNameIndex 
+              Unsigned32,
+          agentDhcpServerPoolClassNameIndex 
+              Unsigned32,
+          agentDhcpServerPoolNameForClass
+              DisplayString,
+          agentDhcpServerPoolClassName
+              DisplayString,
+          agentDhcpServerPoolClassStartIpAddress
+              IpAddress,
+          agentDhcpServerPoolClassEndIpAddress
+              IpAddress,
+          agentDhcpServerPoolClassAddressRangeStatus
+              RowStatus
+          }
+
+    agentDhcpServerPoolNameIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..1024)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The Pool Index along with class, acts as index for the DHCP Server 
+                      Class Address RAnge table."
+         ::= { agentDhcpServerPoolClassEntry 1 }
+
+    agentDhcpServerPoolClassNameIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (0..1024)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "This specifies the DHCP option code. This alongwith pool-index acts as the index of the 
+                      DHCP Server Option table."
+         ::= { agentDhcpServerPoolClassEntry 2 }
+         
+    agentDhcpServerPoolNameForClass OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The name of the DHCP Address pool."
+         ::= { agentDhcpServerPoolClassEntry 3 }
+
+    agentDhcpServerPoolClassName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The name of the DHCP Class that can be binded to pool."
+         ::= { agentDhcpServerPoolClassEntry 4 }
+
+    agentDhcpServerPoolClassStartIpAddress OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This specifies the starting IP address of the DHCP Class binded to a pool."
+         ::= { agentDhcpServerPoolClassEntry 5 }
+
+    agentDhcpServerPoolClassEndIpAddress OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This specifies the ending IP address of the DHCP Class binded to a pool."
+         ::= { agentDhcpServerPoolClassEntry 6 }
+         
+    agentDhcpServerPoolClassAddressRangeStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This specifies the row-status of the DHCP Server Pool-Class binding."
+         ::= { agentDhcpServerPoolClassEntry 7 }
+
     --**************************************************************************************
     -- agentDhcpServerLeaseGroup -> contains MIB objects displaying and clearing leases of a DHCP server
     --
@@ -840,7 +969,7 @@ IMPORTS
          STATUS      current
          DESCRIPTION
                      "Represents entry for a Dhcp server's leases."
-         INDEX       { agentDhcpServerLeaseIPAddress }
+         INDEX       { agentDhcpServerLeaseLeaseIndex }
 
          ::= { agentDhcpServerLeaseTable 1 }
 
@@ -857,7 +986,13 @@ IMPORTS
           agentDhcpServerLeaseType
               INTEGER,
           agentDhcpServerLeaseStatus
-              RowStatus
+              RowStatus,
+          agentDhcpServerLeasePoolName
+              DisplayString,
+          agentDhcpServerLeaseVrfName
+              DisplayString,
+          agentDhcpServerLeaseLeaseIndex
+              Unsigned32
           }
 
     agentDhcpServerLeaseIPAddress OBJECT-TYPE
@@ -910,9 +1045,78 @@ IMPORTS
                      "This specifies the row-status of the address-lease. Implemented values
                       are - active(1) and destroy(6). For a valid range, the row-satus will return active(1).
                       When it is set to destroy(6), the corresponding address-lease is cleared."
-         ::= { agentDhcpServerLeaseEntry 6 } 
-         
-         
+         ::= { agentDhcpServerLeaseEntry 6 }
+
+    agentDhcpServerLeasePoolName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The name of the DHCP Address pool associated with the lease entry."
+         ::= { agentDhcpServerLeaseEntry 7 }
+  
+    agentDhcpServerLeaseVrfName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..64))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                      "A textual string containing the name of a VRF Instance. This specifies 
+                       the VRF Instance with which this lease entry is assocaited."
+         ::= { agentDhcpServerLeaseEntry 8 }
+
+    agentDhcpServerLeaseLeaseIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..4096)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Lease entry's associated Lease-Index within a specific DHCP address Pool, which will be used as one of the indices for the ServerLease Table."
+         ::= { agentDhcpServerLeaseEntry 9 }
+
+
+    agentDhcpServerLeaseClearVrfAndIPaddrSpecificBindings OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                      "Clearing of a specific binding identified by an IP-address of a 
+                      specific VRF instance is done by applying write operation on this
+                      MIB object and providing the VRF-name and IP-address.
+                      It is given in format - VRF-Name and IP address 
+                      separated by '-' and terminated by ';'.
+                      One example would be - VrfRed-102.5.5.5;  .
+                      This clears the binding matching the IP-address 102.5.5.5 in VRF instance VrfRed.
+                      If only VRF-name is given then all bindings in that VRF are cleared.
+                      Get operation on this MIB object returns a
+                      null-value, as for the purpose of viewing the
+                      VRF bindings, the user should perform the
+                      traversal of agentDhcpServerLeaseTable.
+                      For this reason the get operation on object
+                      agentDhcpServerLeaseClearVrfAndIPaddrSpecificBindings becomes insignificant."
+    ::= { agentDhcpServerLeaseGroup 3}
+
+
+    agentDhcpServerLeaseClearPoolAndIPaddrSpecificBindings OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                      "Clearing of a specific binding identified by an IP-address of a 
+                      specific DHCP Pool is done by applying write operation on this
+                      MIB object and providing the Pool-name and IP-address.
+                      It is given in format - Pool-Name and IP address 
+                      separated by '-' and terminated by ';'.
+                      One example would be - PoolRed-102.5.5.5;  .
+                      This clears the binding matching the IP-address 102.5.5.5 in Pool PoolRed.
+                      If only Pool-name is given then all bindings from that pool are cleared.
+                      Get operation on this MIB object returns a
+                      null-value, as for the purpose of viewing the
+                      pool specific bindings, the user should perform the
+                      traversal of agentDhcpServerLeaseTable.
+                      For this reason the get operation on object
+                      agentDhcpServerLeaseClearPoolAndIPaddrSpecificBindings becomes insignificant."
+    ::= { agentDhcpServerLeaseGroup 4}
+
+
     --**************************************************************************************
     -- agentDhcpServerAddressConflictGroup -> contains MIB objects displaying and clearing 
     --   address conflicts found by a DHCP server, when addresses are offered to the client. 
@@ -1015,4 +1219,170 @@ IMPORTS
                       are - active(1) and destroy(6). For a valid range, the row-satus will return active(1).
                       When it is set to destroy(6), the corresponding conflicting-address entry is cleared."
          ::= { agentDhcpServerAddressConflictEntry 4 }
+
+--**********************************************************************************
+-- agentDhcpServerClassConfigGroup
+--  This group contains two tables :  agentDhcpServerClassTable,
+--                                      agentDhcpServerClassConfigTable
+--
+--  agentDhcpServerClassTable -> This table is used to configure a
+--                               new DHCP Class on a DHCP server. This table
+--                               is also used to create and delete a DHCP Class.
+--
+--  agentDhcpServerClassConfigTable -> This table is used to configure/delete a Option 82 
+--                                     parameters (Remote Id and Circuit Id) for a DHCP Class 
+--                                     on a DHCP server. 
+--
+--**********************************************************************************
+
+
+    agentDhcpServerClassConfigGroup        OBJECT IDENTIFIER ::= { fastPathDHCPServerPrivate 5 }
+
+    agentDhcpServerClassTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDhcpServerClassEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table of the DHCP Server Class entries."
+         ::= { agentDhcpServerClassConfigGroup 1 }
+
+    agentDhcpServerClassEntry OBJECT-TYPE
+         SYNTAX      AgentDhcpServerClassEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a Dhcp Class."
+         INDEX       { agentDhcpServerClassIndex } 
+         ::= { agentDhcpServerClassTable 1 }
+
+    AgentDhcpServerClassEntry ::= SEQUENCE {
+          agentDhcpServerClassIndex
+              Unsigned32,
+          agentDhcpServerClassName
+              DisplayString,
+          agentDhcpServerClassRowStatus
+              RowStatus
+          }
+
+    agentDhcpServerClassIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..1024)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The Class Index, which 'll be used as index for the Class Table."
+         ::= { agentDhcpServerClassEntry 1 }
+
+     agentDhcpServerClassName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The name of the DHCP Class."
+         ::= { agentDhcpServerClassEntry 2 }
+
+     agentDhcpServerClassRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+         "The row status variable is used according to installation
+          and removal conventions for conceptual rows. This object 
+          is used to create and delete the DHCP Class."
+         ::= { agentDhcpServerClassEntry 3 }
+
+    agentDhcpServerClassConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDhcpServerClassConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table of the DHCP Server Class configuration entries."
+         ::= { agentDhcpServerClassConfigGroup 2 }
+
+    agentDhcpServerClassConfigEntry OBJECT-TYPE
+         SYNTAX      AgentDhcpServerClassConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a Dhcp server class."
+         INDEX       { agentDhcpServerClassConfigIndex, 
+                       agentDhcpServerClassEntryIndex}
+         ::= { agentDhcpServerClassConfigTable 1 }
+
+    AgentDhcpServerClassConfigEntry ::= SEQUENCE {
+          agentDhcpServerClassConfigIndex
+              Unsigned32,
+          agentDhcpServerClassEntryIndex
+              Unsigned32,
+          agentDhcpServerClassConfigName
+              DisplayString,
+          agentDhcpServerClassConfigRemoteId
+              DisplayString,
+          agentDhcpServerClassConfigCircuitId
+              DisplayString,
+          agentDhcpServerClassConfigRowStatus
+              RowStatus
+          }
+
+    agentDhcpServerClassConfigIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..1024)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The Class Index, which 'll be used as index for the ClassConfig Table."
+         ::= { agentDhcpServerClassConfigEntry 1 }
+
+    agentDhcpServerClassEntryIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..32)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The Class Index, which 'll be used as index for the ClassConfig Table."
+         ::= { agentDhcpServerClassConfigEntry 2 }
+
+     agentDhcpServerClassConfigName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The name of the DHCP Class. When setting this value, the
+                     value of 'agentDhcpServerClassConfigRemoteId' and 'agentDhcpServerClassConfigCircuitId' 
+                     must be set at the same time."
+         ::= { agentDhcpServerClassConfigEntry 3 }
+
+     agentDhcpServerClassConfigRemoteId OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This specifies the DHCP option 82 Remote Id parameter. 
+                      When setting this value, the value of 'agentDhcpServerClassConfigName' 
+                      and 'agentDhcpServerClassConfigCircuitId' must be set at the same time.
+                      When empty string is set for Remote Id, all Option 82 entries 
+                      configured on the class will be deleted."
+         ::= { agentDhcpServerClassConfigEntry 4 }
+
+     agentDhcpServerClassConfigCircuitId OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This specifies the DHCP option 82 Citcuit Id parameter.
+                      When setting this value, the value of 'agentDhcpServerClassConfigName' 
+                      and 'agentDhcpServerClassConfigRemoteId' must be set at the same time.
+                      When empty string is set for Circuit Id, all Option 82 entries 
+                      configured with the specific Remote Id on the class will be deleted."
+         ::= { agentDhcpServerClassConfigEntry 5 }
+
+     agentDhcpServerClassConfigRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+         "The row status variable is used according to installation
+          and removal conventions for conceptual rows. This object 
+          is used to delete the DHCP Class Entry with a specific 
+          Remote Id/Circuit Id. Enter 'agentDhcpServerClassConfigName', 
+          'agentDhcpServerClassConfigRemoteId' and 'agentDhcpServerClassConfigCircuitId' 
+          along with this object to delete it. "
+         ::= { agentDhcpServerClassConfigEntry 6 }
 END

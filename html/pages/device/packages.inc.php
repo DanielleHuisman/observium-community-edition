@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -25,45 +24,17 @@ echo('    </tr>' . PHP_EOL);
 echo('  </thead>' . PHP_EOL);
 echo('  <tbody>' . PHP_EOL);
 
-$i = 0;
-foreach (dbFetchRows("SELECT * FROM `packages` WHERE `device_id` = ? ORDER BY `name`", [$device['device_id']]) as $entry) {
+foreach (dbFetchRows("SELECT * FROM `packages` WHERE `device_id` = ? ORDER BY `name`", [ $device['device_id'] ]) as $entry) {
 
-    switch ($entry['arch']) {
-        case "amd64":
-            $entry['arch_class'] = 'label-success';
-            break;
-        case "i386":
-            $entry['arch_class'] = 'label-info';
-            break;
-        default:
-            $entry['arch_class'] = '';
-    }
-
-    switch ($entry['manager']) {
-        case "deb":
-            $entry['manager_class'] = 'label-warning';
-            break;
-        case "rpm":
-            $entry['manager_class'] = 'label-important';
-            break;
-        default:
-            $entry['manager_class'] = '';
-    }
+    $dbuild = !safe_empty($entry['build']) ? '-' . $entry['build'] : '';
 
     echo('    <tr>' . PHP_EOL);
     echo('      <td class="entity"><a href="' . generate_url(['page' => 'packages', 'name' => $entry['name']]) . '">' . $entry['name'] . '</a></td>' . PHP_EOL);
-    if ($build != '') {
-        $dbuild = '-' . $entry['build'];
-    } else {
-        $dbuild = '';
-    }
     echo('      <td>' . $entry['version'] . $dbuild . '</td>' . PHP_EOL);
-    echo('      <td><span class="label ' . $entry['arch_class'] . '">' . $entry['arch'] . '</span></td>' . PHP_EOL);
-    echo('      <td><span class="label ' . $entry['manager_class'] . '">' . $entry['manager'] . '</span></td>' . PHP_EOL);
+    echo('      <td>' . get_type_class_label($entry['arch'], 'arch') . '</td>' . PHP_EOL);
+    echo('      <td>' . get_type_class_label($entry['manager'], 'pkg') . '</td>' . PHP_EOL);
     echo('      <td>' . format_si($entry['size']) . '</td>' . PHP_EOL);
     echo('    </tr>' . PHP_EOL);
-
-    $i++;
 }
 
 echo('  </tbody>' . PHP_EOL);

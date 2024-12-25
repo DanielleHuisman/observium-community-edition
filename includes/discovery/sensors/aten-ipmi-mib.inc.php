@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -152,7 +152,8 @@ foreach ($oids as $index => $entry) {
         $descr = str_replace([' Pwr', ' Power' ], '', $descr);
         $class = 'power';
     } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) || preg_match('/^\d+(\.\d+)?V/', $descr) ||
-              str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN', 'SOC', 'VMEM' ])) {
+              str_icontains_array($descr, [ 'VCC', 'VPP', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT',
+                                            'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN', 'SOC', 'VMEM' ])) {
         if ($value == 0) {
             continue;
         }
@@ -175,7 +176,7 @@ foreach ($oids as $index => $entry) {
         $class = 'temperature';
     }
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 }
 
 // EOF

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -302,7 +302,7 @@ function print_alert_table($vars)
 
         $alert['state_popup'] = '';
 
-        if (safe_count($state['failed'])) {
+        if (is_array($state) && isset($state['failed']) && safe_count($state['failed'])) {
             $alert['state_popup'] .= generate_box_open(['title' => 'Failed Tests']); //'<h4>Failed Tests</h4>';
 
             $alert['state_popup'] .= '<table style="min-width: 400px;" class="table   table-striped table-condensed">';

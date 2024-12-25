@@ -8,7 +8,7 @@
  * @package        observium
  * @subpackage     discovery
  * @author         Nick Schmalenberger <nick@schmalenberger.us>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -154,7 +154,7 @@ function get_fdbtable_array($vars) {
                 break;
             case 'interface':
             case 'port_name':
-                $where_array[] = generate_query_values($value, 'I.ifDescr', 'LIKE%');
+                $where_array[] = generate_query_values($value, 'I.port_label', 'LIKE%');
                 $join_ports = TRUE;
                 break;
             case 'trunk':
@@ -186,6 +186,7 @@ function get_fdbtable_array($vars) {
         }
     }
 
+    $sort = '';
     if (isset($vars['sort'])) {
         $sort_order = get_sort_order($vars);
         switch ($vars['sort']) {

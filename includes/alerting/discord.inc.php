@@ -4,27 +4,25 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     alerting
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage alerting
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 // FIXME: This is fairly messy and crude. Feel free to improve it!
 
 // Slack only params
-switch ($message_tags['ALERT_STATE']) {
-    case "RECOVER":
-        $color = "2850816";
-        break;
-
-    case "SYSLOG":
-        $color = "8410368";
-        break;
-
-    default:
-        $color = "8388651";
+if ($message_tags['ALERT_STATE'] === "SYSLOG") {
+    $color = "8410368";
+} elseif ($message_tags['ALERT_STATE'] === "RECOVER") {
+    $color = "2850816";
+} elseif (str_contains($message_tags['ALERT_STATE'], "REMINDER")) {
+    $color = "8388651";
+} else {
+    $color = "8388651";
 }
+
 $emoji = ':' . $message_tags['ALERT_EMOJI_NAME'] . ':';
 
 // JSON data

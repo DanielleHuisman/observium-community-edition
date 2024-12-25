@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -77,15 +77,18 @@ if ($hr_count) {
 
     if ($hr_cpus) {
         discover_processor($valid['processor'], $device, 1, 1, 'hr-average', 'Average', 1, $hr_total / $hr_cpus);
-        //$ucd_count = @dbFetchCell("SELECT COUNT(*) FROM `processors` WHERE `device_id` = ? AND `processor_type` = 'ucd-old'", array($device['device_id']));
-        //if ($ucd_count)
-        if (dbExist('processors', '`device_id` = ? AND `processor_type` = ?', [$device['device_id'], 'ucd-old'])) {
-            $GLOBALS['module_stats']['processors']['deleted']++;                                                   //echo('-');
-            dbDelete('processors', "`device_id` = ? AND `processor_type` = ?", [$device['device_id'], 'ucd-old']); // Heh, this is because UCD-SNMP-MIB run earlier
+
+        // Remove UCD processor poller, this is because UCD-SNMP-MIB run earlier
+        $ucd_where = '`device_id` = ? AND `processor_type` IN (?, ?)';
+        $ucd_params = [ $device['device_id'], 'ucd-old', 'ucd-raw' ];
+        if (dbExist('processors', $ucd_where, $ucd_params)) {
+            print_debug("Removed UCD processor, prefer HOST-RESOURCES average");
+            $GLOBALS['module_stats']['processors']['deleted']++;
+            dbDelete('processors', $ucd_where, $ucd_where);
         }
     }
 
-    unset($hr_array, $oid);
+    unset($hr_array, $oid, $ucd_where, $ucd_params);
 }
 
 // EOF

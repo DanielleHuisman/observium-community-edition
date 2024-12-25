@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -162,15 +162,14 @@ humanize_alert_check($check);
 echo generate_box_open($box_args);
 
 $where  = '`aca_type` = ? AND `alert_checker_id` = ?';
-$params = ['alert', $vars['alert_test_id']];
+$params = [ 'alert', $vars['alert_test_id'] ];
 if ($config['email']['default_syscontact']) {
     $where    = "($where) OR `contact_method` = ?";
     $params[] = 'syscontact';
 }
 
-$sql      = "SELECT * FROM `alert_contacts_assoc`
-          LEFT JOIN `alert_contacts` ON `alert_contacts`.`contact_id` = `alert_contacts_assoc`.`contact_id`
-          WHERE $where";
+$sql = "SELECT * FROM `alert_contacts_assoc`
+          LEFT JOIN `alert_contacts` USING(`contact_id`) WHERE $where";
 $contacts = dbFetchRows($sql, $params);
 
 echo('
@@ -192,7 +191,7 @@ echo('
             <td class="state-marker"></td>
             <!--<td>' . $check['alert_test_id'] . '</td>-->
             <td><b>' . escape_html($check['alert_name']) . '</b><br />
-                <i class="' . $config['entities'][$check['entity_type']]['icon'] . '"></i> ' . nicecase($check['entity_type']) . '</td>
+                ' . get_icon($config['entities'][$check['entity_type']]['icon']) . ' ' . nicecase($check['entity_type']) . '</td>
             <td><i><small>' . escape_html($check['alert_message']) . '</small></i></td>
             <td>');
 

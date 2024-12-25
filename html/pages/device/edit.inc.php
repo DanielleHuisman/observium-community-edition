@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -43,9 +43,6 @@ if ($cache['health_exist'][$device['device_id']]['status']) {
 // if ($cache['health_exist'][$device['device_id']]['counter']) {
 //     $panes['counter'] = 'Counters';
 // }
-if (safe_count($config['os'][$device['os']]['icons'])) {
-    $panes['icon'] = 'Icon';
-}
 
 $panes['modules'] = 'Modules';
 
@@ -74,7 +71,7 @@ if (($config['enable_libvirt'] && $device['os'] === 'linux') ||                 
     $device['os_group'] === 'unix' || is_module_enabled($device, 'unix-agent', 'poller')) { // unix-agent
     $panes['ssh'] = 'SSH';
 }
-if ($device['os_group'] === 'unix' || $device['os'] === 'generic') {
+if (($device['os_group'] === 'unix' || $device['os'] === 'generic') && (is_module_enabled($device, 'unix-agent', 'poller'))) {
     $panes['agent'] = 'Agent';
 }
 if ($device['os_group'] === 'unix' || $device['os'] === 'windows') {
@@ -125,7 +122,7 @@ if (is_file($filename)) {
 The requested page does not exist. Please correct the URL and try again.');
 }
 
-unset($filename, $navbar, $panes, $link_array);
+unset($filename, $navbar, $panes, $link_array, $readonly);
 
 register_html_title("Settings");
 

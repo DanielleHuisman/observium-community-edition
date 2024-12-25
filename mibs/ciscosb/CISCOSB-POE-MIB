@@ -1,29 +1,27 @@
 CISCOSB-POE-MIB DEFINITIONS ::= BEGIN
 
--- Title:               CISCOSB LOCALIZATION ROS
+-- Title: CISCOSB LOCALIZATION ROS
 --                      This Private MIB is enhancement for rfc3621.txt - Power Ethernet Mib
--- Version:             7.60
--- Date:                28 Nov 2005
 
 IMPORTS
-    switch001                                   FROM CISCOSB-MIB
     DisplayString, TruthValue                   FROM SNMPv2-TC
-    InterfaceIndexOrZero, InterfaceIndex    	FROM IF-MIB
+    InterfaceIndexOrZero, InterfaceIndex        FROM IF-MIB
     OBJECT-TYPE, MODULE-IDENTITY, Unsigned32    FROM SNMPv2-SMI
-    PortList                                    FROM Q-BRIDGE-MIB;
+    PortList                                    FROM Q-BRIDGE-MIB
+    switch001                                    FROM CISCOSB-MIB;
+
 
 
 rlPoe    MODULE-IDENTITY
-         LAST-UPDATED "200911260000Z"
-         ORGANIZATION "Cisco Systems, Inc."
+         LAST-UPDATED "202004100000Z"
+                ORGANIZATION "Cisco Systems, Inc."
+                CONTACT-INFO
+                "Postal: 170 West Tasman Drive
+                San Jose , CA 95134-1706
+                USA
 
-         CONTACT-INFO
-         "Postal: 170 West Tasman Drive
-         San Jose , CA 95134-1706
-         USA
-
-         
-         Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
+                
+                Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
 
          DESCRIPTION
                 "Add a new field in the PoE MIB to indicate Max power allocation allowed"
@@ -34,6 +32,7 @@ rlPoe    MODULE-IDENTITY
          DESCRIPTION
                 "Initial revision."
         ::= { switch001 108 }
+
 RlPoeType ::= TEXTUAL-CONVENTION
     STATUS      current
     DESCRIPTION "PoE types:
@@ -41,13 +40,15 @@ RlPoeType ::= TEXTUAL-CONVENTION
                 2 - PoE: Standard AF PoE
                 3 - PoE Plus: Standard AT PoE
                 4 - 60 W: 60W poe port
-		5 - PoE BT: 802.3BT standard"
+                5 - PoE BT-type3: 802.3BT standard, type 3
+                6 - PoE BT-type4: 802.3BT standard, type 4"
      SYNTAX  INTEGER {
                     none(1),
                     poe(2),
                     poeplus(3),
                     poe60w(4),
-		    poeBT(5)
+                    poeBTtype3(5),
+                    poeBTtype4(6)
                 }
 
 --rlPethPsePortTable
@@ -91,8 +92,10 @@ RlPethPsePortEntry ::= SEQUENCE {
     rlPethPsePortLegacySupport              INTEGER,
     rlPethPsePortHighPowerModeEnable        INTEGER,
     rlPethPsePortMenagementMode             INTEGER,
-    rlPethPsePortStaticPowerAllocation	    INTEGER,
-    rlPethPsePortHighPowerOpStatus	    INTEGER
+    rlPethPsePortStaticPowerAllocation      INTEGER,
+    rlPethPsePortHighPowerOpStatus          INTEGER,
+    rlPethPsePortClassLimit                 INTEGER,
+	rlPethPsePortNegotiation                TruthValue
 }
 
 rlPethPsePortGroupIndex OBJECT-TYPE
@@ -124,7 +127,7 @@ rlPethPsePortOutputVoltage OBJECT-TYPE
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-        "This variable indicates on the output voltage level in milli volts from rlPethPsePortIndex."
+        "This variable indicates on the output voltage level in millivolts from rlPethPsePortIndex."
     ::= { rlPethPsePortEntry 3 }
 
 rlPethPsePortOutputCurrent OBJECT-TYPE
@@ -132,7 +135,7 @@ rlPethPsePortOutputCurrent OBJECT-TYPE
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-        "This variable indicates on the output current level in milli amper from rlPethPsePortIndex."
+        "This variable indicates on the output current level in milliampere from rlPethPsePortIndex."
     ::= { rlPethPsePortEntry 4 }
 
 rlPethPsePortOutputPower OBJECT-TYPE
@@ -140,7 +143,7 @@ rlPethPsePortOutputPower OBJECT-TYPE
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-        "This variable indicates on the output power level in milli watts from rlPethPsePortIndex."
+        "This variable indicates on the output power level in milliwatts from rlPethPsePortIndex."
     ::= { rlPethPsePortEntry 5 }
 
 rlPethPsePortPowerLimit OBJECT-TYPE
@@ -315,7 +318,30 @@ rlPethPsePortHighPowerOpStatus OBJECT-TYPE
     DESCRIPTION
         "This variable identifies the poe port high power status"
     ::= { rlPethPsePortEntry 23 }
-	
+
+rlPethPsePortClassLimit OBJECT-TYPE
+    SYNTAX      INTEGER {
+        unlimited(0),
+        class3(3),
+        class4(4),
+        class5(5),
+        class6(6),
+        class7(7)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This variable indicates class limit for the port"
+    ::= { rlPethPsePortEntry 24 }
+
+rlPethPsePortNegotiation OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This ready-write value indicates if power negotiation is enabled or disabled."
+    ::= { rlPethPsePortEntry 25 }
+
 --rlPethMainPseTable
 
 rlPethMainPseTable OBJECT-TYPE
@@ -429,11 +455,11 @@ rlPethMainPsedisconnectMethod OBJECT-TYPE
     ::= { rlPethMainPseEntry 7 }
 
 rlPethMainPseTemperatureSensor OBJECT-TYPE
-    SYNTAX      INTEGER (-200..200)
+    SYNTAX      INTEGER (-200..200 | 32767)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-        "This variable identifies the pd temperature sensor. "
+        "This variable identifies the pd temperature sensor. 32767 (0x7FFF) represent N/A temperature"
     ::= { rlPethMainPseEntry 8 }
 
 rlPethMainPseInrushTestEnabled OBJECT-TYPE
@@ -501,7 +527,9 @@ RlPethPdPortEntry ::= SEQUENCE {
     rlPethPdPortPowerRequest                Unsigned32,
     rlPethPdPortPowerAvailable              Unsigned32,
     rlPethPdPortForcedMode                  RlPoeType,
-    rlPethPdPortNegotiationProtocolOwner    INTEGER
+    rlPethPdPortNegotiationProtocolOwner    INTEGER,
+    rlPethPdPortNegotiationEnable           TruthValue,
+    rlPethPdPortPoweredStatus               INTEGER
 }
 
 rlPethPdPortIndex OBJECT-TYPE
@@ -552,7 +580,7 @@ rlPethPdPortForcedMode OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "This variable indicates the powered PD port forced mode"
-    ::= { rlPethPdPortEntry 6 }	
+    ::= { rlPethPdPortEntry 6 }
 
 rlPethPdPortNegotiationProtocolOwner OBJECT-TYPE
     SYNTAX      INTEGER {
@@ -566,8 +594,29 @@ rlPethPdPortNegotiationProtocolOwner OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "This variable indicates the protocol owner on power management negotiation protocol"
-    ::= { rlPethPdPortEntry 7 }	
+    ::= { rlPethPdPortEntry 7 }
 
+rlPethPdPortNegotiationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This ready-write value indicates if power negotiation is enabled or disabled."
+    ::= { rlPethPdPortEntry 8 }
+
+rlPethPdPortPoweredStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        poweredStatusNA(0),
+        poweredStatusPowered(1),
+        poweredStatusAbsent(2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This variable indicates the powered status of the pd port"
+    ::= { rlPethPdPortEntry 9 }
+
+--rlPethMainPseTable
 
 --rlPethPseUnitTable
 
@@ -585,7 +634,7 @@ rlPethPseUnitEntry  OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         " An entry in the rlPethPseUnitTable."
-    INDEX    { rlPethUnitIndex } 
+    INDEX    { rlPethUnitIndex }
     ::= {rlPethPseUnitTable  1 }
 
 RlPethPseUnitEntry ::= SEQUENCE {
@@ -618,7 +667,7 @@ rlPethUnitType OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "This variable identifies the unit type (PSE/PD/Both/None)."
-    ::= { rlPethPseUnitEntry 2 }	
+    ::= { rlPethPseUnitEntry 2 }
 
 rlPethUnitColor OBJECT-TYPE
     SYNTAX      INTEGER {
@@ -631,7 +680,7 @@ rlPethUnitColor OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "This variable identifies the unit PSE status (color can be green,yellow,red)."
-    ::= { rlPethPseUnitEntry 3 }	
+    ::= { rlPethPseUnitEntry 3 }
 
 --
 -- Clear port counters Section
@@ -642,7 +691,7 @@ rlPethPseCountersClear OBJECT-TYPE
     MAX-ACCESS  read-write
     STATUS  current
     DESCRIPTION
-        "Clear poe port counter. By setting the MIB to 0x0FFFFFFF, all poe ports counters are set to zero. 
+        "Clear poe port counter. By setting the MIB to 0x0FFFFFFF, all poe ports counters are set to zero.
         by Setting to port index, all specific poe port counters are set to zero"
     ::= {rlPoe 6}
 
@@ -674,7 +723,7 @@ rlPethPerPseEntry  OBJECT-TYPE
     INDEX    { rlPethPerPseGroupIndex, rlPethPerPseDeviceIndex }
     ::= {rlPethPerPseTable  1 }
 
-RlPethPerPseEntry ::= SEQUENCE {    
+RlPethPerPseEntry ::= SEQUENCE {
     rlPethPerPseGroupIndex            INTEGER,
     rlPethPerPseDeviceIndex           INTEGER,
     rlPethPerPseTemperatureValue      INTEGER,
@@ -694,7 +743,7 @@ rlPethPerPseGroupIndex OBJECT-TYPE
     ::= { rlPethPerPseEntry 1 }
 
 rlPethPerPseDeviceIndex OBJECT-TYPE
-    SYNTAX      INTEGER (0..7)
+    SYNTAX      INTEGER (0..15)
     MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION
@@ -702,11 +751,11 @@ rlPethPerPseDeviceIndex OBJECT-TYPE
     ::= { rlPethPerPseEntry 2 }
 
 rlPethPerPseTemperatureValue OBJECT-TYPE
-    SYNTAX      INTEGER (-200..200)
+    SYNTAX      INTEGER (-200..200 | 32767)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-        "This variable represents temperature reported from PSE device."
+        "This variable represents temperature reported from PSE device. 32767 (0x7FFF) represent N/A temperature"
     ::= { rlPethPerPseEntry 3 }
 
 rlPethPerPseHwRevision OBJECT-TYPE
@@ -714,9 +763,9 @@ rlPethPerPseHwRevision OBJECT-TYPE
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-        "This variable identifies the MCU HW version."
+        "This variable identifies the PSE HW revision. String '0x0' represent N/A HW revision."
     ::= { rlPethPerPseEntry 4 }
-    
+
 rlPethPerPseVopStatus OBJECT-TYPE
     SYNTAX      INTEGER {
         deviceOk(0),
@@ -790,7 +839,7 @@ rlPethPowerPseGroupIndex OBJECT-TYPE
     ::= { rlPethPowerPseEntry 1 }
 
 
--- depricated
+-- deprecated
 rlPethPowerPsePower OBJECT-TYPE
     SYNTAX      INTEGER {
         none(0),
@@ -804,7 +853,7 @@ rlPethPowerPsePower OBJECT-TYPE
         "This variable identifies the maximum power in [W] supplied by PSE."
     ::= { rlPethPowerPseEntry 2 }
 
--- depricated
+-- deprecated
 rlPethPowerPseRpsPower OBJECT-TYPE
     SYNTAX      INTEGER {
         none(0),

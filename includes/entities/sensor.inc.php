@@ -6,18 +6,17 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 // New Definition Discovery
 
-function discover_sensor_definition($device, $mib, $entry)
-{
+function discover_sensor_definition($device, $mib, $entry) {
 
     echo($entry['oid'] . ' [');
 
-    // Just append mib name to definition entry, for simple pass to external functions
+    // Append mib name to definition entry, for simple pass to external functions
     if (empty($entry['mib'])) {
         $entry['mib'] = $mib;
     }
@@ -34,7 +33,7 @@ function discover_sensor_definition($device, $mib, $entry)
         return;
     }
 
-    // Validate if Oid exist for current mib (in case when used generic definitions, ie edgecore)
+    // Validate if Oid exist for current mib (in case when used generic definitions, i.e., edgecore)
     if (empty($entry['oid_num'])) {
         // Use snmptranslate if oid_num not set
         $entry['oid_num'] = snmp_translate($entry['oid'], $mib);
@@ -45,17 +44,21 @@ function discover_sensor_definition($device, $mib, $entry)
         }
     } else {
         $entry['oid_num'] = rtrim($entry['oid_num'], '.');
+        if (OBS_DEBUG) {
+            $oid_num = snmp_translate($entry['oid'], $mib);
+            if ($entry['oid_num'] != $oid_num) {
+                print_error("OID translate '$oid_num' not equals to definition oid_num '{$entry['oid_num']}'!");
+            }
+        }
     }
 
     // Fetch table or Oids
-    $table_oids = ['oid', 'oid_descr', 'oid_scale', 'oid_precision', 'oid_unit', 'oid_class',
-                   'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high', 'oid_limit_warn',
-                   'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale',
-                   'oid_extra', 'oid_entPhysicalIndex'];
+    $table_oids = [ 'oid', 'oid_descr', 'oid_scale', 'oid_precision', 'oid_unit', 'oid_class',
+                    'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high', 'oid_limit_warn',
+                    'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale',
+                    'oid_extra', 'oid_entPhysicalIndex' ];
 
     $sensor_array = discover_fetch_oids($device, $mib, $entry, $table_oids);
-
-    $entry['type'] = $mib . '-' . $entry['oid'];
 
     $counters = []; // Reset per-class counters for each MIB
 
@@ -65,7 +68,7 @@ function discover_sensor_definition($device, $mib, $entry)
 
         $sensor = array_merge($sensor, entity_index_tags($index));
 
-        $dot_index = strlen($index) ? '.' . $index : '';
+        $dot_index = !safe_empty($index) ? '.' . $index : '';
         $oid_num   = $entry['oid_num'] . $dot_index;
 
         // Determine the sensor class
@@ -166,7 +169,7 @@ function discover_sensor_definition($device, $mib, $entry)
         }
 
         print_debug_vars($options);
-        discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, $entry['type'], $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, $descr, $scale, $value, $options);
     }
 
     echo '] ';
@@ -175,13 +178,16 @@ function discover_sensor_definition($device, $mib, $entry)
 
 
 // Compatibility wrapper!
-function discover_sensor($class, $device, $numeric_oid, $index, $type, $sensor_descr, $scale = 1, $value = NULL, $options = [], $poller_type = NULL)
-{
+function discover_sensor($class, $device, $numeric_oid, $index, $type, $sensor_descr, $scale = 1, $value = NULL, $options = [], $poller_type = NULL) {
+
+    if (!safe_empty($type)) {
+        $options['sensor_type'] = $type;
+    }
     if (!safe_empty($poller_type)) {
         $options['poller_type'] = $poller_type;
     }
 
-    return discover_sensor_ng($device, $class, '', '', $numeric_oid, $index, $type, $sensor_descr, $scale, $value, $options);
+    return discover_sensor_ng($device, $class, '', '', $numeric_oid, $index, $sensor_descr, $scale, $value, $options);
 }
 
 
@@ -189,8 +195,8 @@ function discover_sensor($class, $device, $numeric_oid, $index, $type, $sensor_d
 /**
  * Discover a new sensor on a device
  *
- * This function adds a status sensor to a device, if it does not already exist.
- * Data on the sensor is updated if it has changed, and an event is logged with regards to the changes.
+ * This function adds a status sensor to a device (if it does not already exist).
+ * Data on the sensor is updated if it has changed, and an event is logged in regard to the changes.
  *
  * Status sensors are handed off to discover_status().
  * Current sensor values are rectified in case they are broken (added spaces, etc).
@@ -198,23 +204,22 @@ function discover_sensor($class, $device, $numeric_oid, $index, $type, $sensor_d
  * @param array        $device       Device array sensor is being discovered on
  * @param string       $class        Class of sensor (voltage, temperature, etc.)
  * @param string       $mib          SNMP MIB name
- * @param string       $object       SNMP Named Oid of sensor (without index)
- * @param string       $oid          SNMP Numeric Oid of sensor (without index)
+ * @param string       $object       SNMP Named Oid of sensor (without an index)
+ * @param string       $oid          SNMP Numeric Oid of sensor (without an index)
  * @param string       $index        SNMP index of sensor
- * @param string       $type         Type of sensor
  * @param string       $sensor_descr Description of sensor
  * @param int          $scale        Scale of sensor (0.1 for 1:10 scale, 10 for 10:1 scale, etc)
- * @param string|float $value        Current sensor value
- * @param array        $options      Options (sensor_unit, limit_auto, limit*, poller_type, scale, measured_*)
+ * @param mixed        $value        Current sensor value
+ * @param array        $options      Options (sensor_type, sensor_unit, limit_auto, limit*, poller_type, scale, measured_*)
  *
  * @return bool
  */
-function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type, $sensor_descr, $scale = 1, $value = NULL, $options = [])
-{
+function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $sensor_descr, $scale = 1, $value = NULL, $options = []) {
     global $config;
 
     //echo 'MIB:'; print_vars($mib);
 
+    $type        = $options['sensor_type'] ?? NULL; // Default type based on $mib-$object
     $poller_type = $options['poller_type'] ?? 'snmp';
 
     $sensor_deleted = 0;
@@ -229,23 +234,37 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         return discover_counter($device, $class, $mib, $object, $oid, $index, $sensor_descr, $scale, $value, $options);
     }
     if ($class === 'power' && $options['measured_class'] === 'port' &&                   // Power sensor with measured port entity
-        $config['sensors']['port']['power_to_dbm'] &&                                    // Convert option set to TRUE
-        $options['sensor_unit'] !== 'W' && !str_icontains_array($sensor_descr, 'PoE')) { // Not forced W unit, not PoE
+        $config['sensors']['port']['power_to_dbm'] &&                                    // Convert power to dbm an option set to TRUE
+        $options['sensor_unit'] !== 'W' && !str_contains(strtolower($sensor_descr), 'poe')) { // Not forced W unit, not PoE
+
         // DOM Power sensors convert to dBm
         print_debug("DOM power sensor forced to dBm sensor.");
         $options['sensor_unit'] = 'W';
-        return discover_sensor_ng($device, 'dbm', $mib, $object, $oid, $index, $type, $sensor_descr, $scale, $value, $options);
+        $options['limit_unit']  = 'W';
+        return discover_sensor_ng($device, 'dbm', $mib, $object, $oid, $index, $sensor_descr, $scale, $value, $options);
     }
 
-    // Init main
+    if (func_num_args() > 10) {
+        print_error("BUG: discover_sensor_ng() passed more arguments than supported. Probably need move \$type to \$options['sensor_type'].");
+    }
+
+    // Main params
     $param_main = [
-      'oid'            => 'sensor_oid',
-      'type'           => 'sensor_type', // anyway compare type on update, while db query is case-insensitive
-      'sensor_descr'   => 'sensor_descr',
-      'scale'          => 'sensor_multiplier',
-      'sensor_deleted' => 'sensor_deleted',
-      'mib'            => 'sensor_mib',
-      'object'         => 'sensor_object'
+        'oid'            => 'sensor_oid',
+        'type'           => 'sensor_type', // anyway, compare a type on update, while db query is case-insensitive
+        'sensor_descr'   => 'sensor_descr',
+        'scale'          => 'sensor_multiplier',
+        'sensor_deleted' => 'sensor_deleted',
+        'mib'            => 'sensor_mib',
+        'object'         => 'sensor_object'
+    ];
+
+    // Params limits
+    $param_limits = [
+        'limit_high'      => 'sensor_limit',
+        'limit_high_warn' => 'sensor_limit_warn',
+        'limit_low'       => 'sensor_limit_low',
+        'limit_low_warn'  => 'sensor_limit_low_warn'
     ];
 
     // Init numeric values
@@ -257,18 +276,21 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
     if (safe_empty($type)) {
         $type = $mib . '-' . $object;
     }
-    // Another hack for FIBERSTORE-MIB/FS-SWITCH-MIB multi lane DOM sensors
+    // Another hack for FIBERSTORE-MIB/FS-SWITCH-MIB multi-lane DOM sensors
     // Append unit as sensor type part
     if (isset($options['sensor_unit']) && str_starts($options['sensor_unit'], 'split')) {
         $type .= '-' . $options['sensor_unit'];
     }
 
     // Skip discovery sensor if value not numeric or null (default)
-    if (strlen($value)) {
-        // Some retarded devices report data with spaces and commas
+    if (!safe_empty($value)) {
+        // Some silly devices report data with spaces and commas
         // STRING: "  20,4"
         $value = snmp_fix_numeric($value, $options['sensor_unit']);
     }
+
+    // SI unit for this sensor class
+    $sensor_unit_to = $GLOBALS['config']['sensor_types'][$class]['symbol'];
 
     if (is_numeric($value)) {
         // $attrib_type = 'sensor_addition';
@@ -277,13 +299,15 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         //     $value += $options[$attrib_type];
         // }
         $value = sensor_addition($device, $value, $options,
-                                 [ 'poller_type' => $poller_type, 'device_id' => $device['device_id'],
+                                 [ 'poller_type'  => $poller_type, 'device_id' => $device['device_id'],
                                    'sensor_class' => $class, 'sensor_index' => $index,
-                                   'sensor_type' => $type, 'sensor_mib' => $mib ]);
+                                   'sensor_type'  => $type,  'sensor_mib'   => $mib ]);
 
-        $value = scale_value($value, $scale);
-        // $value *= $scale; // Scale before unit conversion
-        $value = value_to_si($value, $options['sensor_unit'], $class); // Convert if not SI unit
+        $value = scale_value($value, $scale); // Scale before unit conversion
+
+        // Convert if not SI unit
+        $value = value_unit_convert($value, $options['sensor_unit'], $sensor_unit_to);
+
     } else {
         print_debug("Sensor skipped by not numeric value: '$value', '$sensor_descr'");
         if (!safe_empty($value)) {
@@ -298,20 +322,18 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         return FALSE;
     }
 
-    $param_limits = [ 'limit_high' => 'sensor_limit', 'limit_high_warn' => 'sensor_limit_warn',
-                      'limit_low'  => 'sensor_limit_low', 'limit_low_warn' => 'sensor_limit_low_warn' ];
     foreach ($param_limits as $key => $column) {
         // Set limits vars and unit convert if required
         if (is_numeric($options[$key])) {
-            $$key = value_to_si($options[$key], $options['sensor_unit'], $class);
+            // Convert limit unit when required
+            $$key = value_unit_convert($options[$key], $options['limit_unit'], $sensor_unit_to);
             // Force disable limit auto if any limit passed
-            if (!isset($options['limit_auto']) && is_numeric($$key)) {
+            if (!isset($options['limit_auto'])) {
                 $options['limit_auto'] = FALSE;
             }
         } else {
             $$key = NULL;
         }
-        //$$key = (is_numeric($options[$key]) ? value_to_si($options[$key], $options['sensor_unit'], $class) : NULL);
     }
     // Auto calculate high/low limits if not passed
     $limit_auto = !isset($options['limit_auto']) || (bool)$options['limit_auto'];
@@ -355,14 +377,16 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         [ $limit_high_warn, $limit_low_warn ] = [ $limit_low_warn, $limit_high_warn ];
     }
 
-    // Init optional
-    $param_opt = ['entPhysicalIndex', 'entPhysicalClass', 'entPhysicalIndex_measured',
-                  'measured_class', 'measured_entity', 'measured_entity_label', 'sensor_unit'];
+    // Params optional
+    $param_opt = [ 'entPhysicalIndex', 'entPhysicalClass', 'entPhysicalIndex_measured',
+                   'measured_class', 'measured_entity', 'measured_entity_label', 'sensor_unit' ];
     foreach ($param_opt as $key) {
         $$key = $options[$key] ?: NULL;
     }
 
-    print_debug("Discover sensor: [class: $class, device: " . $device['hostname'] . ", oid: $oid, index: $index, type: $type, descr: $sensor_descr, scale: $scale, limits: ($limit_low, $limit_low_warn, $limit_high_warn, $limit_high), CURRENT: $value, $entPhysicalIndex, $entPhysicalClass");
+    print_debug("Discover sensor: [class: $class, device: " . $device['hostname'] .
+                ", oid: $oid, index: $index, type: $type, descr: $sensor_descr, scale: $scale" .
+                ", limits: ($limit_low, $limit_low_warn, $limit_high_warn, $limit_high), CURRENT: $value, $entPhysicalIndex, $entPhysicalClass");
 
     // print_debug_vars($limit_auto);
     // print_debug_vars($limit_high);
@@ -372,6 +396,8 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
     if (!dbExist('sensors', '`poller_type`= ? AND `sensor_class` = ? AND `device_id` = ? AND `sensor_type` = ? AND `sensor_index` = ?',
                  [ $poller_type, $class, $device['device_id'], $type, $index ])) {
+
+        // Limits fixates
         if (!is_numeric($limit_high)) {
             $limit_high = sensor_limit_high($class, $value, $limit_auto);
         }
@@ -397,8 +423,8 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
             print_cli_table($limit_rows, [ 'Limit Param', 'Value' ]);
         }
 
-        $sensor_insert = ['poller_type'  => $poller_type, 'sensor_class' => $class, 'device_id' => $device['device_id'],
-                          'sensor_index' => $index, 'sensor_type' => $type];
+        $sensor_insert = [ 'poller_type'  => $poller_type, 'device_id' => $device['device_id'],
+                           'sensor_class' => $class,  'sensor_index' => $index, 'sensor_type' => $type ];
 
         foreach ($param_main as $key => $column) {
             $sensor_insert[$column] = $$key;
@@ -406,18 +432,15 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
         foreach ($param_limits as $key => $column) {
             // Convert strings/numbers to (float) or to array('NULL')
-            $$key                   = is_numeric($$key) ? (float)$$key : ['NULL'];
-            $sensor_insert[$column] = $$key;
+            $sensor_insert[$column] = is_numeric($$key) ? (float)$$key : [ 'NULL' ];
         }
+
         foreach ($param_opt as $key) {
-            if (is_null($$key)) {
-                $$key = ['NULL'];
-            }
-            $sensor_insert[$key] = $$key;
+            $sensor_insert[$key] = !is_null($$key) ? $$key : [ 'NULL' ];
         }
 
         $sensor_insert['sensor_value']  = $value;
-        $sensor_insert['sensor_polled'] = time(); // array('NOW()'); // this field is INT(11)
+        $sensor_insert['sensor_polled'] = time();
 
         $sensor_id = dbInsert($sensor_insert, 'sensors');
 
@@ -434,7 +457,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
         log_event("Sensor added: $class $type $index $sensor_descr", $device, 'sensor', $sensor_id);
     } else {
-        $sensor_entry = dbFetchRow("SELECT * FROM `sensors` WHERE `sensor_class` = ? AND `device_id` = ? AND `sensor_type` = ? AND `sensor_index` = ?", [$class, $device['device_id'], $type, $index]);
+        $sensor_entry = dbFetchRow("SELECT * FROM `sensors` WHERE `sensor_class` = ? AND `device_id` = ? AND `sensor_type` = ? AND `sensor_index` = ?", [ $class, $device['device_id'], $type, $index ]);
         $sensor_id    = $sensor_entry['sensor_id'];
 
         // Limits
@@ -512,7 +535,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
 
         foreach ($param_opt as $key) {
             if ($$key != $sensor_entry[$key]) {
-                $update[$key] = !is_null($$key) ? $$key : ['NULL'];
+                $update[$key] = !is_null($$key) ? $$key : [ 'NULL' ];
             }
         }
 
@@ -531,7 +554,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
         }
 
         if (count($update)) {
-            $updated = dbUpdate($update, 'sensors', '`sensor_id` = ?', [$sensor_entry['sensor_id']]);
+            $updated = dbUpdate($update, 'sensors', '`sensor_id` = ?', [ $sensor_entry['sensor_id'] ]);
             echo('U');
             log_event("Sensor updated: $class $type $index $sensor_descr", $device, 'sensor', $sensor_entry['sensor_id']);
         } else {
@@ -557,8 +580,6 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
     $GLOBALS['valid']['sensor'][$class][$type][$index] = 1;
 
     return $sensor_id;
-    //return TRUE;
-
 }
 
 // TESTME needs unit testing
@@ -1033,8 +1054,7 @@ function parse_ipmitool_sensor($device, $results, $source = 'ipmi')
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function get_sensor_rrd($device, $sensor)
-{
+function get_sensor_rrd($device, $sensor) {
     global $config;
 
     # For IPMI/agent, sensors tend to change order, and there is no index, so we prefer to use the description as key here.
@@ -1047,10 +1067,7 @@ function get_sensor_rrd($device, $sensor)
     }
 
     // note, in discover_sensor_ng() sensor_type == %mib%-%object%
-    $rrd_file = "sensor-" . $sensor['sensor_class'] . "-" . $sensor['sensor_type'] . "-" . $index . ".rrd";
-
-
-    return $rrd_file;
+    return "sensor-" . $sensor['sensor_class'] . "-" . $sensor['sensor_type'] . "-" . $index . ".rrd";
 }
 
 // DOCME needs phpdoc block
@@ -1213,7 +1230,9 @@ function sensor_value_scale($device, $sensor_value, &$sensor_db) {
     }
 
     // Unit conversion to SI (if required)
-    return value_to_si($sensor_value, $sensor_db['sensor_unit'], $sensor_db['sensor_class']);
+    $unit_to = $GLOBALS['config']['sensor_types'][$sensor_db['sensor_class']]['symbol'];
+
+    return value_unit_convert($sensor_value, $sensor_db['sensor_unit'], $unit_to);
 }
 
 function sensor_addition($device, $sensor_value, $attribs = [], $sensor_db = []) {
@@ -1248,6 +1267,245 @@ function sensor_addition($device, $sensor_value, $attribs = [], $sensor_db = [])
     }
 
     return $sensor_value;
+}
+
+/**
+ * Convert the value of sensor from known unit to another unit
+ *
+ * @param float|string $value Value in non standard unit
+ * @param string       $unit_from Unit name/symbol convert from
+ * @param string|null  $unit_to   Unit name/symbol convert to (default SI unit for sensor class)
+ *
+ * @return float|string Value converted to standard (SI) unit
+ */
+
+function value_unit_convert($value, $unit_from, $unit_to = NULL) {
+
+    if (!is_numeric($value) || empty($unit_from)) {
+        // Just return the original value if not numeric
+        return $value;
+    }
+
+    $unit_lower    = strtolower($unit_from);
+    $unit_to_lower = strtolower($unit_to);
+    $case_units = [
+        'c'    => 'C', 'celsius'    => 'C', '&deg;c' => 'C',
+        'f'    => 'F', 'fahrenheit' => 'F',
+        'k'    => 'K', 'kelvin'     => 'K',
+
+        'w'    => 'W', 'watts'      => 'W',
+        'dbm'  => 'dBm',
+
+        'mpsi' => 'Mpsi',
+        'mmhg' => 'mmHg',
+        'inhg' => 'inHg',
+        'mg/m<sup>3</sup>' => 'mg/m3',
+    ];
+    // set a correct unit case (required for external lib)
+    if (isset($case_units[$unit_lower])) {
+        $unit_from = $case_units[$unit_lower];
+    }
+    if (!empty($unit_to_lower) && isset($case_units[$unit_to_lower])) {
+        $unit_to = $case_units[$unit_to_lower];
+    }
+
+    switch ($unit_lower) {
+        case 'units':
+        case 'bytes':
+        case 'bits':
+            // This unit didn't require conversions
+            return $value;
+
+        case 'f':
+        case 'fahrenheit':
+        case 'k':
+        case 'kelvin':
+            $type = 'temperature';
+            $unit_to = 'C';
+
+            try {
+                // Fix case of unit
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Temperature::getUnit($unit_from);
+            } catch (Throwable $e) {
+                $unit_from = $unit_lower;
+            }
+            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Temperature($value, $unit_from);
+            $si_value   = $value_from->toUnit($unit_to);
+            if ($si_value < -273.15) {
+                // Physically incorrect value
+                $si_value = FALSE;
+            }
+
+            $from = $value . " $unit_from";
+            $to   = $si_value . ' Celsius';
+            break;
+
+        case 'c':
+        case 'celsius':
+            // not convert, just keep the correct value
+            return $value;
+
+        case 'w':
+        case 'watts':
+            if ($unit_to_lower === 'dbm') {
+                // Used when Power convert to dBm
+                // https://en.wikipedia.org/wiki/DBm
+                // https://www.everythingrf.com/rf-calculators/watt-to-dbm
+                if ($value > 0) {
+                    $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, 'W');
+                    $si_value   = $value_from->toUnit('dBm');
+
+                    $from = $value . " $unit_from";
+                    $to   = $si_value . ' dBm';
+                } elseif (strlen($value) && $value == 0) {
+                    // See: https://jira.observium.org/browse/OBS-3200
+                    $si_value = -99; // This is incorrect, but the minimum possible value for dBm
+                    $from     = $value . ' W';
+                    $to       = $si_value . ' dBm';
+                } else {
+                    $si_value = FALSE;
+                    $from     = $value . ' W';
+                    $to       = 'FALSE';
+                }
+            } else {
+                // not convert, just keep correct value
+                $type = 'power';
+                return $value;
+            }
+            break;
+
+        case 'dbm':
+            if ($unit_to_lower === 'w' || $unit_to_lower === 'watts') {
+                // Used when Power convert to dBm
+                // https://en.wikipedia.org/wiki/DBm
+                // https://www.everythingrf.com/rf-calculators/dbm-to-watts
+                $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, 'dBm');
+                $si_value   = $value_from->toUnit('W');
+
+                $from = $value . " $unit_from";
+                $to   = $si_value . ' W';
+
+            } else {
+                // not convert, just keep correct value
+                $type = 'dbm';
+                return $value;
+            }
+            break;
+
+        case 'psi':
+        case 'ksi':
+        case 'mpsi':
+        case 'mmhg':
+        case 'inhg':
+        case 'bar':
+        case 'atm':
+            $type = 'pressure';
+            $unit_to = 'Pa';
+
+            // https://en.wikipedia.org/wiki/Pounds_per_square_inch
+            try {
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Pressure::getUnit($unit_from);
+            } catch (Throwable $e) {
+                $unit_from = $unit_lower;
+            }
+            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit_from);
+            $si_value   = $value_from->toUnit($unit_to);
+
+            $from = $value . " $unit_from";
+            $to   = $si_value . " $unit_to";
+            break;
+
+        case 'ft/s':
+        case 'fps':
+        case 'ft/min':
+        case 'fpm':
+        case 'lfm': // linear feet per minute
+        case 'mph': // Miles per hour
+        case 'mps': // Miles per second
+        case 'm/min': // Meter per minute
+        case 'km/h':  // Kilometer per hour
+            $type = 'velocity';
+            $unit_to = 'm/s';
+
+            try {
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\Velocity::getUnit($unit_from);
+            } catch (Throwable $e) {
+                // PHP 7+
+                $unit_from = $unit_lower;
+            }
+            // Any velocity units:
+            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Velocity($value, $unit_from);
+            $si_value   = $value_from->toUnit($unit_to);
+
+            $from = $value . " $unit_from";
+            $to   = $si_value . " $unit_to";
+            break;
+
+        case 'ft3/s':
+        case 'cfs':
+        case 'ft3/min':
+        case 'cfm':
+        case 'gpd': // US (gallon per day)
+        case 'gpm': // US (gallon per min)
+        case 'l/min':
+        case 'lpm':
+        case 'cmh':
+        case 'm3/h':
+        case 'cmm':
+        case 'm3/min':
+            try {
+                $tmp = \PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow::getUnit($unit_from);
+            } catch (Throwable $e) {
+                $unit_from = $unit_lower;
+            }
+            /*
+            if ($type === 'waterflow') {
+                // Waterflow default unit is L/s
+                $unit_to = 'L/s';
+            } elseif ($type === 'airflow') {
+                // Use for Airflow imperial unit CFM (Cubic foot per minute) as a more common industry standard
+                $unit_to = 'CFM';
+            } else {
+                // For the future
+                $unit_to = 'm^3/s';
+            }
+            */
+            $unit_to = !empty($unit_to) ? $unit_to : 'm^3/s';
+            $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\VolumeFlow($value, $unit_from);
+            $si_value   = $value_from->toUnit($unit_to);
+
+            $from = $value . " $unit_from";
+            $to   = $si_value . " $unit_to";
+            break;
+
+        default:
+            // Ability to use any custom function to convert value based on unit name
+            $function_name = 'value_unit_' . $unit_lower; // ie: value_unit_ekinops_dbm1($value) or value_unit_ieee32float($value)
+            if (function_exists($function_name)) {
+                $si_value = $function_name($value);
+
+                $from = "$function_name($value)";
+                $to   = $si_value;
+            } elseif ($unit_to_lower === 'pa' && str_ends($unit_lower, [ 'pa', 'si' ])) {
+                $type = 'pressure';
+                $unit_to = 'Pa';
+
+                // Any of pressure unit, like hPa
+                $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit_from);
+                $si_value   = $value_from->toUnit('Pa');
+
+                $from = $value . " $unit_from";
+                $to   = $si_value . " $unit_to";
+            }
+
+    }
+
+    if (isset($si_value)) {
+        print_debug('Converted ' . nicecase($type) . ' value: ' . $from . ' -> ' . $to);
+        return $si_value;
+    }
+
+    return $value; // Fallback original value
 }
 
 /**
@@ -1295,6 +1553,24 @@ function value_unit_ekinops_dbm2($value)
 function value_unit_tmnx_rx_power($rx, $rx0 = 0, $rx1 = 0, $rx2 = 0, $rx3 = 0, $rx4 = 0)
 {
     return ieeeint2float($rx0) + ieeeint2float($rx1) * $rx**1 + ieeeint2float($rx2) * $rx**2 + ieeeint2float($rx3) * $rx**3 + ieeeint2float($rx4) * $rx**4;
+}
+
+
+// sys[46] 06 i R "raw" (raw) temperature value of the SoC chip (it is not directly the temperature in degC, but a special digital value),
+//                    the meaning of the values ​​ depends on the type of specific SDS device.
+//                    It is given by the way this temperature is measured, and the conversion to degrees Celsius is simple, through the formula.
+//
+//  SDS MICRO (LM), MACRO (LM), UPS, IO6 (LM):
+//   The formula to convert to degC is [ temperature_SoC_in_degC = ((5*(59-30*((3/1024)*sys[46])))/2) ]
+//
+//  SDS TTCPRO, MINI, MACRO-ST, MICRO-ST, IO6-ST:
+//   The formula to convert to degC is [ temperature_SoC_v_degC = (((((sys[46]/4096)*3.3)-0.76)/0.0025)+25) ]
+function value_unit_sds_lm($value) {
+    return (5 * (59 - 30 * ((3 / 1024) * $value))) / 2;
+}
+
+function value_unit_sds_st($value) {
+    return (((($value / 4096) * 3.3) - 0.76) / 0.0025) + 25;
 }
 
 // EOF

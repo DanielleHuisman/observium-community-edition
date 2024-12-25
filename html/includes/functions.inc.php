@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -232,16 +232,21 @@ function register_html_alert($text, $title = NULL, $severity = 'info') {
  * @param string $html Section panel content
  */
 // TESTME needs unit testing
-function register_html_panel($html = '')
-{
-    if (!isset($GLOBALS['cache_html']['page_panel']) && is_alpha($html) &&
-        is_file($GLOBALS['config']['html_dir'] . "/includes/panels/" . $html . ".inc.php")) {
+function register_html_panel($html = '') {
+    if (!isset($GLOBALS['cache_html']['page_panel']) && (empty($html) || $html === 'default')) {
+        // register default (ajax) panel
 
-        $panel_file = $GLOBALS['config']['html_dir'] . "/includes/panels/" . $html . ".inc.php";
-        ob_start();
-        include($panel_file);
-        $html = ob_get_clean();
+        // Load a default panel after whole page (only when visible)
+        // $config['html_dir'] . "/includes/panels/default.inc.php"
+        register_html_resource('script', "$(document).ready(function (e) { $('#myAffix:visible[data-panel=default]').load('/ajax/panel.php').attr('data-panel', 'loaded'); });");
+        // load when become visible
+        register_html_resource('script', "$(window).resize(function (e)  { $('#myAffix:visible[data-panel=default]').load('/ajax/panel.php').attr('data-panel', 'loaded'); });");
+
+        return;
     }
+
+    // Just rename data attrib for panel placeholder from default
+    register_html_resource('script', "$(document).ready(function (e) { $('#myAffix[data-panel=default]').attr('data-panel', 'register'); });");
 
     $GLOBALS['cache_html']['page_panel'] = $html;
 }
@@ -454,7 +459,8 @@ function get_vars($vars_order = [], $auth = FALSE) {
 function form_action(&$vars) {
     global $config;
 
-    if (!isset($vars['action']) || !is_alpha($vars['action'])) {
+    if (!isset($vars['action']) || is_ajax() || !is_alpha($vars['action'])) {
+        //bdump($vars);
         return FALSE;
     }
     if ($vars['page'] === 'wmap') {
@@ -463,15 +469,22 @@ function form_action(&$vars) {
     }
     if ($_SESSION['userlevel'] < 7) {
         print_error_permission('Action not allowed.');
+        return FALSE;
     }
     if (!request_token_valid($vars)) {
         //r($vars);
         return FALSE;
     }
 
+    if ($config['devel']) {
+        bdump($vars);
+    }
+
     $limitwrite  = $_SESSION['userlevel'] >= 8;
     $securewrite = $_SESSION['userlevel'] >= 9;
     $readwrite   = $_SESSION['userlevel'] >= 10;
+
+    $vars['action'] = strtolower($vars['action']); // force action to lowercase
 
     if (is_file($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php")) {
         return include($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php");
@@ -496,8 +509,7 @@ function form_action(&$vars) {
  *
  * @return boolean TRUE if session requesttoken same as passed from request
  */
-function request_token_valid($token = NULL, &$json = '')
-{
+function request_token_valid($token = NULL, &$json = '') {
     if (is_array($token)) {
         // If $vars array passed, fetch our default 'requesttoken' param
         $token = $token['requesttoken'];
@@ -512,13 +524,15 @@ function request_token_valid($token = NULL, &$json = '')
     // See: https://stackoverflow.com/questions/6287903/how-to-properly-add-csrf-token-using-php
     // Session token generated after valid user auth in html/includes/authenticate.inc.php
     if (empty($_SESSION['requesttoken'])) {
-        // User not authenticated
+        // User didn't authenticate
         //print_warning("Request passed by unauthorized user.");
         if ($silent) {
             $json = safe_json_encode(['status' => 'failed', 'message' => 'Request passed by unauthorized user.', 'class' => 'danger']);
         }
+
         return FALSE;
     }
+
     if (empty($token)) {
         // Token not passed, WARNING seems as CSRF attack
         if (!$silent) {
@@ -526,9 +540,10 @@ function request_token_valid($token = NULL, &$json = '')
         } else {
             $json = safe_json_encode(['status' => 'failed', 'message' => 'WARNING. Possible CSRF attack with EMPTY request token.', 'class' => 'danger']);
         }
-        ///FIXME. need an user actions log
+
         return FALSE;
     }
+
     if (hash_equals($_SESSION['requesttoken'], $token)) {
         // Correct session and request tokens, all good
         if ($silent) {
@@ -542,7 +557,7 @@ function request_token_valid($token = NULL, &$json = '')
     if (!$silent) {
         print_error("WARNING. Possible CSRF attack with INCORRECT request token.");
     } else {
-        $json = safe_json_encode(['status' => 'failed', 'message' => 'WARNING. Possible CSRF attack with INCORRECT request token.', 'class' => 'danger',
+        $json = safe_json_encode([ 'status' => 'failed', 'message' => 'WARNING. Possible CSRF attack with INCORRECT request token.', 'class' => 'danger',
                                   /* 'session_t' => $_SESSION['requesttoken'], 'request_t' => $token */]);
     }
     ///FIXME. need an user actions log
@@ -555,12 +570,11 @@ function request_token_valid($token = NULL, &$json = '')
  *
  * @return string
  */
-function generate_alert_graph($graph_array)
-{
-    global $config;
+function generate_alert_graph($graph_array) {
+    global $config, $vars;
 
     $vars                   = $graph_array;
-    $auth                   = (is_cli() ? TRUE : $GLOBALS['auth']); // Always set $auth to true for cli
+    $auth                   = is_cli() ? TRUE : $GLOBALS['auth']; // Always set $auth to true for cli
     $vars['image_data_uri'] = TRUE;
     $vars['height']         = '150';
     $vars['width']          = '400';
@@ -718,7 +732,7 @@ function detect_browser($user_agent = NULL)
     if (isset($GLOBALS['config']['devel']) && $GLOBALS['config']['devel']) {
         bdump($GLOBALS['cache']['detect_browser']);
     }
-
+    
     return $GLOBALS['cache']['detect_browser'];
 }
 
@@ -797,7 +811,7 @@ function get_browser_screen(&$detect_browser) {
     $detect_browser['screen_ratio'] = $_COOKIE['observium_screen_ratio'] ?? 2;
     if (isset($_COOKIE['observium_screen_resolution'])) {
         $detect_browser['screen_resolution'] = $_COOKIE['observium_screen_resolution'];
-        //$detect_browser['screen_size']       = $_COOKIE['observium_screen_size'];
+        $detect_browser['screen_size']       = $_COOKIE['observium_screen_size'];
     }
 
     return $detect_browser['screen_ratio'];
@@ -863,16 +877,14 @@ function generate_link($text, $vars, $new_vars = [], $escape = TRUE)
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function pagination(&$vars, $total, $options = [])
-{
+function pagination(&$vars, $total, $options = []) {
 
     // Compatibility with pre-options
-    if ($options === TRUE) {
-        $options                = [];
-        $options['return_vars'] = TRUE;
+    if (!is_array($options)) {
+        $options = [ 'return_vars' => (bool)$options ];
     }
 
-    $pagesizes = [10, 20, 50, 100, 500, 1000, 10000, 50000]; // Permitted pagesizes
+    $pagesizes = [ 10, 20, 50, 100, 500, 1000, 10000, 50000 ]; // Permitted pagesizes
     if (is_numeric($vars['pagesize'])) {
         $per_page = (int)$vars['pagesize'];
     } elseif (isset($_SESSION['pagesize'])) {
@@ -881,7 +893,8 @@ function pagination(&$vars, $total, $options = [])
         $per_page = $GLOBALS['config']['web_pagesize'];
     }
 
-    if (!$vars['short']) {
+    // Widget/ajax do not set session var for pagesize
+    if (!$vars['short'] && !is_ajax()) {
         // Permit fixed pagesizes only (except $vars['short'] == TRUE)
         foreach ($pagesizes as $pagesize) {
             if ($per_page <= $pagesize) {
@@ -1531,10 +1544,9 @@ function generate_menu_link($url, $text, $count = NULL, $class = 'label', $escap
  * @param bool $escape
  */
 // TESTME needs unit testing
-function generate_menu_link_ng($array, $text = NULL, $escape = TRUE)
-{
+function generate_menu_link_ng($array, $text = NULL, $escape = TRUE) {
 
-    $array = array_merge([ 'role' => 'menuitem', 'count' => NULL, 'count_class' => 'label' ], (array)$array);
+    $array = array_merge([ 'role' => 'menuitem', 'count' => NULL, 'event' => '' ], (array)$array);
 
     $attribs = [];
     if (isset($array['role'])) {
@@ -1634,11 +1646,13 @@ function generate_menu_link_ng($array, $text = NULL, $escape = TRUE)
     } else {
         // single counts
         if (isset($array['alert_count']) && is_numeric($array['alert_count'])) {
-            $extra .= ' <span class="label label-danger">' . $array['alert_count'] . '</span> ';
+            //$extra .= ' <span class="label label-danger">' . $array['alert_count'] . '</span> ';
+            $extra .= ' ' . get_label_span($array['alert_count'], 'danger') . ' ';
         }
 
         if (isset($array['count']) && is_numeric($array['count'])) {
-            $extra .= ' <span class="' . $array['count_class'] . '">' . $array['count'] . '</span>';
+            //$extra .= ' <span class="' . $array['count_class'] . '">' . $array['count'] . '</span>';
+            $extra .= ' ' . get_label_span($array['count'], $array['events']);
         }
     }
     if (isset($array['extra'])) {
@@ -2260,12 +2274,16 @@ function generate_query_permitted_ng($type_array = [ 'device' ], $options = []) 
                 $query_part[]      = implode(" AND ", $query_permitted);
                 unset($query_permitted);
                 break;
+
             // Ports permission query
             case 'port':
             case 'ports':
-                $column = '`port_id`';
-                if (isset($options['port_table'])) {
-                    $column = '`' . $options['port_table'] . '`.' . $column;
+                $table = isset($options['port_table']) ? '`' . $options['port_table'] . '`.' : '';
+                if (isset($options['entity'])) {
+                    $query_permitted[] = generate_query_values('port', $table.'entity_type');
+                    $column = $table.'`entity_id`';
+                } else {
+                    $column = $table.'`port_id`';
                 }
 
                 // If port IDs stored in SESSION use it (used in ajax)
@@ -2359,15 +2377,18 @@ function generate_query_permitted_ng($type_array = [ 'device' ], $options = []) 
                 unset($query_permitted);
 
                 break;
+
             case 'sensor':
             case 'sensors':
                 // For sensors
                 // FIXME -- this is easily generifyable, just use translate_table_array()
 
-                $column = '`sensor_id`';
-
-                if (isset($options['sensor_table'])) {
-                    $column = '`' . $options['sensor_table'] . '`.' . $column;
+                $table = isset($options['sensor_table']) ? '`' . $options['sensor_table'] . '`.' : '';
+                if (isset($options['entity'])) {
+                    $query_permitted[] = generate_query_values('sensor', $table.'entity_type');
+                    $column = $table.'`entity_id`';
+                } else {
+                    $column = $table.'`sensor_id`';
                 }
 
                 // If IDs stored in SESSION use it (used in ajax)
@@ -2379,12 +2400,16 @@ function generate_query_permitted_ng($type_array = [ 'device' ], $options = []) 
                 // Show only permitted entities
                 if ($user_limited) {
                     if (!safe_empty($GLOBALS['permissions']['sensor'])) {
-                        $query_permitted = generate_query_values(array_keys((array)$GLOBALS['permissions']['sensor']), $column);
+                        $query_permitted[] = generate_query_values(array_keys((array)$GLOBALS['permissions']['sensor']), $column);
                     } else {
                         // Exclude all entries, because there are no permitted entities
-                        $query_permitted = '0';
+                        $query_permitted[] = '0';
                     }
-                    $query_part[] = $query_permitted;
+                    $query_permitted = implode(" AND ", (array)$query_permitted);
+
+                    if (!safe_empty($query_permitted)) {
+                        $query_part[] = str_replace(" AND OR ", ' OR ', $query_permitted);
+                    }
                     unset($query_permitted);
                 }
 
@@ -2409,6 +2434,7 @@ function generate_query_permitted_ng($type_array = [ 'device' ], $options = []) 
                 }
 
                 break;
+
             case 'bill':
             case 'bills':
                 // For bills
@@ -2668,6 +2694,16 @@ function process_sql_vars($vars)
                             $ok = TRUE;
                         }
                         break;
+
+                    case 'enum-list':
+                        //r($content);
+                        //r($params);
+                        if (isset($content['value'])) {
+                            $content = array_filter(array_unique($content['value']), static function ($value) { return !safe_empty($value); });
+                            $ok = !safe_empty($content);
+                            //r($content);
+                        }
+                        break;
                     case 'enum-key-value':
                         //r($content);
                         //r($params);
@@ -2676,11 +2712,12 @@ function process_sql_vars($vars)
                             $content = [];
                             foreach ($tmp['key'] as $i => $key) {
                                 if (safe_empty($key) && safe_empty($tmp['value'][$i])) {
+                                    // skip an empty key-value pair
                                     continue;
-                                } // skip empty key-value pair
+                                }
                                 $content[$key] = $tmp['value'][$i];
                             }
-                            $ok = TRUE;
+                            $ok = !safe_empty($content);
                             //r($content);
                         }
                         break;
@@ -2980,21 +3017,25 @@ function html_highlight($text, $search = [], $replace = '', $words = FALSE)
  * @return string
  */
 function get_type_class($type, $group = "unknown") {
-    global $cache, $config;
+    global $cache;
 
     // Short-circuit if hardcoded classes exist for this
-    if (isset($config['type_class'][$group][$type]['class'])) {
-        return $config['type_class'][$group][$type]['class'];
+    if (isset($GLOBALS['config']['type_class'][$group][$type]['class'])) {
+        return $GLOBALS['config']['type_class'][$group][$type]['class'];
     }
 
     if (isset($cache['type_class'][$group][$type])) {
         return $cache['type_class'][$group][$type]['class'];
     }
 
-    // Hardcode available classes (perhaps make this somehow configurable per-group for larger groups)
-    $classes = [ 'primary', 'success', 'warning', 'error', 'suppressed' ];
+    // all known label classes
+    // $classes = [ 'default', 'primary', 'success', 'info', 'warning', 'important',
+    //              'error', 'danger', 'suppressed', 'delayed', 'inverse', 'rainbow' ];
 
-    $next = $cache['type_class'][$group]['NEXT'] ?? 0;
+    // available label classes for cycling
+    $classes = [ 'primary', 'success', 'info', 'warning', 'important', 'suppressed', 'default' ];
+
+    $next = $cache['type_class'][$group]['_NEXT_'] ?? 0;
 
     $cache['type_class'][$group][$type]['class'] = $classes[$next];
 
@@ -3003,7 +3044,7 @@ function get_type_class($type, $group = "unknown") {
     } else {
         $next = 0;
     }
-    $cache['type_class'][$group]['NEXT'] = $next;
+    $cache['type_class'][$group]['_NEXT_'] = $next;
 
     return $cache['type_class'][$group][$type]['class'];
 }
@@ -3017,7 +3058,6 @@ function get_type_class($type, $group = "unknown") {
  * @return string
  */
 function get_type_class_label($type, $group = "unknown") {
-
     return '<span class="label label-' . get_type_class($type, $group) . '">' . $type . '</span>';
 }
 

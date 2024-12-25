@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -82,7 +82,7 @@ function print_navbar($navbar)
                 <?php
 
                 if (isset($navbar['brand'])) {
-                    echo ' <a class="brand ' . ($navbar['brand-class'] ?? '') . '">' . $navbar['brand'] . '</a>';
+                    echo ' <a class="brand ' . ($navbar['brand-class'] ?? '') . '">' . escape_html($navbar['brand']) . '</a>';
                 }
 
                 echo('<div class="nav-collapse" id="nav-' . $id . '">');
@@ -426,7 +426,6 @@ function navbar_location_menu($array)
                 $icon      = get_icon_country($new_entry);
             } elseif ($new_entry_data['level'] === "location") {
                 $name = $new_entry === '' ? OBS_VAR_UNSET : $new_entry;
-                //echo('            <li>' . generate_menu_link(generate_location_url($new_entry), $image . '&nbsp;' . $name, $new_entry_data['count']) . '</li>');
                 echo('            <li>' . generate_menu_link_ng([ 'url' => generate_location_url($new_entry), 'icon' => $icon, 'count' => $new_entry_data['count'] ], $name) . '</li>');
                 continue;
             }
@@ -442,12 +441,10 @@ function navbar_location_menu($array)
                         $link_array['location_country'] = var_encode($array['country']);
                     }
 
-                    //echo('<li class="dropdown-submenu">' . generate_menu_link(generate_url($link_array), $image . '&nbsp;' . $sub_entry, $sub_entry_data['count']));
                     echo('<li class="dropdown-submenu">' . generate_menu_link_ng([ 'url' => generate_url($link_array), 'icon' => $icon, 'count' => $sub_entry_data['count'] ], $sub_entry));
                     navbar_location_menu($sub_entry_data);
                 } else {
                     $name = $sub_entry === '' ? OBS_VAR_UNSET : escape_html($sub_entry);
-                    //echo('            <li>' . generate_menu_link(generate_location_url($sub_entry), $image . '&nbsp;' . $name, $sub_entry_data['count']) . '</li>');
                     echo('            <li>' . generate_menu_link_ng([ 'url' => generate_location_url($sub_entry), 'icon' => $icon, 'count' => $sub_entry_data['count'] ], $name) . '</li>');
                 }
             }

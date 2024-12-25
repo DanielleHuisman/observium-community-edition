@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -36,7 +36,7 @@ foreach (array_slice(array_keys($hpups_array), 1) as $phase) {
     $value = $hpups_array[$phase]['upsInputVoltage'];
 
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsInputEntry.$index"];
-    discover_sensor_ng($device, 'voltage', $mib, 'upsInputVoltage', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'voltage', $mib, 'upsInputVoltage', $oid, $index, $descr, 1, $value, $options);
 
     ## Input current
     $oid = ".1.3.6.1.4.1.232.165.3.3.4.1.3.$index";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         # CPQPOWER-MIB:upsInputCurrent.$index
@@ -44,14 +44,14 @@ foreach (array_slice(array_keys($hpups_array), 1) as $phase) {
 
     if ($value < 10000) { # upsInputCurrent.1 = 136137420 ? really? You're nuts.
         $options = ['rename_rrd' => "CPQPOWER-MIB-upsInputEntry.$index"];
-        discover_sensor_ng($device, 'current', $mib, 'upsInputCurrent', $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, 'upsInputCurrent', $oid, $index, $descr, 1, $value, $options);
     }
 
     ## Input power
     $oid     = ".1.3.6.1.4.1.232.165.3.3.4.1.4.$index";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             # CPQPOWER-MIB:upsInputWatts.$index
     $value   = $hpups_array[$phase]['upsInputWatts'];
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsInputEntry.$index"];
-    discover_sensor_ng($device, 'power', $mib, 'upsInputWatts', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'power', $mib, 'upsInputWatts', $oid, $index, $descr, 1, $value, $options);
 
     # Output
     $index = $hpups_array[$phase]['upsOutputPhase'];
@@ -64,26 +64,26 @@ foreach (array_slice(array_keys($hpups_array), 1) as $phase) {
     $oid     = ".1.3.6.1.4.1.232.165.3.4.4.1.2.$index"; # CPQPOWER-MIB:upsOutputVoltage.$index
     $value   = $hpups_array[$phase]['upsOutputVoltage'];
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsOutputEntry.$index"];
-    discover_sensor_ng($device, 'voltage', $mib, 'upsOutputVoltage', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'voltage', $mib, 'upsOutputVoltage', $oid, $index, $descr, 1, $value, $options);
 
     ## Output current
     $oid     = ".1.3.6.1.4.1.232.165.3.4.4.1.3.$index"; # CPQPOWER-MIB:upsOutputCurrent.$index
     $value   = $hpups_array[$phase]['upsOutputCurrent'];
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsOutputEntry.$index"];
-    discover_sensor_ng($device, 'current', $mib, 'upsOutputCurrent', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'current', $mib, 'upsOutputCurrent', $oid, $index, $descr, 1, $value, $options);
 
     ## Output power
     $oid     = ".1.3.6.1.4.1.232.165.3.4.4.1.4.$index"; # CPQPOWER-MIB:upsOutputWatts.$index
     $value   = $hpups_array[$phase]['upsOutputWatts'];
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsOutputEntry.$index"];
-    discover_sensor_ng($device, 'power', $mib, 'upsOutputWatts', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'power', $mib, 'upsOutputWatts', $oid, $index, $descr, 1, $value, $options);
 
     ## Output Load
     $oid     = '.1.3.6.1.4.1.232.165.3.4.1.0'; # CPQPOWER-MIB:upsOutputLoad.$index
     $descr   = 'Output Load';
     $value   = $hpups_array[$phase]['upsOutputLoad'];
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsOutputLoad.0"];
-    discover_sensor_ng($device, 'capacity', $mib, 'upsOutputLoad', $oid, '0', NULL, $descr, 1, $value, $options);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // FIXME load?
+    discover_sensor_ng($device, 'capacity', $mib, 'upsOutputLoad', $oid, '0', $descr, 1, $value, $options);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       // FIXME load?
 
     # Bypass
     $index = $hpups_array[$phase]['upsBypassPhase'];
@@ -96,7 +96,7 @@ foreach (array_slice(array_keys($hpups_array), 1) as $phase) {
     $oid     = ".1.3.6.1.4.1.232.165.3.5.3.1.2.$index";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     # CPQPOWER-MIB:upsBypassVoltage.$index
     $value   = $hpups_array[$phase]['upsBypassVoltage'];
     $options = ['rename_rrd' => "CPQPOWER-MIB-upsBypassEntry.$index"];
-    discover_sensor_ng($device, 'voltage', $mib, 'upsBypassVoltage', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'voltage', $mib, 'upsBypassVoltage', $oid, $index, $descr, 1, $value, $options);
 }
 
 $scale = 0.1;
@@ -105,19 +105,19 @@ $scale = 0.1;
 $oid     = '.1.3.6.1.4.1.232.165.3.3.1.0';                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               # CPQPOWER-MIB:upsInputFrequency.0
 $value = $hpups_array[0]['upsInputFrequency'];
 $options = ['rename_rrd' => "CPQPOWER-MIB-upsInputFrequency.0"];
-discover_sensor_ng($device, 'frequency', $mib, 'upsInputFrequency', $oid, '0', NULL, 'Input', $scale, $value, $options);
+discover_sensor_ng($device, 'frequency', $mib, 'upsInputFrequency', $oid, '0', 'Input', $scale, $value, $options);
 
 ## Output Frequency
 $oid = '.1.3.6.1.4.1.232.165.3.4.2.0';                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           # CPQPOWER-MIB:upsOutputFrequency.0
 $value = $hpups_array[0]['upsOutputFrequency'];
 $options = ['rename_rrd' => "CPQPOWER-MIB-upsOutputFrequency.0"];
-discover_sensor_ng($device, 'frequency', $mib, 'upsOutputFrequency', $oid, '0', NULL, 'Output', $scale, $value, $options);
+discover_sensor_ng($device, 'frequency', $mib, 'upsOutputFrequency', $oid, '0', 'Output', $scale, $value, $options);
 
 ## Bypass Frequency
 $oid     = '.1.3.6.1.4.1.232.165.3.5.1.0';                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       # CPQPOWER-MIB:upsBypassFrequency.0
 $value   = $hpups_array[0]['upsBypassFrequency'];
 $options = ['rename_rrd' => "CPQPOWER-MIB-upsBypassFrequency.0"];
-discover_sensor_ng($device, 'frequency', $mib, 'upsBypassFrequency', $oid, '0', NULL, 'Bypass', $scale, $value, $options);
+discover_sensor_ng($device, 'frequency', $mib, 'upsBypassFrequency', $oid, '0', 'Bypass', $scale, $value, $options);
 
 unset($hpups_array);
 
@@ -156,7 +156,7 @@ foreach ($hppdu_array as $index => $entry) {
     $limits = [];
     if (!empty($entry['pduOutputLoad']) && $entry['pduOutputLoad'] != '-1') {
         $options = ['rename_rrd' => "CPQPOWER-MIB-%index%"];
-        discover_sensor_ng($device, 'capacity', $mib, 'pduOutputLoad', $oid, $index, NULL, $descr, 1, $entry['pduOutputLoad'], $options);
+        discover_sensor_ng($device, 'capacity', $mib, 'pduOutputLoad', $oid, $index, $descr, 1, $entry['pduOutputLoad'], $options);
 
         // Find power limit by measure the reported output power divided by the reported load of the PDU
         $pdu_maxload  = 100 * float_div($entry['pduOutputPower'], $entry['pduOutputLoad']);
@@ -172,7 +172,7 @@ foreach ($hppdu_array as $index => $entry) {
     if (!empty($entry['pduOutputPower']) && $entry['pduOutputPower'] != '-1') {
         $options               = $limits;
         $options['rename_rrd'] = "CPQPOWER-MIB-%index%";
-        discover_sensor_ng($device, 'power', $mib, 'pduOutputPower', $oid, $index, NULL, $descr, 1, $entry['pduOutputPower'], $options);
+        discover_sensor_ng($device, 'power', $mib, 'pduOutputPower', $oid, $index, $descr, 1, $entry['pduOutputPower'], $options);
     }
 }
 
@@ -205,17 +205,17 @@ foreach ($hppdu_breaker_array as $index => $entry) {
     $oid                   = ".1.3.6.1.4.1.232.165.2.3.2.1.3.$index";
     $options               = $limits;
     $options['rename_rrd'] = "CPQPOWER-MIB-%index%";
-    discover_sensor_ng($device, 'current', $mib, 'breakerCurrent', $oid, $index, NULL, $descr, 0.01, $entry['breakerCurrent'], $options);
+    discover_sensor_ng($device, 'current', $mib, 'breakerCurrent', $oid, $index, $descr, 0.01, $entry['breakerCurrent'], $options);
 
     $descr   = $breaker_descr . ' Voltage';
     $oid     = ".1.3.6.1.4.1.232.165.2.3.2.1.2.$index";
     $options = ['rename_rrd' => "CPQPOWER-MIB-%index%"];
-    discover_sensor_ng($device, 'voltage', $mib, 'breakerVoltage', $oid, $index, NULL, $descr, 1, $entry['breakerVoltage'], $options);
+    discover_sensor_ng($device, 'voltage', $mib, 'breakerVoltage', $oid, $index, $descr, 1, $entry['breakerVoltage'], $options);
 
     $descr   = $breaker_descr . ' Load';
     $oid     = ".1.3.6.1.4.1.232.165.2.3.2.1.4.$index";
     $options = ['rename_rrd' => "CPQPOWER-MIB-%index%"];
-    discover_sensor_ng($device, 'capacity', $mib, 'breakerPercentLoad', $oid, $index, NULL, $descr, 1, $entry['breakerPercentLoad'], $options);
+    discover_sensor_ng($device, 'capacity', $mib, 'breakerPercentLoad', $oid, $index, $descr, 1, $entry['breakerPercentLoad'], $options);
 
     $descr = $breaker_descr . ' Status';
     $oid   = ".1.3.6.1.4.1.232.165.2.3.2.1.5.$index";

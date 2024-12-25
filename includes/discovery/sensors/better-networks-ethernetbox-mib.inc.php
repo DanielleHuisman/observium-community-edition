@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -64,7 +63,7 @@ foreach ($oids as $index => $entry) {
             break;
     }
     if ($sensor_type) {
-        discover_sensor_ng($device, $sensor_type, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $sensor_type, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
     }
 
 }

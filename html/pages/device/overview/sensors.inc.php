@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -52,7 +52,7 @@ foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry) {
                     $lane = 0;
                 }
                 $sensors_db['measured'][$entry['measured_class']][$entry['measured_entity']][$entry['sensor_class']][] = $entry;
-                $measured_multi[$entry['measured_class']][$entry['measured_entity']][$lane][$entry['sensor_class']][]  = $entry;
+                        $measured_multi[$entry['measured_class']][$entry['measured_entity']][$lane][$entry['sensor_class']][]  = $entry;
                 break;
             default:
                 $sensors_db['measured'][$entry['measured_class']][$entry['measured_entity']][$entry['sensor_class']][] = $entry;
@@ -221,10 +221,14 @@ if (isset($sensors_db['measured'])) {
 
                 foreach ($order as $class) {
                     foreach ($entry[$class] as $sensor) {
-                        $sensor['sensor_descr'] = trim(str_ireplace($rename_from, '', $sensor['sensor_descr']), ":- \t\n\r\0\x0B");
-                        if (empty($sensor['sensor_descr'])) {
+                        $sensor['sensor_descr_short'] = trim(str_ireplace($rename_from, '', $sensor['sensor_descr']), ":- \t\n\r\0\x0B");
+                        if (empty($sensor['sensor_descr_short'])) {
                             // Some time sensor descriptions equals to entity name
                             $sensor['sensor_descr'] = nicecase($sensor['sensor_class']);
+                        } elseif (str_starts_with($sensor['sensor_descr_short'], '(')) {
+                            $sensor['sensor_descr'] = nicecase($sensor['sensor_class']) . ' ' . $sensor['sensor_descr_short'];
+                        } else {
+                            $sensor['sensor_descr'] = $sensor['sensor_descr_short'];
                         }
 
                         print_sensor_row($sensor, $vars);

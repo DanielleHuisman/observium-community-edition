@@ -10,8 +10,9 @@ include(__DIR__ . '/../html/includes/functions.inc.php');
 class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
 {
   /**
-  * @dataProvider providerNiceCase
-  */
+   * @dataProvider providerNiceCase
+   * @group string
+   */
   public function testNiceCase($string, $result)
   {
     $this->assertSame($result, nicecase($string));
@@ -62,50 +63,55 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-  * @dataProvider providerGetDeviceIcon
-  * @group device
-  */
-  public function testGetDeviceIcon($device, $base_icon, $result)
-  {
-    $GLOBALS['config']['base_url'] = 'http://localhost';
-    // for device_permitted
-    $device['device_id'] = 98217;
-    $_SESSION['userlevel'] = 7;
-    $this->assertSame($result, get_device_icon($device, $base_icon));
-  }
+    /**
+     * @dataProvider providerGetDeviceIcon
+     * @group icon
+     */
+    public function testGetDeviceIcon($device, $base_icon, $result) {
+        $GLOBALS['config']['base_url'] = 'http://localhost';
+        // for device_permitted
+        $device['device_id'] = 98217;
+        $_SESSION['userlevel'] = 7;
+        $this->assertSame($result, get_device_icon($device, $base_icon));
+    }
 
-  public function providerGetDeviceIcon()
-  {
-    return array(
-      // by $device['os']
-      array(array('os' => 'screenos', 'icon' => '', 'sysObjectID' => ''), TRUE, 'juniper-old'),
-      // by $device['os'] and icon definition
-      array(array('os' => 'ios', 'icon' => '', 'sysObjectID' => ''), TRUE, 'cisco'),
-      // by $device['os'] and vendor definition
-      array(array('os' => 'liebert', 'icon' => '', 'sysObjectID' => ''), TRUE, 'emerson'),
-      // by $device['os'] and vendor defined icon
-      array(array('os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => ''), TRUE, 'summitd'),
-      // by $device['os'] and vendor defined icon
-      array(array('os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => '', 'vendor' => 'Summit Development'), TRUE, 'summitd'),
-      // by $device['os'] and vendor definition (with non alpha chars)
-      //array(array('os' => 'ccplus'), TRUE, 'c_c_power'),
-      // by $device['os'] and distro name in array
-      array(array('os' => 'linux', 'icon' => '', 'sysObjectID' => '', 'distro' => 'RedHat'), TRUE, 'redhat'),
-      // by $device['os'] and icon in array
-      array(array('os' => 'ios', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
-      // by all, who win?
-      array(array('os' => 'liebert', 'distro' => 'RedHat', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
-      // unknown
-      array(array('os' => 'yohoho', 'icon' => '', 'sysObjectID' => ''), TRUE, 'generic'),
-      // empty
-      array(array(), TRUE, 'generic'),
-      
-      // Last, check with img tag
-      array(array('os' => 'ios'),   FALSE, '<img src="http://localhost/images/os/cisco.svg" style="max-height: 32px;" alt="" />'),
-      array(array('os' => 'screenos'), FALSE, '<img src="http://localhost/images/os/juniper-old.png" srcset="http://localhost/images/os/juniper-old_2x.png 2x" alt="" />'),
-    );
-  }
+    public function providerGetDeviceIcon() {
+        return [
+            // by $device['os']
+            [ [ 'os' => 'screenos', 'icon' => '', 'sysObjectID' => '' ], TRUE, 'juniper-old' ],
+            // by $device['os'] and icon definition
+            [ [ 'os' => 'ios', 'icon' => '', 'sysObjectID' => '' ], TRUE, 'cisco' ],
+            // by $device['os'] and vendor definition
+            [ [ 'os' => 'liebert', 'icon' => '', 'sysObjectID' => '' ], TRUE, 'emerson' ],
+            // by $device['os'] and vendor defined icon
+            [ [ 'os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => '' ], TRUE, 'summitd' ],
+            // by $device['os'] and vendor defined icon
+            [ [ 'os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => '', 'vendor' => 'Summit Development' ], TRUE, 'summitd' ],
+            // by $device['os'] and vendor definition (with non alpha chars)
+            [ [ 'os' => 'wut-com' ], TRUE, 'wut' ], // W&T
+            // by $device['os'] and distro name in array
+            [ [ 'os' => 'linux', 'icon' => '', 'sysObjectID' => '', 'distro' => 'RedHat' ], TRUE, 'redhat' ],
+            // by $device['os'] and icon in device array
+            [ [ 'os' => 'ios', 'icon' => 'cisco-old', 'sysObjectID' => '' ], TRUE, 'cisco-old' ],
+            // by all, who win?
+            [ [ 'os' => 'liebert', 'distro' => 'RedHat', 'icon' => 'cisco-old', 'sysObjectID' => '' ], TRUE, 'cisco-old' ],
+            // unknown
+            [ [ 'os' => 'yohoho', 'icon' => '', 'sysObjectID' => '' ], TRUE, 'generic' ],
+            // empty
+            [ [], TRUE, 'generic' ],
+
+            // Prevent use vendor icon for unix/window oses and visa-versa for others
+            [ [ 'os' => 'pve',            'type' => 'hypervisor', 'sysObjectID' => '', 'vendor' => 'Supermicro' ], TRUE, 'proxmox' ],
+            [ [ 'os' => 'proxmox-server', 'type' => 'server',     'sysObjectID' => '', 'vendor' => 'Supermicro' ], TRUE, 'proxmox' ],
+            [ [ 'os' => 'truenas-core',   'type' => 'storage',    'sysObjectID' => '', 'vendor' => 'Supermicro' ], TRUE, 'truenas' ],
+            [ [ 'os' => 'generic-ups',    'type' => 'power',      'sysObjectID' => '', 'vendor' => '' ],           TRUE, 'ups' ],
+            [ [ 'os' => 'generic-ups',    'type' => 'power',      'sysObjectID' => '', 'vendor' => 'Supermicro' ], TRUE, 'supermicro' ],
+
+            // Last, check with img tag
+            [ [ 'os' => 'ios' ],   FALSE, '<img src="http://localhost/images/os/cisco.svg" style="max-height: 32px; max-width: 48px;" alt="" />' ],
+            [ [ 'os' => 'screenos' ], FALSE, '<img src="http://localhost/images/os/juniper-old.png" srcset="http://localhost/images/os/juniper-old_2x.png 2x" alt="" />' ],
+        ];
+    }
 
     protected function setUp(): void
     {
@@ -120,18 +126,27 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
         session_destroy();
     }
 
+    /**
+     * @group session
+     */
     public function test_single_key()
     {
         session_set_var('key', 'value');
         $this->assertEquals('value', $_SESSION['key']);
     }
 
+    /**
+     * @group session
+     */
     public function test_nested_keys()
     {
         session_set_var('key1->key2->key3', 'value');
         $this->assertEquals('value', $_SESSION['key1']['key2']['key3']);
     }
 
+    /**
+     * @group session
+     */
     public function test_unset_single_key()
     {
         $_SESSION['key'] = 'value';
@@ -139,6 +154,9 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
         $this->assertArrayNotHasKey('key', $_SESSION);
     }
 
+    /**
+     * @group session
+     */
     public function test_unset_nested_keys()
     {
         $_SESSION['key1']['key2']['key3'] = 'value';
@@ -146,6 +164,9 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
         $this->assertArrayNotHasKey('key3', $_SESSION['key1']['key2']);
     }
 
+    /**
+     * @group session
+     */
     public function test_no_change_single_key()
     {
         $_SESSION['key'] = 'value';
@@ -153,6 +174,9 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('value', $_SESSION['key']);
     }
 
+    /**
+     * @group session
+     */
     public function test_no_change_nested_keys()
     {
         $_SESSION['key1']['key2']['key3'] = 'value';
@@ -160,18 +184,27 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('value', $_SESSION['key1']['key2']['key3']);
     }
 
+    /**
+     * @group session
+     */
     public function test_single_key_array()
     {
         session_set_var(['key'], 'value');
         $this->assertEquals('value', $_SESSION['key']);
     }
 
+    /**
+     * @group session
+     */
     public function test_nested_keys_array()
     {
         session_set_var(['key1', 'key2', 'key3'], 'value');
         $this->assertEquals('value', $_SESSION['key1']['key2']['key3']);
     }
 
+    /**
+     * @group session
+     */
     public function test_unset_single_key_array()
     {
         $_SESSION['key'] = 'value';
@@ -179,6 +212,9 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
         $this->assertArrayNotHasKey('key', $_SESSION);
     }
 
+    /**
+     * @group session
+     */
     public function test_unset_nested_keys_array()
     {
         $_SESSION['key1']['key2']['key3'] = 'value';

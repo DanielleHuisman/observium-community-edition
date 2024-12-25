@@ -8,7 +8,7 @@
  * @package        observium
  * @subpackage     geolocation
  * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 

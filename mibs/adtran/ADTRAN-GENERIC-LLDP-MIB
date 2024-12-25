@@ -1,0 +1,653 @@
+ADTRAN-GENERIC-LLDP-MIB
+
+-- TITLE:     Adtran Generic LLDP MIB
+-- PRODUCT:   TA5000
+-- VERSION:   1.0
+-- DATE:      Oct. 18th, 2011
+-- AUTHOR:    John R. Allegra
+-- STATUS:    Created
+--
+
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+   adGenLldp,
+   adGenLldpID               FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+       
+   InterfaceIndex,
+   ifIndex                   FROM IF-MIB
+      
+   OBJECT-TYPE,
+   MODULE-IDENTITY,
+   NOTIFICATION-TYPE,
+   Integer32,
+   IpAddress                 FROM SNMPv2-SMI
+
+   TruthValue,
+   DisplayString,
+   TEXTUAL-CONVENTION        FROM SNMPv2-TC
+
+   SnmpAdminString           FROM SNMP-FRAMEWORK-MIB
+    
+   AddressFamilyNumbers      FROM IANA-ADDRESS-FAMILY-NUMBERS-MIB
+    
+   adTrapInformSeqNum 		 FROM ADTRAN-GENTRAPINFORM-MIB
+   
+   sysName					 FROM SNMPv2-MIB;
+
+
+adGenLldpMIB MODULE-IDENTITY
+   LAST-UPDATED "201309180000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO
+     "CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+                 Tel: +1 800 726-8663
+                 Fax: +1 256 963 6217
+                 E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the Generic LLDP MIB."
+   
+   REVISION "201309180000Z"
+   DESCRIPTION "Added traps adGenLldpPeerAdded and adGenLldpPeerRemoved."
+   REVISION "201110180000Z"
+   DESCRIPTION "Created" 
+   
+
+
+::= { adGenLldpID 1 }
+
+  -- ///////////////////////////////////////////////////////
+  -- Operation Groups
+  -- ///////////////////////////////////////////////////////
+  adGenLldpConfiguration      OBJECT IDENTIFIER ::= { adGenLldp  1   }
+  adGenLldpStatistics         OBJECT IDENTIFIER ::= { adGenLldp  2   }
+  adGenLldpLocalSystemData    OBJECT IDENTIFIER ::= { adGenLldp  3   }
+  adGenLldpRemoteSystemData   OBJECT IDENTIFIER ::= { adGenLldp  4   }
+  adGenLldpExtentsions        OBJECT IDENTIFIER ::= { adGenLldp  5   }
+  adGenLldpEvents            OBJECT IDENTIFIER ::= { adGenLldp  6   }
+  adGenLldpTraps              OBJECT IDENTIFIER ::= { adGenLldpEvents 0 }
+
+
+-- 
+-- ***********************************************************
+-- 
+-- Textual Conventions
+-- 
+-- ***********************************************************
+
+AdGenChassisIdSubtype ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This TC describes the source of a chassis identifier.
+
+            The enumeration 'chassisComponent(1)' represents a chassis
+            identifier based on the value of entPhysicalAlias object
+            (defined in IETF RFC 2737) for a chassis component (i.e.,
+            an entPhysicalClass value of 'chassis(3)').
+
+            The enumeration 'interfaceAlias(2)' represents a chassis
+            identifier based on the value of ifAlias object (defined in
+            IETF RFC 2863) for an interface on the containing chassis.
+
+            The enumeration 'portComponent(3)' represents a chassis
+            identifier based on the value of entPhysicalAlias object
+            (defined in IETF RFC 2737) for a port or backplane
+            component (i.e., entPhysicalClass value of 'port(10)' or
+            'backplane(4)'), within the containing chassis.
+
+            The enumeration 'macAddress(4)' represents a chassis
+            identifier based on the value of a unicast source address
+            (encoded in network byte order and IEEE 802.3 canonical bit
+            order), of a port on the containing chassis as defined in
+            IEEE Std 802-2001.
+
+            The enumeration 'networkAddress(5)' represents a chassis
+            identifier based on a network address, associated with
+            a particular chassis.  The encoded address is actually
+            composed of two fields.  The first field is a single octet,
+            representing the IANA AddressFamilyNumbers value for the
+            specific address type, and the second field is the network
+            address value.
+
+            The enumeration 'interfaceName(6)' represents a chassis
+            identifier based on the value of ifName object (defined in
+            IETF RFC 2863) for an interface on the containing chassis.
+
+            The enumeration 'local(7)' represents a chassis identifier
+            based on a locally defined value."
+    SYNTAX  INTEGER {
+            chassisComponent(1),
+            interfaceAlias(2),
+            portComponent(3),
+            macAddress(4),
+            networkAddress(5),
+            interfaceName(6),
+            local(7)
+    }
+
+AdGenChassisId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This TC describes the format of a chassis identifier string.
+            Objects of this type are always used with an associated
+            AdGenChassisIdSubtype object, which identifies the format of
+            the particular AdGenChassisId object instance.
+
+            If the associated AdGenChassisIdSubtype object has a value of
+            'chassisComponent(1)', then the octet string identifies
+            a particular instance of the entPhysicalAlias object
+            (defined in IETF RFC 2737) for a chassis component (i.e.,
+            an entPhysicalClass value of 'chassis(3)').
+
+            If the associated AdGenChassisIdSubtype object has a value
+            of 'interfaceAlias(2)', then the octet string identifies
+            a particular instance of the ifAlias object (defined in
+            IETF RFC 2863) for an interface on the containing chassis.
+            If the particular ifAlias object does not contain any values,
+            another chassis identifier type should be used.
+
+            If the associated AdGenChassisIdSubtype object has a value
+            of 'portComponent(3)', then the octet string identifies a
+            particular instance of the entPhysicalAlias object (defined
+            in IETF RFC 2737) for a port or backplane component within
+            the containing chassis.
+
+            If the associated AdGenChassisIdSubtype object has a value of
+            'macAddress(4)', then this string identifies a particular
+            unicast source address (encoded in network byte order and
+            IEEE 802.3 canonical bit order), of a port on the containing
+            chassis as defined in IEEE Std 802-2001.
+
+            If the associated AdGenChassisIdSubtype object has a value of
+            'networkAddress(5)', then this string identifies a particular
+            network address, encoded in network byte order, associated
+            with one or more ports on the containing chassis.  The first
+            octet contains the IANA Address Family Numbers enumeration
+            value for the specific address type, and octets 2 through
+            N contain the network address value in network byte order.
+
+            If the associated AdGenChassisIdSubtype object has a value
+            of 'interfaceName(6)', then the octet string identifies
+            a particular instance of the ifName object (defined in
+            IETF RFC 2863) for an interface on the containing chassis.
+            If the particular ifName object does not contain any values,
+            another chassis identifier type should be used.
+
+            If the associated AdGenChassisIdSubtype object has a value of
+            'local(7)', then this string identifies a locally assigned
+            Chassis ID."
+    SYNTAX      OCTET STRING (SIZE (1..255))
+
+AdGenPortIdSubtype ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This TC describes the source of a particular type of port
+            identifier used in the LLDP MIB.
+
+            The enumeration 'interfaceAlias(1)' represents a port
+            identifier based on the ifAlias MIB object, defined in IETF
+            RFC 2863.
+
+            The enumeration 'portComponent(2)' represents a port
+            identifier based on the value of entPhysicalAlias (defined in
+            IETF RFC 2737) for a port component (i.e., entPhysicalClass
+            value of 'port(10)'), within the containing chassis.
+
+            The enumeration 'macAddress(3)' represents a port identifier
+            based on a unicast source address (encoded in network
+            byte order and IEEE 802.3 canonical bit order), which has
+            been detected by the agent and associated with a particular
+            port (IEEE Std 802-2001).
+
+            The enumeration 'networkAddress(4)' represents a port
+            identifier based on a network address, detected by the agent
+            and associated with a particular port.
+
+            The enumeration 'interfaceName(5)' represents a port
+            identifier based on the ifName MIB object, defined in IETF
+            RFC 2863.
+
+            The enumeration 'agentCircuitId(6)' represents a port
+            identifier based on the agent-local identifier of the circuit
+            (defined in RFC 3046), detected by the agent and associated
+            with a particular port.
+
+            The enumeration 'local(7)' represents a port identifier
+            based on a value locally assigned."
+
+    SYNTAX  INTEGER {
+            interfaceAlias(1),
+            portComponent(2),
+            macAddress(3),
+            networkAddress(4),
+            interfaceName(5),
+            agentCircuitId(6),
+            local(7)
+    }
+
+AdGenPortId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This TC describes the format of a port identifier string.
+            Objects of this type are always used with an associated
+            AdGenPortIdSubtype object, which identifies the format of the
+            particular AdGenPortId object instance.
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'interfaceAlias(1)', then the octet string identifies a
+            particular instance of the ifAlias object (defined in IETF
+            RFC 2863).  If the particular ifAlias object does not contain
+            any values, another port identifier type should be used.
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'portComponent(2)', then the octet string identifies a
+            particular instance of the entPhysicalAlias object (defined
+            in IETF RFC 2737) for a port or backplane component.
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'macAddress(3)', then this string identifies a particular
+            unicast source address (encoded in network byte order
+            and IEEE 802.3 canonical bit order) associated with the port
+            (IEEE Std 802-2001).
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'networkAddress(4)', then this string identifies a network
+            address associated with the port.  The first octet contains
+            the IANA AddressFamilyNumbers enumeration value for the
+            specific address type, and octets 2 through N contain the
+            networkAddress address value in network byte order.
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'interfaceName(5)', then the octet string identifies a
+            particular instance of the ifName object (defined in IETF
+            RFC 2863).  If the particular ifName object does not contain
+            any values, another port identifier type should be used.
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'agentCircuitId(6)', then this string identifies a agent-local
+            identifier of the circuit (defined in RFC 3046).
+
+            If the associated AdGenPortIdSubtype object has a value of
+            'local(7)', then this string identifies a locally
+            assigned port ID."
+    SYNTAX      OCTET STRING (SIZE (1..255))
+
+AdGenManAddrIfSubtype ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This TC describes the basis of a particular type of
+            interface associated with the management address.
+
+            The enumeration 'unknown(1)' represents the case where the
+            interface is not known.
+
+            The enumeration 'ifIndex(2)' represents interface identifier
+            based on the ifIndex MIB object.
+
+            The enumeration 'systemPortNumber(3)' represents interface
+            identifier based on the system port numbering convention."
+    SYNTAX  INTEGER {
+            unknown(1),
+            ifIndex(2),
+            systemPortNumber(3)
+    }
+
+AdGenManAddress ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "The value of a management address associated with the LLDP
+            agent that may be used to reach higher layer entities to
+            assist discovery by network management.
+
+            It should be noted that appropriate security credentials,
+            such as SNMP engineId, may be required to access the LLDP
+            agent using a management address.  These necessary credentials
+            should be known by the network management and the objects
+            associated with the credentials are not included in the
+            LLDP agent."
+    SYNTAX      OCTET STRING (SIZE (1..31))
+
+AdGenSystemCapabilitiesMap ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This TC describes the system capabilities.
+
+            The bit 'other(0)' indicates that the system has capabilities
+            other than those listed below.
+
+            The bit 'repeater(1)' indicates that the system has repeater
+            capability.
+
+            The bit 'bridge(2)' indicates that the system has bridge
+            capability.
+
+            The bit 'wlanAccessPoint(3)' indicates that the system has 
+            WLAN access point capability.
+
+            The bit 'router(4)' indicates that the system has router
+            capability.
+
+            The bit 'telephone(5)' indicates that the system has telephone
+            capability.
+
+            The bit 'docsisCableDevice(6)' indicates that the system has
+            DOCSIS Cable Device capability (IETF RFC 2669 & 2670).
+
+            The bit 'stationOnly(7)' indicates that the system has only
+            station capability and nothing else."
+    SYNTAX  BITS {
+            other(0),
+            repeater(1),
+            bridge(2),
+            wlanAccessPoint(3),
+            router(4),
+            telephone(5),
+            docsisCableDevice(6),
+            stationOnly(7)
+    }
+
+-- 
+-- ***********************************************************
+-- 
+--                  L L D P    C O N F I G 
+--
+--                  (adGenLldpConfiguration)
+-- 
+-- *********************************************************** 
+    adGenLldpProvTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdGenLldpProvEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+                   "Provisioning table."
+        ::= { adGenLldpConfiguration 1 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpProvEntry OBJECT-TYPE
+        SYNTAX  AdGenLldpProvEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+                   "Table Entry."
+        INDEX   { ifIndex }
+        ::= { adGenLldpProvTable 1 }
+
+    -- /////////////////////////////////////////////////////////
+    AdGenLldpProvEntry ::=
+        SEQUENCE {
+                        adGenLldpConfigState           INTEGER
+                 }
+    -- /////////////////////////////////////////////////////////
+    adGenLldpConfigState  OBJECT-TYPE 
+    SYNTAX INTEGER { 
+       txOnly(1), 
+       rxOnly(2),
+       txAndRx(3),
+       disabled(4)
+    }
+    MAX-ACCESS read-write 
+    STATUS     current 
+    DESCRIPTION 
+            "The administratively desired status of the local LLDP agent.
+
+            If the associated lldpPortConfigAdminStatus object has a
+            value of 'txOnly(1)', then LLDP agent will transmit LLDP
+            frames on this port and it will not store any information
+            about the remote systems connected.
+         
+            If the associated lldpPortConfigAdminStatus object has a
+            value of 'rxOnly(2)', then the LLDP agent will receive,
+            but it will not transmit LLDP frames on this port.
+
+            If the associated lldpPortConfigAdminStatus object has a
+            value of 'txAndRx(3)', then the LLDP agent will transmit
+            and receive LLDP frames on this port.
+
+            If the associated lldpPortConfigAdminStatus object has a
+            value of 'disabled(4)', then LLDP agent will not transmit or
+            process LLDP frames on this port.  If there is remote systems
+            information which is received on this port and stored in
+            other tables, before the port's lldpPortConfigAdminStatus
+            becomes disabled, then the information will naturally age out."
+    ::= { adGenLldpProvEntry 1 }
+    
+--  *********************************************************** 
+--
+--                   L L D P    S T A T S 
+--
+--  *********************************************************** 
+
+
+--  ***********************************************************
+--
+--          L O C A L    S Y S T E M    D A T A
+--
+--  ***********************************************************
+
+
+--  ***********************************************************
+--
+--          R E M O T E    S Y S T E M S    D A T A
+--
+--                  (adGenLldpRemoteSystemData)
+-- 
+--  ***********************************************************
+    adGenLldpRemSysDataTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdGenLldpRemSysDataEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+                   "Provisioning table."
+        ::= { adGenLldpRemoteSystemData 1 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemSysDataEntry OBJECT-TYPE
+        SYNTAX  AdGenLldpRemSysDataEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+                   "Table Entry."
+        INDEX   { ifIndex }
+        ::= { adGenLldpRemSysDataTable 1 }
+
+    -- /////////////////////////////////////////////////////////
+    AdGenLldpRemSysDataEntry ::=
+        SEQUENCE {
+                   adGenLldpRemChassisIdSubtype   AdGenChassisIdSubtype,
+                   adGenLldpRemChassisId          AdGenChassisId,
+                   adGenLldpRemPortIdSubtype      AdGenPortIdSubtype,
+                   adGenLldpRemPortId             AdGenPortId,
+                   adGenLldpRemPortDesc           SnmpAdminString,
+                   adGenLldpRemSysName            SnmpAdminString,
+                   adGenLldpRemSysDesc            SnmpAdminString,
+                   adGenLldpRemSysCapSupported    AdGenSystemCapabilitiesMap,
+                   adGenLldpRemSysCapEnabled      AdGenSystemCapabilitiesMap,
+                   adGenLldpRemManAddrSubtype     AddressFamilyNumbers,
+                   adGenLldpRemManAddr            AdGenManAddress,
+                   adGenLldpRemManAddrIfSubtype   AdGenManAddrIfSubtype,
+                   adGenLldpRemManAddrIfId        Integer32
+                 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemChassisIdSubtype  OBJECT-TYPE
+    SYNTAX      AdGenChassisIdSubtype
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The type of encoding used to identify the chassis associated
+            with the remote system."
+    ::= { adGenLldpRemSysDataEntry 1 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemChassisId  OBJECT-TYPE
+    SYNTAX      AdGenChassisId
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The string value used to identify the chassis component
+            associated with the remote system."
+    ::= { adGenLldpRemSysDataEntry 2 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemPortIdSubtype  OBJECT-TYPE
+    SYNTAX      AdGenPortIdSubtype
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The type of port identifier encoding used in the associated
+            'adGenLldpRemPortId' object."
+    ::= { adGenLldpRemSysDataEntry 3 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemPortId  OBJECT-TYPE
+    SYNTAX      AdGenPortId
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The string value used to identify the port component
+            associated with the remote system."
+    ::= { adGenLldpRemSysDataEntry 4 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemPortDesc  OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE(0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The string value used to identify the description of
+            the given port associated with the remote system."
+    ::= { adGenLldpRemSysDataEntry 5 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemSysName  OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE(0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The string value used to identify the system name of the
+            remote system."
+    ::= { adGenLldpRemSysDataEntry 6 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemSysDesc  OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE(0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The string value used to identify the system description
+            of the remote system."
+    ::= { adGenLldpRemSysDataEntry 7 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemSysCapSupported OBJECT-TYPE
+    SYNTAX      AdGenSystemCapabilitiesMap
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The bitmap value used to identify which system capabilities
+            are supported on the remote system."
+    ::= { adGenLldpRemSysDataEntry 8 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemSysCapEnabled  OBJECT-TYPE
+    SYNTAX      AdGenSystemCapabilitiesMap
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The bitmap value used to identify which system capabilities
+            are enabled on the remote system."
+    ::= { adGenLldpRemSysDataEntry 9 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemManAddrSubtype  OBJECT-TYPE
+    SYNTAX      AddressFamilyNumbers
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The type of management address identifier encoding used in
+            the associated 'adGenLldpRemManagmentAddr' object."
+    ::= { adGenLldpRemSysDataEntry 10 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemManAddr  OBJECT-TYPE
+    SYNTAX      AdGenManAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The string value used to identify the management address
+            component associated with the remote system.  The purpose
+            of this address is to contact the management entity."
+    ::= { adGenLldpRemSysDataEntry 11 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemManAddrIfSubtype  OBJECT-TYPE
+    SYNTAX      AdGenManAddrIfSubtype
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The enumeration value that identifies the interface numbering
+            method used for defining the interface number, associated
+            with the remote system."
+    ::= { adGenLldpRemSysDataEntry 12 }
+
+    -- /////////////////////////////////////////////////////////
+    adGenLldpRemManAddrIfId  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The integer value used to identify the interface number
+            regarding the management address component associated with
+            the remote system."
+    ::= { adGenLldpRemSysDataEntry 13 }
+    
+    
+    --==============================================================================
+	--==============================================================================
+	--==============================================================================
+
+
+
+   adGenLldpPeerRemoved NOTIFICATION-TYPE
+      OBJECTS  {
+         adTrapInformSeqNum,
+         sysName,
+         ifIndex
+      }
+      STATUS  current
+      DESCRIPTION
+         "This trap indicates that a LLDP peer has been removed."
+
+         --#TYPE         "Status - Event"
+         --#SUMMARY      "LLDP 1: LLDP Peer Removed"
+         --#SEVERITY     INFORMATIONAL  
+         --#GENERIC      6
+         --#CATEGORY     "Provisioning Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenLldpTraps 1 }
+
+   adGenLldpPeerAdded NOTIFICATION-TYPE
+      OBJECTS  {
+         adTrapInformSeqNum,
+         sysName,
+         ifIndex
+      }
+      STATUS  current
+      DESCRIPTION
+         "This trap indicates that a LLDP peer has been added."
+         --#TYPE         "Status - Event"
+         --#SUMMARY      "LLDP 2: LLDP Peer Added"
+         --#SEVERITY     INFORMATIONAL
+         --#GENERIC      6
+         --#CATEGORY     "Provisioning Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adGenLldpTraps 2 }
+
+    END
+

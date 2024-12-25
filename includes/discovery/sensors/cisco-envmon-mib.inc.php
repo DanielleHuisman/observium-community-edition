@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -45,13 +44,13 @@ foreach ($oids as $index => $entry) {
         $oid = '.1.3.6.1.4.1.9.9.13.1.3.1.3.' . $index;
         // Exclude duplicated entries from CISCO-ENTITY-SENSOR
         //$ent_exist = dbFetchCell('SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) AND CONCAT(`sensor_limit`) = ?;',
-        $ent_exist = dbExist('sensors', '`device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) AND CONCAT(`sensor_limit`) = ?',
-                             [$device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'temperature', $descr . '%', '%- ' . $descr, $entry['ciscoEnvMonTemperatureThreshold']]);
+        $ent_exist = dbExist('sensors', '`device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?)',
+                             [ $device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'temperature', $descr . '%', '%- ' . $descr ]);
         if (!$ent_exist && $entry['ciscoEnvMonTemperatureStatusValue'] != 0) {
             $options               = [];
             $options['limit_high'] = $entry['ciscoEnvMonTemperatureThreshold'];
             $options['rename_rrd'] = 'cisco-envmon-' . $index;
-            discover_sensor_ng($device, 'temperature', $mib, 'ciscoEnvMonTemperatureStatusValue', $oid, $index, NULL, $descr, 1, $entry['ciscoEnvMonTemperatureStatusValue'], $options);
+            discover_sensor_ng($device, 'temperature', $mib, 'ciscoEnvMonTemperatureStatusValue', $oid, $index, $descr, 1, $entry['ciscoEnvMonTemperatureStatusValue'], $options);
         }
     } elseif (isset($entry['ciscoEnvMonTemperatureState'])) {
         $oid = '.1.3.6.1.4.1.9.9.13.1.3.1.6.' . $index;
@@ -83,16 +82,15 @@ foreach ($oids as $index => $entry) {
         // Exclude duplicated entries from CISCO-ENTITY-SENSOR
         //$query = 'SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) ';
         $where = '`device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) ';
-        $where .= ($entry['ciscoEnvMonVoltageThresholdHigh'] > $entry['ciscoEnvMonVoltageThresholdLow']) ? 'AND CONCAT(`sensor_limit`) = ? AND CONCAT(`sensor_limit_low`) = ?' : 'AND CONCAT(`sensor_limit_low`) = ? AND CONCAT(`sensor_limit`) = ?'; //swich negative numbers
         //$ent_exist = dbFetchCell($query, array($device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'voltage', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale, $entry['ciscoEnvMonVoltageThresholdLow'] * $scale));
-        $ent_exist = dbExist('sensors', $where, [$device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'voltage', $descr . '%', '%- ' . $descr, $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale, $entry['ciscoEnvMonVoltageThresholdLow'] * $scale]);
+        $ent_exist = dbExist('sensors', $where, [ $device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'voltage', $descr . '%', '%- ' . $descr ]);
         if (!$ent_exist) {
             $options = ['limit_high' => $entry['ciscoEnvMonVoltageThresholdLow'] * $scale,
                         'limit_low'  => $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale];
 
 
             $options['rename_rrd'] = 'cisco-envmon-' . $index;
-            discover_sensor_ng($device, 'voltage', $mib, 'ciscoEnvMonVoltageStatusValue', $oid, $index, NULL, $descr, $scale, $entry['ciscoEnvMonVoltageStatusValue'], $options);
+            discover_sensor_ng($device, 'voltage', $mib, 'ciscoEnvMonVoltageStatusValue', $oid, $index, $descr, $scale, $entry['ciscoEnvMonVoltageStatusValue'], $options);
         }
     } elseif (isset($entry['ciscoEnvMonVoltageState'])) {
         $oid = '.1.3.6.1.4.1.9.9.13.1.2.1.7.' . $index;
@@ -102,7 +100,7 @@ foreach ($oids as $index => $entry) {
         $ent_exist = dbExist('status', $where, [$device['device_id'], 'cisco-entity-state', $descr . '%', '%- ' . $descr]);
         if (!$ent_exist) {
             $options['rename_rrd'] = $sensor_state_type . '-voltage-' . $index;
-            discover_status_ng($device, $mib, 'ciscoEnvMonVoltageState', $oid, $index, $sensor_state_type, $descr, $entry['ciscoEnvMonVoltageState'], ['entPhysicalClass' => 'chassis']);
+            discover_status_ng($device, $mib, 'ciscoEnvMonVoltageState', $oid, $index, $sensor_state_type, $descr, $entry['ciscoEnvMonVoltageState'], [ 'entPhysicalClass' => 'chassis' ]);
         }
     }
 }
@@ -182,7 +180,7 @@ foreach ($oids as $index => $entry) {
             $descr         = array_str_replace($descr_replace, $descr);
 
             $options['rename_rrd'] = $sensor_state_type . '-fan-' . $index;
-            discover_status_ng($device, $mib, 'ciscoEnvMonFanState', $oid, $index, $sensor_state_type, $descr, $entry['ciscoEnvMonFanState'], ['entPhysicalClass' => 'fan']);
+            discover_status_ng($device, $mib, 'ciscoEnvMonFanState', $oid, $index, $sensor_state_type, $descr, $entry['ciscoEnvMonFanState'], [ 'entPhysicalClass' => 'fan' ]);
         }
     }
 }

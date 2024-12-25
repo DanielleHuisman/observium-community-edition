@@ -1,0 +1,268 @@
+ADTRAN-TA5000-THERMAL-MGMT-MIB  DEFINITIONS ::= BEGIN
+
+    -- TITLE:       TA5000 Thermal Management MIB
+    -- FILENAME:    adta5kthermalmgmt.mi2
+    -- PARTNUMBER:  Multiple
+    -- AUTHOR:      Geoff Oltmans
+    -- DATE:        07/10/2013
+    --
+    -- This MIB defines the TA5000 thermal management support, including but not limited to
+    -- alarming for high temperature conditions, and retrieval of temperature data.
+
+        IMPORTS
+           MODULE-IDENTITY,
+           OBJECT-TYPE,
+           NOTIFICATION-TYPE,
+           Integer32
+                  FROM SNMPv2-SMI
+           sysName
+                  FROM SNMPv2-MIB
+           DisplayString,
+           TruthValue
+                  FROM SNMPv2-TC
+           adIdentity,
+           adProducts,
+           adMgmt
+                  FROM ADTRAN-MIB
+           ifIndex
+                  FROM IF-MIB
+                  
+           adTa5kThermalManagement,
+   	       adTa5kThermalManagementID
+            	  FROM ADTRAN-GENTA5K-MIB
+           adGenSlotInfoIndex
+                  FROM ADTRAN-GENSLOT-MIB
+           adTrapInformSeqNum
+                  FROM ADTRAN-GENTRAPINFORM-MIB
+           ;
+
+    adTa5kThermalMgmtModuleIdentity MODULE-IDENTITY
+        LAST-UPDATED "201311250000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Total Access 5000 Thermal Management MIB"
+
+        REVISION "201311250000Z"
+        DESCRIPTION "Added adTa5kRemoteDeviceCriticalTempActive
+                     and adTa5kRemoteDeviceCriticalTempClear."
+
+        REVISION "201308012100Z"
+        DESCRIPTION "Initial"
+             
+        ::= { adTa5kThermalManagementID 1 }
+
+    -- OBJECT IDENTIFIERS
+
+    adTA5kThermalMgmtmg      OBJECT IDENTIFIER ::= { adTa5kThermalManagement 1 }
+    adTA5kThermalEventsFix   OBJECT IDENTIFIER ::= { adTa5kThermalManagement 2 }
+
+    adTa5kThermalEvents      OBJECT IDENTIFIER ::= { adTA5kThermalEventsFix 0 }
+    adTA5kThermal            OBJECT IDENTIFIER ::= { adTA5kThermalMgmtmg 1 }
+
+
+-- ============================================================================
+
+
+-- ============================================================================
+-- TA5000 Thermal Management Slot Table
+-- ============================================================================
+
+   adTA5kThermalSlotTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTA5kThermalSlotEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+               "Table of slot indexed OIDs to support this MIB."
+       ::= { adTA5kThermal 1 }
+
+   adTA5kThermalSlotEntry OBJECT-TYPE
+       SYNTAX      AdTA5kThermalSlotEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+               "An entry in the Thermal Slot Table. This table
+                is indexed by adGenSlotInfoIndex."
+       INDEX   { adGenSlotInfoIndex }
+       ::= { adTA5kThermalSlotTable 1 }
+
+   AdTA5kThermalSlotEntry ::=
+       SEQUENCE {
+           adTA5kThermalSlotNumSensors
+               Integer32
+       }
+
+    adTA5kThermalSlotNumSensors  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The number of sensors that are accessible on this slot."
+        ::= { adTA5kThermalSlotEntry 1 }
+
+
+-- ============================================================================
+-- TA5000 Thermal Management Slot/Sensor Table
+-- ============================================================================
+
+   adTA5kThermalManagementTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTA5kThermalManagementEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+               "Table of OIDs indexed by slot and temp sensor id."
+       ::= { adTA5kThermal 2 }
+
+   adTA5kThermalManagementEntry OBJECT-TYPE
+       SYNTAX      AdTA5kThermalManagementEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+               "An entry in the Thermal Management Table. This table
+                is indexed by adGenSlotInfoIndex and adTA5kThermalManagementSensorId."
+       INDEX   { adGenSlotInfoIndex, adTA5kThermalManagementSensorId }
+       ::= { adTA5kThermalManagementTable 1 }
+
+   AdTA5kThermalManagementEntry ::=
+       SEQUENCE {
+           adTA5kThermalManagementSensorId
+               Integer32,
+           adTA5kThermalManagementSensorName
+               DisplayString,
+           adTA5kThermalManagementSensorCurrTemp
+               Integer32
+       }
+
+    adTA5kThermalManagementSensorId  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "ID of the sensor."
+        ::= { adTA5kThermalManagementEntry 1 }
+
+    adTA5kThermalManagementSensorName  OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The Human-readable name for this temperature sensor."
+        ::= { adTA5kThermalManagementEntry 2 }
+
+    adTA5kThermalManagementSensorCurrTemp  OBJECT-TYPE
+        SYNTAX      Integer32
+        UNITS		"0.1C"
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The current temperature reported by this temperature sensor,
+             in tenths of a degree celsius."
+        ::= { adTA5kThermalManagementEntry 3 }
+
+-- ============================================================================
+-- TA5000 Thermal Traps
+-- ============================================================================
+
+adTA5kSlotCriticalTempActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex,
+                adTA5kThermalManagementSensorCurrTemp
+        }  
+        STATUS current
+        DESCRIPTION
+                "This trap indicates that the critical temperature threshold for the
+                 card has been reached. Indicates whether or not equipment is in danger
+                 of shutting down, shedding power, or otherwise due to a critical high 
+                 temperature condition. The equipment will take appropriate actions to 
+                 protect the hardware from damage."
+
+        --#TYPE       "Error - Critical Temperature Alarm Active"
+        --#SUMMARY    "TA5000 Slot: Critical Temperature Alarm active for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   CRITICAL
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kThermalEvents 1 }
+
+adTA5kSlotCriticalTempClear  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                adGenSlotInfoIndex,
+                adTA5kThermalManagementSensorCurrTemp
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates that the critical temperature condition previously
+                 declared for this card has now cleared."
+        --#TYPE       "Error - Critical Temperature Alarm Cleared"
+        --#SUMMARY    "TA5000 Slot: Critical Temperature Alarm cleared for "
+        --#SUMMARY    "Shelf %s, Slot %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   CRITICAL
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kThermalEvents 2 }
+        
+adTa5kRemoteDeviceCriticalTempActive  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                ifIndex
+        }  
+        STATUS current
+        DESCRIPTION
+                "This trap indicates that the critical temperature threshold for the
+                 remote device has been reached. Indicates whether or not equipment is
+                 in danger of shutting down, shedding power, or otherwise due to a
+                 critical high temperature condition. The equipment will take
+                 appropriate actions to protect the hardware from damage."
+
+        --#TYPE       "Error - Critical Temperature Alarm Active"
+        --#SUMMARY    "TA5000 Device: Critical Temperature Alarm active for "
+        --#SUMMARY    "Shelf %s, Device %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   CRITICAL
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kThermalEvents 3 }
+
+adTa5kRemoteDeviceCriticalTempClear  NOTIFICATION-TYPE
+        OBJECTS {
+                adTrapInformSeqNum,
+                sysName,
+                ifIndex
+        }
+        STATUS current
+        DESCRIPTION
+                "This trap indicates that the critical temperature condition previously
+                 declared for this device has now cleared."
+        --#TYPE       "Error - Critical Temperature Alarm Cleared"
+        --#SUMMARY    "TA5000 Device: Critical Temperature Alarm cleared for "
+        --#SUMMARY    "Shelf %s, Device %d"
+        --#ARGUMENTS  {1, 2}
+        --#SEVERITY   CRITICAL
+        --#GENERIC    6
+        --#CATEGORY   "Error Events"
+        --#SOURCE_ID  "A"
+        --#TIMEINDEX  0
+        ::= { adTa5kThermalEvents 4 }
+
+END

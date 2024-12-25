@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -21,7 +20,7 @@ foreach ($chkpnt['temp'] as $index => $entry) {
     $object = 'tempertureSensorValue';
     $value  = $entry['tempertureSensorValue'];
     if ($entry['tempertureSensorValue'] > 0 && $value <= 1000) {
-        discover_sensor_ng($device, 'temperature', $mib, $object, $oid, $index, NULL, $descr, 1, $value, ['rename_rrd' => "checkpoint-$index"]);
+        discover_sensor_ng($device, 'temperature', $mib, $object, $oid, $index, $descr, 1, $value, [ 'rename_rrd' => "checkpoint-$index" ]);
     }
 }
 
@@ -31,7 +30,7 @@ foreach ($chkpnt['fan'] as $index => $entry) {
     $descr  = $entry['fanSpeedSensorName'];
     $value  = $entry['fanSpeedSensorValue'];
     if ($entry['fanSpeedSensorValue'] > 0) {
-        discover_sensor_ng($device, 'fanspeed', $mib, $object, $oid, $index, NULL, $descr, 1, $value, ['rename_rrd' => "checkpoint-$index"]);
+        discover_sensor_ng($device, 'fanspeed', $mib, $object, $oid, $index, $descr, 1, $value, [ 'rename_rrd' => "checkpoint-$index" ]);
     }
 }
 
@@ -41,8 +40,10 @@ foreach ($chkpnt['volt'] as $index => $entry) {
     $descr  = $entry['voltageSensorName'];
     $value  = $entry['voltageSensorValue'];
     if (is_numeric($value) && $value > 0) {
-        discover_sensor_ng($device, 'voltage', $mib, $object, $oid, $index, NULL, $descr, 1, $value, ['rename_rrd' => "checkpoint-$index"]);
+        discover_sensor_ng($device, 'voltage', $mib, $object, $oid, $index, $descr, 1, $value, [ 'rename_rrd' => "checkpoint-$index" ]);
     }
 }
+
+unset($chkpnt);
 
 // EOF

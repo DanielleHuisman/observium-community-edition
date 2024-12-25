@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -46,18 +46,18 @@ $oids = snmpwalk_cache_oid($device, "externalSensorTable", [], "PDU-MIB");
 // PDU-MIB::externalSensorValue.2 = INTEGER: 0
 
 $sensor_types = [
-  'rmsCurrent'     => 'current',
-  //'peakCurrent', 'unbalancedCurrent',
-  'rmsVoltage'     => 'voltage',
-  'activePower'    => 'power',
-  'apparentPower'  => 'apower',
-  'powerFactor'    => 'powerfactor',
-  'activeEnergy'   => 'energy',
-  'apparentEnergy' => 'energy',
-  'temperature'    => 'temperature',
-  'humidity'       => 'humidity',
-  'airFlow'        => 'velocity', // No one know, but seems as this is LFM unit
-  //'airPressure', 'onOff', 'trip', 'vibration', 'waterDetection', 'smokeDetection', 'binary', 'contact', 'other', 'none'
+    'rmsCurrent'     => 'current',
+    //'peakCurrent', 'unbalancedCurrent',
+    'rmsVoltage'     => 'voltage',
+    'activePower'    => 'power',
+    'apparentPower'  => 'apower',
+    'powerFactor'    => 'powerfactor',
+    'activeEnergy'   => 'energy',
+    'apparentEnergy' => 'energy',
+    'temperature'    => 'temperature',
+    'humidity'       => 'humidity',
+    'airFlow'        => 'velocity', // No one know, but seems as this is LFM unit
+    //'airPressure', 'onOff', 'trip', 'vibration', 'waterDetection', 'smokeDetection', 'binary', 'contact', 'other', 'none'
 ];
 $sensor_units = [
     //none(-1), other(0),
@@ -115,7 +115,7 @@ foreach ($oids as $index => $entry) {
             $options['sensor_unit'] = "F";
         }
 
-        discover_sensor_ng($device, $sensor_types[$entry['externalSensorType']], $mib, 'externalSensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $sensor_types[$entry['externalSensorType']], $mib, 'externalSensorValue', $oid, $index, $descr, $scale, $value, $options);
     }
 }
 

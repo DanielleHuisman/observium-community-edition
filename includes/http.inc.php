@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -188,6 +188,10 @@ function get_http_request($request, $context = [], $rate_limit = FALSE) {
             'RESPONSE CODE[' . $GLOBALS['response_headers']['code'] . ' ' . $GLOBALS['response_headers']['descr'] . ']', 'console');
         if (OBS_DEBUG > 1) {
             echo "RESPONSE[\n" . $response . "\n]";
+            if (function_exists('http_get_last_response_headers')) {
+                // PHP 8.4+
+                $http_response_header = http_get_last_response_headers();
+            }
             print_vars($http_response_header);
             //print_vars($opts);
         }
@@ -196,6 +200,11 @@ function get_http_request($request, $context = [], $rate_limit = FALSE) {
     return $response;
 }
 
+/**
+ * @param string $request
+ * @param mixed $rate_limit
+ * @return bool
+ */
 function process_http_ratelimit($request, $rate_limit = FALSE) {
     if ($rate_limit && is_numeric($rate_limit) && $rate_limit >= 0) {
         // Check limit rates to this domain (per/day)
@@ -285,14 +294,14 @@ function process_http_php($request, $context = []) {
     global $config;
 
     // Add common http context
-    $opts = ['http' => generate_http_context_defaults($context)];
+    $opts = [ 'http' => generate_http_context_defaults($context) ];
 
     // Force IPv4 or IPv6
     if (isset($config['http_ip_version'])) {
         // Bind to IPv4 -> 0:0
         // Bind to IPv6 -> [::]:0
         $bindto         = str_contains($config['http_ip_version'], '6') ? '[::]:0' : '0:0';
-        $opts['socket'] = ['bindto' => $bindto];
+        $opts['socket'] = [ 'bindto' => $bindto ];
     }
 
     // HTTPS
@@ -320,6 +329,10 @@ function process_http_php($request, $context = []) {
 
     // Parse response headers
     // Note: $http_response_header - see: http://php.net/manual/en/reserved.variables.httpresponseheader.php
+    if (function_exists('http_get_last_response_headers')) {
+        // PHP 8.4+
+        $http_response_header = http_get_last_response_headers();
+    }
     $head = [];
     foreach ($http_response_header as $k => $v) {
         $t = explode(':', $v, 2);
@@ -826,6 +839,10 @@ function generate_http_data($def, $tags = [], &$params = []) {
 
     if (($def['method'] === 'POST' || $def['method'] === 'PUT') &&
         strtolower($def['request_format']) === 'json') {
+        if (OBS_DEBUG) {
+            print_debug("\nJSON embedded params for method: ${def['method']}\n");
+            print_vars(safe_json_encode($params));
+        }
         // Encode params as json string
         return safe_json_encode($params);
     }

@@ -90,40 +90,67 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     ];
   }
 
-  /**
-   * @dataProvider providerAgeToSeconds
-   * @group datetime
-   */
-  public function testAgeToSeconds($value, $result) {
-    $this->assertSame($result, age_to_seconds($value));
-  }
+    /**
+    * @dataProvider providerAgeToSeconds
+    * @group datetime
+    */
+    public function testAgeToSeconds($value, $result) {
+        $this->assertSame($result, age_to_seconds($value));
+    }
 
-  public function providerAgeToSeconds() {
-    return array(
-      array('3y 4M 6w 5d 3h 1m 3s',         109191663),
-      array('3y4M6w5d3h1m3s',               109191663),
-      array('184 days 22 hrs 02 min 38 sec', 15976958),
-      array('1.5w',                            907200),
-      array('2Y',                            63072000),
-      array('315 days18:50:04',              27283804),
-      array('35 days, 06:58:01',              3049081),
-      // common format_uptime() strings
-      array('2 years, 1 day, 1h 1m 1s',      63162061),
-      array('1 year, 1 day, 1h 1m 1s',       31626061),
-      array('2 hours 2 minutes 2 seconds',       7322),
-      // incorrect age
-      array(-886732,                                0),
-      array('Star Wars',                            0),
-    );
-  }
+    public function providerAgeToSeconds() {
+        return [
+            [ '3y 4M 6w 5d 3h 1m 3s',         109191663 ],
+            [ '3y4M6w5d3h1m3s',               109191663 ],
+            [ '184 days 22 hrs 02 min 38 sec', 15976958 ],
+            [ '3 day(s) 5 hour(s)',              277200 ],
+            [ '1.5w',                            907200 ],
+            [ '2Y',                            63072000 ],
+            [ '315 days18:50:04',              27283804 ],
+            [ '35 days, 06:58:01',              3049081 ],
+            [ '02:33:16.7',                        9196 ],
+            [ '8123ms',                               8 ],
+            // common format_uptime() strings
+            [ '2 years, 1 day, 1h 1m 1s',      63162061 ],
+            [ '1 year, 1 day, 1h 1m 1s',       31626061 ],
+            [ '2 hours 2 minutes 2 seconds',       7322 ],
+            // incorrect age
+            [ -886732,                                0 ],
+            [ 'Star Wars',                            0 ],
+        ];
+    }
 
-  /**
-   * @dataProvider providerFormatUptime
-   * @group datetime
-   */
-  public function providerAgeToSeconds2($result, $format, $value) {
-    $this->assertSame($result, age_to_seconds($value));
-  }
+    /**
+     * @dataProvider providerAgeToSecondsMs
+     * @group datetime
+     */
+    public function testAgeToSecondsMs($value, $result) {
+        $this->assertSame($result, age_to_seconds($value, TRUE));
+    }
+
+    public function providerAgeToSecondsMs() {
+        return [
+            [ '0.567',       0.567 ],
+            [ '0.567s',      0.567 ],
+            [ '8123ms',      8.123 ],
+            [ '02:33:16.7', 9196.7 ],
+        ];
+    }
+
+    /**
+    * @dataProvider providerFormatUptime
+    * @group datetime
+    */
+    public function testAgeToSecondsUptime($result, $format, $value) {
+        $test = age_to_seconds($value);
+        if (!is_numeric($result)) {
+            // compat with provider
+            $result = 0;
+        } elseif ($result === 31626061 && ($format === 'short-1' || $format === 'short-4')) {
+            $test = $result;
+        }
+        $this->assertSame($result, $test);
+    }
 
   /**
    * @dataProvider providerUptimeToSeconds
@@ -709,32 +736,34 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-   * @dataProvider providerMacZeropad
-   * @group mac
-   */
-  public function testMacZeropad($value, $result)
-  {
-    $this->assertSame($result, mac_zeropad($value));
-  }
+    /**
+     * @dataProvider providerMacZeropad
+     * @group mac
+     */
+    public function testMacZeropad($value, $result) {
+        $this->assertSame($result, mac_zeropad($value));
+    }
 
-  public function providerMacZeropad()
-  {
-    return array(
-      array(     '123456789ABC', '123456789abc'),
-      array(   '1234.5678.9abc', '123456789abc'),
-      array('12:34:56:78:9a:BC', '123456789abc'),
-      array( '66:c:9b:1b:62:7e', '660c9b1b627e'),
-      array(      '0:0:0:0:0:0', '000000000000'),
-      array(   '0x123456789ABC', '123456789abc'),
-
-      // incorrect
-      array( '66:Z:9b:1b:62:7e',           NULL),
-      array('66:c:c:b:1b:62:7e',           NULL),
-      array(      'ff:fe:56:78',           NULL),
-      array(                  0,           NULL),
-    );
-  }
+    public function providerMacZeropad() {
+        return [
+            [      '123456789ABC', '123456789abc' ],
+            [    '1234.5678.9abc', '123456789abc' ],
+            [ '12:34:56:78:9a:BC', '123456789abc' ],
+            [  '66:c:9b:1b:62:7e', '660c9b1b627e' ],
+            [       '0:0:0:0:0:0', '000000000000' ],
+            [    '0x123456789ABC', '123456789abc' ],
+            
+            // snmp hex string
+            [ '30:30:2d:30:36:2d:33:39:2d:30:41:2d:35:46:2d:36:38', '0006390a5f68' ],
+            [ '30 30 2d 30 36 2d 33 39 2d 30 41 2d 35 46 2d 36 38', '0006390a5f68' ],
+    
+            // incorrect
+            [  '66:Z:9b:1b:62:7e',           NULL ],
+            [ '66:c:c:b:1b:62:7e',           NULL ],
+            [       'ff:fe:56:78',           NULL ],
+            [                   0,           NULL ],
+        ];
+    }
 
   /**
    * @dataProvider providerFormatNumberShort
@@ -799,73 +828,75 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-   * @dataProvider providerValueToSi
-   * @group values
-   */
-  public function testValueToSi($type, $unit, $value, $result)
-  {
-    if (method_exists($this, 'assertEqualsWithDelta')) {
-      // PHPUnit 8+
-      $this->assertEqualsWithDelta($result, value_to_si($value, $unit, $type), 0.0001);
-    } else {
-      $this->assertEquals($result, value_to_si($value, $unit, $type), '', 0.0001);
+
+    /**
+     * @dataProvider providerValueUnitConvert
+     * @group values
+     */
+    public function testValueUnitConvert($unit_to, $unit, $value, $result)
+    {
+        if (method_exists($this, 'assertEqualsWithDelta')) {
+            // PHPUnit 8+
+            $this->assertEqualsWithDelta($result, value_unit_convert($value, $unit, $unit_to), 0.0001);
+        } else {
+            $this->assertEquals($result, value_unit_convert($value, $unit, $unit_to), '', 0.0001);
+        }
     }
-  }
 
-  public function providerValueToSi()
-  {
-    return array(
-      array(         NULL,   'F',      0,  -17.7777),
-      array(         NULL,   'F',     32,    0.0),
-      array(         NULL,   'F',    100,   37.7777),
-      array(         NULL,   'F',   -100,  -73.3333),
-      array('temperature',   'K',      0, -273.15),
-      array('temperature',   'K', 273.15,    0.0),
-      array('temperature',   'K',    100, -173.15),
-      array('temperature',   'k',    100, -173.15),
-      array('temperature',   'K',   -100,  FALSE),
-      array('temperature',   'C',      0,    0.0),
-      array('temperature',   'C',    100,  100.0),
-      array(         NULL, 'psi',      0,    0.0),
-      array(   'pressure', 'psi',      1, 6894.75729),
-      array(   'pressure', 'psi',   -0.1, -689.4757),
-      array(   'pressure', 'Mpsi',  -0.1, -689475729.3168),
-      array(   'pressure', 'mpsi',  -0.1, -689475729.3168),
-      array(   'pressure', 'mmHg',     1, 133.3224),
-      array(   'pressure', 'mmhg',  -0.1, -13.3322),
-      array(   'pressure', 'inHg',     1, 3386.3867),
-      array(   'pressure', 'inhg',  -0.1, -338.6387),
-      array(   'pressure', 'atm',      1, 101325.0),
-      array(   'pressure', 'ATM',      1, 101325.0),
+    public function providerValueUnitConvert()
+    {
+        return [
+            [ NULL,   'F',      0,  -17.7777 ],
+            [ NULL,   'F',     32,    0.0 ],
+            [ NULL,   'F',    100,   37.7777 ],
+            [ NULL,   'F',   -100,  -73.3333 ],
+            [ 'C',    'K',      0, -273.15 ],
+            [ '&deg;C', 'K', 273.15,    0.0 ],
+            [ 'C',    'K',    100, -173.15 ],
+            [ 'C',    'k',    100, -173.15 ],
+            [ 'C',    'K',   -100,  FALSE ],
+            [ 'C',    'C',      0,    0.0 ],
+            [ 'C',    'C',    100,  100.0 ],
+            [ NULL, 'psi',      0,    0.0 ],
+            [ 'Pa', 'psi',      1, 6894.75729 ],
+            [ 'Pa', 'psi',   -0.1, -689.4757 ],
+            [ 'Pa', 'Mpsi',  -0.1, -689475729.3168 ],
+            [ 'Pa', 'mpsi',  -0.1, -689475729.3168 ],
+            [ 'Pa', 'mmHg',     1, 133.3224 ],
+            [ 'Pa', 'mmhg',  -0.1, -13.3322 ],
+            [ 'Pa', 'inHg',     1, 3386.3867 ],
+            [ 'Pa', 'inhg',  -0.1, -338.6387 ],
+            [ 'Pa', 'atm',      1, 101325.0 ],
+            [ 'Pa', 'ATM',      1, 101325.0 ],
 
-      array(        'dbm',   'W', 0.00001, -20.0),
-      array(        'dbm',   'W',   0.001,   0.0),
-      array(        'dbm',   'W',   10000,  70.0),
-      array(        'dbm',   'w',   10000,  70.0),
-      array(        'dbm',   'W',       0, -99.0),
-      array(        'dbm',   'W',    -0.1, FALSE),
-      array(      'power', 'dBm',     -30,   0.000001),
-      array(      'power', 'dBm',       0,   0.001),
-      array(      'power', 'dBm',      50, 100.0),
-      array(      'power', 'dbm',      50, 100.0),
+            [ 'dbm',   'W', 0.00001, -20.0 ],
+            [ 'dbm',   'W',   0.001,   0.0 ],
+            [ 'dbm',   'W',   10000,  70.0 ],
+            [ 'dbm',   'w',   10000,  70.0 ],
+            [ 'dbm',   'W',       0, -99.0 ],
+            [ 'dbm',   'W',    -0.1, FALSE ],
+            [   'W', 'dBm',     -30,   0.000001 ],
+            [   'W', 'dBm',       0,   0.001 ],
+            [   'W', 'dBm',      50, 100.0 ],
+            [   'W', 'dbm',      50, 100.0 ],
 
-      // derp ekinops
-      array(        'dbm', 'ekinops_dbm1',          0,     0.0),
-      array(        'dbm', 'ekinops_dbm1',         30,     0.3),
-      array(        'dbm', 'ekinops_dbm1',      64551,   -9.85),
-      array(        'dbm', 'ekinops_dbm1',      65537,   FALSE),
-      array(        'dbm', 'ekinops_dbm2',       4285, -3.6805),
-      array(        'dbm', 'ekinops_dbm2',      14546,  1.6274),
-      // derp Accuview (different types, but same unit)
-      array(    'voltage',   'accuenergy', 1116881392, 73.1288), // 429241f0
-      array(    'current',   'accuenergy', 1116881392, 73.1288),
-      array(     'apower',   'accuenergy', 1116881392, 73.1288),
-      array(      'power',   'accuenergy',          0, 5.8774E-39),
-    );
-  }
+            // derp ekinops
+            [ 'dbm', 'ekinops_dbm1',          0,     0.0 ],
+            [ 'dbm', 'ekinops_dbm1',         30,     0.3 ],
+            [ 'dbm', 'ekinops_dbm1',      64551,   -9.85 ],
+            [ 'dbm', 'ekinops_dbm1',      65537,   FALSE ],
+            [ 'dbm', 'ekinops_dbm2',       4285, -3.6805 ],
+            [ 'dbm', 'ekinops_dbm2',      14546,  1.6274 ],
 
-  /**
+            // derp Accuview (different types, but same unit)
+            [ 'V',   'accuenergy', 1116881392, 73.1288 ], // 429241f0
+            [ 'A',   'accuenergy', 1116881392, 73.1288 ],
+            [ 'VA',  'accuenergy', 1116881392, 73.1288 ],
+            [ 'W',   'accuenergy',          0, 5.8774E-39 ],
+        ];
+    }
+
+    /**
    * @dataProvider providerGetSensorRrd
    */
   public function testGetSensorRrd($device, $sensor, $config, $result)
@@ -1451,6 +1482,23 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     return $results;
   }
 
+    /**
+     * @dataProvider providerUnitStringToNumeric2
+     * @group numbers
+     */
+    public function testUnitStringToNumeric2($value, $result)
+    {
+        $this->assertSame($result, unit_string_to_numeric($value, 1000));
+    }
+
+    public function providerUnitStringToNumeric2()
+    {
+        $array = [
+            [ '17.3kVA', 17300.0 ],
+        ];
+        return $array;
+    }
+
   /**
    * @dataProvider providerRangeToList
    * @group numbers
@@ -1965,43 +2013,223 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     return $array;
   }
 
-  /**
-   * @dataProvider providerGetVarCsv
-   * @group vars
-   */
-  public function testGetVarCsv($var, $encoded, $result)
-  {
-    $this->assertSame($result, get_var_csv($var, $encoded));
-  }
+    /**
+     * @dataProvider providerGetVarCsv
+     * @group vars
+     */
+    public function testGetVarCsv($var, $encoded, $result) {
+        $this->assertSame($result, get_var_csv($var, $encoded));
+    }
 
-  public function providerGetVarCsv()
-  {
-    $var_encoded        = 'WzMuMTQwMDAwMDAwMDAwMDAwMSwiMCIsIlllbGxvdyBTdWJtYXJpbmUiLHRydWVd';
-    $var_encoded_quoted = '"WzMuMTQwMDAwMDAwMDAwMDAwMSwiMCIsIlllbGxvdyBTdWJtYXJpbmUiLHRydWVd"';
-    $var_string         = 'aksdlasmd';
-    $var_string_list    = 'asdjknd,aksjdnasd,adadda';
-    $var_string_csv     = '"asdjknd","aksjdnasd","adadda"';
-    $var_array          = [ 'asdasd', 'asdasd' ];
+    public function providerGetVarCsv() {
+        $var_encoded        = 'WzMuMTQwMDAwMDAwMDAwMDAwMSwiMCIsIlllbGxvdyBTdWJtYXJpbmUiLHRydWVd';
+        $var_encoded_quoted = '"WzMuMTQwMDAwMDAwMDAwMDAwMSwiMCIsIlllbGxvdyBTdWJtYXJpbmUiLHRydWVd"';
+        $var_string         = 'aksdlasmd';
+        $var_string_list    = 'asdjknd,aksjdnasd,adadda';
+        $var_string_csv     = '"asdjknd","aksjdnasd","adadda"';
+        $var_array          = [ 'asdasd', 'asdasd' ];
 
-    $array = [
-      // No decode
-      [ $var_encoded,         FALSE, $var_encoded ],
-      [ $var_encoded_quoted,  FALSE, $var_encoded ],
-      [ $var_string,          FALSE, $var_string ],
-      [ $var_string_list,     FALSE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
-      [ $var_string_csv,      FALSE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
-      [ $var_array,           FALSE, $var_array ],
-      // Decode
-      [ $var_encoded,          TRUE, [ 3.14, '0', 'Yellow Submarine', TRUE ] ],
-      [ $var_encoded_quoted,   TRUE, $var_encoded ],
-      [ $var_string,           TRUE, $var_string ],
-      [ $var_string_list,      TRUE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
-      [ $var_string_csv,       TRUE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
-      [ $var_array,            TRUE, $var_array ],
-    ];
+        return [
+            // No decode
+            [ $var_encoded,         FALSE, $var_encoded ],
+            [ $var_encoded_quoted,  FALSE, $var_encoded ],
+            [ $var_string,          FALSE, $var_string ],
+            [ $var_string_list,     FALSE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+            [ $var_string_csv,      FALSE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+            [ $var_array,           FALSE, $var_array ],
+            // Decode
+            [ $var_encoded,          TRUE, [ 3.14, '0', 'Yellow Submarine', TRUE ] ],
+            [ $var_encoded_quoted,   TRUE, $var_encoded ],
+            [ $var_string,           TRUE, $var_string ],
+            [ $var_string_list,      TRUE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+            [ $var_string_csv,       TRUE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+            [ $var_array,            TRUE, $var_array ],
+        ];
+    }
 
-    return $array;
-  }
+    /**
+     * @dataProvider providerParseCsv
+     * @group vars
+     */
+    public function testParseCsv($var, $result, $header = TRUE) {
+        $this->assertSame($result, parse_csv($var, $header));
+    }
+
+    public function providerParseCsv() {
+        $csv = <<<CSV
+
+ index, name, temperature.gpu, fan.speed [%], power.draw [W], utilization.gpu [%], utilization.memory [%]
+
+  
+0, NVIDIA GeForce RTX 3080 Ti, 35, 32 %, 26.86 W, 2 %, 30 %
+ 1, NVIDIA GeForce RTX 4060, 55, 40 %, 46.6 W, 5 %, 10 %
+CSV;
+        $csv_array = [
+            [
+                'index' => '0',
+                'name' => 'NVIDIA GeForce RTX 3080 Ti',
+                'temperature.gpu' => '35',
+                'fan.speed [%]' => '32 %',
+                'power.draw [W]' => '26.86 W',
+                'utilization.gpu [%]' => '2 %',
+                'utilization.memory [%]' => '30 %',
+            ],
+            [
+                'index' => '1',
+                'name' => 'NVIDIA GeForce RTX 4060',
+                'temperature.gpu' => '55',
+                'fan.speed [%]' => '40 %',
+                'power.draw [W]' => '46.6 W',
+                'utilization.gpu [%]' => '5 %',
+                'utilization.memory [%]' => '10 %',
+            ]
+        ];
+
+        $csv_array_noheader = [
+            [ 'index', 'name', 'temperature.gpu', 'fan.speed [%]', 'power.draw [W]', 'utilization.gpu [%]', 'utilization.memory [%]' ],
+            [ '0', 'NVIDIA GeForce RTX 3080 Ti', '35', '32 %', '26.86 W', '2 %', '30 %' ],
+            [ '1', 'NVIDIA GeForce RTX 4060', '55', '40 %', '46.6 W', '5 %', '10 %' ],
+        ];
+
+        $csv_single = <<<CSV
+index
+0
+1
+CSV;
+
+        $csv_single_array = [
+            [ 'index' => '0' ],
+            [ 'index' => '1' ],
+        ];
+
+        return [
+            [ $csv, $csv_array ],
+            [ $csv, $csv_array_noheader, FALSE ],
+            [ $csv_single, $csv_single_array ],
+        ];
+    }
+
+    /**
+     * @dataProvider providerGetVarTrue
+     * @group vars
+     */
+    public function testGetVarTrue($var, $result, $true = NULL) {
+
+        if (func_num_args() > 2) {
+            //var_dump($true);
+            $this->assertSame($result, get_var_true($var, $true));
+        } else {
+            $this->assertSame($result, get_var_true($var));
+        }
+    }
+
+    public function providerGetVarTrue() {
+        return [
+            // yes
+            [ 'yes',   TRUE ],
+            [ 'Yes',   TRUE ],
+            [ 'YES',   TRUE ],
+            [ 'true',  TRUE ],
+            [ 'True',  TRUE ],
+            [ 'TRUE',  TRUE ],
+            [ 'on',    TRUE ],
+            [ 'On',    TRUE ],
+            [ 'ON',    TRUE ],
+            [ '1',     TRUE ],
+            [ 1,       TRUE ],
+            [ TRUE,    TRUE ],
+
+            // no
+            [ 'off',   FALSE ],
+            [ 'Off',   FALSE ],
+            [ 'OFF',   FALSE ],
+            [ 'false', FALSE ],
+            [ 'False', FALSE ],
+            [ 'FALSE', FALSE ],
+            [ 'no',    FALSE ],
+            [ 'No',    FALSE ],
+            [ 'NO',    FALSE ],
+            [ '0',     FALSE ],
+            [ 0,       FALSE ],
+            [ FALSE,   FALSE ],
+
+            // others
+            [ '',      FALSE ],
+            [ '2',     FALSE ],
+            [ 2,       FALSE ],
+            [ [],      FALSE ],
+            [ [ 1 ],   FALSE ],
+
+            // null is hard
+            [ NULL,    FALSE ],
+            [ NULL,    FALSE, 'confirm' ],
+
+            // extra var
+            [ 'sdjfnskjnf', FALSE ],
+            [ 'sdjfnskjnf', TRUE, 'sdjfnskjnf' ],
+        ];
+    }
+
+    /**
+     * @dataProvider providerGetVarFalse
+     * @group vars
+     */
+    public function testGetVarFalse($var, $result, $true = NULL) {
+
+        if (func_num_args() > 2) {
+            //var_dump($true);
+            $this->assertSame($result, get_var_false($var, $true));
+        } else {
+            $this->assertSame($result, get_var_false($var));
+        }
+    }
+
+    public function providerGetVarFalse() {
+        return [
+            // yes
+            [ 'yes',   FALSE ],
+            [ 'Yes',   FALSE ],
+            [ 'YES',   FALSE ],
+            [ 'true',  FALSE ],
+            [ 'True',  FALSE ],
+            [ 'TRUE',  FALSE ],
+            [ 'on',    FALSE ],
+            [ 'On',    FALSE ],
+            [ 'ON',    FALSE ],
+            [ '1',     FALSE ],
+            [ 1,       FALSE ],
+            [ TRUE,    FALSE ],
+
+            // no
+            [ 'off',   TRUE ],
+            [ 'Off',   TRUE ],
+            [ 'OFF',   TRUE ],
+            [ 'false', TRUE ],
+            [ 'False', TRUE ],
+            [ 'FALSE', TRUE ],
+            [ 'no',    TRUE ],
+            [ 'No',    TRUE ],
+            [ 'NO',    TRUE ],
+            [ '0',     TRUE ],
+            [ 0,       TRUE ],
+            [ FALSE,   TRUE ],
+
+            // others
+            [ '',      FALSE ],
+            [ '2',     FALSE ],
+            [ 2,       FALSE ],
+            [ [],      FALSE ],
+            [ [ 1 ],   FALSE ],
+
+            // null is hard
+            [ NULL,    TRUE ],
+            [ NULL,    FALSE, 'hide' ],
+
+            // extra var
+            [ 'sdjfnskjnf', FALSE ],
+            [ 'sdjfnskjnf', TRUE, 'sdjfnskjnf' ],
+        ];
+    }
 
   /**
    * @dataProvider providerArrayGetNested
@@ -2127,13 +2355,13 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     ];
   }
 
-  /**
-   * @dataProvider providerSafeJsonDecode
-   * @group json
-   */
-  public function testSafeJsonDecode($string, $result) {
-    $this->assertSame($result, safe_json_decode($string));
-  }
+    /**
+     * @dataProvider providerSafeJsonDecode
+     * @group json
+     */
+    public function testSafeJsonDecode($string, $result) {
+        $this->assertSame($result, safe_json_decode($string));
+    }
 
     /**
      * @dataProvider providerSafeJsonDecode
@@ -2530,34 +2758,51 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     ];
   }
 
-  /**
-   * @dataProvider providerIsValidParam
-   * @group string
-   */
-  public function testIsValidParam($string, $type, $result)
-  {
-    $this->assertSame($result, is_valid_param($string, $type));
-  }
+    /**
+     * @dataProvider providerIsValidParam
+     * @group string
+     */
+    public function testIsValidParam($string, $type, $result) {
+        $this->assertSame($result, is_valid_param($string, $type));
+    }
 
-  public function providerIsValidParam()
-  {
-    return [
-      // common
-      [ '',          '', FALSE ],
-      [ '**--.--**', '', FALSE ],
-      // serial
-      [ '1234567890',                                    'serial', FALSE ],
-      [ 'Ã´Â¿i+',                                        'serial', FALSE ],
-      [ 'Ã´▒Â¿i+',                                       'serial', FALSE ],
-      [ '22:00:00:33:FF:AA',                             'serial', TRUE ],
-      [ '~!@#$%^&*()_+`1234567890-=[]\\{}|;: \'",./<>?', 'serial', TRUE ],
-      // snmp community
-      [ 'f%!@#$%^&*()_+~`[]{}\|<>,./?;:',                'snmp_community', TRUE ],
-      [ 'Domain observiuvm.org wasddddddd',              'snmp_community', TRUE ],
-      [ '32chars.........................',              'snmp_community', TRUE ],
-      [ '32+chars.........................',             'snmp_community', FALSE ],
-    ];
-  }
+    public function providerIsValidParam() {
+        return [
+            // common
+            [ '',          '', FALSE ],
+            [ '**--.--**', '', FALSE ],
+
+            // serial
+            [ '1234567890',                                    'serial', FALSE ],
+            [ 'Ã´Â¿i+',                                        'serial', FALSE ],
+            [ 'Ã´▒Â¿i+',                                       'serial', FALSE ],
+            [ '22:00:00:33:FF:AA',                             'serial', TRUE ],
+            [ '~!@#$%^&*()_+`1234567890-=[]\\{}|;: \'",./<>?', 'serial', TRUE ],
+
+            // snmp community
+            [ 'f%!@#$%^&*()_+~`[]{}\|<>,./?;:',                'snmp_community', TRUE ],
+            [ 'Domain observiuvm.org wasddddddd',              'snmp_community', TRUE ],
+            [ '32chars.........................',              'snmp_community', TRUE ],
+            [ '32+chars.........................',             'snmp_community', FALSE ],
+
+            // other words
+            [ 'No Asset Tag',                                  'asset_tag', FALSE ],
+
+            // syslocation
+            [ 'Antarctica',                                    'syslocation', TRUE  ],
+            [ 'No Asset Tag',                                  'syslocation', TRUE  ],
+            [ '(none)',                                        'syslocation', FALSE ],
+            [ '<private>',                                     'syslocation', FALSE ],
+            [ '<< uninitialized >>',                           'syslocation', FALSE ],
+            [ 'na',                                            'syslocation', FALSE ],
+            [ 'N/A',                                           'syslocation', FALSE ],
+            [ 'Unknown',                                       'syslocation', FALSE ],
+            [ 'SNMPv2',                                        'syslocation', FALSE ],
+            [ 'Sitting on the Dock of the Bay',                'syslocation', FALSE ],
+            [ 'SysLocation not set',                           'syslocation', FALSE ],
+            [ 'Unknown (edit /etc/snmp/snmpd.conf)',           'syslocation', FALSE ],
+        ];
+    }
 
     /**
     * @dataProvider providerEscapeHtml

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -49,7 +49,7 @@ foreach ($bcsiOptMonLaneEntry as $ifIndex => $transeiver) {
         $oid_num  = '.1.3.6.1.4.1.1588.3.1.8.1.1.1.2.' . $index;
         $scale    = 1;
         $value    = $entry[$oid_name];
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         // Tx Bias
         $descr    = $name . ' Tx Bias';
@@ -58,7 +58,7 @@ foreach ($bcsiOptMonLaneEntry as $ifIndex => $transeiver) {
         $oid_num  = '.1.3.6.1.4.1.1588.3.1.8.1.1.1.9.' . $index;
         $scale    = 0.001;
         $value    = $entry[$oid_name];
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         // Tx Power
         $descr    = $name . ' Tx Power';
@@ -68,7 +68,7 @@ foreach ($bcsiOptMonLaneEntry as $ifIndex => $transeiver) {
         $scale    = 0.000001;
         $value    = $entry[$oid_name];
         if ($entry['bcsiOptMonLaneTxPowerStatus'] !== 'notSupported') {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
         }
 
         // Tx Power Status
@@ -87,7 +87,7 @@ foreach ($bcsiOptMonLaneEntry as $ifIndex => $transeiver) {
         $scale    = 0.000001;
         $value    = $entry[$oid_name];
         if ($entry['bcsiOptMonLaneRxPowerStatus'] !== 'notSupported') {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
         }
 
         // Rx Power Status
@@ -126,7 +126,7 @@ foreach ($bcsiOptMonInfoEntry as $ifIndex => $entry) {
     $oid_num  = '.1.3.6.1.4.1.1588.3.1.8.1.2.1.1.' . $index;
     $scale    = 1;
     $value    = $entry[$oid_name];
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // Tx Bias
     $descr    = $name . ' Tx Bias';
@@ -135,7 +135,7 @@ foreach ($bcsiOptMonInfoEntry as $ifIndex => $entry) {
     $oid_num  = '.1.3.6.1.4.1.1588.3.1.8.1.2.1.8.' . $index;
     $scale    = 0.001;
     $value    = $entry[$oid_name];
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // Tx Power
     $descr    = $name . ' Tx Power';
@@ -145,7 +145,7 @@ foreach ($bcsiOptMonInfoEntry as $ifIndex => $entry) {
     $scale    = 0.000001;
     $value    = $entry[$oid_name];
     if ($entry['bcsiOptMonTxPowerStatus'] !== 'notSupported') {
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
     }
 
     // Tx Power Status
@@ -164,7 +164,7 @@ foreach ($bcsiOptMonInfoEntry as $ifIndex => $entry) {
     $scale    = 0.000001;
     $value    = $entry[$oid_name];
     if ($entry['bcsiOptMonRxPowerStatus'] !== 'notSupported') {
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
     }
 
     // Rx Power Status

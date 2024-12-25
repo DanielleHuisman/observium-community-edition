@@ -1,7 +1,7 @@
 DNOS-MGMT-SECURITY-MIB DEFINITIONS ::= BEGIN
 
 -- Broadcom FastPath Mgmt Security MIB
--- Copyright 2016-2019 Broadcom.
+-- Copyright 2016-2022 Broadcom.
 -- This SNMP Management Information Specification
 -- embodies Broadcom's confidential and proprietary
 -- intellectual property.  Broadcom retains all title
@@ -21,15 +21,32 @@ IMPORTS
     TruthValue                          FROM SNMPv2-TC;
 
     fastPathMgmtSecurity MODULE-IDENTITY
-        LAST-UPDATED "201912050000Z" -- 05 Dec 2019 12:00:00 GMT
-        ORGANIZATION "Dell EMC"
+        LAST-UPDATED "202111220000Z" -- 22 Nov 2021 12:00:00 GMT
+        ORGANIZATION "Dell"
         CONTACT-INFO ""
         DESCRIPTION
           "The Dell Networking Private MIB for Security"
 
         -- Revision history.
         REVISION
-          "201912120000Z" -- 12 December 2019 12:00:00 GMT
+          "202202220000Z" -- 22 Feb 2022 12:00:00 GMT
+        DESCRIPTION
+          "Added agentSSLCryptoDhParam to agentSSLConfigGroup.
+           Added tls12 option in agentSSLProtocolLevel object."
+        REVISION
+          "202111220000Z" -- 22 Nov 2021 12:00:00 GMT
+        DESCRIPTION
+          "Added rsa-dsa(7),rsa-ecdsa(8) and dsa-ecdsa(9) to agentSSHKeysPresent and agentSSHKeyGenerationStatus."
+        REVISION
+          "202109210000Z" -- 21 Sep 2021 12:00:00 GMT
+        DESCRIPTION
+          "Added agentSSLIpHttpSecureCiphersuite to agentSSLConfigGroup.
+           Added agentSSHDsaKeyLen and agentSSHRsaKeyLen to agentSSHConfigGroup.
+           Added agentSSHAuthenticationRetries to agentSSHConfigGroup.
+           Added agentSSHEncryptionAlgorithmsConfigGroup, agentSSHMacAlgorithmsConfigGroup and
+           agentSSHKexAlgorithmsConfigGroup to agentSSHConfigGroup."
+        REVISION
+          "201907250000Z" -- 25 July 2019 12:00:00 GMT
         DESCRIPTION
           "Added MIB objects for Outbound SSH."
         REVISION
@@ -84,13 +101,14 @@ IMPORTS
          SYNTAX      INTEGER {
                      ssl30(1), -- SSL 3.0
                      tls10(2), -- TSL 1.0
-                     both(3)
+                     both(3),
+                     tls12(4) -- TLS 1.2
                      }
          MAX-ACCESS  read-only
          STATUS      current
          DESCRIPTION
-                     "Displays which protocol versions of SSL are enabled on this
-                     switch.  The default value is both(3)."
+                     "Indicates which protocol versions of SSL are enabled on this
+                     switch. The default value is tls12(4)."
          ::= { agentSSLConfigGroup 3 }
 
     agentSSLMaxSessions OBJECT-TYPE
@@ -147,6 +165,38 @@ IMPORTS
          DESCRIPTION
                      "Indicates whether certificate files are currently being generated."
          ::= { agentSSLConfigGroup 9 }
+
+    agentSSLIpHttpSecureCiphersuite OBJECT-TYPE
+         SYNTAX      BITS {
+                     undefined(0),
+                     aes128-cbc-sha(1),
+                     aes256-cbc-sha(2),
+                     dhe-aes128-cbc-sha(3),
+                     dhe-aes-cbc-sha2(4),
+                     dhe-aes-gcm-sha2(5),
+                     ecdhe-rsa-aes-cbc-sha2(6),
+                     ecdhe-rsa-aes-gcm-sha2(7),
+                     rsa-aes-cbc-sha2(8),
+                     rsa-aes-gcm-sha2(9)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Specifies ciphersuites to be used for SSL tunnel.
+                      This object is being used for assigning specified Secure Ciphersuite list.
+                      Bit mask value is being used for configuring Secure Ciphersuites."
+         ::= { agentSSLConfigGroup 10 }
+
+    agentSSLCryptoDhParam OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     dh1024(1),
+                     dh2048(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the Diffie-Hellman to be used for SSL tunnel."
+         ::= { agentSSLConfigGroup 11 }
 
     --**************************************************************************************
     -- agentSSHConfigGroup
@@ -214,7 +264,10 @@ IMPORTS
                      both(3), --deprecated
                      none(4),
                      ecdsa(5),
-                     all(6)
+                     all(6),
+                     rsa-dsa(7),
+                     rsa-ecdsa(8),
+                     dsa-ecdsa(9)
                      }
          MAX-ACCESS  read-only
          STATUS      current
@@ -229,7 +282,10 @@ IMPORTS
                      both(3), --deprecated
                      none(4),
                      ecdsa(5),
-                     all(6)
+                     all(6),
+                     rsa-dsa(7),
+                     rsa-ecdsa(8),
+                     dsa-ecdsa(9)
                      }
          MAX-ACCESS  read-only
          STATUS      current
@@ -246,7 +302,7 @@ IMPORTS
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                     "Controls RSA key generation and deletion.  Always returns noop(1)."
+                     "Controls RSA key generation and deletion.  A read of this object always returns noop(1)."
          ::= { agentSSHConfigGroup 8 }
 
     agentSSHDSAKeyControl OBJECT-TYPE
@@ -258,7 +314,7 @@ IMPORTS
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
-                     "Controls DSA key generation and deletion.  Always returns noop(1)."
+                     "Controls DSA key generation and deletion.  A read of this object always returns noop(1)."
          ::= { agentSSHConfigGroup 9 }
 
     agentSSHExecBannerState OBJECT-TYPE
@@ -314,6 +370,276 @@ IMPORTS
         DESCRIPTION "Get/Set ECDSA key length. Supported Key lengths are 256, 384 and 521 bits."
         ::= { agentSSHConfigGroup 14 }
 
+    agentSSHDsaKeyLen OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Get/Set DSA key length. Supported Key length is 1024 bits."
+         DEFVAL { 1024 }
+         ::= { agentSSHConfigGroup 15 }
+
+    agentSSHRsaKeyLen OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Get/Set RSA key length. Supported Key lengths are 1024, 2048 and 3072 bits."
+         DEFVAL { 1024 }
+         ::= { agentSSHConfigGroup 16 }
+
+    agentSSHAuthenticationRetries OBJECT-TYPE
+         SYNTAX      Unsigned32 (0..5)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the maximum authentication retries allowed per SSH connection."
+         DEFVAL { 3 }
+         ::= { agentSSHConfigGroup 17 }
+
+    --**************************************************************************************
+    -- agentSSHEncryptionAlgorithmsConfigGroup
+    --
+    --**************************************************************************************
+
+    agentSSHEncryptionAlgorithmsConfigGroup                        OBJECT IDENTIFIER ::= { agentSSHConfigGroup 18 }
+
+    agentSSHServerEncryptionAlgorithmsTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentSSHServerEncryptionAlgorithmsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Specifies SSH encryption algorithms to be used."
+         ::= { agentSSHEncryptionAlgorithmsConfigGroup 1 }
+
+
+    agentSSHServerEncryptionAlgorithmsEntry OBJECT-TYPE
+         SYNTAX      AgentSSHServerEncryptionAlgorithmsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Config entry for SSH encryption algorithms."
+         INDEX       { agentSSHServerEncryptionIndex }
+         ::= { agentSSHServerEncryptionAlgorithmsTable 1 }
+
+    AgentSSHServerEncryptionAlgorithmsEntry ::= SEQUENCE {
+                          agentSSHServerEncryptionIndex
+                           Unsigned32,
+                          agentSSHServerEncryptionAlgorithms
+                           INTEGER
+           }
+
+    agentSSHServerEncryptionIndex OBJECT-TYPE
+         SYNTAX     Unsigned32 (1..4)
+         MAX-ACCESS not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The index of the SSH encryption configuration order."
+
+         ::= { agentSSHServerEncryptionAlgorithmsEntry 1 }
+
+    agentSSHServerEncryptionAlgorithms OBJECT-TYPE
+         SYNTAX      INTEGER {
+                       undefined(0),
+                       aes128-ctr(1),
+                       aes192-ctr(2),
+                       aes256-ctr(3),
+                       chacha20-poly1305(4)
+                     }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Specifies encryption algorithm to be used for SSH.
+
+                      Abbreviation used.
+                      - chacha20-poly1305(4) is used for chacha20-poly1305@openssh.com.
+                      "
+         DEFVAL { undefined }
+
+         ::= { agentSSHServerEncryptionAlgorithmsEntry 2 }
+
+    agentSSHServerEncryptionRefresh OBJECT-TYPE
+         SYNTAX     INTEGER {
+                    enable(1),
+                    disable(2)
+                    }
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+                    "When set to enable(1), configuration of agentSSHServerEncryptionAlgorithmsEntry will be configured
+                     and refresh ssh process. The value is write-only.
+                     Attempt to read will return disable(2)."
+
+         ::= { agentSSHEncryptionAlgorithmsConfigGroup 2 }
+
+    --**************************************************************************************
+    -- agentSSHMacAlgorithmsConfigGroup
+    --
+    --**************************************************************************************
+
+    agentSSHMacAlgorithmsConfigGroup                    OBJECT IDENTIFIER ::= { agentSSHConfigGroup 19 }
+
+    agentSSHServerMacAlgorithmsTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentSSHServerMacAlgorithmsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Specifies SSH mac algorithms to be used."
+         ::= { agentSSHMacAlgorithmsConfigGroup 1 }
+
+
+    agentSSHServerMacAlgorithmsEntry OBJECT-TYPE
+         SYNTAX      AgentSSHServerMacAlgorithmsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Config entry for SSH mac algorithms."
+         INDEX       { agentSSHServerMacIndex }
+         ::= { agentSSHServerMacAlgorithmsTable 1 }
+
+    AgentSSHServerMacAlgorithmsEntry ::= SEQUENCE {
+                          agentSSHServerMacIndex
+                           Unsigned32,
+                          agentSSHServerMacAlgorithms
+                           INTEGER
+           }
+
+    agentSSHServerMacIndex OBJECT-TYPE
+         SYNTAX     Unsigned32 (1..10)
+         MAX-ACCESS not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The index of the SSH mac algorithms configuration order."
+
+         ::= { agentSSHServerMacAlgorithmsEntry 1 }
+
+    agentSSHServerMacAlgorithms OBJECT-TYPE
+         SYNTAX      INTEGER {
+                       undefined(0),
+                       hmac-sha1(1),
+                       hmac-sha1-etm(2),
+                       hmac-md5-etm(3),
+                       hmac-sha2-256(4),
+                       hmac-sha2-512(5),
+                       hmac-sha1-96-etm(6),
+                       hmac-md5-96-etm(7),
+                       hmac-md5(8),
+                       hmac-sha2-256-etm(9),
+                       hmac-sha2-512-etm(10)
+                     }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Specifies MAC algorithm to be used for SSH.
+
+                      Abbreviation used.
+                      - hmac-sha1-etm(2) is used for hmac-sha1-etm@openssh.com
+                      - hmac-md5-etm(3) is used for hmac-md5-etm@openssh.com
+                      - hmac-sha1-96-etm(6) is used for hmac-sha1-96-etm@openssh.com
+                      - hmac-md5-96-etm(7) is used for hmac-md5-96-etm@openssh.com
+                      - hmac-sha2-256-etm(9) is used for hmac-sha2-256-etm@openssh.com
+                      - hmac-sha2-512-etm(10) is used for hmac-sha2-512-etm@openssh.com
+
+                     "
+         DEFVAL { undefined }
+
+         ::= { agentSSHServerMacAlgorithmsEntry 2 }
+
+    agentSSHServerMacRefresh OBJECT-TYPE
+         SYNTAX     INTEGER {
+                    enable(1),
+                    disable(2)
+                    }
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+                    "When set to enable(1), configuration of agentSSHServerMacAlgorithmsEntry will be configured
+                     and refresh ssh process. The value is write-only.
+                     Attempt to read will return disable(2)."
+
+         ::= { agentSSHMacAlgorithmsConfigGroup 2 }
+
+
+    --**************************************************************************************
+    -- agentSSHKexAlgorithmsConfigGroup
+    --
+    --**************************************************************************************
+
+    agentSSHKexAlgorithmsConfigGroup                    OBJECT IDENTIFIER ::= { agentSSHConfigGroup 20 }
+
+    agentSSHServerKexAlgorithmsTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentSSHServerKexAlgorithmsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Specifies SSH kex algorithms to be used."
+         ::= { agentSSHKexAlgorithmsConfigGroup 1 }
+
+
+    agentSSHServerKexAlgorithmsEntry OBJECT-TYPE
+         SYNTAX      AgentSSHServerKexAlgorithmsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Config entry for SSH kex algorithms."
+         INDEX       { agentSSHServerKexIndex }
+         ::= { agentSSHServerKexAlgorithmsTable 1 }
+
+    AgentSSHServerKexAlgorithmsEntry ::= SEQUENCE {
+                          agentSSHServerKexIndex
+                           Unsigned32,
+                          agentSSHServerKexAlgorithms
+                           INTEGER
+           }
+
+    agentSSHServerKexIndex OBJECT-TYPE
+         SYNTAX     Unsigned32 (1..10)
+         MAX-ACCESS not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The index of the SSH kex algorithms configuration order."
+
+         ::= { agentSSHServerKexAlgorithmsEntry 1 }
+
+    agentSSHServerKexAlgorithms OBJECT-TYPE
+         SYNTAX      INTEGER {
+                       undefined(0),
+                       curve25519-sha256(1),
+                       curve25519-sha256-libssh(2),
+                       ecdh-sha2-nistp256(3),
+                       ecdh-sha2-nistp384(4),
+                       ecdh-sha2-nistp521(5),
+                       diffie-hellman-group-exchange-sha256(6),
+                       diffie-hellman-group16-sha512(7),
+                       diffie-hellman-group18-sha512(8),
+                       diffie-hellman-group14-sha256(9),
+                       diffie-hellman-group14-sha1(10)
+                     }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Specifies KEX algorithm to be used for SSH.
+
+                      Abbreviation used.
+                      - curve25519-sha256-libssh(2) is used for curve25519-sha256@libssh.org
+                     "
+         DEFVAL { undefined }
+
+         ::= { agentSSHServerKexAlgorithmsEntry 2 }
+
+    agentSSHServerKexRefresh OBJECT-TYPE
+         SYNTAX     INTEGER {
+                    enable(1),
+                    disable(2)
+                    }
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+                    "When set to enable(1), configuration of agentSSHServerKexAlgorithmsEntry will be configured
+                     and refresh ssh process. The value is write-only.
+                     Attempt to read will return disable(2)."
+
+         ::= { agentSSHKexAlgorithmsConfigGroup 2 }
 
     --**************************************************************************************
     -- agentOutboundSSHGroup -> contains MIB objects displaying various properties 
@@ -323,6 +649,18 @@ IMPORTS
 
     agentOutboundSSHGroup       OBJECT IDENTIFIER ::= { fastPathMgmtSecurity 3}
 
+    agentOutboundSSHAdminMode OBJECT-TYPE
+      SYNTAX      INTEGER {
+                  enable(1),
+                  disable(2)
+                  }
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+       " Admin-mode of the Outbound SSH."
+      DEFVAL { disable }
+    ::= { agentOutboundSSHGroup 1 }
+
     agentOutboundSSHMaxSessions OBJECT-TYPE
       SYNTAX     INTEGER (0..5)
       MAX-ACCESS read-write
@@ -330,7 +668,7 @@ IMPORTS
       DESCRIPTION
        " The maximum no. of Outbound SSH sessions allowed."
       DEFVAL { 5 }
-    ::= { agentOutboundSSHGroup 1 }
+    ::= { agentOutboundSSHGroup 2 }
 
     agentOutboundSSHActiveSessions OBJECT-TYPE
          SYNTAX      Integer32
@@ -338,7 +676,7 @@ IMPORTS
          STATUS      current
          DESCRIPTION
                      "Get the number of active outgoing SSH sessions."
-         ::= { agentOutboundSSHGroup 2 }
+         ::= { agentOutboundSSHGroup 3 }
 
 
     agentOutboundSSHTimeout OBJECT-TYPE
@@ -348,7 +686,6 @@ IMPORTS
       DESCRIPTION
        " The login inactivity timeout value for Outbound SSH."
       DEFVAL { 5 }
-    ::= { agentOutboundSSHGroup 3 }
-
+    ::= { agentOutboundSSHGroup 4 }
 
 END

@@ -6,21 +6,18 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
-// Global read only because no permissions checking right now
+// Global read-only because no permissions checking right now
 if ($_SESSION['userlevel'] < 5) {
     print_error_permission();
     return;
 }
 
-$vlans = [];
-if (!isset($vars['vlan_id'])) {
 
-
-    $vlans = get_vlans($vars);
+if (safe_empty($vars['vlan_id']) || !is_numeric($vars['vlan_id'])) {
 
     echo generate_box_open();
     echo '<table class="table table-striped table-hover">';
@@ -31,7 +28,7 @@ if (!isset($vars['vlan_id'])) {
     echo '<th>Unique MACs</th>';
     echo '</tr>';
 
-    foreach ($vlans as $vlan_id => $vlan) {
+    foreach (get_vlans($vars) as $vlan_id => $vlan) {
 
         if ($vlan_id === '') {
             continue;
@@ -67,10 +64,11 @@ if (!isset($vars['vlan_id'])) {
 
     // Per-VLAN page
 
-    $vls = dbFetchRows("SELECT * FROM `vlans`");
-    foreach ($vls as $vlan) {
+    /* FIXME. unsed here?
+    foreach (dbFetchRows("SELECT `vlan_vlan`, `vlan_name` FROM `vlans`") as $vlan) {
         $vlans[$vlan['vlan_vlan']]['names'][$vlan['vlan_name']]++;
     }
+    */
 
     $count_untagged = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `ifVlan` = ?", [$vars['vlan_id']]);
     $count_device   = dbFetchCell("SELECT COUNT(DISTINCT(`device_id`)) FROM `vlans` WHERE `vlan_vlan` = ?", [$vars['vlan_id']]);
@@ -83,7 +81,7 @@ if (!isset($vars['vlan_id'])) {
   <tbody>
     <tr class="up">
       <td class="state-marker"></td>
-      <td style="padding: 10px 14px;"><span style="font-size: 20px; color: #193d7f;">VLAN ' . $vars['vlan_id'] . '</span>
+      <td style="padding: 10px 14px;"><span style="font-size: 20px; color: #193d7f;">VLAN ' . escape_html($vars['vlan_id']) . '</span>
       </td>
       <td>
 
@@ -147,7 +145,6 @@ if (!isset($vars['vlan_id'])) {
     switch ($vars['view']) {
 
         case "tagged":
-
 
             break;
 

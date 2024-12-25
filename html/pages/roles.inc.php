@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -99,14 +99,16 @@ if (isset($vars['role_id'])) {
                             foreach ($group_members as $user) {
 
                                 $user = array_merge((array)$user, (array)$user_list[$user['user_id']]);
+                                $user['edit_url'] = generate_url(['page' => 'user_edit', 'user_id' => $user['user_id']]);
+                                //r($user);
 
-                                echo '<tr>';
-                                echo '<td width="5"></td>';
-                                echo '<td>' . $user['username'] . '</td>';
-                                echo '<td width="100">' . $user['email'] . '</td>';
-                                echo '<td width="100">Level ' . $user['level'] . '</td>';
+                                echo '<tr class="' . $user['row_class'] . '">';
+                                echo '<td class="state-marker"></td>';
+                                echo '<td><strong>' . generate_tooltip_link($user['edit_url'], $user['username'], $user['realname'], NULL, [ 'target' => '_blank' ], TRUE) . '</strong></td>';
+                                echo '<td>' . get_icon($user['icon']) . ' <span class="label label-' . $user['label_class'] . '">' . $user['level_label'] . '</span></td>';
+                                echo '<td><strong>' . escape_html($user['email']) . '</strong></td>';
 
-                                echo '<td width="40">';
+                                echo '<td width="30px">';
 
                                 $form = [
                                     'type' => 'simple',
@@ -115,11 +117,6 @@ if (isset($vars['role_id'])) {
                                 ];
 
                                 // Elements
-                                $form['row'][0]['auth_secret'] = [
-                                  'type'  => 'hidden',
-                                  'value' => $_SESSION['auth_secret']
-                                ];
-
                                 $form['row'][0]['user_id'] = [
                                     'type'  => 'hidden',
                                     'value' => $user['user_id']
@@ -156,7 +153,6 @@ if (isset($vars['role_id'])) {
                             //'url'   => generate_url($vars)
                         ];
                         // Elements
-                        $form['row'][0]['auth_secret'] = [ 'type' => 'hidden', 'value' => $_SESSION['auth_secret'] ];
                         $form['row'][0]['role_id']     = [ 'type' => 'hidden', 'value' => $role['role_id'] ];
                         $form['row'][0]['action']      = [ 'type' => 'hidden', 'value' => 'role_user_add' ];
 
@@ -218,10 +214,6 @@ if (isset($vars['role_id'])) {
                               //'url'   => generate_url($vars)
                             ];
                             // Elements
-                            $form['row'][0]['auth_secret'] = [
-                              'type'  => 'hidden',
-                              'value' => $_SESSION['auth_secret']
-                            ];
                             $form['row'][0]['role_id']     = ['type' => 'hidden', 'value' => $role['role_id']];
                             $form['row'][0]['permission']  = ['type' => 'hidden', 'value' => $perm];
                             $form['row'][0]['action']      = ['type' => 'hidden', 'value' => 'role_permission_del'];
@@ -253,7 +245,6 @@ if (isset($vars['role_id'])) {
                       //'url'   => generate_url($vars)
                     ];
                     // Elements
-                    $form['row'][0]['auth_secret'] = ['type' => 'hidden', 'value' => $_SESSION['auth_secret']];
                     $form['row'][0]['role_id']     = ['type' => 'hidden', 'value' => $role['role_id']];
                     $form['row'][0]['action']      = ['type' => 'hidden', 'value' => 'role_permission_add'];
 

@@ -1,10 +1,6 @@
 <?php
-/**
- * Flight: An extensible micro-framework.
- *
- * @copyright   Copyright (c) 2011, Mike Cao <mike@mikecao.com>
- * @license     MIT, http://flightphp.com/license
- */
+
+declare(strict_types=1);
 
 namespace flight\template;
 
@@ -12,115 +8,123 @@ namespace flight\template;
  * The View class represents output to be displayed. It provides
  * methods for managing view data and inserts the data into
  * view templates upon rendering.
+ *
+ * @license MIT, http://flightphp.com/license
+ * @copyright Copyright (c) 2011, Mike Cao <mike@mikecao.com>
  */
-class View {
-    /**
-     * Location of view templates.
-     *
-     * @var string
-     */
-    public $path;
+class View
+{
+    /** Location of view templates. */
+    public string $path;
 
-    /**
-     * File extension.
-     *
-     * @var string
-     */
-    public $extension = '.php';
+    /** File extension. */
+    public string $extension = '.php';
+
+    public bool $preserveVars = true;
 
     /**
      * View variables.
      *
-     * @var array
+     * @var array<string, mixed> $vars
      */
-    protected $vars = array();
+    protected array $vars = [];
 
-    /**
-     * Template file.
-     *
-     * @var string
-     */
-    private $template;
+    /** Template file. */
+    private string $template;
 
     /**
      * Constructor.
      *
      * @param string $path Path to templates directory
      */
-    public function __construct($path = '.') {
+    public function __construct(string $path = '.')
+    {
         $this->path = $path;
     }
 
     /**
      * Gets a template variable.
      *
-     * @param string $key Key
-     * @return mixed Value
+     * @return mixed Variable value or `null` if doesn't exists
      */
-    public function get($key) {
-        return isset($this->vars[$key]) ? $this->vars[$key] : null;
+    public function get(string $key)
+    {
+        return $this->vars[$key] ?? null;
     }
 
     /**
      * Sets a template variable.
      *
-     * @param mixed $key Key
-     * @param string $value Value
+     * @param string|iterable<string, mixed> $key
+     * @param mixed $value Value
+     *
+     * @return self
      */
-    public function set($key, $value = null) {
-        if (is_array($key) || is_object($key)) {
+    public function set($key, $value = null): self
+    {
+        if (\is_iterable($key)) {
             foreach ($key as $k => $v) {
                 $this->vars[$k] = $v;
             }
-        }
-        else {
+        } else {
             $this->vars[$key] = $value;
         }
+
+        return $this;
     }
 
     /**
      * Checks if a template variable is set.
      *
-     * @param string $key Key
-     * @return boolean If key exists
+     * @return bool If key exists
      */
-    public function has($key) {
+    public function has(string $key): bool
+    {
         return isset($this->vars[$key]);
     }
 
     /**
      * Unsets a template variable. If no key is passed in, clear all variables.
      *
-     * @param string $key Key
+     * @return $this
      */
-    public function clear($key = null) {
-        if (is_null($key)) {
-            $this->vars = array();
-        }
-        else {
+    public function clear(?string $key = null): self
+    {
+        if ($key === null) {
+            $this->vars = [];
+        } else {
             unset($this->vars[$key]);
         }
+
+        return $this;
     }
 
     /**
      * Renders a template.
      *
      * @param string $file Template file
-     * @param array $data Template data
+     * @param ?array<string, mixed> $data Template data
+     *
      * @throws \Exception If template not found
      */
-    public function render($file, $data = null) {
+    public function render(string $file, ?array $data = null): void
+    {
         $this->template = $this->getTemplate($file);
 
-        if (!file_exists($this->template)) {
-            throw new \Exception("Template file not found: {$this->template}.");
+        if (!\file_exists($this->template)) {
+            $normalized_path = self::normalizePath($this->template);
+            throw new \Exception("Template file not found: {$normalized_path}.");
         }
 
-        if (is_array($data)) {
-            $this->vars = array_merge($this->vars, $data);
-        }
+        \extract($this->vars);
 
-        extract($this->vars);
+        if (\is_array($data) === true) {
+            \extract($data);
+
+            if ($this->preserveVars === true) {
+                $this->vars = \array_merge($this->vars, $data);
+            }
+        }
 
         include $this->template;
     }
@@ -129,56 +133,71 @@ class View {
      * Gets the output of a template.
      *
      * @param string $file Template file
-     * @param array $data Template data
+     * @param ?array<string, mixed> $data Template data
+     *
      * @return string Output of template
      */
-    public function fetch($file, $data = null) {
-        ob_start();
+    public function fetch(string $file, ?array $data = null): string
+    {
+        \ob_start();
 
         $this->render($file, $data);
-        $output = ob_get_clean();
 
-        return $output;
+        return \ob_get_clean();
     }
 
     /**
      * Checks if a template file exists.
      *
      * @param string $file Template file
+     *
      * @return bool Template file exists
      */
-    public function exists($file) {
-        return file_exists($this->getTemplate($file));
+    public function exists(string $file): bool
+    {
+        return \file_exists($this->getTemplate($file));
     }
 
     /**
      * Gets the full path to a template file.
      *
      * @param string $file Template file
+     *
      * @return string Template file location
      */
-    public function getTemplate($file) {
+    public function getTemplate(string $file): string
+    {
         $ext = $this->extension;
 
-        if (!empty($ext) && (substr($file, -1 * strlen($ext)) != $ext)) {
+        if (!empty($ext) && (\substr($file, -1 * \strlen($ext)) != $ext)) {
             $file .= $ext;
         }
 
-        if ((substr($file, 0, 1) == '/')) {
+        $is_windows = \strtoupper(\substr(PHP_OS, 0, 3)) === 'WIN';
+
+        if ((\substr($file, 0, 1) === '/') || ($is_windows && \substr($file, 1, 1) === ':')) {
             return $file;
         }
-        
-        return $this->path.'/'.$file;
+
+        return $this->path . DIRECTORY_SEPARATOR . $file;
     }
 
     /**
      * Displays escaped output.
      *
      * @param string $str String to escape
+     *
      * @return string Escaped string
      */
-    public function e($str) {
-        echo htmlentities($str);
+    public function e(string $str): string
+    {
+        $value = \htmlentities($str);
+        echo $value;
+        return $value;
+    }
+
+    protected static function normalizePath(string $path, string $separator = DIRECTORY_SEPARATOR): string
+    {
+        return \str_replace(['\\', '/'], $separator, $path);
     }
 }
-

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -18,37 +18,45 @@ $section                           = 'base';
 $config_sections[$section]['text'] = 'Base';
 
 $config_variable['own_hostname'] = [
-  'section'    => $section,
-  'subsection' => 'General',
-  'name'       => "Observium Server's own hostname",
-  'type'       => 'string',
-  'shortdesc'  => 'What is my own hostname (used so Observium can identify its host in its own database). By default equals `hostname -f`.',
+    'section'    => $section,
+    'subsection' => 'General',
+    'name'       => "Observium Server's own hostname",
+    'type'       => 'string',
+    'shortdesc'  => 'What is my own hostname (used so Observium can identify its host in its own database). By default equals `hostname -f`.',
 ];
 
 $config_variable['require_hostname'] = [
-  'section'    => $section,
-  'subsection' => 'General',
-  'name'       => 'Require valid hostname',
-  'type'       => 'bool',
-  'shortdesc'  => 'If TRUE, devices must have a valid resolvable hostname (in DNS or /etc/hosts). Default is FALSE, allowing addition of devices by IP address.',
+    'section'    => $section,
+    'subsection' => 'General',
+    'name'       => 'Require valid hostname',
+    'type'       => 'bool',
+    'shortdesc'  => 'If TRUE, devices must have a valid resolvable hostname (in DNS or /etc/hosts). Default is FALSE, allowing addition of devices by IP address.',
 ];
 
 $config_variable['use_ip'] = [
-  'section'    => $section,
-  'subsection' => 'General',
-  'name'       => 'Use resolved IP',
-  'type'       => 'bool',
-  'shortdesc'  => 'If TRUE, snmp and other services request device by resolved ip instead hostname. This reduce queries to DNS cache.',
+    'section'    => $section,
+    'subsection' => 'General',
+    'name'       => 'Use resolved IP',
+    'type'       => 'bool',
+    'shortdesc'  => 'If TRUE, snmp and other services request device by resolved ip instead hostname. This reduce queries to DNS cache.',
+];
+
+$config_variable['php_memory_limit_min'] = [
+    'section'    => $section,
+    'subsection' => 'PHP',
+    'name'       => 'Minimum PHP memory limit',
+    'type'       => 'enum|256M|512M|1024M|2048M',
+    'shortdesc'  => "Override PHP memory_limit setting from php.ini (".ini_get('memory_limit').") if less than this minimum. Has no effect until setting specified.",
 ];
 
 $config_variable['timestamp_format'] = [
-  'section'    => $section,
-  'subsection' => 'Datetime',
-  'name'       => "Time format",
-  'useredit'   => TRUE,
-  'type'       => 'enum',
-  'params'     => get_params_timestamp(),
-  'shortdesc'  => 'Default time format.',
+    'section'    => $section,
+    'subsection' => 'Datetime',
+    'name'       => "Time format",
+    'useredit'   => TRUE,
+    'type'       => 'enum',
+    'params'     => get_params_timestamp(),
+    'shortdesc'  => 'Default time format.',
 ];
 
 /* This config not used (only in reformat_us_date())
@@ -61,83 +69,83 @@ $config_variable[$setting]['shortdesc']  = 'Default time format ('.date($config[
 */
 
 $config_variable['rrdcached'] = [
-  'section'    => $section,
-  'subsection' => 'RRD / RRDcacheD',
-  'name'       => "RRDcacheD host or socket",
-  'type'       => 'string',
-  'shortdesc'  => 'Address of local (unix://xxx) or remote (IP:PORT) rrdcached host.'
+    'section'    => $section,
+    'subsection' => 'RRD / RRDcacheD',
+    'name'       => "RRDcacheD host or socket",
+    'type'       => 'string',
+    'shortdesc'  => 'Address of local (unix://xxx) or remote (IP:PORT) rrdcached host.'
 ];
 
 $config_variable['rrd_override'] = [
-  'section'    => $section,
-  'subsection' => 'RRD / RRDcacheD',
-  'name'       => 'RRD override',
-  'type'       => 'bool',
-  'shortdesc'  => 'Allow adding of devices if RRD directory already exists.'
+    'section'    => $section,
+    'subsection' => 'RRD / RRDcacheD',
+    'name'       => 'RRD override',
+    'type'       => 'bool',
+    'shortdesc'  => 'Allow adding of devices if RRD directory already exists.'
 ];
 
 $config_variable['db|debug'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Database errors logging',
-  'type'       => 'bool',
-  'shortdesc'  => 'Log database query errors into logs/db.log.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Database errors logging',
+    'type'       => 'bool',
+    'shortdesc'  => 'Log database query errors into logs/db.log.'
 ];
 
 $config_variable['profile_sql'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Profile SQL',
-  'type'       => 'bool',
-  'shortdesc'  => 'Store SQL queries and performance data.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Profile SQL',
+    'type'       => 'bool',
+    'shortdesc'  => 'Store SQL queries and performance data.'
 ];
 
 $config_variable['snmp|hide_auth'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Hide SNMP auth',
-  'type'       => 'bool',
-  'shortdesc'  => 'Hide SNMPv1/2 community and SNMPv3 auth from debug and web output.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Hide SNMP auth',
+    'type'       => 'bool',
+    'shortdesc'  => 'Hide SNMPv1/2 community and SNMPv3 auth from debug and web output.'
 ];
 
 $config_variable['snmp|errors'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Collect SNMP Errors',
-  'type'       => 'bool',
-  'shortdesc'  => 'Collect SNMP errors into DB and (auto)disable SNMP queries with invalid response (empty/broken/etc).'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Collect SNMP Errors',
+    'type'       => 'bool',
+    'shortdesc'  => 'Collect SNMP errors into DB and (auto)disable SNMP queries with invalid response (empty/broken/etc).'
 ];
 
 $config_variable['ping|debug'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Ping debug',
-  'type'       => 'bool',
-  'shortdesc'  => 'Log ping errors into logs/debug.log.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Ping debug',
+    'type'       => 'bool',
+    'shortdesc'  => 'Log ping errors into logs/debug.log.'
 ];
 
 $config_variable['syslog|debug'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Syslog debug',
-  'type'       => 'bool',
-  'shortdesc'  => 'Log RAW syslog entries into logs/debug.log.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Syslog debug',
+    'type'       => 'bool',
+    'shortdesc'  => 'Log RAW syslog entries into logs/debug.log.'
 ];
 
 $config_variable['rrd|debug'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'RRD debug',
-  'type'       => 'bool',
-  'shortdesc'  => 'Log RRD errors into logs/rrd.log.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'RRD debug',
+    'type'       => 'bool',
+    'shortdesc'  => 'Log RRD errors into logs/rrd.log.'
 ];
 
 $config_variable['web_debug_unprivileged'] = [
-  'section'    => $section,
-  'subsection' => 'Debugging / Profiling',
-  'name'       => 'Web UI debug Unprivileged',
-  'type'       => 'bool',
-  'shortdesc'  => '[WARNING] Allow showing debug information to unprivileged (userlevel < 7) users in Web UI. This may leak configuration data to unauthorized users.'
+    'section'    => $section,
+    'subsection' => 'Debugging / Profiling',
+    'name'       => 'Web UI debug Unprivileged',
+    'type'       => 'bool',
+    'shortdesc'  => '[WARNING] Allow showing debug information to unprivileged (userlevel < 7) users in Web UI. This may leak configuration data to unauthorized users.'
 ];
 
 /// POLLING /////////////////////////////////////////////////////////
@@ -1059,6 +1067,36 @@ $config_variable[$setting]['name']       = 'Convert Port DOM power sensors to dB
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'When device provide port DOM power sensors in Watts, set to TRUE for convert it to dBm sensors. NOTE: power DOM sensors in Watts will removed.';
 
+$config_variable['ports|descr_regexp'] = [
+    'section'    => $section,
+    'subsection' => 'Ports Description Parsing',
+    'name'       => 'Description Parsing Reqular Expression',
+    'type'       => 'enum-list',
+    'params'     => [
+        'value'  => [ 'name' => 'Pattern', 'type' => 'text' ]
+    ],
+    'shortdesc'  => 'Pattern(s) with match references for type, descr, circuit, speed, notes. See: [Port Description Parsing]('.OBSERVIUM_DOCS_URL.'/port_descr_parsing/){target=_blank}.',
+];
+
+$config_variable['int_groups'] = [
+    'section'    => $section,
+    'subsection' => 'Ports Description Parsing',
+    'name'       => 'Custom Interface Types',
+    'type'       => 'enum-freeinput',
+    'shortdesc'  => 'List of any user defined types for parsing in interface descriptions.',
+];
+
+foreach ($config['ports']['descr_groups'] as $int_group => $entry) {
+    $setting = 'ports|descr_groups|'.$int_group;
+    $config_variable[$setting.'|enable'] = [
+        'section'    => $section,
+        'subsection' => 'Ports Description Parsing',
+        'name'       => 'Show "'.$entry['name'].'" interface type',
+        'type'       => 'bool',
+        'shortdesc'  => 'Display this entry in Ports navigation menu and other pages.',
+    ];
+}
+
 $setting                                 = 'sensors|limits_events';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Sensors';
@@ -1086,18 +1124,33 @@ $config_variable[$setting]['shortdesc']  = 'Enable experimental support for IPMI
 $section                           = 'alerting';
 $config_sections[$section]['text'] = 'Alerting';
 
-$setting                                     = 'alerts|interval';
+$setting                                     = 'alerts|critical|interval';
 $config_variable[$setting]['section']        = $section;
 $config_variable[$setting]['subsection']     = 'Notification';
-$config_variable[$setting]['name']           = 'Alert notification re-send interval';
+$config_variable[$setting]['name']           = 'Critical alerts notification re-send interval';
 $config_variable[$setting]['type']           = 'enum';
 $config_variable[$setting]['params'][0]      = [ 'name' => 'Disable re-send' ];
+$config_variable[$setting]['params'][3600]   = [ 'name' => '1 hour' ];
 $config_variable[$setting]['params'][21600]  = [ 'name' => '6 hours' ];
 $config_variable[$setting]['params'][43200]  = [ 'name' => '12 hours' ];
 $config_variable[$setting]['params'][86400]  = [ 'name' => '1 day' ];
 $config_variable[$setting]['params'][172800] = [ 'name' => '2 days' ];
 $config_variable[$setting]['params'][604800] = [ 'name' => '1 week' ];
-$config_variable[$setting]['shortdesc']      = 'How frequently to re-send a notification for a continuing alert condition. Default is 1 day.';
+$config_variable[$setting]['shortdesc']      = 'How frequently to re-send a notification for a continuing critical alert condition. Default is 1 day.';
+
+$setting                                     = 'alerts|warning|interval';
+$config_variable[$setting]['section']        = $section;
+$config_variable[$setting]['subsection']     = 'Notification';
+$config_variable[$setting]['name']           = 'Warning alerts notification re-send interval';
+$config_variable[$setting]['type']           = 'enum';
+$config_variable[$setting]['params'][0]      = [ 'name' => 'Disable re-send' ];
+$config_variable[$setting]['params'][3600]   = [ 'name' => '1 hour' ];
+$config_variable[$setting]['params'][21600]  = [ 'name' => '6 hours' ];
+$config_variable[$setting]['params'][43200]  = [ 'name' => '12 hours' ];
+$config_variable[$setting]['params'][86400]  = [ 'name' => '1 day' ];
+$config_variable[$setting]['params'][172800] = [ 'name' => '2 days' ];
+$config_variable[$setting]['params'][604800] = [ 'name' => '1 week' ];
+$config_variable[$setting]['shortdesc']      = 'How frequently to re-send a notification for a continuing warning alert condition. Default is 1 day.';
 
 $setting                                 = 'alerts|disable|all';
 $config_variable[$setting]['section']    = $section;
@@ -1112,6 +1165,43 @@ $config_variable[$setting]['subsection'] = 'Notification';
 $config_variable[$setting]['name']       = 'Suppress All Alerts';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Causes all failed alerts to be placed in the suppressed state.';
+
+$setting                                 = 'alerts|status_name|0';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Status name for alert notifications';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Set alert status name in %TITLE%, default is ALERT.';
+
+$setting                                 = 'alerts|status_name|1';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Status name for recovery notifications';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Set recover status name in %TITLE%, default is RECOVER.';
+
+/* Seems as not required
+$setting                                 = 'alerts|status_name|2';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Status name for delay notifications';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Set delay status name in %TITLE%, default is DELAY.';
+
+$setting                                 = 'alerts|status_name|3';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Status name for suppress notifications';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Set suppress status name in %TITLE%, default is SUPPRESS.';
+*/
+
+$setting                                 = 'alerts|status_name|9';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Status name for syslog notifications';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Set syslog status name in %TITLE%, default is SYSLOG.';
 
 $setting                                 = 'email|enable';
 $config_variable[$setting]['section']    = $section;
@@ -1749,7 +1839,7 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Geocoding';
 $config_variable[$setting]['name']       = 'Use DNS LOC records for geolocation';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Try to use DNS LOC records for detect device coordinates. See https://en.wikipedia.org/wiki/LOC_record and https://dnsloc.net/'; // FIXME actually link this
+$config_variable[$setting]['shortdesc']  = 'Try to use DNS LOC records for detect device coordinates. See: [LOC record](https://en.wikipedia.org/wiki/LOC_record){target=_blank} and [Create DNS LOC record](https://dnsloc.net/){target=_blank}.';
 
 $setting                                 = 'geocoding|default|lat';
 $config_variable[$setting]['section']    = $section;
@@ -1870,7 +1960,7 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Hosts & filters';
 $config_variable[$setting]['name']       = 'Syslog messages filters';
 $config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['shortdesc']  = 'Filter (ignore) syslog entries containing these strings.';
+$config_variable[$setting]['shortdesc']  = 'Filter (ignore) syslog entries containing these message strings. Case-sensitive.';
 $config_variable[$setting]['set_attrib'] = 'syslog_config_changed'; //set_obs_attrib('syslog_config_changed', time()); // Trigger reload syslog script
 
 $setting                                 = 'syslog|filter_regex';
@@ -1878,7 +1968,23 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Hosts & filters';
 $config_variable[$setting]['name']       = 'Syslog messages filters by regex';
 $config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['shortdesc']  = 'Filter (ignore) syslog entries containing these regular expressions.';
+$config_variable[$setting]['shortdesc']  = 'Filter (ignore) syslog entries containing these message regular expressions.';
+$config_variable[$setting]['set_attrib'] = 'syslog_config_changed'; //set_obs_attrib('syslog_config_changed', time()); // Trigger reload syslog script
+
+$setting                                 = 'syslog|filter_program';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Hosts & filters';
+$config_variable[$setting]['name']       = 'Syslog program filters';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['shortdesc']  = 'Filter (ignore) syslog entries containing these program(s). Case-insensitive.';
+$config_variable[$setting]['set_attrib'] = 'syslog_config_changed'; //set_obs_attrib('syslog_config_changed', time()); // Trigger reload syslog script
+
+$setting                                 = 'syslog|filter_tag';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Hosts & filters';
+$config_variable[$setting]['name']       = 'Syslog program filters';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['shortdesc']  = 'Filter (ignore) syslog entries containing these tag(s). Case-insensitive.';
 $config_variable[$setting]['set_attrib'] = 'syslog_config_changed'; //set_obs_attrib('syslog_config_changed', time()); // Trigger reload syslog script
 
 /// INTEGRATION //////////////////////////////////////////////////////
@@ -2232,54 +2338,61 @@ $config_variable[$setting]['shortdesc']  = 'Set the base to divider bytes to kB,
 $section                           = 'housekeeping';
 $config_sections[$section]['text'] = 'Housekeeping';
 
+$setting                                 = 'housekeeping|bill_data|age';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Billing';
+$config_variable[$setting]['name']       = 'Billing Data Max Age';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Maximum age of Billing Data entries. 0 to disable. Minimum 3 Months';
+
 $setting                                 = 'housekeeping|eventlog|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Event Log';
 $config_variable[$setting]['name']       = 'Event Log Max Age';
 $config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Maximum age of Event Log entries in seconds; 0 to disable (i.e. 30*86400 for 30 days.)';
+$config_variable[$setting]['shortdesc']  = 'Maximum age of Event Log entries. 0 to disable';
 
 $setting                                 = 'housekeeping|syslog|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Syslog';
 $config_variable[$setting]['name']       = 'Syslog Max Age';
 $config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Maximum age of syslog entries in seconds; 0 to disable (i.e. 30*86400 for 30 days.)';
+$config_variable[$setting]['shortdesc']  = 'Maximum age of syslog entries. 0 to disable';
 
 $setting                                 = 'housekeeping|alertlog|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Alert Log';
 $config_variable[$setting]['name']       = 'Alert Log Max Age';
 $config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Maximum age of Alert Log entries in seconds; 0 to disable (i.e. 30*86400 for 30 days.)';
+$config_variable[$setting]['shortdesc']  = 'Maximum age of Alert Log entries in seconds. 0 to disable';
 
 $setting                                 = 'housekeeping|authlog|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Auth Log';
 $config_variable[$setting]['name']       = 'Auth Log Max Age';
 $config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Maximum age of Authentication Log entries in seconds; 0 to disable (i.e. 30*86400 for 30 days.)';
+$config_variable[$setting]['shortdesc']  = 'Maximum age of Authentication Log entries in seconds. 0 to disable';
 
 $setting                                 = 'housekeeping|rrd|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RRD Files';
 $config_variable[$setting]['name']       = 'RRD File Max Age';
 $config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Maximum time since an RRD file was last updated in seconds. Useful for deleting old RRDs for removed ports and sensors. (i.e. 30*86400 for 30 days.)';
+$config_variable[$setting]['shortdesc']  = 'Maximum time since an RRD file was last updated. Useful for deleting old RRDs for removed ports and sensors';
 
 $setting                                 = 'housekeeping|rrd|notmodified';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RRD Files';
 $config_variable[$setting]['name']       = 'Delete old RRD files';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Delete .rrd files not modified more than age (eg removed entities)';
+$config_variable[$setting]['shortdesc']  = 'Delete .rrd files not modified more than age (e.g. removed entities)';
 
 $setting                                 = 'housekeeping|rrd|invalid';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RRD Files';
 $config_variable[$setting]['name']       = 'Delete invalid RRD files';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Delete .rrd files that are not valid RRD files (eg created with a full disk)';
+$config_variable[$setting]['shortdesc']  = 'Delete .rrd files that are not valid RRD files (e.g. created with a full disk)';
 
 $setting                                 = 'housekeeping|rrd|deleted';
 $config_variable[$setting]['section']    = $section;
@@ -2293,14 +2406,14 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RRD Files';
 $config_variable[$setting]['name']       = 'Delete old RRD dirs for disabled devices';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Delete rrd dirs for disabled devices more than age ago(device still in db, but disabled by some reasons)';
+$config_variable[$setting]['shortdesc']  = 'Delete rrd dirs for disabled devices more than age ago (device still in db, but disabled)';
 
 $setting                                 = 'housekeeping|deleted_ports|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Ports';
 $config_variable[$setting]['name']       = 'Remove Deleted Ports Age';
 $config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Maximum age of deleted ports in seconds before automatically purging; 0 to disable (i.e. 30*86400 for 30 days.)';
+$config_variable[$setting]['shortdesc']  = 'Maximum age of deleted ports before automatically purging; 0 to disable';
 
 /* Paths commented out
 /// PATHS ////////////////////////////////////////////////////////////

@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -40,17 +39,20 @@ if (preg_match('/^(?:dlink |d-link )?(?<hardware>[a-z]+\-\d+[\w\/-]+) +(?<featur
         //Gigabit Ethernet Switch
         $features = str_replace('-', ' ', $matches['features']);
     }
-} else {
+} elseif ($hw = snmp_get_oid($device, 'swSingleIPPlatform.0', 'SINGLE-IP-MIB')) {
     // SINGLE-IP-MIB::swSingleIPPlatform.0 = STRING: "DES-3028P L2 Switch"
-    [$hardware] = explode(' ', snmp_get($device, 'swSingleIPPlatform.0', '-Ovq', 'SINGLE-IP-MIB'));
+    $hardware = explode(' ', $hw)[0];
 }
 
 if (!$version) {
     // DLINK-EQUIPMENT-MIB::swUnitMgmtVersion.1 = STRING: "6.00.B21"
     //$version = snmp_get($device, "swUnitMgmtVersion.1", "-Ovq", "DLINK-EQUIPMENT-MIB");
     // RMON2-MIB::probeSoftwareRev.0 = STRING: "Build 6.00.B21"
-    $version = snmp_get($device, 'probeSoftwareRev.0', '-Ovq', 'RMON2-MIB');
+    $version = snmp_get_oid($device, 'probeSoftwareRev.0', 'RMON2-MIB');
     $version = str_replace('Build ', '', $version);
+    // Clean Chinese hieroglyph:
+    // 2.00.B2700.B27^D^MP1CV2C30<80>A<F1><B0>1
+    $version = preg_replace('/^([[:print:]\p{L}]+).*/mu', '$1', $version);
 }
 
 // HW revision is not required, but anyone can come in handy in the future.

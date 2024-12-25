@@ -1,0 +1,786 @@
+    ADTRAN-TA5K-LINK-AGGREGATION-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN Total Access TA5000 Link Aggregation MIB
+    -- PRODUCT:   TA5000 SMs and AMs
+    -- VERSION:   1.2
+    -- DATE:      July 07, 2014
+
+    -- This MIB Contains tables specific to the TA5000 Tree Networking
+    --
+
+    -- MIBs supported:
+
+
+
+    IMPORTS
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE,
+        OBJECT-TYPE,
+        Gauge32
+            FROM SNMPv2-SMI
+
+        sysName
+            FROM SNMPv2-MIB
+
+        MacAddress,
+        TruthValue
+            FROM SNMPv2-TC
+
+        ifIndex
+            FROM IF-MIB
+
+        adTa5kLinkAggregation,
+        adTa5kLinkAggregationID
+            FROM ADTRAN-GENTA5K-MIB
+
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+
+        adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB
+
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB;
+
+-- *********************************************************************************************************
+
+    adTa5kLinkAggregationModuleIdentity MODULE-IDENTITY
+        LAST-UPDATED "201407230000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Total Access 5000 Link Aggregation MIB"
+
+        REVISION        "201407230000Z"
+        DESCRIPTION     "Added OID for setting the LACP system priority per slot."
+        
+        REVISION        "201309250000Z"
+        DESCRIPTION     "Added OID for setting the LACP response-mode per slot."
+
+        REVISION        "201111301918Z"
+        DESCRIPTION     "Added OIDs for LACP counters and statuses."
+
+        REVISION        "201110261800Z"
+        DESCRIPTION     "Add provisioning for alarm enable/disable."
+
+
+        ::= { adTa5kLinkAggregationID 1 }
+
+-- OBJECT IDENTIFIERS
+    adTa5kLinkAggregationAlarmPrefix    OBJECT IDENTIFIER ::= { adTa5kLinkAggregation 1 }
+    adTa5kLinkAggregationAlarms         OBJECT IDENTIFIER ::= { adTa5kLinkAggregationAlarmPrefix 0}
+    adTa5kLinkAggregationProvisioning   OBJECT IDENTIFIER ::= { adTa5kLinkAggregation 2}
+    adTa5kLinkAggregationPerformance    OBJECT IDENTIFIER ::= { adTa5kLinkAggregation 3 }
+    adTa5kLinkAggregationStatus         OBJECT IDENTIFIER ::= { adTa5kLinkAggregation 4 }
+
+-- ******************************************************************************************
+-- Provisioning Table
+-- ******************************************************************************************
+
+   adTa5kLinkAggLACPProvTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdTa5kLinkAggLACPProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The LACP Provisioning Table."
+      ::= { adTa5kLinkAggregationProvisioning 1 }
+
+   adTa5kLinkAggLACPProvEntry OBJECT-TYPE
+      SYNTAX  AdTa5kLinkAggLACPProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the LACP Provisioning Table."
+      INDEX   { ifIndex }
+      ::= { adTa5kLinkAggLACPProvTable 1 }
+
+   AdTa5kLinkAggLACPProvEntry  ::=
+      SEQUENCE {
+         adTa5kLinkAggLACPMode      INTEGER,
+         adTa5kLinkAggLACPGrammar   INTEGER
+      }
+
+    adTa5kLinkAggLACPMode            OBJECT-TYPE
+        SYNTAX                  INTEGER {
+            disabled (1),
+            active (2),
+            passive (3)
+            }
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "LACP Mode for the network port."
+        ::= {adTa5kLinkAggLACPProvEntry 1}
+
+
+   adTa5kLinkAggLACPGrammar OBJECT-TYPE
+      SYNTAX  INTEGER {
+                standbyAggregation(1),
+                noStandbyAggregation(2)
+              }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+         "The LACP grammar for a given ethernet interface.
+          Setting this value to standbyAggregation(1) declares that the standby module's port
+          is capable of being aggregated, so the AGGREGATION bit is always high in the LACP PDU.
+          standbyAggregation(1) is the recommended setting for Juniper switches.
+          Setting this value to noStandbyAggregation(2) declares that the standby module's port
+          is not capable of being aggregated.  This is the recommended setting for Cisco switches."
+      ::= { adTa5kLinkAggLACPProvEntry 2 }
+
+-- ******************************************************************************************
+-- Alarm Provisioning
+-- ******************************************************************************************
+
+    adTa5kLinkAggAlarmProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kLinkAggAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Link Aggregation Alarm Provisioning"
+       ::= { adTa5kLinkAggregationProvisioning 2 }
+
+    adTa5kLinkAggAlarmProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kLinkAggAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "An entry in the Link Aggregation Alarm Provisioning table"
+       INDEX { ifIndex }
+       ::= { adTa5kLinkAggAlarmProvTable 1 }
+
+   AdTa5kLinkAggAlarmProvEntry ::=
+       SEQUENCE {
+           adTa5kLinkAggLACPTimeOutAlarmEnable                  TruthValue,
+           adTa5kLinkAggMinimumActiveLnkAlarmEnable             TruthValue
+       }
+
+   adTa5kLinkAggLACPTimeOutAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kLinkAggAlarmProvEntry 1 }
+
+   adTa5kLinkAggMinimumActiveLnkAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kLinkAggAlarmProvEntry 2 }
+
+   adTa5kLinkAggLACPSlotProvTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF AdTa5kLinkAggLACPSlotProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "The LACP Slot Provisioning Table."
+      ::= { adTa5kLinkAggregationProvisioning 3 }
+
+   adTa5kLinkAggLACPSlotProvEntry OBJECT-TYPE
+      SYNTAX  AdTa5kLinkAggLACPSlotProvEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+         "An entry in the LACP Slot Provisioning Table."
+      INDEX   { adGenSlotInfoIndex }
+      ::= { adTa5kLinkAggLACPSlotProvTable 1 }
+
+   AdTa5kLinkAggLACPSlotProvEntry  ::=
+      SEQUENCE {
+         adTa5kLinkAggLACPResponseMode      INTEGER,
+         adTa5kLinkAggLACPSlotSystemPriority    INTEGER
+      }
+
+    adTa5kLinkAggLACPResponseMode            OBJECT-TYPE
+        SYNTAX                  INTEGER {
+            reporterOnly (1),
+            interactive (2)
+            }
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "LACP Response Mode for all LACP-capable ports on the slot. Sets the
+	     behavior of the LACP state machine on the system to either only report
+	     LACP messages to the partner, or to interactively respond to the partner
+	     requests to add/remove ports from operation within the LAG group."
+        DEFVAL {reporterOnly}
+        ::= {adTa5kLinkAggLACPSlotProvEntry 1}
+        
+    adTa5kLinkAggLACPSlotSystemPriority            OBJECT-TYPE
+        SYNTAX                  INTEGER (1..35535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "A 2-octet read-write value indicating the priority value
+        associated with the Actor's System ID"
+        ::= {adTa5kLinkAggLACPSlotProvEntry 2}
+
+-- ******************************************************************************************
+-- Alarms
+-- ******************************************************************************************
+
+   adTa5kSmLACPTimeOutClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that LACP timeout alarm has cleared"
+
+         --#TYPE         "Status - LACP Timeout Clear"
+         --#SUMMARY      "TA5000 Switch Module: LACP Timeout Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kLinkAggregationAlarms 2 }
+
+   adTa5kSmLACPTimeOutActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates the SM is not receiving LACP messages"
+
+         --#TYPE         "Status - LACP Timeout Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: LACP Timeout Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kLinkAggregationAlarms 3 }
+
+   adTa5kSmUnderMiniActiveLnkClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            ifIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the number of active links falls below Minimum Active Links threshold has cleard"
+
+         --#TYPE         "Status - below Minimum Active links threshold Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module:  Below Minimum Active links threshold Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s, slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kLinkAggregationAlarms 4 }
+
+   adTa5kSmUnderMiniActiveLnk         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            ifIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the number of active links falls below Minimum Active Links threshold alarm is active"
+
+         --#TYPE         "Status - below Minimum Active links threshold Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Below Minimum Active links threshold Alarm Active on"
+         --#SUMMARY      "Shelf: %s, slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kLinkAggregationAlarms 5 }
+
+
+-- ******************************************************************************************
+-- Port Statistics Table
+-- ******************************************************************************************
+    adTa5kLinkAggLACPPortStatsTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdTa5kLinkAggLACPPortStatsEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "The LACP Port Statistics Table."
+        ::= { adTa5kLinkAggregationPerformance 1 }
+
+    adTa5kLinkAggLACPPortStatsEntry OBJECT-TYPE
+        SYNTAX  AdTa5kLinkAggLACPPortStatsEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "An entry in the LACP Port Statistics Table."
+        INDEX   { ifIndex }
+        ::= { adTa5kLinkAggLACPPortStatsTable 1 }
+
+    AdTa5kLinkAggLACPPortStatsEntry  ::=
+        SEQUENCE {
+            adTa5kLinkAggPortStatsLACPDUsTx              Gauge32,
+            adTa5kLinkAggPortStatsLACPDUsRx              Gauge32,
+            adTa5kLinkAggPortStatsMarkerPDUsRx           Gauge32,
+            adTa5kLinkAggPortStatsMarkerResponsePDUsTx   Gauge32
+        }
+
+    adTa5kLinkAggPortStatsLACPDUsTx     OBJECT-TYPE
+        SYNTAX Gauge32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of LACPDUs transmitted on this
+        Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatsEntry 1 }
+
+    adTa5kLinkAggPortStatsLACPDUsRx     OBJECT-TYPE
+        SYNTAX Gauge32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of valid LACPDUs received on this
+        Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatsEntry 2 }
+
+    adTa5kLinkAggPortStatsMarkerPDUsRx      OBJECT-TYPE
+        SYNTAX Gauge32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of valid Marker PDUs received on this
+        Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatsEntry 3 }
+
+    adTa5kLinkAggPortStatsMarkerResponsePDUsTx      OBJECT-TYPE
+        SYNTAX Gauge32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of Marker Response PDUs transmitted
+        on this Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatsEntry 4 }
+
+-- ******************************************************************************************
+-- System Status Table
+-- ******************************************************************************************
+    adTa5kLinkAggLACPStatusTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdTa5kLinkAggLACPStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "The LACP Port Status Table."
+        ::= { adTa5kLinkAggregationStatus 1 }
+
+    adTa5kLinkAggLACPStatusEntry OBJECT-TYPE
+        SYNTAX  AdTa5kLinkAggLACPStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "An entry in the LACP Status Table."
+        INDEX   { ifIndex }
+        ::= { adTa5kLinkAggLACPStatusTable 1 }
+
+    AdTa5kLinkAggLACPStatusEntry  ::=
+        SEQUENCE {
+            adTa5kLinkAggLACPSystemID           MacAddress,
+            adTa5kLinkAggLACPSystemPriority     INTEGER
+        }
+
+    adTa5kLinkAggLACPSystemID      OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "A 6-octet read-write MAC address value used as a unique
+        identifier for the System that contains this Aggregator.
+
+        NOTE-From the perspective of the Link Aggregation mechanisms
+        only a single combination of Actor's System ID and System Priority are considered, and no
+        distinction is made between the values of these parameters for an Aggregator and the port(s) that
+        are associated with it; i.e., the protocol is described in terms of the operation of aggregation within
+        a single System. However, the managed objects provided for the Aggregator and the port both
+        allow management of these parameters. The result of this is to permit a single piece of equipment
+        to be configured by management to contain more than one System from the point of view of the
+        operation of Link Aggregation. This may be of particular use in the configuration of equipment
+        that has limited aggregation capability."
+        ::= { adTa5kLinkAggLACPStatusEntry 1 }
+
+    adTa5kLinkAggLACPSystemPriority      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "A 2-octet read-write value indicating the priority value
+        associated with the Actor's System ID"
+        ::= { adTa5kLinkAggLACPStatusEntry 2 }
+-- ******************************************************************************************
+-- Port Status Table
+-- ******************************************************************************************
+    adTa5kLinkAggLACPPortStatusTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdTa5kLinkAggLACPPortStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "The LACP Port Status Table."
+        ::= { adTa5kLinkAggregationStatus 2 }
+
+    adTa5kLinkAggLACPPortStatusEntry OBJECT-TYPE
+        SYNTAX  AdTa5kLinkAggLACPPortStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "An entry in the LACP Port Status Table."
+        INDEX   { ifIndex }
+        ::= { adTa5kLinkAggLACPPortStatusTable 1 }
+
+    AdTa5kLinkAggLACPPortStatusEntry  ::=
+        SEQUENCE {
+            adTa5kLinkAggLACPActorPortState             BITS,
+            adTa5kLinkAggLACPActorPortID                INTEGER,
+            adTa5kLinkAggLACPActorPortKey               INTEGER,
+            adTa5kLinkAggLACPActorPortPriority          INTEGER,
+            adTa5kLinkAggLACPPartnerPortState           BITS,
+            adTa5kLinkAggLACPPartnerPortID              INTEGER,
+            adTa5kLinkAggLACPPartnerPortKey             INTEGER,
+            adTa5kLinkAggLACPPartnerPortPriority        INTEGER,
+            adTa5kLinkAggLACPPartnerPortSystemID        MacAddress,
+            adTa5kLinkAggLACPPartnerPortSystemPriority  INTEGER
+        }
+
+    adTa5kLinkAggLACPActorPortState      OBJECT-TYPE
+        SYNTAX      BITS {
+            lacpActivity        (0),
+            lacpTimeout         (1),
+            aggregation         (2),
+            synchronization     (3),
+            collecting          (4),
+            distributing        (5),
+            defaulted           (6),
+            expired             (7)
+            }
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "(0) lacpActivity: 1 indicates active LACP. 0 indicates passive LACP.
+
+            (1) lacpTimeout: 1 indicates a short timeout. 0 indicates a long timeout.
+
+            (2) aggregation: 1 indicates the system considers this link to be a potential candidate
+                for aggregation.
+
+            (3) synchronization: 1 indicates the system considers this link to be IN_SYNC.
+
+            (4) collecting: 1 indicates collection is currently enabled and is not expected to be
+                disabled in the absence of administrative changes or changes in received
+                protocol information.
+
+            (5) distributing: 0 indicates distribution is currently disabled and is not expected
+                to be enabled in the absence of administrative changes or changes in received
+                protocol information.
+
+            (6) defaulted: 1 indicates the actors receive machine has defaulted.
+
+            (7) expired: 1 indicates the actors receive machine has expired."
+
+        ::= { adTa5kLinkAggLACPPortStatusEntry 1 }
+
+    adTa5kLinkAggLACPActorPortID      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "The port number locally assigned to the Aggregation Port.
+        The port number is communicated in LACPDUs as the Actor_Port.
+        This should be converted to hex."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 2 }
+
+    adTa5kLinkAggLACPActorPortKey      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "The current operational value of the Key for the
+        Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 3 }
+
+    adTa5kLinkAggLACPActorPortPriority      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "The priority value assigned to the port, used to
+        converge dynamic Key changes. This should be converted
+        to hex."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 4 }
+
+    adTa5kLinkAggLACPPartnerPortState      OBJECT-TYPE
+        SYNTAX      BITS {
+            lacpActivity        (0),
+            lacpTimeout         (1),
+            aggregation         (2),
+            synchronization     (3),
+            collecting          (4),
+            distributing        (5),
+            defaulted           (6),
+            expired             (7)
+            }
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "(0) lacpActivity: 1 indicates active LACP. 0 indicates passive LACP.
+
+            (1) lacpTimeout: 1 indicates a short timeout. 0 indicates a long timeout.
+
+            (2) aggregation: 1 indicates the system considers this link to be a potential candidate
+                for aggregation.
+
+            (3) synchronization: 1 indicates the system considers this link to be IN_SYNC.
+
+            (4) collecting: 1 indicates collection is currently enabled and is not expected to be
+                disabled in the absence of administrative changes or changes in received
+                protocol information.
+
+            (5) distributing: 0 indicates distribution is currently disabled and is not expected
+                to be enabled in the absence of administrative changes or changes in received
+                protocol information.
+
+            (6) defaulted: 1 indicates the actors receive machine has defaulted.
+
+            (7) expired: 1 indicates the actors receive machine has expired."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 5 }
+
+    adTa5kLinkAggLACPPartnerPortID      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "The port number locally assigned to the Aggregation Port.
+        The port number is communicated in LACPDUs as the
+        Partner_Port. This should be converted to hex."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 6 }
+
+
+    adTa5kLinkAggLACPPartnerPortKey      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "The current operational value of the Key for the
+        Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 7 }
+
+    adTa5kLinkAggLACPPartnerPortPriority      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "The operational value of the port number assigned
+        to this link by the Partner. The Actor sets this variable
+        either to the value received from the Partner in an LACPDU,
+        or to the value of Partner_Admin_Port_Number. This should
+        be converted to hex."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 8 }
+
+    adTa5kLinkAggLACPPartnerPortSystemID      OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "A 6-octet read-only MAC address value that defines
+        the value of the System ID for the System that contains this
+        Aggregation Port."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 9 }
+
+    adTa5kLinkAggLACPPartnerPortSystemPriority      OBJECT-TYPE
+        SYNTAX      INTEGER ( 0..65535)
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "A 2-octet read-only value that indicates the priority
+        value associated with the Partner’s System ID. If the
+        aggregation is manually configured, this System Priority value
+        will be a value assigned by the local System."
+        ::= { adTa5kLinkAggLACPPortStatusEntry 10 }
+
+-- ******************************************************************************************
+-- State Machine Table
+-- ******************************************************************************************
+    adTa5kLinkAggLACPStateMachineTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdTa5kLinkAggLACPStateMachineEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "The LACP Port Status Table."
+        ::= { adTa5kLinkAggregationStatus 3 }
+
+    adTa5kLinkAggLACPStateMachineEntry OBJECT-TYPE
+        SYNTAX  AdTa5kLinkAggLACPStateMachineEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+           "An entry in the LACP Status Table."
+        INDEX   { ifIndex }
+        ::= { adTa5kLinkAggLACPStateMachineTable 1 }
+
+    AdTa5kLinkAggLACPStateMachineEntry  ::=
+        SEQUENCE {
+            adTa5kLinkAggLACPSelectedState          INTEGER,
+            adTa5kLinkAggLACPReceiveState           INTEGER,
+            adTa5kLinkAggLACPPeriodicTxState        INTEGER,
+            adTa5kLinkAggLACPMuxState               INTEGER
+        }
+
+    adTa5kLinkAggLACPSelectedState      OBJECT-TYPE
+        SYNTAX      INTEGER {
+            unselected      (0),
+            selected        (1),
+            standby         (2),
+            notAvailable    (255)
+            }
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "(1) unslected: This state indicates that no aggregator is currently selected.
+
+            (2) selected: This state indicates that the Selection Logic has selected an appropriate
+                Aggregator.
+
+            (3) standby: This state indicates that although the Selection Logic has selected an appropriate
+                Aggregator, aggregation restrictions currently prevent the port from being enabled as
+                part of the aggregation.
+
+            (255) notAvailable: LACP is disabled.
+            "
+        ::= { adTa5kLinkAggLACPStateMachineEntry 1 }
+
+    adTa5kLinkAggLACPReceiveState      OBJECT-TYPE
+        SYNTAX      INTEGER {
+            initialize      (0),
+            portDisabled    (1),
+            expired         (2),
+            lacpDisabled    (3),
+            defaulted       (4),
+            current         (5),
+            notAvailable             (255)
+            }
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "(1) initialize: This state causes the administrative values of the Partner
+                parameters to be used as the current operational values.
+
+            (2) portDisabled: This state indicates that the port has become inoperable and a
+                BEGIN event has not occurred.
+
+            (3) expired: This state indicates that no LACPDU was received before the current_while
+                timer expired.
+
+            (4) lacpDisabled: This state indicates that the port is enabled but something has caused
+                LACP to become diabled such as the port operating in half duplex.
+
+            (5) defaulted: This state indicates that no LACPDU was received before the current_while
+                timer expired a second time after the receive state entered the expired state.
+
+            (6) current: This state is entered upon receival of a LACPDU.
+
+            (255) notAvailable: LACP is disabled.
+            "
+        ::= { adTa5kLinkAggLACPStateMachineEntry 2 }
+
+    adTa5kLinkAggLACPPeriodicTxState      OBJECT-TYPE
+        SYNTAX      INTEGER {
+            noPeriodic      (0),
+            fastPeriodic    (1),
+            slowPeriodic    (2),
+            periodicTx      (3),
+            notAvailable    (255)
+            }
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "(1) noPeriodic: While in this state, periodic transmissions are disabled.
+
+            (2) fastPeriodic: While in this state, periodic transmissions are enabled
+                at a fast transmission rate.
+
+            (3) slowPeriodic: While in this state, periodic transmissions are enabled
+                at a slow transmission rate.
+
+            (4) periodicTx:This is a transitory state entered on periodic_timer expiry,
+                that asserts NTT and then exits to FAST_PERIODIC or SLOW_PERIODIC depending
+                upon the Partner’s LACP_Timeout setting.
+
+            (255) notAvailable: LACP is disabled.
+            "
+        ::= { adTa5kLinkAggLACPStateMachineEntry 3 }
+
+    adTa5kLinkAggLACPMuxState      OBJECT-TYPE
+        SYNTAX      INTEGER {
+            detached        (0),
+            waiting         (1),
+            attached        (2),
+            collecting      (3),
+            distributing    (4),
+            notAvailable    (255)
+            }
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "(1) detached: This state indicates that the port is either in the process of
+                being detached or is currently detached from the Aggregator. A  port may be
+                detached from the Aggregator used by its Link Aggregation Group as a result
+                of protocol(e.g., Key) changes, or because of System constraints (e.g., exceeding
+                a maximum allowable number of aggregated links, or device failures) at either
+                end of the link.
+
+            (2) waiting: This state indicates that the mux is waiting to allow for the possibility
+                that other ports may be reconfiguring at the same time. Once the wait_while_timer
+                expires, and once the wait_while_timers of all other ports that are ready to
+                attach to the same Aggregator have expired, the process of attaching the port to
+                the Aggregator can proceed.
+
+            (3) attached: This state indicates that the port is in the process of being attached
+                to the Aggregator.
+
+            (4) collecting: This state indicates that collection of frames from the port is enabled.
+
+            (5) distributing: This state indicates that distribution of frames to the port is enabled.
+
+            (255) notAvailable: LACP is disabled.
+            "
+        ::= { adTa5kLinkAggLACPStateMachineEntry 4 }
+
+   END
+

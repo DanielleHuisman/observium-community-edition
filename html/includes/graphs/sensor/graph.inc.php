@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -18,6 +18,10 @@ switch ($sensor['sensor_class']) {
     case 'progress':
         $scale_min = "0";
         $scale_max = "100";
+        break;
+
+    case 'power':
+        $autoscale = 'default';
         break;
 
     case 'snr':
@@ -43,7 +47,7 @@ $colour_line   = "cc0000";
 $colour_area   = "FFBBBB";
 $colour_minmax = "c5c5c5";
 
-$graph_max = 1;
+//$graph_max = 1;
 if (isset($sensor_type['graph_unit'])) {
     $unit_text = $sensor_type['graph_unit'];
 } else {

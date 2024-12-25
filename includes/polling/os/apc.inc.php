@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -147,7 +147,7 @@ if (empty($hardware)) {
             'fwrev'  => 'sPDUIdentFirmwareRev',
             'serial' => 'sPDUIdentSerialNumber'
         ],
-        # NetBotz 200
+        # NetBotz 200/250
         'ems' => [
             'model'  => 'emsIdentProductNumber',
             'hwrev'  => 'emsIdentHardwareRev',
@@ -214,6 +214,10 @@ if (empty($hardware)) {
 
             case str_starts_with($features, 'ATS'):
                 $apc_keys = [ 'ats' ];
+                break;
+
+            case str_starts_with($features, 'NetBotz Rack Monitor'):
+                $apc_keys = [ 'ems' ];
                 break;
 
             case str_starts_with($features, 'rd3xx'):

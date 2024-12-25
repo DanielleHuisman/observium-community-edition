@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -103,25 +103,20 @@ register_html_resource('js', 'observium-entities.js');
 
 <?php
 if ($vars['user_id']) {
-    // Check if correct auth secret passed
-    $auth_secret_fail = empty($_SESSION['auth_secret']) || empty($vars['auth_secret']) || !hash_equals($_SESSION['auth_secret'], $vars['auth_secret']);
-    //print_vars($auth_secret_fail);
-    //$auth_secret_fail = TRUE;
 
-    if ($vars['action'] == "deleteuser" && request_token_valid($vars)) {
+    if ($vars['action'] === "deleteuser" && request_token_valid($vars)) {
         include($config['html_dir'] . "/pages/edituser/deleteuser.inc.php");
     } else {
 
         // Perform actions if requested
 
-        if (auth_usermanagement() && isset($vars['action']) && request_token_valid($vars)) { // Admins always can change user info & password
+        if (auth_usermanagement() && isset($vars['action']) && request_token_valid($vars)) {
+            // Admins always can change user info & password
+            $status = FALSE;
             switch ($vars['action']) {
-                case "changepass":
+                case "user_update_password":
                     if ($vars['new_pass'] == "" || $vars['new_pass2'] == "") {
                         print_warning("Password cannot be blank.");
-                    } elseif ($auth_secret_fail) {
-                        // Incorrect auth secret, seems as someone try to hack system ;)
-                        print_debug("Incorrect admin auth, get out from here nasty hacker.");
                     } elseif ($vars['new_pass'] === $vars['new_pass2'] &&
                               is_valid_param($vars['new_pass'], 'password')) {
                         $status = auth_change_password($user_data['username'], $vars['new_pass']);
@@ -135,27 +130,22 @@ if ($vars['user_id']) {
                     }
                     break;
 
-                case "change_user":
-                    if ($auth_secret_fail) {
-                        // Incorrect auth secret, seems as someone try to hack system ;)
-                        print_debug("Incorrect admin auth, get out from here nasty hacker.");
+                case "user_update":
+                    $update_array                  = [];
+                    $vars['new_can_modify_passwd'] = isset($vars['new_can_modify_passwd']) && $vars['new_can_modify_passwd'] ? 1 : 0;
+                    foreach ([ 'realname', 'level', 'email', 'descr', 'can_modify_passwd' ] as $param) {
+                        if ($vars['new_' . $param] != $user_data[$param]) {
+                            $update_array[$param] = $vars['new_' . $param];
+                        }
+                    }
+
+                    if (count($update_array)) {
+                        $status = dbUpdate($update_array, 'users', '`user_id` = ?', [ $vars['user_id'] ]);
+                    }
+                    if ($status) {
+                        print_success("User Info Changed.");
                     } else {
-                        $update_array                  = [];
-                        $vars['new_can_modify_passwd'] = (isset($vars['new_can_modify_passwd']) && $vars['new_can_modify_passwd'] ? 1 : 0);
-                        foreach (['realname', 'level', 'email', 'descr', 'can_modify_passwd'] as $param) {
-                            if ($vars['new_' . $param] != $user_data[$param]) {
-                                $update_array[$param] = $vars['new_' . $param];
-                            }
-                        }
-                        $status = FALSE;
-                        if (count($update_array)) {
-                            $status = dbUpdate($update_array, 'users', '`user_id` = ?', [$vars['user_id']]);
-                        }
-                        if ($status) {
-                            print_success("User Info Changed.");
-                        } else {
-                            print_error("User Info not changed.");
-                        }
+                        print_error("User Info not changed.");
                     }
                     break;
             }
@@ -170,16 +160,10 @@ if ($vars['user_id']) {
             }
         }
 
-        // FIXME -- output messages!
+        // FIXME. Move to actions includes
         if (($vars['submit'] === "user_perm_del" || $vars['action'] === "user_perm_del") && request_token_valid($vars)) {
-            if ($auth_secret_fail) {
-                // Incorrect auth secret, seems as someone try to hack system ;)
-                print_debug("Incorrect admin auth, get out from here nasty hacker.");
-            } else {
-                if (isset($vars['entity_id'])) {
-                } // use entity_id
-                elseif (isset($vars[$vars['entity_type'] . '_entity_id'])) // use type_entity_id
-                {
+                if (isset($vars['entity_id'])) {                               // use entity_id
+                } elseif (isset($vars[$vars['entity_type'] . '_entity_id'])) { // use type_entity_id
                     $vars['entity_id'] = $vars[$vars['entity_type'] . '_entity_id'];
                 }
 
@@ -188,35 +172,28 @@ if ($vars['user_id']) {
                 //if (@dbFetchCell("SELECT COUNT(*) FROM `entity_permissions` WHERE " . $where, array($vars['user_id'], $vars['entity_type'])))
                 if (dbExist('entity_permissions', $where, $params)) {
                     dbDelete('entity_permissions', $where, $params);
+                    print_success("Entity Permission Removed.");
                 }
-            }
         } elseif (($vars['submit'] == "user_perm_add" || $vars['action'] == "user_perm_add") &&
                   request_token_valid($vars)) {
-            if ($auth_secret_fail) {
-                // Incorrect auth secret, seems as someone try to hack system ;)
-                print_debug("Incorrect admin auth, get out from here nasty hacker.");
-            } else {
-                if (isset($vars['entity_id'])) { // use entity_id
-                } elseif (isset($vars[$vars['entity_type'] . '_entity_id'])) { // use type_entity_id
-                    $vars['entity_id'] = $vars[$vars['entity_type'] . '_entity_id'];
-                }
-                if (!is_array($vars['entity_id'])) {
-                    $vars['entity_id'] = [$vars['entity_id']];
-                }
+            if (isset($vars['entity_id'])) {                               // use entity_id
+            } elseif (isset($vars[$vars['entity_type'] . '_entity_id'])) { // use type_entity_id
+                $vars['entity_id'] = $vars[$vars['entity_type'] . '_entity_id'];
+            }
+            if (!is_array($vars['entity_id'])) {
+                $vars['entity_id'] = [$vars['entity_id']];
+            }
 
-                foreach ($vars['entity_id'] as $entry) {
-                    $where  = '`user_id` = ? AND `entity_type` = ? AND `entity_id` = ? AND `auth_mechanism` = ?';
-                    $params = [$vars['user_id'], $vars['entity_type'], $entry, $config['auth_mechanism']];
-                    if (get_entity_by_id_cache($vars['entity_type'], $entry) && // Skip not exist entities
-                        !dbExist('entity_permissions', $where, $params)) {
-                        dbInsert(['entity_id' => $entry, 'entity_type' => $vars['entity_type'], 'user_id' => $vars['user_id'], 'auth_mechanism' => $config['auth_mechanism']], 'entity_permissions');
-                    }
+            foreach ($vars['entity_id'] as $entry) {
+                $where  = '`user_id` = ? AND `entity_type` = ? AND `entity_id` = ? AND `auth_mechanism` = ?';
+                $params = [ $vars['user_id'], $vars['entity_type'], $entry, $config['auth_mechanism'] ];
+                if (get_entity_by_id_cache($vars['entity_type'], $entry) && // Skip not exist entities
+                    !dbExist('entity_permissions', $where, $params)) {
+                    dbInsert(['entity_id' => $entry, 'entity_type' => $vars['entity_type'], 'user_id' => $vars['user_id'], 'auth_mechanism' => $config['auth_mechanism']], 'entity_permissions');
+                    print_success("Entity Permission Added.");
                 }
             }
         }
-
-        // Generate new auth secret
-        session_set_var('auth_secret', md5(random_string()));
 
         ?>
         <div class="row"> <!-- main row begin -->
@@ -278,93 +255,97 @@ if ($vars['user_id']) {
                     <?php
                     if (auth_usermanagement()) { // begin user edit modal
 
-                        $form = ['type'  => 'horizontal',
-                                 //'userlevel'  => 10,          // Minimum user level for display form
-                                 'id'    => 'user_edit',
-                                 'title' => 'Edit User: ' . escape_html($user_data['username']),
-                                 //'modal_args' => $modal_args, // modal specific options
-                                 //'help'      => 'This will delete the selected contact and any alert assocations.',
-                                 //'class'     => '', // Clean default box class (default for modals)
-                                 //'url'       => 'delhost/'
+                        $form = [
+                            'type'  => 'horizontal',
+                            //'userlevel'  => 10,          // Minimum user level for display form
+                            'id'    => 'user_edit',
+                            'title' => 'Edit User: ' . escape_html($user_data['username']),
+                            //'modal_args' => $modal_args, // modal specific options
+                            //'help'      => 'This will delete the selected contact and any alert assocations.',
+                            //'class'     => '', // Clean default box class (default for modals)
+                            //'url'       => 'delhost/'
                         ];
                         //$form['fieldset']['body']   = array('class' => 'modal-body');   // Required this class for modal body!
                         //$form['fieldset']['footer'] = array('class' => 'modal-footer'); // Required this class for modal footer!
 
-
-                        $form['row'][] = ['user_id'     => [
-                          'type'     => 'hidden',
-                          'fieldset' => 'body',
-                          'value'    => $user_data['user_id']],
-                                          'auth_secret' => [
-                                            'type'     => 'hidden',
-                                            'fieldset' => 'body',
-                                            'value'    => $_SESSION['auth_secret']]
+                        // Body elements
+                        $form['row'][]['user_id'] = [
+                            'type'     => 'hidden',
+                            'fieldset' => 'body',
+                            'value'    => $user_data['user_id']
+                        ];
+                        $form['row'][]['old_username'] = [
+                            'type'        => 'text',
+                            'fieldset'    => 'body',
+                            'name'        => 'User Name',
+                            'width'       => '80%',
+                            'placeholder' => TRUE,
+                            'disabled'    => TRUE,
+                            'value'       => $user_data['username']
+                        ];
+                        $form['row'][]['new_realname'] = [
+                            'type'        => 'text',
+                            'fieldset'    => 'body',
+                            'name'        => 'Real Name',
+                            'width'       => '80%',
+                            'placeholder' => TRUE,
+                            'value'       => $user_data['realname']
+                        ];
+                        $form['row'][]['new_level'] = [
+                            'type'     => 'select',
+                            'fieldset' => 'body',
+                            'name'     => 'User Level',
+                            'width'    => '80%',
+                            'subtext'  => TRUE,
+                            'values'   => $GLOBALS['config']['user_level'],
+                            'value'    => $user_data['level_real']
+                        ];
+                        $form['row'][]['new_email'] = [
+                            'type'        => 'text',
+                            'fieldset'    => 'body',
+                            'name'        => 'E-mail',
+                            'width'       => '80%',
+                            'placeholder' => TRUE,
+                            'value'       => $user_data['email']
+                        ];
+                        $form['row'][]['new_descr'] = [
+                            'type'        => 'text',
+                            'fieldset'    => 'body',
+                            'name'        => 'Description',
+                            'width'       => '80%',
+                            'placeholder' => TRUE,
+                            'value'       => $user_data['descr']
+                        ];
+                        $form['row'][]['new_can_modify_passwd'] = [
+                            'type'        => 'toggle',
+                            'view'        => 'toggle',
+                            'fieldset'    => 'body',
+                            'placeholder' => 'Allow the user to change his password',
+                            'value'       => $user_data['can_modify_passwd']
                         ];
 
-                        $form['row'][]['old_username'] = [
-                          'type'        => 'text',
-                          'fieldset'    => 'body',
-                          'name'        => 'User Name',
-                          'width'       => '80%',
-                          'placeholder' => TRUE,
-                          'disabled'    => TRUE,
-                          'value'       => $user_data['username']];
-
-                        $form['row'][]['new_realname']          = [
-                          'type'        => 'text',
-                          'fieldset'    => 'body',
-                          'name'        => 'Real Name',
-                          'width'       => '80%',
-                          'placeholder' => TRUE,
-                          'value'       => $user_data['realname']];
-                        $form['row'][]['new_level']             = [
-                          'type'     => 'select',
-                          'fieldset' => 'body',
-                          'name'     => 'User Level',
-                          'width'    => '80%',
-                          'subtext'  => TRUE,
-                          'values'   => $GLOBALS['config']['user_level'],
-                          'value'    => $user_data['level_real']];
-                        $form['row'][]['new_email']             = [
-                          'type'        => 'text',
-                          'fieldset'    => 'body',
-                          'name'        => 'E-mail',
-                          'width'       => '80%',
-                          'placeholder' => TRUE,
-                          'value'       => $user_data['email']];
-                        $form['row'][]['new_descr']             = [
-                          'type'        => 'text',
-                          'fieldset'    => 'body',
-                          'name'        => 'Description',
-                          'width'       => '80%',
-                          'placeholder' => TRUE,
-                          'value'       => $user_data['descr']];
-                        $form['row'][]['new_can_modify_passwd'] = [
-                          'type'        => 'toggle',
-                          'view'        => 'toggle',
-                          'fieldset'    => 'body',
-                          'placeholder' => 'Allow the user to change his password',
-                          'value'       => $user_data['can_modify_passwd']];
-
+                        // Footer row
                         $form['row'][] = [
-                          'close'  => [
-                            'type'      => 'submit',
-                            'fieldset'  => 'footer',
-                            'div_class' => '', // Clean default form-action class!
-                            'name'      => 'Close',
-                            'icon'      => '',
-                            'attribs'   => ['data-dismiss' => 'modal',  // dismiss modal
-                                            'aria-hidden'  => 'true']], // do not sent any value
-                          'action' => [
-                            'type'      => 'submit',
-                            'fieldset'  => 'footer',
-                            'div_class' => '', // Clean default form-action class!
-                            'name'      => 'Save Changes',
-                            'icon'      => 'icon-ok icon-white',
-                            //'right'       => TRUE,
-                            'class'     => 'btn-primary',
-                            //'disabled'    => TRUE,
-                            'value'     => 'change_user']
+                            'close'  => [
+                                'type'      => 'submit',
+                                'fieldset'  => 'footer',
+                                'div_class' => '', // Clean default form-action class!
+                                'name'      => 'Close',
+                                'icon'      => '',
+                                'attribs'   => [ 'data-dismiss' => 'modal',  // dismiss modal
+                                                 'aria-hidden'  => 'true']
+                            ], // do not sent any value
+                            'action' => [
+                                'type'      => 'submit',
+                                'fieldset'  => 'footer',
+                                'div_class' => '', // Clean default form-action class!
+                                'name'      => 'Save Changes',
+                                'icon'      => 'icon-ok icon-white',
+                                //'right'       => TRUE,
+                                'class'     => 'btn-primary',
+                                //'disabled'    => TRUE,
+                                'value'     => 'user_update'
+                            ]
                         ];
 
                         echo generate_form_modal($form);
@@ -373,37 +354,40 @@ if ($vars['user_id']) {
                     } // end edit user modal
 
                     if (auth_usermanagement()) { // begin change password
-                        $form = ['type'     => 'horizontal',
-                                 //'space'   => '10px',
-                                 'title'    => 'Change Password',
-                                 'icon'     => $config['icon']['lock'],
-                                 //'class'   => 'box box-solid',
-                                 'fieldset' => ['change_password' => '']];
+                        $form = [
+                            'type'     => 'horizontal',
+                            //'space'   => '10px',
+                            'title'    => 'Change Password',
+                            'icon'     => $config['icon']['lock'],
+                            //'class'   => 'box box-solid',
+                            'fieldset' => ['change_password' => '']
+                        ];
                         //'fieldset'  => array('change_password' => 'Change Password'));
-                        $form['row'][0]['action']      = [
-                          'type'  => 'hidden',
-                          'value' => 'changepass'];
-                        $form['row'][1]['auth_secret'] = [
-                          'type'  => 'hidden',
-                          'value' => $_SESSION['auth_secret']];
-                        $form['row'][2]['new_pass']    = [
-                          'type'     => 'password',
-                          'fieldset' => 'change_password', // Group by fieldset
-                          'name'     => 'New Password',
-                          'width'    => '95%',
-                          'value'    => ''];
-                        $form['row'][3]['new_pass2']   = [
-                          'type'     => 'password',
-                          'fieldset' => 'change_password', // Group by fieldset
-                          'name'     => 'Retype Password',
-                          'width'    => '95%',
-                          'value'    => ''];
-                        $form['row'][10]['submit']     = [
-                          'type'  => 'submit',
-                          'name'  => 'Update&nbsp;Password',
-                          'icon'  => $config['icon']['lock'],
-                          'right' => TRUE,
-                          'value' => 'save'];
+                        $form['row'][0]['action'] = [
+                            'type'  => 'hidden',
+                            'value' => 'user_update_password'
+                        ];
+                        $form['row'][2]['new_pass'] = [
+                            'type'     => 'password',
+                            'fieldset' => 'change_password', // Group by fieldset
+                            'name'     => 'New Password',
+                            'width'    => '95%',
+                            'value'    => ''
+                        ];
+                        $form['row'][3]['new_pass2'] = [
+                            'type'     => 'password',
+                            'fieldset' => 'change_password', // Group by fieldset
+                            'name'     => 'Retype Password',
+                            'width'    => '95%',
+                            'value'    => ''
+                        ];
+                        $form['row'][10]['submit'] = [
+                            'type'  => 'submit',
+                            'name'  => 'Update&nbsp;Password',
+                            'icon'  => $config['icon']['lock'],
+                            'right' => TRUE,
+                            'value' => 'save'
+                        ];
                         echo('  <div class="col-md-6">' . PHP_EOL);
                         print_form($form);
                         unset($form, $i);
@@ -444,10 +428,6 @@ if ($vars['user_id']) {
                         $form = ['type' => 'simple'];
 
                         // Elements
-                        $form['row'][0]['auth_secret'] = [
-                          'type'  => 'hidden',
-                          'value' => $_SESSION['auth_secret']];
-
                         $form['row'][0]['role_id'] = ['type'  => 'hidden',
                                                       'value' => $role['role_id']];
                         $form['row'][0]['action']  = ['type'  => 'hidden',
@@ -477,7 +457,6 @@ if ($vars['user_id']) {
                          //'url'   => generate_url($vars)
                 ];
                 // Elements
-                $form['row'][0]['auth_secret'] = ['type' => 'hidden', 'value' => $_SESSION['auth_secret']];
                 $form['row'][0]['user_id']     = ['type' => 'hidden', 'value' => $user_data['user_id']];
                 $form['row'][0]['action']      = ['type' => 'hidden', 'value' => 'role_user_add'];
 
@@ -600,11 +579,11 @@ if ($vars['user_id']) {
             $user['edit_url'] = generate_url(['page' => 'user_edit', 'user_id' => $user['user_id']]);
 
             echo '<tr class="' . $user['row_class'] . '">
-      <td class="state-marker"></td>
+        <td class="state-marker"></td>
         <td>' . $user['user_id'] . '</td>
         <td><strong><a href="' . $user['edit_url'] . '">' . escape_html($user['username']) . '</a></strong></td>
         <!-- <td><strong>' . $user['level'] . '</strong></td> -->
-        <td><i class="' . $user['icon'] . '"></i> <span class="label label-' . $user['label_class'] . '">' . $user['level_label'] . '</span></td>
+        <td>' . get_icon($user['icon']) . ' <span class="label label-' . $user['label_class'] . '">' . $user['level_label'] . '</span></td>
         <td><strong>' . escape_html($user['realname']) . '</strong></td>
         <td><strong>' . escape_html($user['email']) . '</strong></td>
         <td>' . get_type_class_label($user['type'], 'user_type') . '</td>

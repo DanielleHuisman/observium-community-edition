@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -162,55 +162,77 @@ function process_port_speed(&$this_port, $device, $port = []) {
 }
 
 function process_port_label_def(&$this_port, $device) {
-    global $config;
 
     // Process label by os definition rewrites
-    $oid = 'port_label';
-    if (!isset($config['os'][$device['os']][$oid])) {
+    $label = 'port_label';
+    if (!isset($GLOBALS['config']['os'][$device['os']][$label])) {
         // No definitions for port label
         return FALSE;
     }
 
-    $this_port['port_label'] = preg_replace('/\ {2,}/', ' ', $this_port['port_label']); // clear two and more spaces
+    $port_label        = $this_port[$label]; // original label
+    $this_port[$label] = preg_replace('/\ {2,}/', ' ', $this_port[$label]); // clear two and more spaces
 
-    $oid_base  = $oid . '_base';
-    $oid_num   = $oid . '_num';
-    $oid_short = $oid . '_short';
-    foreach ($config['os'][$device['os']][$oid] as $pattern) {
-        if (preg_match($pattern, $this_port[$oid], $matches)) {
+    $label_base  = $label . '_base';
+    $label_num   = $label . '_num';
+    $label_short = $label . '_short';
+    foreach ($GLOBALS['config']['os'][$device['os']][$label] as $pattern) {
+        if (preg_match($pattern, $this_port[$label], $matches)) {
             //print_debug_vars($matches);
-            if (isset($matches[$oid])) {
+            if (isset($matches[$label])) {
                 // if exist 'port_label' match reference
-                $this_port[$oid] = $matches[$oid];
+                $this_port[$label] = $matches[$label];
             } else {
                 // or just first reference
-                $this_port[$oid] = $matches[1];
+                $this_port[$label] = $matches[1];
             }
-            print_debug("Port '$oid' rewritten: '" . $this_port[$oid] . "' -> '" . $this_port[$oid] . "'");
 
-            if (isset($matches[$oid_base])) {
-                $this_port[$oid_base] = $matches[$oid_base];
+            if (isset($matches[$label_base])) {
+                $this_port[$label_base] = $matches[$label_base];
             }
-            if (isset($matches[$oid_num])) {
-                if ($device['os'] === 'cisco-altiga' && $matches[$oid_num] === '') { // This derp only for altiga (I hope so)
+            if (isset($matches[$label_num])) {
+                if ($device['os'] === 'cisco-altiga' && $matches[$label_num] === '') { // This derp only for altiga (I hope so)
                     // See cisco-altiga os definition
                     // If port_label_num match set, but it empty, use ifIndex as num
-                    $this_port[$oid_num] = $this_port['ifIndex'];
-                    $this_port[$oid]     .= $this_port['ifIndex'];
+                    $this_port[$label_num] = $this_port['ifIndex'];
+                    $this_port[$label]     .= $this_port['ifIndex'];
                 } else {
-                    $this_port[$oid_num] = $matches[$oid_num];
+                    $this_port[$label_num] = $matches[$label_num];
+                }
+
+                // new port_label
+                if (isset($matches[$label_base])) {
+                    $this_port[$label] = $matches[$label_base] . $this_port[$label_num];
+                }
+            } elseif (isset($matches[$label_num . '0'])) {
+                // Multiple label_num0/1/2/3/4.. See: adtran-ta os definition
+                $num = [ $matches[$label_num . '0'] ];
+                for ($i = 1; $i < 4; $i++) {
+                    if (!isset($matches[$label_num . $i])) {
+                        break;
+                    }
+                    $num[] = $matches[$label_num . $i];
+                }
+                $this_port[$label_num] = implode('/', $num);
+
+                // new port_label
+                if (isset($matches[$label_base])) {
+                    $this_port[$label] = $matches[$label_base] . ' ' . $this_port[$label_num];
                 }
             }
 
+            print_debug("Port '$label' rewritten: '" . $port_label . "' -> '" . $this_port[$label] . "'");
+
             // Additionally, possible to parse port_label_short
-            if (isset($matches[$oid_short])) {
-                $this_port[$oid_short] = $matches[$oid_short];
+            if (isset($matches[$label_short])) {
+                $this_port[$label_short] = $matches[$label_short];
             }
 
             // Additionally, possible to parse ifAlias from ifDescr (i.e. timos)
             if (isset($matches['ifAlias'])) {
                 $this_port['ifAlias'] = $matches['ifAlias'];
             }
+
             break;
         }
     }
@@ -571,25 +593,34 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
                 $port = get_port_by_index_cache($device['device_id'], $ifIndex);
                 if (is_array($port)) {
                     // Hola, port really found
-                    print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port['port_id']);
+                    print_debug("Port is found by sensor entAliasMappingIdentifier: ifIndex = $ifIndex, port_id = " . $port['port_id']);
                     return $port;
                 }
             } elseif (!$allow_snmp && $sensor_port['ifIndex']) {
                 // ifIndex already stored by inventory module
                 $ifIndex = $sensor_port['ifIndex'];
                 $port    = get_port_by_index_cache($device['device_id'], $ifIndex);
-                print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port['port_id']);
+                print_debug("Port is found by sensor ifIndex: ifIndex = $ifIndex, port_id = " . $port['port_id']);
                 return $port;
             } else {
                 // This is another case for Cisco IOSXR, when have incorrect entAliasMappingIdentifier association,
                 // https://jira.observium.org/browse/OBS-3654
+                // Same for SONiC os
                 $port_id = get_port_id_by_ifDescr($device['device_id'], $sensor_port['entPhysicalName']);
                 if (is_numeric($port_id)) {
                     // Hola, port really found
                     $port    = get_port_by_id($port_id);
                     $ifIndex = $port['ifIndex'];
-                    print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+                    print_debug("Port is found by port entPhysicalName: ifIndex = $ifIndex, port_id = " . $port_id);
 
+                    if (str_contains($sensor_port['entPhysicalDescr'], 'QSFP28')) {
+                        // SONiC OS:
+                        //   [entPhysicalDescr]        => string(35) "QSFP28 or later for Eth52/3(Port52)"
+                        //   [entPhysicalName]         => string(10) "Ethernet62"
+                        // ...
+                        //   [entPhysicalDescr]        => string(40) "DOM TX Bias Sensor for Eth52/3(Port52)/1"
+                        $port['sensor_multilane'] = TRUE;
+                    }
                     return $port;
                 }
             }
@@ -603,7 +634,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
                 // Hola, port really found
                 $port    = get_port_by_id($port_id);
                 $ifIndex = $port['ifIndex'];
-                print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+                print_debug("Port is found by Arista entPhysicalAlias: ifIndex = $ifIndex, port_id = " . $port_id);
                 return $port; // Exit do-while
             }
             if ($port_id = get_port_id_by_ifDescr($device['device_id'], $sensor_port['entPhysicalAlias'] . '/1')) {
@@ -611,7 +642,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
                 $port                     = get_port_by_id($port_id);
                 $port['sensor_multilane'] = TRUE;
                 $ifIndex                  = $port['ifIndex'];
-                print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+                print_debug("Port is found by Arista entPhysicalAlias ML: ifIndex = $ifIndex, port_id = " . $port_id);
                 return $port; // Exit do-while
             }
             $sensor_index = $sensor_port['entPhysicalContainedIn']; // Next ifIndex
@@ -638,7 +669,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
                 $port = get_port_by_index_cache($device['device_id'], $ifIndex);
                 if (is_array($port)) {
                     // Hola, port really found
-                    print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port['port_id']);
+                    print_debug("Port is found by module entAliasMappingIdentifier: ifIndex = $ifIndex, port_id = " . $port['port_id']);
                     return $port;
                 }
             }
@@ -683,7 +714,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
                 // Hola, port really found
                 $port    = get_port_by_id($port_id);
                 $ifIndex = $port['ifIndex'];
-                print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+                print_debug("Port is found by Cisco entPhysicalName: ifIndex = $ifIndex, port_id = " . $port_id);
 
                 return $port;
             }
@@ -701,7 +732,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
                 // Hola, port really found
                 $port    = get_port_by_id($port_id);
                 $ifIndex = $port['ifIndex'];
-                print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+                print_debug("Port is found by module entPhysicalName: ifIndex = $ifIndex, port_id = " . $port_id);
 
                 return $port;
             }
@@ -1329,25 +1360,31 @@ function humanspeed($speed)
 }
 
 // CLEANME DEPRECATED
-function get_port_rrdfilename($port, $suffix = NULL, $fullpath = FALSE)
-{
+function get_port_rrdfilename($port, $suffix = NULL, $fullpath = FALSE) {
     $this_port_identifier = get_port_rrdindex($port);
 
-    if ($suffix == "") {
+    if (safe_empty($suffix)) {
         $filename = "port-" . $this_port_identifier . ".rrd";
     } else {
         $filename = "port-" . $this_port_identifier . "-" . $suffix . ".rrd";
     }
 
     if ($fullpath) {
+        if (isset($port['hostname'])) {
+            // hostname already passed in port array, less queries
+            return get_rrd_path($port, $filename);
+        }
+
+        $device = [];
         if (isset($port['device_id'])) {
-            $device_id = $port['device_id'];
+            $device['device_id'] = $port['device_id'];
         } else {
             // In poller, device_id not always passed
             $port_tmp  = get_port_by_id_cache($port['port_id']);
-            $device_id = $port_tmp['device_id'];
+            $device['device_id'] = $port_tmp['device_id'];
         }
-        $device   = device_by_id_cache($device_id);
+        //$device   = device_by_id_cache($device_id);
+        $device['hostname'] = get_device_hostname_by_id($device['device_id']); // get_rrd_path() need only hostname
         $filename = get_rrd_path($device, $filename);
     }
 

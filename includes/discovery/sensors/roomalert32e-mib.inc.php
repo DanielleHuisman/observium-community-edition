@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -30,7 +30,7 @@ foreach ($oids as $index => $entry) {
     $descr = "Internal Temperature";
     $value = $entry['internal-tempc'];
 
-    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
     $oid_name = "internal-humidity";
     $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.1.2.1.$index";
@@ -38,7 +38,7 @@ foreach ($oids as $index => $entry) {
     $descr = "Internal Humidity";
     $value = $entry['internal-humidity'];
 
-    discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+    discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
     $oid_name = "internal-heat-indexC";
     $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.1.4.2.$index";
@@ -46,7 +46,7 @@ foreach ($oids as $index => $entry) {
     $descr = "Internal Heat Index";
     $value = $entry['internal-heat-indexC'];
 
-    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
     $oid_name = "internal-dew-point-c";
     $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.1.7.1.$index";
@@ -54,7 +54,7 @@ foreach ($oids as $index => $entry) {
     $descr = "Internal Dew Point";
     $value = $entry['internal-dew-point-c'];
 
-    discover_sensor_ng($device, 'dewpoint', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+    discover_sensor_ng($device, 'dewpoint', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
     $oid_name = "internal-power";
     $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.1.3.1.$index";
@@ -106,7 +106,7 @@ for ($i = 1; $i <= 8; $i++) {
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Temperature";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
         } elseif (isset($oids[$index]["digital-sen$i-5"])) {
             // Don't hav any of these sensors, unable to test
 
@@ -122,21 +122,21 @@ for ($i = 1; $i <= 8; $i++) {
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Temperature";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
             $oid_name = "digital-sen$i-3";
             $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.2.$i.3.$index";
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Humidity";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
             $oid_name = "digital-sen$i-5";
             $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.2.$i.5.$index";
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Heat Index";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
         } else {
             // Don't have any of these sensors, unable to test
@@ -147,28 +147,28 @@ for ($i = 1; $i <= 8; $i++) {
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Current";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
             $oid_name = "digital-sen$i-2";
             $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.2.$i.2.$index";
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Power";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
             $oid_name = "digital-sen$i-3";
             $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.2.$i.3.$index";
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Voltage";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
             $oid_name = "digital-sen$i-4";
             $oid_num  = ".1.3.6.1.4.1.20916.1.8.1.2.$i.4.$index";
             $descr    = "External Digital Sensor " . str_pad($i, 2, '0', STR_PAD_LEFT) . ": Reference Voltage";
             $value    = $oids[$index][$oid_name];
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
         }
     }

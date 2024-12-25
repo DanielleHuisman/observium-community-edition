@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -35,7 +35,7 @@ foreach ($oids as $index => $entry) {
             $descr = $hardware . ' (' . $entry['cpqDaCntlrHwLocation'] . ')';
 
             $options = ['rename_rrd' => "cpqida-cntrl-temp-cpqDaCntlrEntry.%index%"];
-            discover_sensor_ng($device, 'temperature', $mib, 'cpqDaCntlrCurrentTemp', $oid, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'temperature', $mib, 'cpqDaCntlrCurrentTemp', $oid, $index, $descr, 1, $value, $options);
         }
     }
 }
@@ -61,7 +61,7 @@ foreach ($oids as $index => $entry) {
         $options = ['limit_high' => $entry['cpqDaPhyDrvTemperatureThreshold']];
 
         $options['rename_rrd'] = "cpqida-cpqDaPhyDrv.%index%";
-        discover_sensor_ng($device, 'temperature', $mib, 'cpqDaPhyDrvCurrentTemperature', $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'cpqDaPhyDrvCurrentTemperature', $oid, $index, $descr, 1, $value, $options);
 
     }
 
@@ -115,7 +115,7 @@ foreach ($oids as $index => $entry) {
     $oid     = ".1.3.6.1.4.1.232.3.2.3.1.1.12." . $index;
     $value   = $entry['cpqDaLogDrvPercentRebuild'];
     $options = ['limit_low' => 15, 'limit_low_warn' => 50];
-    discover_sensor_ng($device, 'progress', $mib, 'cpqDaLogDrvPercentRebuild', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'progress', $mib, 'cpqDaLogDrvPercentRebuild', $oid, $index, $descr, 1, $value, $options);
     //}
     // CPQIDA-MIB::cpqDaLogDrvRPIPercentComplete.3.1 = Gauge32: 0
     //if ($entry['cpqDaLogDrvRPIPercentComplete'] < 4294967295) {
@@ -123,7 +123,7 @@ foreach ($oids as $index => $entry) {
     $oid     = ".1.3.6.1.4.1.232.3.2.3.1.1.23." . $index;
     $value   = $entry['cpqDaLogDrvRPIPercentComplete'];
     $options = ['limit_low' => 15, 'limit_low_warn' => 50];
-    discover_sensor_ng($device, 'progress', $mib, 'cpqDaLogDrvRPIPercentComplete', $oid, $index, NULL, $descr, 1, $value, $options);
+    discover_sensor_ng($device, 'progress', $mib, 'cpqDaLogDrvRPIPercentComplete', $oid, $index, $descr, 1, $value, $options);
     //}
 }
 

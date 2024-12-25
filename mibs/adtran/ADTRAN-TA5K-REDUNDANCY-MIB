@@ -1,0 +1,762 @@
+    ADTRAN-TA5K-REDUNDANCY-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN Total Access TA5000 Redundancy MIB
+    -- PRODUCT:   1187020L1, 1187800L1, 1187300L1
+    -- VERSION:   1.0
+    -- DATE:      April 15, 2006
+
+    -- This MIB Contains tables specific to the TA5000 Redundancy
+    --
+
+    -- MIBs supported:
+
+    -- HISTORY:
+    --     04/18/06 tpm First edition
+    --     04/19/06 tpm Module identiy inherits from adIdentityShared, and mgmt objects are in adShared,
+    --                  RedundancyTable renamed to EquipmentRedundancy
+    --     05/06/08 aed Add two new alarm notifications: protection unavailable and card active.
+    --     06/05/08 aed Correct errors found during SMICng compile
+    --     11/05/08 aed Change the severity for three alarms.  Peer version mismatch, Remote Db Sync,
+    --                  and Db Mirroring traps are all warnings.
+    --     01/27/09 aed Add new manual-switch notification.
+    --	   03/17/09 rp	Added SNMP Support for the Eqpt APS On Alarm. Added the Active and Clear version of the OIDS.
+    --     07/10/09 nra Added new Automatic Switch notification
+    --	   02/18/10 glf Added Alarm Provisioning to allow enable/disable of redundancy alarms
+    --     **** DO NOT ADD REVISION HISTORY HERE  ****
+
+
+
+    IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Counter32,
+        IpAddress,
+--        Gauge32,
+--        Counter64,
+--        TimeTicks,
+--        Unsigned32,
+        NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+
+        sysName
+            FROM SNMPv2-MIB
+
+        ifIndex
+--        InterfaceIndexOrZero,
+--        InterfaceIndex
+            FROM IF-MIB
+
+        DisplayString,
+        TruthValue,
+        RowStatus,
+--        TimeInterval,
+        MacAddress,
+        TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+
+--        SnmpAdminString
+--            FROM SNMP-FRAMEWORK-MIB
+
+        adIdentity,
+        adIdentityShared,
+        adProducts,
+        adMgmt
+            FROM ADTRAN-MIB
+
+        adGenTa5kRedundancy,
+        adGenTa5kRedundancyID
+            FROM ADTRAN-GENTA5K-MIB
+
+--        IANAifType
+--                FROM IANAifType-MIB
+
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB;
+
+-- *********************************************************************************************************
+
+    adTa5kRedundancyModuleIdentity MODULE-IDENTITY
+        LAST-UPDATED "201110121400Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Total Access 5000 Redundancy MIB"
+
+        REVISION "201110121400Z"
+        DESCRIPTION "Add Standby Not Ready Reasons Table"
+        ::= { adGenTa5kRedundancyID 1 }
+
+-- OBJECT IDENTIFIERS
+    adTa5kEquipmentRedundancy   OBJECT IDENTIFIER ::= { adGenTa5kRedundancy 1 }
+    adTa5kFacilityRedundancy    OBJECT IDENTIFIER ::= { adGenTa5kRedundancy 2 }
+    adTa5kRedundancyAlarmPrefix OBJECT IDENTIFIER ::= { adGenTa5kRedundancy 3 }
+    adTa5kRedundancyAlarmProv   OBJECT IDENTIFIER ::= { adGenTa5kRedundancy 4 }
+    adTa5kRedundancyAlarms      OBJECT IDENTIFIER ::= { adTa5kRedundancyAlarmPrefix 0}
+
+
+    adTa5kEquipmentRedundancyTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kEquipmentRedundancyEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kEquipmentRedundancy 1 }
+
+    adTa5kEquipmentRedundancyEntry OBJECT-TYPE
+       SYNTAX      AdTa5kEquipmentRedundancyEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kEquipmentRedundancyTable 1 }
+
+   AdTa5kEquipmentRedundancyEntry ::=
+       SEQUENCE {
+           adTa5kEquipmentRedundancySupported                      INTEGER,
+           adTa5kEquipmentRedundancyRevertive                      INTEGER,
+           adTa5kEquipmentRedundancyRevertiveTimeout               Integer32,
+           adTa5kEquipmentRedundancyForceFailover                  INTEGER,
+           adTa5kEquipmentRedundancyState                          INTEGER,
+           adTa5kEquipmentRedundancyPeerSlot                       Integer32,
+           adTa5kEquipmentRedundancyFeatureEnabled                 INTEGER,
+           adTa5kEquipmentRedundancyFacilityType                   INTEGER,
+           adTa5kEquipmentRedundancyStandbyReasonsCount            Integer32
+       }
+
+   adTa5kEquipmentRedundancySupported          OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           true (1),
+           peerNotResponding (2),
+           peerIncompatible (3),
+           peerNotPresent (4),
+           peerNotReady (5)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Supported means this unit will be able to failover to a standby card.
+            if it is not true, the value returns a reason why the unit cannot failover.
+            Valid for the active unit only."
+       ::= { adTa5kEquipmentRedundancyEntry 1 }
+
+   adTa5kEquipmentRedundancyRevertive        OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enable (1),
+           disable (2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Enable or disable the property of a protected unit reverting back to the original
+            operating unit when the original unit's health has returned to normal operating status.
+            Enabled will revert (after a timeout default=15s).
+            Disabled will leave the second unit acting as the active and the first unit will be the standby.
+            Valid for the active unit only."
+       ::= { adTa5kEquipmentRedundancyEntry 2 }
+
+   adTa5kEquipmentRedundancyRevertiveTimeout OBJECT-TYPE
+       SYNTAX                       Integer32
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Time in seconds to wait before allowing a protection switch to revert back to the primary unit.
+            Valid for the active unit only."
+       ::= { adTa5kEquipmentRedundancyEntry 3 }
+
+   adTa5kEquipmentRedundancyForceFailover    OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           failover (1),
+           notapplicable (2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Setting this to failover(1) will swap the active and standby status of the redundant modules.
+            Valid for the active unit only."
+       ::= { adTa5kEquipmentRedundancyEntry 4 }
+
+   adTa5kEquipmentRedundancyState            OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           active (1),
+           standby (2),
+           standbyNotReady (3),
+           notApplicable (4)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Equipment Redundancy State.
+            StandbyNotReady means the unit is the standby, but cannot accept a failover should one occur.
+            This case occurs when the standby is booting up, or not syncronized with provisioning from the active."
+       ::= { adTa5kEquipmentRedundancyEntry 5 }
+
+   adTa5kEquipmentRedundancyPeerSlot             OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The Slot number of the peer."
+       ::= { adTa5kEquipmentRedundancyEntry 6 }
+
+   adTa5kEquipmentRedundancyFeatureEnabled      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+                                     disabled(0),
+                                     enabled(1)
+                                 }
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Enabled if the card is provisioned to operate rendundantly if possible.  Disabled
+            if the card if provisioned for non-redundant operation only."
+       ::= { adTa5kEquipmentRedundancyEntry 7 }
+
+   adTa5kEquipmentRedundancyFacilityType        OBJECT-TYPE
+       SYNTAX                    INTEGER {
+                                     sharedFacilities(0),
+                                     dualFacilities(1),
+                                     separateFacilities(2)
+                                 }
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Shared Facilities:   redundant modules share a physical cable/fiber ('y-cable')
+            Dual Facilities:     redundant modules have independent redundant cable/fiber facilities
+            Separate Facilites:  modules and cable/fiber facilities are not redundant"
+       ::= { adTa5kEquipmentRedundancyEntry 8 }
+
+    adTa5kEquipmentRedundancyStandbyReasonsCount  OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "Returns a count of the number of rows in the StandbyNotReadyReasonsTable."
+        ::= { adTa5kEquipmentRedundancyEntry 9 }
+
+    adTa5kStandbyNotReadyReasonsTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kStandbyNotReadyReasonEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table lists the reasons why a module is in the StandbyNotReady state"
+       ::= { adTa5kEquipmentRedundancy 3 }
+
+    adTa5kStandbyNotReadyReasonEntry OBJECT-TYPE
+       SYNTAX      AdTa5kStandbyNotReadyReasonEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "An entry in the StandbyNotReadyReasonsTable"
+       INDEX { adGenSlotInfoIndex, adTa5kStandbyNotReadyReasonIndex }
+       ::= { adTa5kStandbyNotReadyReasonsTable 1 }
+
+    AdTa5kStandbyNotReadyReasonEntry ::=
+       SEQUENCE {
+           adTa5kStandbyNotReadyReasonIndex             Integer32,
+           adTa5kStandbyNotReadyReason                  DisplayString
+       }
+
+    adTa5kStandbyNotReadyReasonIndex  OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "A unique index for each StandbyNotReady reason.
+                         Values range from 1 to adTa5kEquipmentRedundancyStandbyReasonsCount"
+        ::= { adTa5kStandbyNotReadyReasonEntry 1 }
+
+    adTa5kStandbyNotReadyReason  OBJECT-TYPE
+        SYNTAX          DisplayString
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "Returns the reason for the StandbyNotReady state."
+        ::= { adTa5kStandbyNotReadyReasonEntry 2 }
+
+-- *********************************************************************************************************
+-- **********************   Facility   *********************************************************************
+-- *********************************************************************************************************
+
+    adTa5kFacilityRedundancyTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kFacilityRedundancyEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table is valid for the active unit only."
+       ::= { adTa5kFacilityRedundancy 1 }
+
+    adTa5kFacilityRedundancyEntry OBJECT-TYPE
+       SYNTAX      AdTa5kFacilityRedundancyEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { ifIndex }
+       ::= { adTa5kFacilityRedundancyTable 1 }
+
+   AdTa5kFacilityRedundancyEntry ::=
+       SEQUENCE {
+           adTa5kFacilityRedundancySupported            INTEGER,
+           adTa5kFacilityRedundancyState                INTEGER,
+           adTa5kFacilityRedundancyForceProtect         Integer32,
+           adTa5kFacilityRedundancyProtectedByIfIndex   Integer32
+       }
+
+   adTa5kFacilityRedundancySupported               OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           protected (1),
+           redundantFacilityNotPresent (2),
+           redundantFacilityNotCompatible (3),
+           redundantFacilityAdminDown (4),
+           redundantFacilityLinkDown (5),
+           redundantFacilityInUse (6),
+           redundantEquipmentAdminDown (7)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kFacilityRedundancyEntry 1 }
+
+   adTa5kFacilityRedundancyState                   OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           active (1),
+           standby (2)
+       }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kFacilityRedundancyEntry 2 }
+
+   adTa5kFacilityRedundancyForceProtect            OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kFacilityRedundancyEntry 3 }
+
+   adTa5kFacilityRedundancyProtectedByIfIndex      OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kFacilityRedundancyEntry 4 }
+-- ******************************************************************************************
+-- Alarm Provisioning
+-- ******************************************************************************************
+
+    adTa5kRedundancyAlarmProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kRedundancyAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kRedundancyAlarmProv 1 }
+
+    adTa5kRedundancyAlarmProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kRedundancyAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kRedundancyAlarmProvTable 1 }
+
+   AdTa5kRedundancyAlarmProvEntry ::=
+       SEQUENCE {
+           adTa5kRedundancyAlarmProvCardActiveEnable               			TruthValue,
+           adTa5kRedundancyAlarmProvProtectionUnavailableEnable             TruthValue,
+           adTa5kRedundancyAlarmProvPeerCodeVersionMismatchEnable           TruthValue,
+           adTa5kRedundancyAlarmProvPeerDbMirroringSyncInProgressEnable     TruthValue,
+           adTa5kRedundancyAlarmProvPeerRemoteDatabaseSyncInProgressEnable  TruthValue,
+           adTa5kRedundancyAlarmProvManualSwitchEnable  					TruthValue,
+           adTa5kRedundancyAlarmProvSwitchToProtectEnable  					TruthValue,
+           adTa5kRedundancyAlarmProvAutomaticSwitchEnable  					TruthValue
+
+       }
+
+   adTa5kRedundancyAlarmProvCardActiveEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 1 }
+
+   adTa5kRedundancyAlarmProvProtectionUnavailableEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 2 }
+
+   adTa5kRedundancyAlarmProvPeerCodeVersionMismatchEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	 "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 3 }
+
+   adTa5kRedundancyAlarmProvPeerDbMirroringSyncInProgressEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	 "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 4 }
+
+   adTa5kRedundancyAlarmProvPeerRemoteDatabaseSyncInProgressEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	 "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 5 }
+
+    adTa5kRedundancyAlarmProvManualSwitchEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	 "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 6 }
+
+	adTa5kRedundancyAlarmProvSwitchToProtectEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	 "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 7 }
+
+	adTa5kRedundancyAlarmProvAutomaticSwitchEnable OBJECT-TYPE
+        SYNTAX TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	 "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kRedundancyAlarmProvEntry 8 }
+
+-- ******************************************************************************************
+-- Alarms
+-- ******************************************************************************************
+adTa5kRedundancyCardActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the standby card in redundant pair has become the active module."
+
+         --#TYPE         "Status - Card Active"
+         --#SUMMARY      "Redundancy: Card Active on"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 1 }
+
+adTa5kRedundancyProtectionAvailable   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "Redundancy protection is available for this slot."
+
+    --#TYPE         "Minor - Protection Unavailable - Cleared"
+    --#SUMMARY      "Protection Unavailable - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d"
+    --#ARGUMENTS    {1,2}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adTa5kRedundancyAlarms 2}
+
+adTa5kRedundancyProtectionUnavailable   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "Redundancy protection is not available for this slot."
+
+
+    --#TYPE         "Minor - Protection Unavailable - Active"
+    --#SUMMARY      "Protection Unavailable - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d"
+    --#ARGUMENTS    {1,2}
+    --#SEVERITY     "MINOR"
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adTa5kRedundancyAlarms 3}
+
+adTa5kRedundancyPeerCodeVersionMismatchClear         NOTIFICATION-TYPE
+	OBJECTS {
+		adTrapInformSeqNum,
+		sysName,
+		adGenSlotInfoIndex
+	}
+	STATUS  current
+	DESCRIPTION
+	   "Indicates that the Active module code version mismatch with its peer has cleared."
+
+	 --#TYPE         "Status - xM Peer Code Version Mismatch Clear"
+	 --#SUMMARY      "TA5000 Module: Peer Code Version Alarm Cleared on"
+	 --#SUMMARY      "Shelf: %s , slot: %d"
+	 --#ARGUMENTS    {1,2}
+         --#SEVERITY     "WARNING"
+	 --#GENERIC      6
+	 --#CATEGORY     "Error Events"
+	 --#SOURCE_ID    "A"
+	 --#TIMEINDEX    0
+    ::= { adTa5kRedundancyAlarms 4 }
+
+adTa5kRedundancyPeerCodeVersionMismatch         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Active module code version does not match with its peer."
+         --#TYPE         "Status - xM Peer Code Version Mismatch"
+         --#SUMMARY      "TA5000 module:  Peer Code Version Mismatch Alarm on"
+         --#SUMMARY      "Shelf: %s , slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     "WARNING"
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 5 }
+
+
+adTa5kRedundancyPeerDatabaseMirroringInSync         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the xM's peer database mirroring is in sync."
+
+         --#TYPE         "Status - xM Database Mirroring In Sync"
+         --#SUMMARY      "TA5000 Module: Database Mirroring In Sync"
+         --#SUMMARY      "Shelf: %s, slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     "WARNING"
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 6 }
+
+   adTa5kRedundancyPeerDbMirroringSyncInProgress         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the peer database mirroring sync is in progress on the xM."
+
+         --#TYPE         "Status - xM Database Mirroring Sync In Progress"
+         --#SUMMARY      "TA5000 Module: Database Mirroring Sync In Progress"
+         --#SUMMARY      "Shelf: %s , slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     "WARNING"
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 7 }
+
+
+adTa5kRedundancyPeerRemoteDatabaseSyncInProgress         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the peer remote database sync is in progress on the SM."
+
+         --#TYPE         "Status - xM Remote Database Sync In Progress"
+         --#SUMMARY      "TA5000 Module:  Remote Database Sync In Progress on"
+         --#SUMMARY      "Shelf: %s , slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     "WARNING"
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 8 }
+
+adTa5kRedundancyPeerRemoteDatabaseInSync         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the xM's remote database is in sync."
+
+         --#TYPE         "Status - xM Remote Database In Sync"
+         --#SUMMARY      "TA5000 Module: Remote Database In Sync on"
+         --#SUMMARY      "Shelf: %s , slot: %d"
+         --#ARGUMENTS    {1,2}
+         --#SEVERITY     "WARNING"
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 9 }
+
+      adTa5kRedundancyManualSwitch         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the user has initiated a manual protection switch."
+
+         --#TYPE         "Status - Manual Switch"
+         --#SUMMARY      "Redundancy: Request for Manual Switch"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 10 }
+
+  adTa5kEquipmentRedundancySwitchToProtectClear       NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "This alarm indicates that the 'working' module has now become active.
+           This alarm is only generated when revertive mode is enabled.  The 'working' module is always the left-most module (odd slot).
+           The 'protect' module is always the right-most module (even slot)."
+
+         --#TYPE         "Status - Eqpt APS On Clear"
+         --#SUMMARY      "Redundancy: Eqpt APS On Clear"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 12 }
+
+	adTa5kEquipmentRedundancySwitchToProtect       NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "This alarm indicates that the 'working' module has failed and the 'protect' module is now active.
+            This alarm is only generated when revertive mode is enabled.  The 'working' module is always the left-most module (odd slot).
+            The 'protect' module is always the right-most module (even slot)."
+
+         --#TYPE         "Status - Eqpt APS On"
+         --#SUMMARY      "Redundancy: Eqpt APS On"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 13 }
+
+    adTa5kRedundancyAutomaticSwitch         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the equipment initiated an automatic protection switch."
+
+         --#TYPE         "Status - Automatic Switch"
+         --#SUMMARY      "Redundancy: Automatic Switch"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kRedundancyAlarms 14 }
+      
+      END
+
+    

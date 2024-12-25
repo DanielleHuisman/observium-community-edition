@@ -1,0 +1,432 @@
+ADTRAN-GENDS3TEST-MIB     DEFINITIONS ::= BEGIN
+
+-- TITLE:     Generic DS3 TEST MIB
+-- PRODUCT:   All ADTRAN DS3 PRODUCTS
+-- VERSION:   1.0
+-- DATE:      4/10/2008
+-- AUTHOR:    Tim Cox
+-- STATUS:    PRELIMINARY
+-- MIB ARC:   adtran.adShared.adGenDS3Test
+
+-- HISTORY:
+-- 04/10/08 twc STATUS: PRELIMINARY.
+-- 04/24/08 jlb Cleaned up compiling errors.  Linked the MIB into the adDS3 shared branch of the MIB tree.
+--              Fixed some data type mismatches.  Added the MIB groups.
+-- 05/05/08 jlb Changed some data types to make more sense.
+-- 06/19/08 jlb Fixed compiler errors.
+
+-- ******************************************************************************************
+
+    IMPORTS
+        Gauge32,
+        TimeTicks,
+        Unsigned32,
+	Integer32,
+        OBJECT-TYPE,
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+	OBJECT-GROUP,
+        NOTIFICATION-GROUP
+            FROM SNMPv2-CONF
+        sysName
+            FROM SNMPv2-MIB
+        DisplayString
+            FROM SNMPv2-TC
+        ifIndex
+            FROM IF-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+       	adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB
+        adGenDS3Test,
+        adGenDS3TestID
+            FROM ADTRAN-SHARED-DS3-MIB
+        ;
+
+  -- DS3 Test Group
+adGenDS3TestIdentity MODULE-IDENTITY
+   LAST-UPDATED "200804100000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO "http://www.adtran.com"
+   DESCRIPTION
+      "The MIB module describing generic objects used for DS3 testing for any
+	DS3 product developed by ADTRAN, Inc."
+   REVISION "200804100000Z"
+   DESCRIPTION "Created"
+::= { adGenDS3TestID 1 }
+
+-- OBJECT IDENTIFIERS
+--adGenDS3TestIndex               OBJECT IDENTIFIER ::= {adGenDS3Test 1}
+adGenDS3TestCommand             OBJECT IDENTIFIER ::= {adGenDS3Test 2}
+adGenDS3TestNearEndLoopback     OBJECT IDENTIFIER ::= {adGenDS3Test 3}
+adGenDS3TestFarEndLoopback      OBJECT IDENTIFIER ::= {adGenDS3Test 4}
+adGenDS3TestPattern             OBJECT IDENTIFIER ::= {adGenDS3Test 5}
+adGenDS3TestMibConformance      OBJECT IDENTIFIER ::= {adGenDS3Test 6}
+adGenDS3TestMibGroups           OBJECT IDENTIFIER ::= {adGenDS3TestMibConformance 1 }
+
+--adGenDS3TestAlarmsPrefix        OBJECT IDENTIFIER ::= {adGenDS3Test 10}
+--adGenDS3TestAlarms              OBJECT IDENTIFIER ::= {adGenDS3TestAlarmsPrefix 0}
+
+
+-- ******************************************************************************************
+-- Index
+-- ******************************************************************************************
+
+-- ******************************************************************************************
+-- DS3 Test Command Table
+-- ******************************************************************************************
+
+adGenDS3TestCommandTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS3TestCommandEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS3 test command parameters."
+   ::= { adGenDS3TestCommand 1 }
+
+adGenDS3TestCommandEntry OBJECT-TYPE
+   SYNTAX      AdGenDS3TestCommandEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS3TestCommandTable."
+   INDEX { ifIndex }
+   ::= { adGenDS3TestCommandTable 1 }
+
+AdGenDS3TestCommandEntry ::=
+   SEQUENCE
+   {
+   adGenDS3TestTimeout                  Integer32,
+   adGenDS3TestStartStop                INTEGER,
+   adGenDS3TestStatus                   INTEGER,
+   adGenDS3TestTimeRemaining            Unsigned32,
+   adGenDS3TestTimeElapsed              Unsigned32
+   }
+
+adGenDS3TestTimeout OBJECT-TYPE
+   SYNTAX      	Integer32
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- This object defines the number of minutes that any near end or any far end test will
+        be run.
+      - Any locally initiated loopback or BERT, any local response to a remotely requested
+        loopback, and any local request for a far end loopback are all considered tests.
+      - Unless a customer requires otherwise, this value will be programmed from 0 to
+        9999 minutes.  This allows a reasonable 6+ days for a test and reasonably limits
+        the required display space on GUIs.
+      - A value of 0 disables the timeout so that a test will run indefinitely, if not
+        manually stopped."
+   ::= { adGenDS3TestCommandEntry 1 }
+
+ adGenDS3TestStartStop  OBJECT-TYPE
+   SYNTAX               INTEGER
+                        {
+                        nearEndStart(1),
+                        farEndStart(2),
+                        allStop(3)
+                        }
+
+   MAX-ACCESS	read-write
+   STATUS		current
+   DESCRIPTION
+            "
+            nearEndStart - INITIALIZES and starts any near end test and counters
+            farEndStart  - INITIALIZES and starts any far end test and counters
+            allStop      - terminates all tests and freezes status counters of all tests."
+
+   ::= { adGenDS3TestCommandEntry 2 }
+
+adGenDS3TestStatus OBJECT-TYPE
+   SYNTAX       INTEGER
+                {
+                none(1),
+                nearEndLine(2),
+                nearEndPayload(3),
+                nearEndLineFEAC(4),
+                farEndPatt2to23(5),
+                farEndPatt2to20(6),
+                farEndPatt2to15(7),
+                farEndPatt2to23LineLpbk(8),
+                farEndPatt2to20LineLpbk(9),
+                farEndPatt2to15LineLpbk(10),
+                farEndLineLpbk(11)
+                }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "None                    – no near end and no far end tests are in progress.
+      NearEndLineLpbk         – a near end locally initiated DS3 line loopback test is in
+                                progress.
+      NearEndPayloadLpbk      – a near end locally initiated DS3 payload loopback test is in
+                                progress.
+      NearEndLineFEACLpbk     – an incoming FEAC containing the DS3 Line Loopback request
+                                initiatedthe DS3 line loopback that is currently in progress.
+      FarEndPatt2to23         – XNOR of 18th and 23rd stage outputs feed back into 1st stage
+                                input.
+      FarEndPatt2to20         - XOR  of 17th and 20th stage outputs feed back into 1st stage
+                                input.
+      FarEndPatt2to15         – XNOR of 14th and 15th stage outputs feed back into 1st stage
+                                input.
+      farEndPatt2to23LineLpbk - both far end 2^23 and far end DS3 line loopback are progress.
+      farEndPatt2to20LineLpbk - both far end 2^20 and far end DS3 line loopback are progress.
+      farEndPatt2to15LineLpbk - both far end 2^15 and far end DS3 line loopback are progress."
+
+   ::= { adGenDS3TestCommandEntry 3 }
+
+adGenDS3TestTimeRemaining OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS  	read-only
+   STATUS       current
+   DESCRIPTION
+     "Initialized to adGenDS3TestTimeout upon reception of a Start object.
+      0 – occurs when near end test has ended.
+      0 – occurs when near end test is in progress, but timeout has been disabled.
+     >0 – occurs when near end test is in progress, but timeout has not been disabled."
+
+   ::= { adGenDS3TestCommandEntry 4 }
+
+adGenDS3TestTimeElapsed OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS  	read-only
+   STATUS       current
+   DESCRIPTION
+     "0 - initialization value at instance a test starts.
+     >0 – occurs when near end test is in progress or just ended."
+   ::= { adGenDS3TestCommandEntry 5 }
+
+-- ******************************************************************************************
+-- DS3 Test Near End Loopback Table
+-- ******************************************************************************************
+
+adGenDS3TestNearEndLoopbackTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS3TestNearEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS3 Test Near End Loopback parameters."
+   ::= { adGenDS3TestNearEndLoopback 1 }
+
+adGenDS3TestNearEndLoopbackEntry OBJECT-TYPE
+   SYNTAX      AdGenDS3TestNearEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS3TestNearEndLoopbackTable."
+   INDEX { ifIndex }
+   ::= { adGenDS3TestNearEndLoopbackTable 1 }
+
+AdGenDS3TestNearEndLoopbackEntry ::=
+   SEQUENCE
+   {
+        adGenDS3TestNearEndLoopbackType          INTEGER
+   }
+
+adGenDS3TestNearEndLoopbackType OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                line(1),
+                payload(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- This object selects the near end loopback that will be executed upon recognition of
+        a start test.
+      - This object should be ignored if issued while any test is in progress.
+      - line    - indicates that the incoming DS3 will be looped back at a point such that
+                  the outgoing positive and negative pulses correlate with the polarity of
+                  the incoming positive and negative pulses.
+      - payload - indicates that the incoming DS3 payload will be looped back toward the DS3
+                  interface, while the outgoing overhead will be regenerated by a DS3
+                  transmit framer."
+   ::= { adGenDS3TestNearEndLoopbackEntry 1 }
+
+-- ******************************************************************************************
+-- DS3 Test Far End Loopback Table
+-- ******************************************************************************************
+
+adGenDS3TestFarEndLoopbackTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS3TestFarEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS3 Test Far End Loopback parameters."
+   ::= { adGenDS3TestFarEndLoopback 1 }
+
+adGenDS3TestFarEndLoopbackEntry OBJECT-TYPE
+   SYNTAX      AdGenDS3TestFarEndLoopbackEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS3TestFarEndLoopbackTable."
+   INDEX { ifIndex }
+   ::= { adGenDS3TestFarEndLoopbackTable 1 }
+
+AdGenDS3TestFarEndLoopbackEntry ::=
+   SEQUENCE
+   {
+        adGenDS3TestFarEndLpbkType           INTEGER,
+        adGenDS3TestFarEndFEACRequest        INTEGER
+   }
+
+adGenDS3TestFarEndLpbkType OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                none(1),
+                line(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- This object selects the far end loopback that will be executed upon recognition of
+        the adGenDS3TestFarEndStart object.
+      - This object should be ignored if issued while any test is in progress.
+      - none - indicates that no DS3 Line Loopback request will be issued via FEAC upon
+               recognition of the adGenDS3TestFarEndStart object.
+      - line – indicates that DS3 Line Loopback request will be issued via FEAC upon
+               recognition of the adGenDS3TestFarEndStart object."
+   ::= { adGenDS3TestFarEndLoopbackEntry 1 }
+
+adGenDS3TestFarEndFEACRequest OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                        enable(1),
+                        disable(2)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Enable/Disable the response to income FEAC Line Loopback request."
+   ::= { adGenDS3TestFarEndLoopbackEntry 2 }
+
+-- ******************************************************************************************
+-- DS3 Test Pattern Table
+-- ******************************************************************************************
+
+adGenDS3TestPatternTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenDS3TestPatternEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports DS3 Test Pattern parameters."
+   ::= { adGenDS3TestPattern 1 }
+
+adGenDS3TestPatternEntry OBJECT-TYPE
+   SYNTAX      AdGenDS3TestPatternEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenDS3TestPatternTable."
+   INDEX { ifIndex }
+   ::= { adGenDS3TestPatternTable 1 }
+
+AdGenDS3TestPatternEntry ::=
+   SEQUENCE
+   {
+   adGenDS3TestPatternType           INTEGER,
+   adGenDS3TestPatternSync           INTEGER,
+   adGenDS3TestPatternErrorsRcvd     Gauge32,
+   adGenDS3TestPatternInsertError    INTEGER,
+   adGenDS3TestPatternResetCount     INTEGER
+   }
+
+adGenDS3TestPatternType OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                patt2to23(1),
+                patt2to20(2),
+                patt2to15(3)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "  This object selects the DS3 BERT that will be generated and detected upon
+      recognition of a start command.
+        patt2to23    – XNOR of 18th and 23rd stage outputs feed back into 1st stage input.
+        patt2to20    - XOR  of 17th and 20th stage outputs feed back into 1st stage input.
+        patt2to15    – XNOR of 14th and 15th stage outputs feed back into 1st stage input."
+   ::= { adGenDS3TestPatternEntry 1 }
+
+
+adGenDS3TestPatternSync OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                true(1),
+                false(2)
+                }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "  true  – pattern test is in progress and incoming test pattern is in sync;
+                pattern test ended while incoming test pattern was in sync.
+        false – pattern test is in progress and incoming test pattern is out of sync;
+                pattern test ended while incoming test pattern was out of sync;
+                default if no test has ever been run."
+   ::= { adGenDS3TestPatternEntry 2 }
+
+adGenDS3TestPatternErrorsRcvd OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "0 – initialization value when pattern test starts.
+     >0 – increments for each logic error that occurs when pattern test is in
+          progress AND while incoming test pattern is in sync;
+          maintains value when pattern test ends."
+   ::= { adGenDS3TestPatternEntry 3 }
+
+adGenDS3TestPatternInsertError OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                insert(1)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- Upon each reception of this object, 1 logic error is injected into DS3 payload
+        if a pattern test is in progress.
+      - The logic error is injected PRIOR to parity calculation."
+   ::= { adGenDS3TestPatternEntry 4 }
+
+adGenDS3TestPatternResetCount OBJECT-TYPE
+   SYNTAX      	INTEGER
+                {
+                reset(1)
+                }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "- Upon each reception of this object, the pattern error counter is reset to 0 if a
+        far end pattern test is in progress."
+   ::= { adGenDS3TestPatternEntry 5 }
+
+-- ******************************************************************************************
+-- MIB Groups
+-- ******************************************************************************************
+adGenDS3TestGroup OBJECT-GROUP
+   OBJECTS
+   {
+        adGenDS3TestTimeout,
+        adGenDS3TestStartStop,
+        adGenDS3TestStatus,
+        adGenDS3TestTimeRemaining,
+        adGenDS3TestTimeElapsed,
+        adGenDS3TestNearEndLoopbackType,
+        adGenDS3TestFarEndLpbkType,
+        adGenDS3TestPatternType,
+        adGenDS3TestPatternSync,
+        adGenDS3TestPatternErrorsRcvd,
+        adGenDS3TestPatternInsertError,
+        adGenDS3TestPatternResetCount
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DS3 test procedures."
+   ::= { adGenDS3TestMibGroups 1 }
+
+
+END

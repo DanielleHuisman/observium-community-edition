@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -26,9 +26,8 @@
  * @return none
  *
  */
-function print_alert_log($vars)
-{
-    global $alert_rules, $config;
+function print_alert_log($vars) {
+    global $alert_rules;
 
     // This should be set outside, but do it here if it isn't
     if (!is_array($alert_rules)) {
@@ -46,21 +45,21 @@ function print_alert_log($vars)
     } else {
         // Entries have been returned. Print the table.
         $list = [
-          'device' => FALSE,
-          'entity' => FALSE,
-          'info'   => !$events['short'] && get_db_version() >= 479 // informational icon
+            'device' => FALSE,
+            'entity' => FALSE,
+            'info'   => !$events['short'] // informational icon
         ];
-        if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'alert_log') {
+        if (empty($vars['device']) || $vars['page'] == 'alert_log') {
             $list['device'] = TRUE;
         }
-        if ($events['short'] || !isset($vars['entity']) || empty($vars['entity'])) {
+        if ($events['short'] || empty($vars['entity'])) {
             $list['entity'] = TRUE;
         }
 
-        if (!isset($vars['alert_test_id']) || empty($vars['alert_test_id']) || $vars['page'] == 'alert_check' || TRUE) {
+        if (empty($vars['alert_test_id']) || $vars['page'] == 'alert_check' || TRUE) {
             $list['alert_test_id'] = TRUE;
         }
-        if (!isset($vars['entity_type']) || empty($vars['entity_type']) || $vars['page'] == 'alert_check' || TRUE) {
+        if (empty($vars['entity_type']) || $vars['page'] == 'alert_check' || TRUE) {
             $list['entity_type'] = TRUE;
         }
 
@@ -107,6 +106,7 @@ function print_alert_log($vars)
                     $entry['class']          = "green";
                     $entry['html_row_class'] = "info";
                     break;
+                case 'REMINDER_NOTIFY':
                 case 'ALERT_NOTIFY':
                 case 'FAIL':
                     $entry['class']          = "red";
@@ -122,7 +122,7 @@ function print_alert_log($vars)
                     $entry['html_row_class'] = "suppressed";
                     break;
                 default:
-                    // Anything else set the colour to grey and the class to disabled.
+                    // Anything else set the color to gray.
                     $entry['class']          = "gray";
                     $entry['html_row_class'] = "disabled";
             }
@@ -156,7 +156,7 @@ function print_alert_log($vars)
             if ($list['entity']) {
                 $string .= '    <td class="entity">';
                 if ($list['entity_type']) {
-                    $string .= get_icon($config['entities'][$entry['entity_type']]['icon']) . ' ';
+                    $string .= get_icon($GLOBALS['config']['entities'][$entry['entity_type']]['icon']) . ' ';
                 }
                 if ($events['short']) {
                     $string .= '    ' . generate_entity_link($entry['entity_type'], $entry['entity_id'], NULL, NULL, NULL, TRUE) . '</td>' . PHP_EOL;
@@ -337,8 +337,7 @@ function get_alert_log($vars)
     return $array;
 }
 
-function generate_alert_log_form_values($form_filter = FALSE, $column = NULL)
-{
+function generate_alert_log_form_values($form_filter = FALSE, $column = NULL) {
     //global $cache;
 
     $form_items = [];
@@ -356,8 +355,8 @@ function generate_alert_log_form_values($form_filter = FALSE, $column = NULL)
             natcasesort($form_items);
             break;
         case 'log_type':
-            foreach (['OK', 'FAIL', 'FAIL_DELAYED', 'FAIL_SUPPRESSED',
-                      'ALERT_NOTIFY', 'RECOVER_NOTIFY', 'RECOVER_SUPPRESSED'] as $entry) {
+            foreach ([ 'OK', 'FAIL', 'FAIL_DELAYED', 'FAIL_SUPPRESSED', 'ALERT_NOTIFY',
+                       'REMINDER_NOTIFY', 'RECOVER_NOTIFY', 'RECOVER_SUPPRESSED' ] as $entry) {
                 if ($filter && !in_array($entry, $form_filter)) {
                     continue;
                 } // Skip filtered entries
@@ -369,7 +368,7 @@ function generate_alert_log_form_values($form_filter = FALSE, $column = NULL)
                     $class = "suppressed";
                 } elseif (str_contains($entry, 'DELAYED')) {
                     $class = "warning";
-                } elseif (str_contains_array($entry, ['ALERT', 'FAIL'])) {
+                } elseif (str_contains_array($entry, [ 'ALERT', 'FAIL', 'REMINDER' ])) {
                     $class = "danger";
                 } elseif (str_contains($entry, 'RECOVER')) {
                     $class = "info";

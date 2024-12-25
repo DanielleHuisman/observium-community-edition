@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -104,7 +104,7 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry) {
     $value    = $entry[$oid_name];
 
     // Limits (actually this is min/max)
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // Tx Bias
     $descr    = $name . ' Tx Bias' . $name_ext;
@@ -114,7 +114,7 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry) {
     $scale    = 0.000001;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // Tx Power
     $descr    = $name . ' Tx Power' . $name_ext;
@@ -124,7 +124,7 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry) {
     $scale    = 0.01;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // Rx Power
     $descr    = $name . ' Rx Power' . $name_ext;
@@ -134,7 +134,7 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry) {
     $scale    = 0.01;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
     // Voltage
     $descr    = $name . ' Voltage' . $name_ext;
@@ -144,7 +144,7 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry) {
     $scale    = 0.01;
     $value    = $entry[$oid_name];
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
 }
 

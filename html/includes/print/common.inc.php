@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -207,6 +207,81 @@ function print_refresh($vars)
 }
 
 /**
+ * Print box styled text, default with shadow and centered. For change defaults use no-shadow or no-center options
+ * @param string $text
+ * @param string $type
+ * @param array|string|bool $options
+ *
+ * @return void
+ */
+function print_box($text, $type = '', $options = []) {
+
+    if (is_bool($options)) {
+        // boolean manage only no-shadow option
+        $options = $options ? [ 'no-shadow' ] : [];
+    } elseif (!is_array($options)) {
+        // option string convert to array
+        $options = explode(' ', $options);
+    }
+
+    $class = 'shadow-box'; // boxed class (default with shadow)
+    switch ($type) {
+        case 'ok':
+        case 'success':
+            $class .= ' text-success bg-success'; // green
+            break;
+
+        case 'warning':
+            $class .= ' text-warning bg-warning'; // yellow
+            break;
+
+        case 'error':
+        case 'danger':
+        case 'alert':
+            $class .= ' text-danger bg-danger'; // red
+            break;
+
+        case 'suppressed':
+            $class .= ' text-suppressed bg-suppressed'; // magenta
+            break;
+
+        case 'info':
+            $class .= ' text-info bg-info'; // blue
+            break;
+
+        default:
+            $class .= ''; // clean
+            break;
+    }
+
+    // disable shadow when requested in options
+    if (in_array('no-shadow', $options, TRUE)) {
+        $class .= ' no-shadow';
+    }
+    // default centered text while no-center requested
+    if (!in_array('no-center', $options, TRUE)) {
+        $class .= ' text-center';
+    }
+
+    // strip cli tags from text when requested
+    if (in_array('strip', $options, TRUE)) {
+        $text = message_strip_tags($text);
+    }
+    // escape text when requested
+    if (in_array('escape', $options, TRUE)) {
+        $text = escape_html($text);
+    }
+    // use div container instead
+    if (in_array('div', $options, TRUE)) {
+        echo '<div class="'.$class.'">'.$text.'</div>';
+        return;
+    }
+    //r($text);
+
+    echo '<p class="'.$class.'">'.$text.'</p>';
+}
+
+/**
  * This generates an HTML <thead> element based on the contents of the $header array, modified by the current request $vars
  *
  * @param array $header Array with table header definition including columns and classes.
@@ -218,7 +293,7 @@ function print_refresh($vars)
 function generate_table_header($header = [], $vars = []) {
 
     // Store current $vars sort variables
-    if (safe_empty($vars) || (isset($vars['show_sort']) && get_var_false($vars['show_sort']))) {
+    if (safe_empty($vars) || get_var_false($vars['show_sort'] ?? '')) {
         // disable sorting, when empty vars, because unknown current page
         $sort = FALSE;
     } else {
@@ -286,7 +361,6 @@ function generate_table_header($header = [], $vars = []) {
     $output .= '  </thead>' . PHP_EOL;
 
     return $output;
-
 
 }
 
@@ -418,41 +492,11 @@ function get_label_group($params = [], $opt = [], $escape = TRUE)
     foreach ($params as $param_id => $param) {
         // If param is just string, convert to simple group
         if (is_string($param)) {
-            $param = ['text' => $param, 'event' => 'default'];
+            $param = [ 'text' => $param, 'event' => 'default' ];
         }
-
-        //$html_param = '<span id="'.$param_id.'"'; // open span
-        $html_param = '<div id="' . $param_id . '"'; // open div, I use div for fix display label group in navbar
-        // Item style
-        if ($param['style']) {
-            $html_param .= ' style="' . $param['style'] . '"';
-        }
-        // Item class
-        if ($param['event']) {
-            $class = 'label label-' . $param['event'];
-        } else {
-            $class = '';
-        }
-        if ($param['class']) {
-            $class .= ' ' . $param['class'];
-        }
-        if ($class) {
-            $html_param .= ' class="' . $class . '"';
-        } else {
-            // Default
-            $html_param .= ' class="label label-default"';
-        }
-        // Icons?
-        // any custom data attribs?
-        $html_param .= '>';
-        // Item text
-        if ($param['text']) {
-            $html_param .= (bool)$escape ? escape_html($param['text']) : $param['text'];
-        }
-        //$html_param .= '</span>'; // close span
-        $html_param .= '</div>';                     // close div
-
-        $html_params[] = $html_param;
+        $param['div'] = TRUE; // use div for fix display label group in navbar
+        $param['id']  = $param_id;
+        $html_params[] = get_label_span($param['text'], $param['event'], $param, $escape);
     }
 
     // Return single label (without group), since label group for single item is incorrect
@@ -462,6 +506,45 @@ function get_label_group($params = [], $opt = [], $escape = TRUE)
 
     $html .= implode('', $html_params) . PHP_EOL;
     $html .= '</span>' . PHP_EOL;
+
+    return $html;
+}
+
+function get_label_span($text, $type = '', $opt = [], $escape = TRUE) {
+    if ($opt['div']) {
+        $html = '<div'; // open div
+    } else {
+        $html = '<span'; // open span
+    }
+
+    if ($opt['id']) {
+        $html .= ' id="' . $opt['id'] . '"';
+    }
+    if ($opt['style']) {
+        $html .= ' style="' . $opt['style'] . '"';
+    }
+
+    // Icons?
+    // any custom data attribs?
+
+    // label class with extra
+    if (empty($type)) {
+        $class = 'label label-default';
+    } else {
+        $class = 'label label-' . $type;
+    }
+    if ($opt['class']) {
+        $class .= ' ' . $opt['class'];
+    }
+    $html .= ' class="' . $class . '">';
+
+    $html .= (bool)$escape ? escape_html($text) : $text;
+
+    if ($opt['div']) {
+        $html .= '</div>'; // close div
+    } else {
+        $html .= '</span>'; // close span
+    }
 
     return $html;
 }
@@ -572,8 +655,7 @@ function generate_button_group($params = [], $opt = [], $escape = TRUE) {
  *
  * @return string HTML formatted text
  */
-function get_markdown($markdown, $escape = TRUE, $extra = FALSE)
-{
+function get_markdown($markdown, $escape = TRUE, $extra = FALSE) {
     if ($extra) {
         // Allow Extra Markdown syntax
         //$parsedown = new ParsedownExtra();
@@ -599,6 +681,10 @@ function get_markdown($markdown, $escape = TRUE, $extra = FALSE)
 
     //print_vars($html);
     return '<span style="min-width: 150px;">' . $html . '</span>';
+}
+
+function get_markdown_extra($markdown, $escape = TRUE) {
+    return get_markdown($markdown, $escape, TRUE);
 }
 
 /**

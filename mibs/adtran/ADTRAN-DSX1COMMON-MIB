@@ -1,0 +1,3279 @@
+ADTRAN-DSX1COMMON-MIB
+        DEFINITIONS ::= BEGIN
+
+
+--  TITLE:      THE ADTRAN GENERIC DSX MIB
+--  AUTHOR:     Kevin Welsch
+--  PRODUCTS:     Adtran Products with DSX interfaces
+
+--  VERSION:    3.2
+--  DATE:       07/20/2004
+
+--  DESCRIPTION
+--  This is a generic MIB for all variations of
+--  Adtran DSX interface equipment.  The purpose of this MIB
+--  is to combine the shared attributes of DSX equipment
+--  into one "DSX" MIB.
+--  This MIB will be used in Conjunction with the standard
+--  DSX interface MIB, RFC 1406.
+
+--  This MIB supports the following provisioning
+--  items:
+--  1.  LINE BUILDOUT
+--  2.  ADDITIONAL FRAMING TO RFC1406
+--  3.  INBAND LOOPBACK ENABLE/DISABLE
+--  4.  BPV RATIO
+--  5.  AUTO FAILOVER ON LOS
+--  6.  AUTO FAILOVER ON LOF
+--  7.  AUTO FAILOVER ON BER THRESHOLD
+
+--  This MIB also supports the following in it's DSX
+--  alarms group.
+--  1.  SET THRESHOLD DEFAULTS
+--  2.  ENABLE/DISABLE ALL THRESHOLD ALARMS
+--  3.  RESET PM REGISTERS
+--  4.  ENABLE/DISABLE NEAR END QTR THRESHOLDS
+--  5.  ENABLE/DISABLE NEAR END DAY THRESHOLDS
+--  6.  ENABLE/DISABLE FAR END QTR THRESHOLDS
+--  7.  ENABLE/DISABLE FAR END DAY THRESHOLDS
+--  8.  ALL SPECIFIC NEAR END QTR THRESHOLD LIMITS
+--  9.  ALL SPECIFIC FAR END QTR THRESHOLD LIMITS
+-- 10.  ALL SPECIFIC NEAR END DAY THRESHOLD LIMITS
+-- 11.  ALL SPECIFIC FAR END DAY THRESHOLD LIMITS
+
+--  This MIB also supports the following test items:
+--  1.  FAR END LOOPBACK
+
+--  This MIB also supports the following status items:
+--  1.  LOOP STATUS
+
+--  This MIB also supports DSX THRESHOLDS Traps group,
+--  traps 1002101 - 1002191
+
+--  HISTORY
+--  10/17/00  first draft
+--  01/05/01  fixed trap numbers so that odd are active
+--            and even are clear
+--  04/09/01  found out this mib would not compile on HP
+--            OpenView.  The traps were looking to the wrong
+--            MIB to be indexed.
+--  11/12/01  To keep Adtran conventional trap standards and comply
+--            with SCU coding conventions I have obsoleted all the
+--            generic DSX traps from this MIB and put them in
+--            the MIB named "adDSX1commonTraps.mib".  The reasoning behind
+--            replacing all these traps is that we have begun to run out
+--            trap ID numbers for this MIB and because the trap ID numbers
+--            assigned to these traps were not assigned so that the scu
+--            could correctly descern these numbers to the correct traps.
+--  11/26/01  I added BPV ratio prov item, far end loopback test item,
+--            and T1 manual test protection test item.
+--  12/05/01  I added "not applicable" to the ProvFraming which is returned
+--            when RFC 1406 ds1LineType is not set to (1)Other (ESF or D4).
+--  01/25/02  MIB released - Version A01
+--  06/24/02  fixed some comments
+--  03/03/03  added adDSX1CommonStatus
+--  04/30/03  added Auto Failover support and fixed some comments
+--  08/26/03  Syntax error found by Mibcomp3 fixed.
+--  05/06/04  created PHTL (combined PHTL1 and PHTL2 into one)
+--  05/27/04  removed '0' from enum type in adDSX1CommonStatusLoopStatus
+--  05/27/04  standardize version numbering and set to 3.0
+--  06/02/04  added adDSX1CommonProvT1OpState to enable/disable selected T1
+--  07/20/04  deprecated adDSX1CommonTestT1ProtectSelect, moved to adGenLIU
+--  06/29/06  Phil B: Removed all obsoleted MIBs because there is no SMIv1 syntax
+--            for obsoleting MIB. This caused duplications with the other set,
+--            which had different OIDs. They must be removed from this MIB.
+--  06/29/06  Phil B: corrected trap subsyntax errors for HP OV.
+--  10/02/07  Converted to SMIv2.
+--  11/29/07  Seperated alarm provisioning from alarm traps, also contains
+--         DS1 24 hour intervals.
+--  01/02/08  Removed the adDSX1CommonAlmPrefix node in order to match the v1 oid path; also fixed a PM interval compiler warning.
+--  02/14/08  pnb Moved DEFINITIONS :: BEGIN to Module name proximity. Too many comments between.
+--  03/31/08  jlb Added adDSX1CommonPmReset.
+--  04/22/08  dcc Fixed error in adDSX1CommonPmResetTable by removing extra index
+--  05/20/08  jlb Changed threshold alarm severities to WARNING
+--  09/17/08  dcc Added PM tables for current day and 15-minute totals
+--  11/07/08  jlb Changed adDSX1CommonTotalEntry to be located at { adDSX1CommonTotalTable 1 } instead of 3
+--                since the last sub-identifier must be 1
+--  11/24/08  glf adding the enhanced DSX1 traps that contain the severity varbind
+--			      also adding oids to provision severity and suppression of the DSX1 enhanced traps.
+-- ******************************************************************************************
+    IMPORTS
+    Integer32,
+	Gauge32,
+	Counter32,
+        OBJECT-TYPE,
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+    OBJECT-GROUP,
+        NOTIFICATION-GROUP
+            FROM SNMPv2-CONF
+        sysName
+            FROM SNMPv2-MIB
+        DisplayString, TruthValue
+            FROM SNMPv2-TC
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adIdentityShared,
+        adShared
+        FROM ADTRAN-MIB
+    adGenSlotInfoIndex,
+    adGenSlotAlarmStatus
+        FROM ADTRAN-GENSLOT-MIB
+        adGenPortTrapIdentifier
+        FROM ADTRAN-GENPORT-MIB
+        dsx1LineIndex
+            FROM DS1-MIB
+       PerfTotalCount
+            FROM PerfHist-TC-MIB
+   ifIndex
+      FROM IF-MIB
+
+    ;
+
+adDSX1commonModuleIdentity MODULE-IDENTITY
+   LAST-UPDATED "201404280000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO "http://www.adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the common Adtran DSX MIB."
+   REVISION "201404280000Z"
+   DESCRIPTION "Added remote device threshold alerts using ifIndex"
+   REVISION "201108300000Z"
+   DESCRIPTION "Added the adDSX1CommonRollingCountTable Table to add rolling counters for the DS1 PM stats"
+   REVISION "201107080000Z"
+   DESCRIPTION "Changed index into adDSX1CommonModuleInfoTable from adGenSlotInfoIndex to ifIndex"
+   REVISION "201107070000Z"
+   DESCRIPTION "Added adDSX1CommonModuleInfoTable"
+   REVISION "200710020000Z"
+   DESCRIPTION "Created"
+
+::= { adIdentityShared 21 }
+
+--  OBJECT IDENTIFIERS
+
+    adDSX1Common                OBJECT IDENTIFIER ::= { adShared 21 }
+
+    adDSX1CommonAlm             OBJECT IDENTIFIER ::= { adDSX1Common 0 }
+
+    adDSX1CommonProv            OBJECT IDENTIFIER ::= { adDSX1Common 1 }
+    adDSX1CommonAlmProv         OBJECT IDENTIFIER ::= { adDSX1Common 2 }
+    adDSX1CommonTest            OBJECT IDENTIFIER ::= { adDSX1Common 3 }
+    adDSX1CommonStatus          OBJECT IDENTIFIER ::= { adDSX1Common 4 }
+    adDSX1CommonSLC2PerfMon     OBJECT IDENTIFIER ::= { adDSX1Common 5 }
+
+    adDSX1CommonMibConformance  OBJECT IDENTIFIER ::= { adDSX1Common 6 }
+    adDSX1CommonMibGroups       OBJECT IDENTIFIER ::= { adDSX1CommonMibConformance 1 }
+
+    adDSX1CommonDailyPmInt      OBJECT IDENTIFIER ::= { adDSX1Common 7 }
+    adDSX1CommonDailyPm         OBJECT IDENTIFIER ::= { adDSX1Common 8 }
+
+    adDSX1CommonModuleInfo      OBJECT IDENTIFIER ::= { adDSX1Common 9 }
+
+  --
+  --  Card Provisioning group
+  --
+
+
+    adDSX1CommonProvTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonProvEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The DSX1 MIB Provisioning Table."
+        ::= { adDSX1CommonProv 1 }
+
+    adDSX1CommonProvEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonProvEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the DSX1 MIB Provisioning Table."
+        INDEX    {dsx1LineIndex }
+        ::=  { adDSX1CommonProvTable 1 }
+
+    AdDSX1CommonProvEntry ::=
+        SEQUENCE {
+            adDSX1CommonProvLBO
+                INTEGER,
+            adDSX1CommonProvFrame
+                INTEGER,
+            adDSX1CommonProvInbandLoopback
+                                INTEGER,
+                        adDSX1CommonProvBPVRatio
+                                INTEGER,
+                        adDSX1CommonProvAutoFailoverLOS
+                                INTEGER,
+                        adDSX1CommonProvAutoFailoverLOF
+                                INTEGER,
+                        adDSX1CommonProvAutoFailoverBERThresh
+                                INTEGER,
+                        adDSX1CommonProvT1OpState
+                                INTEGER,
+                        adDSX1CommonProvRAI
+                                INTEGER,
+                        adDSX1CommonProvEBit
+                                INTEGER
+            }
+
+     adDSX1CommonProvLBO OBJECT-TYPE
+        SYNTAX    INTEGER {
+            lbo0(1),
+            lbo133(2),
+            lbo266(3),
+            lbo399(4),
+            lbo533(5),
+            db0(6),
+            dbneg7point5(7),
+            dbneg15(8),
+            dbneg22point5(9)
+            }
+        MAX-ACCESS  read-write
+        STATUS    current
+        DESCRIPTION
+            "LBO settings -
+                1 = LBO 0 - 133ft
+                2 = LBO 133 - 266ft
+                3 = LBO 266 - 399ft
+                4 = LBO 399 - 533ft
+                5 = LBO 533 - 655ft
+                6 = 0 dB
+                7 = -7.5 dB
+                8 = -15 dB
+                9 = -22.5 dB"
+        ::= { adDSX1CommonProvEntry 1 }
+
+    adDSX1CommonProvFrame OBJECT-TYPE
+        SYNTAX INTEGER {
+            slc96(8),
+            unframed(9),
+            notapplicable(10)
+            }
+        MAX-ACCESS    read-write
+        STATUS  current
+        DESCRIPTION
+            "Framing types
+             8  - SLC 96
+             9  - Unframed
+             10 - Not Applicable -
+             (RFC 1406 ds1LineType is
+              set to (1)Other.)"
+        ::= { adDSX1CommonProvEntry 2 }
+
+     adDSX1CommonProvInbandLoopback OBJECT-TYPE
+        SYNTAX INTEGER {
+            enable(1),
+            disable(2)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "Inband Loopback Capability
+             1 = enable
+             2 = disable"
+        ::= { adDSX1CommonProvEntry 3 }
+
+       adDSX1CommonProvBPVRatio OBJECT-TYPE
+        SYNTAX INTEGER {
+            tenneg4(1),
+            tenneg5(2),
+            tenneg6(3)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "Bipolar Violation Ratio
+             for SLC 96:
+             1 = 10e-4
+             2 = 10e-5
+             3 = 10e-6 "
+       ::= { adDSX1CommonProvEntry 4 }
+
+       adDSX1CommonProvAutoFailoverLOS OBJECT-TYPE
+        SYNTAX INTEGER {
+            disable(1),
+            enable(2)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "LIU Failover for LOS
+             1 = Disable
+             2 = Enable "
+        ::= { adDSX1CommonProvEntry 5 }
+
+       adDSX1CommonProvAutoFailoverLOF OBJECT-TYPE
+        SYNTAX INTEGER {
+            disable(1),
+            enable(2)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "LIU Failover for LOF
+             1 = Disable
+             2 = Enable "
+        ::= { adDSX1CommonProvEntry 6 }
+
+       adDSX1CommonProvAutoFailoverBERThresh OBJECT-TYPE
+        SYNTAX INTEGER {
+            none(1),
+            tennegthree(2),
+            tennegfour(3),
+            tennegfive(4),
+            tennegsix(5),
+            tennegseven(6)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "Auto-Failover BER Threshold
+             1 = None,
+             2 = 10e-3,
+             3 = 10e-4,
+             4 = 10e-5,
+             5 = 10e-6,
+             6 = 10e-7 "
+       ::= { adDSX1CommonProvEntry 7 }
+
+             adDSX1CommonProvT1OpState OBJECT-TYPE
+        SYNTAX INTEGER {
+            enable(1),
+            disable(2)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                        "T1 Operation State
+             1 = enable
+             2 = disable"
+                ::= { adDSX1CommonProvEntry 8 }
+
+             adDSX1CommonProvRAI OBJECT-TYPE
+        SYNTAX INTEGER {
+            enable(1),
+            disable(2)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                        "E1 Remote Alarm Indicator
+             1 = enable
+             2 = disable"
+                ::= { adDSX1CommonProvEntry 9 }
+
+             adDSX1CommonProvEBit OBJECT-TYPE
+        SYNTAX INTEGER {
+            enable(1),
+            disable(2)
+            }
+          MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                        "E1 EBit
+             1 = enable
+             2 = disable"
+                ::= { adDSX1CommonProvEntry 10 }
+
+--
+--  DSX1 Alarm Provisioning Group
+--
+
+    adDSX1CommonAlmTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonAlmEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+             "The DSX1 Thresholds and Alerts Table."
+        ::= { adDSX1CommonAlmProv 1 }
+
+    adDSX1CommonAlmEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonAlmEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Voice MIB Test Table."
+        INDEX    { dsx1LineIndex }
+        ::= { adDSX1CommonAlmTable 1 }
+
+    AdDSX1CommonAlmEntry ::=
+        SEQUENCE {
+
+    	adDSX1CommonAlmSetThrsDefaults
+        	INTEGER,
+        adDSX1CommonAlmEnableAllThrsAlarms
+            INTEGER,
+        adDSX1CommonAlmDisableAllThrsAlarms
+            INTEGER,
+        adDSX1CommonAlmResetPerfMonRegisters
+            INTEGER,
+        adDSX1CommonAlmNearQtrThrsEnable
+            Integer32,
+        adDSX1CommonAlmNearDayThrsEnable
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsEnable
+            Integer32,
+        adDSX1CommonAlmFarDayThrsEnable
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsESP
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsSESP
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsSEFSP
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsUASP
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsCSS
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsCVP
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsESL
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsSESL
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsESBP
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsDGRM
+            Integer32,
+        adDSX1CommonAlmNearQtrThrsCVL
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsESPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsSESPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsSEFSPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsUASPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsCSSPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsCVPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsESLFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsESBPFE
+            Integer32,
+        adDSX1CommonAlmFarQtrThrsDGRMPFE
+            Integer32,
+        adDSX1CommonAlmNearDayThrsESP
+            Integer32,
+        adDSX1CommonAlmNearDayThrsSESP
+            Integer32,
+        adDSX1CommonAlmNearDayThrsSEFSP
+            Integer32,
+        adDSX1CommonAlmNearDayThrsUASP
+            Integer32,
+        adDSX1CommonAlmNearDayThrsCSS
+            Integer32,
+        adDSX1CommonAlmNearDayThrsCVP
+            Integer32,
+        adDSX1CommonAlmNearDayThrsESL
+            Integer32,
+        adDSX1CommonAlmNearDayThrsSESL
+            Integer32,
+        adDSX1CommonAlmNearDayThrsESBP
+            Integer32,
+        adDSX1CommonAlmNearDayThrsDGRM
+            Integer32,
+        adDSX1CommonAlmNearDayThrsCVL
+            Integer32,
+        adDSX1CommonAlmFarDayThrsESPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsSESPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsSEFSPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsUASPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsCSSPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsCVPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsESLFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsESBPFE
+            Integer32,
+        adDSX1CommonAlmFarDayThrsDGRMPFE
+            Integer32,
+        adDSX1CommonAlmPHTLThrsEnable
+                INTEGER		
+        	}
+
+        adDSX1CommonAlmSetThrsDefaults OBJECT-TYPE
+            SYNTAX INTEGER {
+                        no(1),
+                        yes(2)
+                   }
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the restoration of default PM thresholds
+                    no - Do not restore defaults
+                    yes - Restore defaults"
+            ::= { adDSX1CommonAlmEntry 1 }
+
+        adDSX1CommonAlmEnableAllThrsAlarms OBJECT-TYPE
+            SYNTAX INTEGER {
+                        no(1),
+                        yes(2)
+                   }
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the enabling of all threshold alarms
+                    no - Do not enable all alarms (i.e. no change)
+                    yes - Enable all alarms"
+            ::= { adDSX1CommonAlmEntry 2 }
+
+        adDSX1CommonAlmDisableAllThrsAlarms OBJECT-TYPE
+            SYNTAX INTEGER {
+                        no(1),
+                        yes(2)
+                   }
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the disabling of all threshold alarms
+                    no - Do not disable all alarms (i.e. no change)
+                    yes - Disable all alarms"
+            ::= { adDSX1CommonAlmEntry 3 }
+
+        adDSX1CommonAlmResetPerfMonRegisters OBJECT-TYPE
+            SYNTAX INTEGER {
+                        no(1),
+                        yes(2)
+                   }
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the resetting  of all PM threshold registers
+                    no - Do not reset registers
+                    yes - Reset rgisters"
+            ::= { adDSX1CommonAlmEntry 4 }
+
+        adDSX1CommonAlmNearQtrThrsEnable OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the enables for PM near qtr hour threshold alarms
+                and is a bit mapped sum.  A 1 in a bit postion enables the corresponing
+                alarm, while a 0 disables it.The various bit positions are:
+                1       ESP Threshold alarm enable
+                2       SESP Threshold alarm enable
+                4       SEFSP Threshold alarm enable
+                8       UASP Threshold alarm enable
+                16      CSS Threshold alarm enable
+                32      CVP Threshold alarm enable
+                64      ESL Threshold alarm enable
+                128     SESL Threshold alarm enable
+                256     ESBP Threshold alarm enable
+                512     DGRM Threshold alarm enable
+                1024    CVL Threshold alarm enable"
+            ::= { adDSX1CommonAlmEntry 5 }
+
+        adDSX1CommonAlmNearDayThrsEnable OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the enables for PM near day threshold alarms
+                and is a bit mapped sum.  The various bit positions are as described for
+                adTADSX1NearQtrThrsEnable"
+            ::= { adDSX1CommonAlmEntry 6 }
+
+        adDSX1CommonAlmFarQtrThrsEnable OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the enables for PM far qtr hour threshold alarms
+                and is a bit mapped sum.  A 1 in a bit postion enables the corresponing
+                alarm, while a 0 disables it.The various bit positions are:
+                1       ESPFE Threshold alarm enable
+                2       SESPFE Threshold alarm enable
+                4       SEFSPFE Threshold alarm enable
+                8       UASPFE Threshold alarm enable
+                16      CSSPFE Threshold alarm enable
+                32      CVPFE Threshold alarm enable
+                64      ESLFE Threshold alarm enable
+                128     ESBPFE Threshold alarm enable
+                256     DGRMPFE Threshold alarm enable"
+            ::= { adDSX1CommonAlmEntry 7 }
+
+        adDSX1CommonAlmFarDayThrsEnable OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls the enables for PM far day threshold alarms
+                and is a bit mapped sum.  The various bit positions are as described for
+                adTADSX1FarQtrThrsEnable"
+            ::= { adDSX1CommonAlmEntry 8 }
+
+        adDSX1CommonAlmNearQtrThrsESP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour ESP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 9 }
+
+        adDSX1CommonAlmNearQtrThrsSESP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour SESP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 10 }
+
+        adDSX1CommonAlmNearQtrThrsSEFSP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour SEFSP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 11 }
+
+        adDSX1CommonAlmNearQtrThrsUASP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour UASP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 12 }
+
+        adDSX1CommonAlmNearQtrThrsCSS OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour CSS parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 13 }
+
+        adDSX1CommonAlmNearQtrThrsCVP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour CVP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 14 }
+
+        adDSX1CommonAlmNearQtrThrsESL OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour ESL parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 15 }
+
+        adDSX1CommonAlmNearQtrThrsSESL OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour SESL parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 16 }
+
+        adDSX1CommonAlmNearQtrThrsESBP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour ESBP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 17 }
+
+        adDSX1CommonAlmNearQtrThrsDGRM OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour DGRM parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 18 }
+
+        adDSX1CommonAlmNearQtrThrsCVL OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near qtr hour CVL parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 19 }
+
+        adDSX1CommonAlmFarQtrThrsESPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour ESPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 20 }
+
+        adDSX1CommonAlmFarQtrThrsSESPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour SESPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 21 }
+
+        adDSX1CommonAlmFarQtrThrsSEFSPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour SEFSPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 22 }
+
+        adDSX1CommonAlmFarQtrThrsUASPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour UASPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 23 }
+
+        adDSX1CommonAlmFarQtrThrsCSSPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour CSSPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 24 }
+
+        adDSX1CommonAlmFarQtrThrsCVPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour CVPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 25 }
+
+        adDSX1CommonAlmFarQtrThrsESLFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour ESLFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 26 }
+
+        adDSX1CommonAlmFarQtrThrsESBPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour ESBPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 27 }
+
+        adDSX1CommonAlmFarQtrThrsDGRMPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far qtr hour DGRMPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 28 }
+
+        adDSX1CommonAlmNearDayThrsESP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour ESP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 29 }
+
+        adDSX1CommonAlmNearDayThrsSESP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour SESP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 30 }
+
+        adDSX1CommonAlmNearDayThrsSEFSP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour SEFSP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 31 }
+
+        adDSX1CommonAlmNearDayThrsUASP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour UASP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 32 }
+
+        adDSX1CommonAlmNearDayThrsCSS OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour CSS parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 33 }
+
+        adDSX1CommonAlmNearDayThrsCVP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour CVP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 34 }
+
+        adDSX1CommonAlmNearDayThrsESL OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour ESL parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 35 }
+
+        adDSX1CommonAlmNearDayThrsSESL OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour SESL parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 36 }
+
+        adDSX1CommonAlmNearDayThrsESBP OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour ESBP parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 37 }
+
+        adDSX1CommonAlmNearDayThrsDGRM OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour DGRM parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 38 }
+
+        adDSX1CommonAlmNearDayThrsCVL OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM near day hour CVL parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 39 }
+
+        adDSX1CommonAlmFarDayThrsESPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour ESPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 40 }
+
+        adDSX1CommonAlmFarDayThrsSESPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour SESPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 41 }
+
+        adDSX1CommonAlmFarDayThrsSEFSPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour SEFSPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 42 }
+
+        adDSX1CommonAlmFarDayThrsUASPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour UASPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 43 }
+
+        adDSX1CommonAlmFarDayThrsCSSPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour CSSPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 44 }
+
+        adDSX1CommonAlmFarDayThrsCVPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour CVPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 45 }
+
+        adDSX1CommonAlmFarDayThrsESLFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour ESLFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 46 }
+
+        adDSX1CommonAlmFarDayThrsESBPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour ESBPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 47 }
+
+        adDSX1CommonAlmFarDayThrsDGRMPFE OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable controls PM far day hour DGRMPFE parameter
+                 threshold"
+            ::= { adDSX1CommonAlmEntry 48 }
+
+        adDSX1CommonAlmPHTLThrsEnable OBJECT-TYPE
+            SYNTAX INTEGER {
+                             disable(1),
+                             enable(2)
+                           }
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "This variable enables/disables the PHTL threshold alarm"
+            ::= { adDSX1CommonAlmEntry 49 }
+
+
+--
+--  DSX1 Enhanced Alarm Provisioning Group
+--
+
+    adDSX1CommonEnhancedAlmSlotTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonEnhancedAlmSlotEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+             "This Table sets severity and suppression for all DSX1 interfaces."
+        ::= { adDSX1CommonAlmProv 2 }
+
+    adDSX1CommonEnhancedAlmSlotEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonEnhancedAlmSlotEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            ""
+        INDEX    { adGenSlotInfoIndex }
+        ::= { adDSX1CommonEnhancedAlmSlotTable 1 }
+
+    AdDSX1CommonEnhancedAlmSlotEntry ::=
+        SEQUENCE {
+        		adDSX1CommonEnhancedAlmSlotSALOSSeverity			INTEGER,        		
+				adDSX1CommonEnhancedAlmSlotSALOSSuppression			INTEGER,				
+				adDSX1CommonEnhancedAlmSlotSALOFSeverity			INTEGER,
+				adDSX1CommonEnhancedAlmSlotSALOFSuppression			INTEGER,
+				adDSX1CommonEnhancedAlmSlotSAAISSeverity			INTEGER,
+				adDSX1CommonEnhancedAlmSlotSAAISSSuppression		INTEGER,
+				adDSX1CommonEnhancedAlmSlotSARAISeverity			INTEGER,
+				adDSX1CommonEnhancedAlmSlotSARAISuppression			INTEGER,
+        		adDSX1CommonEnhancedAlmSlotSALOSEnable				TruthValue,
+        		adDSX1CommonEnhancedAlmSlotSALOFEnable				TruthValue,
+        		adDSX1CommonEnhancedAlmSlotSAAISEnable				TruthValue,
+        		adDSX1CommonEnhancedAlmSlotSARAIEnable				TruthValue
+		}
+
+	adDSX1CommonEnhancedAlmSlotSALOSSeverity OBJECT-TYPE
+        SYNTAX INTEGER {
+                        info(2),
+						alert(3),
+						minor(4),
+						major(5),
+						critical(6)        
+                       }
+
+    	MAX-ACCESS read-write
+    	STATUS current
+    	DESCRIPTION
+        	"Sets the Service Affecting LOS Severity (affects all DSX1 Ports)"
+    	DEFVAL    { major }
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 1 }
+
+	adDSX1CommonEnhancedAlmSlotSALOSSuppression OBJECT-TYPE
+        SYNTAX INTEGER (0..3) 
+        
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 SA LOS Alarm suppression (affects all DSX1 Ports)
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 2 }
+
+	adDSX1CommonEnhancedAlmSlotSALOFSeverity OBJECT-TYPE
+		SYNTAX INTEGER {
+                        info(2),
+						alert(3),
+						minor(4),
+						major(5),
+						critical(6)        
+                       }
+
+    	MAX-ACCESS      read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Sets the Service Affecting LOF Severity (affects all DSX1 Ports)"
+    	DEFVAL    { major }
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 3 }
+        
+	adDSX1CommonEnhancedAlmSlotSALOFSuppression OBJECT-TYPE
+		SYNTAX INTEGER (0..3)
+        
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 SA LOF Alarm suppression (affects all DSX1 Ports)
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 4 }
+        
+	adDSX1CommonEnhancedAlmSlotSAAISSeverity OBJECT-TYPE
+		SYNTAX INTEGER {
+                        info(2),
+						alert(3),
+						minor(4),
+						major(5),
+						critical(6)        
+                       }
+
+    	MAX-ACCESS      read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Sets the Service Affecting AIS Severity (affects all DSX1 Ports)"
+    	DEFVAL    { major }
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 5 }
+        
+	adDSX1CommonEnhancedAlmSlotSAAISSSuppression OBJECT-TYPE
+		SYNTAX INTEGER (0..3)
+        
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 SA AIS Alarm suppression (affects all DSX1 Ports)
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 6 }
+        
+	adDSX1CommonEnhancedAlmSlotSARAISeverity OBJECT-TYPE
+		SYNTAX INTEGER {
+                        info(2),
+						alert(3),
+						minor(4),
+						major(5),
+						critical(6)        
+                       }
+
+    	MAX-ACCESS      read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Sets the Service Affecting RAI Severity (affects all DSX1 Ports)"
+    	DEFVAL    { minor }
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 7 }
+        
+	adDSX1CommonEnhancedAlmSlotSARAISuppression OBJECT-TYPE
+		SYNTAX INTEGER (0..3)
+        
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"Bit Map that Enables/Disables SNMP and TL1 SA RAI Alarm suppression (affects all DSX1 Ports)
+        	LSB Bit 0: 0 - Disable SNMP Alarm suppression, 1 - Enable SNMP Alarm suppression
+        		Bit 1: 0 - Disable TL1 Alarm suppression, 1 - Enable TL1 Alarm suppression"
+
+        DEFVAL {0}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 8 }
+        
+    adDSX1CommonEnhancedAlmSlotSALOSEnable OBJECT-TYPE
+        SYNTAX TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all DSX1 Ports)"
+
+        DEFVAL {true}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 9 }
+
+    adDSX1CommonEnhancedAlmSlotSALOFEnable OBJECT-TYPE
+        SYNTAX TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all DSX1 Ports)"
+
+        DEFVAL {true}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 10 }
+
+    adDSX1CommonEnhancedAlmSlotSAAISEnable OBJECT-TYPE
+        SYNTAX TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all DSX1 Ports)"
+
+        DEFVAL {true}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 11 }
+        
+    adDSX1CommonEnhancedAlmSlotSARAIEnable OBJECT-TYPE
+        SYNTAX TruthValue 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+        	"True - activates the alarm (affects all DSX1 Ports)"
+
+        DEFVAL {true}
+        ::= { adDSX1CommonEnhancedAlmSlotEntry 12 }
+        
+--
+--  DSX1 Test Group
+--
+
+    adDSX1CommonTestTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonTestEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+             "The DSX1 Test Table."
+        ::= { adDSX1CommonTest 1 }
+
+    adDSX1CommonTestEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonTestEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Voice MIB Test Table."
+        INDEX    { dsx1LineIndex }
+        ::= { adDSX1CommonTestTable 1 }
+
+    AdDSX1CommonTestEntry ::=
+        SEQUENCE {
+        adDSX1CommonTestFarEndLoopback
+            INTEGER,
+        adDSX1CommonTestT1ProtectSelect
+            INTEGER
+            }
+
+        adDSX1CommonTestFarEndLoopback OBJECT-TYPE
+            SYNTAX INTEGER {
+                        enable(1),
+                        disable(2)
+                   }
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Far End Loopback Test for SLC 96
+                    1 - Enable
+                    2 - Disable"
+            ::= { adDSX1CommonTestEntry 1 }
+
+        adDSX1CommonTestT1ProtectSelect OBJECT-TYPE
+            SYNTAX INTEGER {
+                        protected(1),
+                        notprotected(2)
+                   }
+            MAX-ACCESS read-write
+            STATUS deprecated
+            DESCRIPTION
+                "T1 Protection Select test
+                 for SLC 96
+                    1 - Protected
+                    2 - Not Protected"
+            ::= { adDSX1CommonTestEntry 2 }
+
+--
+--  DSX1 Status Group
+--
+
+    adDSX1CommonStatusTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+             "The DSX1 Status Table."
+        ::= { adDSX1CommonStatus 1 }
+
+    adDSX1CommonStatusEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Voice MIB Status Table."
+        INDEX    { dsx1LineIndex }
+        ::= { adDSX1CommonStatusTable 1 }
+
+    AdDSX1CommonStatusEntry ::=
+        SEQUENCE {
+        adDSX1CommonStatusLoopStatus
+            INTEGER
+        }
+
+        adDSX1CommonStatusLoopStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+                        na(1),
+                        ok(2),
+                        los(3),
+                        lof(4),
+                        ais(5),
+                        rai(6),
+                        bpv(7)
+        }
+        MAX-ACCESS    read-only
+        STATUS  current
+        DESCRIPTION
+            "Loop Status
+                         1 - N/A
+                         2 - O.K.
+                         3 - LOS
+                         4 - LOF
+                         5 - AIS
+                         6 - RAI
+                         7 - BPV"
+     ::= { adDSX1CommonStatusEntry 1 }
+
+--
+--  DSX1 SLC II Perf Group
+--
+
+    adDSX1CommonSLC2PerfMonTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonSLC2PerfMonEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+             "The DSX1 SLC Mode II
+              Performance Monitoring Table."
+        ::= { adDSX1CommonSLC2PerfMon 1 }
+
+    adDSX1CommonSLC2PerfMonEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonSLC2PerfMonEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the DSX1 SLC Mode II
+              Performance Monitoring Table."
+        INDEX    { dsx1LineIndex }
+        ::= { adDSX1CommonSLC2PerfMonTable 1 }
+
+    AdDSX1CommonSLC2PerfMonEntry ::=
+        SEQUENCE {
+        adDSX1CommonSLC2PerfMonBlockCall
+                Integer32,
+        adDSX1CommonSLC2PerfMonAllTrunkBusy
+                Integer32,
+        adDSX1CommonSLC2PerfMonNailedTimeSlot
+                Integer32,
+        adDSX1CommonSLC2PerfMonPHTL
+                Integer32,
+        adDSX1CommonSLC2PerfMonPHTLThreshold
+                Integer32
+        }
+
+    adDSX1CommonSLC2PerfMonBlockCall OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "Number of Blocked Calls"
+        ::= { adDSX1CommonSLC2PerfMonEntry 1 }
+
+    adDSX1CommonSLC2PerfMonAllTrunkBusy OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "Number of Seconds while in an All
+             Trunks Busy condition"
+        ::= { adDSX1CommonSLC2PerfMonEntry 2 }
+
+    adDSX1CommonSLC2PerfMonNailedTimeSlot OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "Number of Time Slots that are
+             Nailed Up"
+        ::= { adDSX1CommonSLC2PerfMonEntry 3 }
+
+    adDSX1CommonSLC2PerfMonPHTL OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "System Peak Hourly Traffic
+             Load in CCS
+
+             Note:  The value given by the SNMP
+             Management software will need to be
+             divided by 10 in order to match the
+             menu value - dividing by ten will
+             achieve the decimal in the menu."
+        ::= { adDSX1CommonSLC2PerfMonEntry 4 }
+
+    adDSX1CommonSLC2PerfMonPHTLThreshold OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "System Peak Hourly Traffic
+             Load Threshold in CCS
+
+             Note:  The value given by the SNMP
+             Management software will need to be
+             divided by 10 in order to match the
+             menu value - dividing by ten will
+             achieve the decimal in the menu."
+        ::= { adDSX1CommonSLC2PerfMonEntry 5 }
+
+
+--
+--  DSX1 Daily PM Interval Table
+--
+
+
+       adDSX1CommonDailyPmIntervalTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonDailyPmIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The DSX1 MIB Daily PM Interval Table."
+        ::= { adDSX1CommonDailyPmInt 1 }
+
+    adDSX1CommonDailyPmIntervalEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonDailyPmIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the DSX1 MIB Daily PM Interval Table.."
+        INDEX    {dsx1LineIndex, adDSX1CommonDailyPmInterval }
+        ::=  { adDSX1CommonDailyPmIntervalTable 1 }
+
+    AdDSX1CommonDailyPmIntervalEntry ::=
+        SEQUENCE {
+            adDSX1CommonDailyPmInterval
+                Integer32,
+            adDSX1CommonDailyPmESP
+                PerfTotalCount,
+            adDSX1CommonDailyPmSESP
+                PerfTotalCount,
+            adDSX1CommonDailyPmUASP
+                PerfTotalCount,
+            adDSX1CommonDailyPmCVP
+                PerfTotalCount,
+            adDSX1CommonDailyPmESL
+                PerfTotalCount,
+            adDSX1CommonDailyPmCVL
+                PerfTotalCount
+            }
+
+     adDSX1CommonDailyPmInterval OBJECT-TYPE
+        SYNTAX    Integer32
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 1 }
+
+     adDSX1CommonDailyPmESP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily ESP PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 2 }
+
+     adDSX1CommonDailyPmSESP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily SESP PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 3 }
+
+     adDSX1CommonDailyPmUASP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily UASP PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 4 }
+
+     adDSX1CommonDailyPmCVP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily CVP PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 5 }
+
+     adDSX1CommonDailyPmESL OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily ESL PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 6 }
+
+     adDSX1CommonDailyPmCVL OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily CVL PM Interval"
+        ::= { adDSX1CommonDailyPmIntervalEntry 7 }
+
+--
+--  DSX1 Daily PM Current Table
+--
+
+
+       adDSX1CommonCurrentDayTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonCurrentDayEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The DSX1 MIB Daily PM Current Table."
+        ::= { adDSX1CommonDailyPmInt 2 }
+
+    adDSX1CommonCurrentDayEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonCurrentDayEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the DSX1 MIB Daily PM Current Table.."
+        INDEX    { dsx1LineIndex }
+        ::=  { adDSX1CommonCurrentDayTable 1 }
+
+    AdDSX1CommonCurrentDayEntry ::=
+        SEQUENCE {
+            adDSX1CommonCurrentDayESP
+                PerfTotalCount,
+            adDSX1CommonCurrentDaySESP
+                PerfTotalCount,
+            adDSX1CommonCurrentDayUASP
+                PerfTotalCount,
+            adDSX1CommonCurrentDayCVP
+                PerfTotalCount,
+            adDSX1CommonCurrentDayESL
+                PerfTotalCount,
+            adDSX1CommonCurrentDayCVL
+                PerfTotalCount
+            }
+
+     adDSX1CommonCurrentDayESP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily ESP PM Current value"
+        ::= { adDSX1CommonCurrentDayEntry 1 }
+
+     adDSX1CommonCurrentDaySESP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily SESP PM Current value"
+        ::= { adDSX1CommonCurrentDayEntry 2 }
+
+     adDSX1CommonCurrentDayUASP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily UASP PM Current value"
+        ::= { adDSX1CommonCurrentDayEntry 3 }
+
+     adDSX1CommonCurrentDayCVP OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily CVP PM Current value"
+        ::= { adDSX1CommonCurrentDayEntry 4 }
+
+     adDSX1CommonCurrentDayESL OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily ESL PM Current value"
+        ::= { adDSX1CommonCurrentDayEntry 5 }
+
+     adDSX1CommonCurrentDayCVL OBJECT-TYPE
+        SYNTAX    PerfTotalCount
+        MAX-ACCESS  read-only
+        STATUS    current
+        DESCRIPTION
+            " Daily CVL PM Current value"
+        ::= { adDSX1CommonCurrentDayEntry 6 }
+
+     -- The DS1 Total Table
+     --
+     -- This table reimplements the DS1 Total Table from the
+     --   RFC 2495 MIB.  Some products have implmented that
+     --   table with the values from the above adDSX1CommonCurrentDayTable.
+     --   However, these values are intended to be the sum of
+     --   all 96 previous 15-minute intervals for each statistic.
+     --   This table provides these values.
+
+     adDSX1CommonTotalTable OBJECT-TYPE
+          SYNTAX  SEQUENCE OF AdDSX1CommonTotalEntry
+          MAX-ACCESS  not-accessible
+          STATUS  current
+          DESCRIPTION
+                 "The DS1 Total Table contains the cumulative sum
+                 of the various statistics for the 24 hour period
+                 preceding the current interval."
+          ::= { adDSX1CommonDailyPmInt 3 }
+
+     adDSX1CommonTotalEntry OBJECT-TYPE
+          SYNTAX  AdDSX1CommonTotalEntry
+          MAX-ACCESS  not-accessible
+          STATUS  current
+          DESCRIPTION
+                 "An entry in the DS1 Total table."
+          INDEX   { dsx1LineIndex }
+          ::= { adDSX1CommonTotalTable 1 }
+
+     AdDSX1CommonTotalEntry ::=
+          SEQUENCE {
+              adDSX1CommonTotalESs       PerfTotalCount,
+              adDSX1CommonTotalSESs      PerfTotalCount,
+              adDSX1CommonTotalSEFSs     PerfTotalCount,
+              adDSX1CommonTotalUASs      PerfTotalCount,
+              adDSX1CommonTotalCSSs      PerfTotalCount,
+              adDSX1CommonTotalPCVs      PerfTotalCount,
+              adDSX1CommonTotalLESs      PerfTotalCount,
+              adDSX1CommonTotalBESs      PerfTotalCount,
+              adDSX1CommonTotalDMs       PerfTotalCount,
+              adDSX1CommonTotalLCVs      PerfTotalCount
+     }
+
+     adDSX1CommonTotalESs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The sum of Errored Seconds encountered by a DS1
+                 interface in the previous 24 hour interval.
+                 Invalid 15 minute intervals count as 0."
+          ::= { adDSX1CommonTotalEntry 1 }
+
+     adDSX1CommonTotalSESs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The number of Severely Errored Seconds
+                 encountered by a DS1 interface in the previous 24
+                 hour interval.  Invalid 15 minute intervals count
+                 as 0."
+          ::= { adDSX1CommonTotalEntry 2 }
+
+     adDSX1CommonTotalSEFSs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The number of Severely Errored Framing Seconds
+
+                 encountered by a DS1 interface in the previous 24
+                 hour interval.  Invalid 15 minute intervals count
+                 as 0."
+          ::= { adDSX1CommonTotalEntry 3 }
+
+     adDSX1CommonTotalUASs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The number of Unavailable Seconds encountered by
+                 a DS1 interface in the previous 24 hour interval.
+                 Invalid 15 minute intervals count as 0."
+          ::= { adDSX1CommonTotalEntry 4 }
+
+     adDSX1CommonTotalCSSs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The number of Controlled Slip Seconds encountered
+                 by a DS1 interface in the previous 24 hour
+                 interval.  Invalid 15 minute intervals count as
+                 0."
+          ::= { adDSX1CommonTotalEntry 5 }
+
+     adDSX1CommonTotalPCVs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The number of Path Coding Violations encountered
+                 by a DS1 interface in the previous 24 hour
+                 interval.  Invalid 15 minute intervals count as
+                 0."
+          ::= { adDSX1CommonTotalEntry 6 }
+
+     adDSX1CommonTotalLESs OBJECT-TYPE
+          SYNTAX  PerfTotalCount
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The number of Line Errored Seconds encountered by
+                 a DS1 interface in the previous 24 hour interval.
+                 Invalid 15 minute intervals count as 0."
+          ::= { adDSX1CommonTotalEntry 7 }
+
+     adDSX1CommonTotalBESs OBJECT-TYPE
+
+          SYNTAX PerfTotalCount
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+                 "The number of Bursty Errored Seconds (BESs)
+                 encountered by a DS1 interface in the previous 24
+                 hour interval. Invalid 15 minute intervals count
+                 as 0."
+          ::= { adDSX1CommonTotalEntry 8 }
+
+     adDSX1CommonTotalDMs OBJECT-TYPE
+          SYNTAX PerfTotalCount
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+                 "The number of Degraded Minutes (DMs) encountered
+                 by a DS1 interface in the previous 24 hour
+                 interval.  Invalid 15 minute intervals count as
+                 0."
+          ::= { adDSX1CommonTotalEntry 9 }
+
+     adDSX1CommonTotalLCVs OBJECT-TYPE
+          SYNTAX PerfTotalCount
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+                 "The number of Line Code Violations (LCVs)
+                 encountered by a DS1 interface in the current 15
+                 minute interval.  Invalid 15 minute intervals
+                 count as 0."
+          ::= { adDSX1CommonTotalEntry 10 }
+          -- The DS1 Rolling Counter Table
+     -- This table implements the DS1 Table of rolling counters
+     -- for the DS1 PM stats.
+
+     adDSX1CommonRollingCountTable OBJECT-TYPE
+          SYNTAX  SEQUENCE OF AdDSX1CommonRollingCountEntry
+          MAX-ACCESS  not-accessible
+          STATUS  current
+          DESCRIPTION
+                 "The DS1 Rolling Count Table contains the cumulative sum
+                 of the various statistics."
+          ::= { adDSX1CommonDailyPmInt 4 }
+
+     adDSX1CommonRollingCountEntry OBJECT-TYPE
+          SYNTAX  AdDSX1CommonRollingCountEntry
+          MAX-ACCESS  not-accessible
+          STATUS  current
+          DESCRIPTION
+                 "An entry in the DS1 Rolling Counter table."
+          INDEX   { dsx1LineIndex }
+          ::= { adDSX1CommonRollingCountTable 1 }
+
+     AdDSX1CommonRollingCountEntry ::=
+          SEQUENCE {
+              adDSX1CommonRollingCountESs     	Counter32,
+              adDSX1CommonRollingCountSESs      Counter32,
+              adDSX1CommonRollingCountSEFSs    	Counter32,
+              adDSX1CommonRollingCountUASs      Counter32,
+              adDSX1CommonRollingCountCSSs      Counter32,
+              adDSX1CommonRollingCountPCVs      Counter32,
+              adDSX1CommonRollingCountLESs      Counter32,
+              adDSX1CommonRollingCountBESs      Counter32,
+              adDSX1CommonRollingCountDMs       Counter32,
+              adDSX1CommonRollingCountLCVs     	Counter32,
+              adDSX1CommonRollingCountReset     INTEGER
+     }
+
+     adDSX1CommonRollingCountESs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of Errored Seconds encountered by a DS1
+                 interface."
+          ::= { adDSX1CommonRollingCountEntry 1 }
+
+     adDSX1CommonRollingCountSESs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of the number of Severely Errored Seconds
+                 encountered by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 2 }
+
+     adDSX1CommonRollingCountSEFSs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of the  number of Severely Errored Framing Seconds
+                 encountered by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 3 }
+
+     adDSX1CommonRollingCountUASs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of the number of Unavailable Seconds encountered by
+                 a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 4 }
+
+     adDSX1CommonRollingCountCSSs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of the number of Controlled Slip Seconds encountered
+                 by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 5 }
+
+     adDSX1CommonRollingCountPCVs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of the number of Path Coding Violations encountered
+                 by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 6 }
+
+     adDSX1CommonRollingCountLESs OBJECT-TYPE
+          SYNTAX  Counter32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "The rolling counter of the number of Line Errored Seconds encountered by
+                 a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 7 }
+
+     adDSX1CommonRollingCountBESs OBJECT-TYPE
+          SYNTAX Counter32
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+                 "The rolling counter of the number of Bursty Errored Seconds (BESs)
+                 encountered by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 8 }
+
+     adDSX1CommonRollingCountDMs OBJECT-TYPE
+          SYNTAX Counter32
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+                 "The rolling counter of the number of Degraded Minutes (DMs) encountered
+                 by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 9 }
+
+     adDSX1CommonRollingCountLCVs OBJECT-TYPE
+          SYNTAX Counter32
+          MAX-ACCESS read-only
+          STATUS current
+          DESCRIPTION
+                 "The rolling counter of the number of Line Code Violations (LCVs)
+                 encountered by a DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 10 }
+
+     adDSX1CommonRollingCountReset OBJECT-TYPE
+          SYNTAX INTEGER { reset(1) }
+          MAX-ACCESS read-write
+          STATUS current
+          DESCRIPTION
+                 "Setting 1 will reset the rolling counters on this
+                 DS1 interface."
+          ::= { adDSX1CommonRollingCountEntry 11 }
+
+--
+--  DSX1 PM Reset Table
+--
+
+
+       adDSX1CommonPmResetTable  OBJECT-TYPE
+                SYNTAX  SEQUENCE OF AdDSX1CommonPmResetEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+                        "The DSX1 MIB PM Reset Table."
+                ::= { adDSX1CommonDailyPm 1 }
+
+        adDSX1CommonPmResetEntry  OBJECT-TYPE
+                SYNTAX  AdDSX1CommonPmResetEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the DSX1 MIB PM Reset Table.."
+                INDEX   { dsx1LineIndex }
+                ::=  { adDSX1CommonPmResetTable 1 }
+
+        AdDSX1CommonPmResetEntry ::=
+        SEQUENCE {
+                        adDSX1CommonPmReset
+                                INTEGER
+            }
+
+        adDSX1CommonPmReset OBJECT-TYPE
+                SYNTAX  INTEGER
+                        {
+                        reset(1)
+                        }
+                MAX-ACCESS  read-write
+        STATUS    current
+        DESCRIPTION
+                        " Reset the PM on the selected DSX1 line."
+                ::= { adDSX1CommonPmResetEntry 1 }
+
+--
+-- DSX1 Module Information Table
+--
+    adDSX1CommonModuleInfoTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF AdDSX1CommonModuleInfoEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+             "This Table contains the module information. This table is added to 
+              contain a read only OID that will indicate whether the T1/E1 module
+              is running in T1 or E1 mode.
+              "
+        ::= { adDSX1CommonModuleInfo 1 }
+
+    adDSX1CommonModuleInfoEntry  OBJECT-TYPE
+        SYNTAX  AdDSX1CommonModuleInfoEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            ""
+        INDEX    { ifIndex }
+        ::= { adDSX1CommonModuleInfoTable 1 }
+
+    AdDSX1CommonModuleInfoEntry ::=
+        SEQUENCE {
+              adDSX1CommonModuleT1E1Mode  INTEGER
+        }
+
+    adDSX1CommonModuleT1E1Mode OBJECT-TYPE
+        SYNTAX INTEGER {
+                        t1(1),
+                        e1(2)
+                       }
+
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Gets the Mode the T1/E1 module is running in."
+        DEFVAL    { t1 }
+        ::= { adDSX1CommonModuleInfoEntry 1 }
+
+--
+-- Generic DSX THRESHOLDS Traps group.
+--
+
+    dsx1almNearQtrThrsESPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour ESP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+        --#SUMMARY      "GenDSX1 1002101: Near QTR ESP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002101}
+
+     dsx1almNearQtrThrsSESPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour SESP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+        --#SUMMARY      "GenDSX1 1002103: Near QTR SESP Threshold Exceeded"
+            --#SUMMARY          "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002103}
+
+    dsx1almNearQtrThrsSEFSPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour SEFSP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002105: Near QTR SEFSP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002105}
+
+    dsx1almNearQtrThrsUASPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour UASP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002107: Near QTR UASP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002107}
+
+    dsx1almNearQtrThrsCSSexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour CSS threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002109: Near QTR CSS Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002109}
+
+    dsx1almNearQtrThrsCVPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour CVP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002111: Near QTR CVP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002111}
+
+    dsx1almNearQtrThrsESLexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour ESL threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002113: Near QTR ESL Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002113}
+
+    dsx1almNearQtrThrsSESLexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour SESL threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002115: Near QTR SESL Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002115}
+
+    dsx1almNearQtrThrsESBPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour ESBP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002117: Near QTR ESBP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002117}
+
+    dsx1almNearQtrThrsDGRMexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour DGRM threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002119: Near QTR DGRM Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002119}
+
+    dsx1almNearQtrThrsCVLexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Quarter-Hour CVL threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002121: Near QTR CVL Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002121}
+
+    dsx1almFarQtrThrsESPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour ESPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002123: Far QTR ESPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002123}
+
+    dsx1almFarQtrThrsSESPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour SESPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002125: Far QTR SESPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002125}
+
+    dsx1almFarQtrThrsSEFSPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour SEFSPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002127: Far QTR SEFSPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002127}
+
+    dsx1almFarQtrThrsuUASPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour UASPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002129: Far QTR UASPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002129}
+
+    dsx1almFarQtrThrsCSSPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour CSSPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002131: Far QTR CSSPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002131}
+
+    dsx1almFarQtrThrsCVPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour CVPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002133: Far QTR CVPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002133}
+
+    dsx1almFarQtrThrsESLFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour ESLFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002135: Far QTR ESLFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002135}
+
+    dsx1almFarQtrThrsESBPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour ESBPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002137: Far QTR ESBPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002137}
+
+    dsx1almFarQtrThrsDGRMPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Quarter-Hour DGRMPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002139: Far QTR DGRMPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002139}
+
+    dsx1almNearDayThrsESPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day ESP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002141: Near Day ESP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002141}
+
+    dsx1almNearDayThrsSESPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day SESP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002143: Near Day SESP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002143}
+
+    dsx1almNearDayThrsSEFSPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day SEFSP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002145: Near Day SEFSP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002145}
+
+    dsx1almNearDayThrsUASPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day UASP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002147: Near Day UASP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002147}
+
+    dsx1almNearDayThrsCSSexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day CSS threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002149: Near Day CSS Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002149}
+
+    dsx1almNearDayThrsCVPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day CVP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002151: Near Day CVP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002151}
+
+    dsx1almNearDayThrsESLexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day ESL threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002153: Near Day ESL Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002153}
+
+    dsx1almNearDayThrsSESLexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day SESL threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002155: Near Day SESL Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002155}
+
+    dsx1almNearDayThrsESBPexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day ESBP threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002157: Near Day ESBP Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002157}
+
+    dsx1almNearDayThrsDGRMexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day DGRM threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002159: Near Day DGRM Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002159}
+
+    dsx1almNearDayThrsCVLexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End
+             Day CVL threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002161: Near Day CVL Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002161}
+
+    dsx1almFarDayThrsESPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day ESPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002163: Far Day ESPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002163}
+
+    dsx1almFarDayThrsSESFPEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day SESFPE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002165: Far Day SESFPE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002165}
+
+    dsx1almFarDayThrsSEFSPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day SEFSPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002167: Far Day SEFSPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002167}
+
+    dsx1almFarDayThrsUASPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day UASPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002169: Far Day UASPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002169}
+
+    dsx1almFarDayThrsCSSPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day CSSPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002171: Far Day CSSPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002171}
+
+    dsx1almFarDayThrsCVPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day CVPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002173: Far Day CVPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002173}
+
+    dsx1almFarDayThrsESLFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day ESLFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002175: Far Day ESLFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002175}
+
+    dsx1almFarDayThrsESBPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day ESBPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002177: Far Day ESBPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002177}
+
+    dsx1almFarDayThrsDGRMPFEexeed  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Far-End
+             Day DGRMPFE threshold
+             has been exceeded."
+        --#TYPE            "Status - Threshold Exceeded"
+            --#SUMMARY          "DSXcommon 1002179: Far Day DGRMPFE Threshold Exceeded"
+        --#SUMMARY      "shelf: %s, slot: %d, %s"
+        --#ARGUMENTS     {1,2,3}
+            --#SEVERITY         WARNING
+        --#GENERIC      6
+        --#CATEGORY      "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+            ::= {adDSX1CommonAlm 1002179}
+            
+    dsx1almNearQtrThrsCVPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day CVP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002181: Near Qtr CVP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002181}
+
+    dsx1almNearQtrThrsESPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day ESP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002183: Near Qtr ESP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002183}
+
+    dsx1almNearQtrThrsSESPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day SESP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002185: Near Qtr SESP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002185}
+        
+    dsx1almNearQtrThrsUASPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day UASP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002187: Near Qtr UASP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002187}
+        
+    dsx1almNearQtrThrsCVLRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day CVL threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002189: Near Qtr CVL Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002189}
+        
+    dsx1almNearQtrThrsESLRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day ESL threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002191: Near Qtr ESL Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002191}
+
+    dsx1almNearQtrThrsESBPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day ESBP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002193: Near Qtr ESBP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002193}
+        
+    dsx1almNearQtrThrsCSSPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day CSSP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002195: Near Qtr CSSP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002195}
+        
+    dsx1almNearQtrThrsSEFSPRemoteExceeded  NOTIFICATION-TYPE
+        OBJECTS    {
+            adTrapInformSeqNum,
+            sysName,
+            ifIndex,
+            adGenSlotAlarmStatus
+            }
+            STATUS          current
+        DESCRIPTION
+            "Indicates the Near-End Day SEFSP threshold has been exceeded."
+        --#TYPE         "Status - Threshold Exceeded"
+        --#SUMMARY      "DSXcommon 1002197: Near Qtr SEFSP Threshold Exceeded at Remote Devices"
+        --#SUMMARY      "shelf: %s, Interface: %d"
+        --#ARGUMENTS    {1,2}
+        --#SEVERITY     WARNING
+        --#GENERIC      6
+        --#CATEGORY     "Status events"
+        --#Source_ID    "A"
+        --#TIMEINDEX    0
+        ::= {adDSX1CommonAlm 1002197}
+--
+--  Generic DSX Traps group.
+--  THIS SECTION HAS BEEN OBSOLETED AS OF 11/12/01.
+--  THE MIB "ADDSX1COMMONTRAPS.MIB" HAS REPLACED ALL OF THIS
+--  SECTIONS TRAPS.
+
+-- 06/29/2006 PhilB Removed all obsolete traps which duplicate other MIB
+
+-- ******************************************************************************************
+-- MIB Groups
+-- ******************************************************************************************
+adDSX1CommonProvGroup OBJECT-GROUP
+   OBJECTS
+   {
+    adDSX1CommonProvLBO,
+    adDSX1CommonProvFrame,
+    adDSX1CommonProvInbandLoopback,
+        adDSX1CommonProvBPVRatio,
+        adDSX1CommonProvAutoFailoverLOS,
+        adDSX1CommonProvAutoFailoverLOF,
+        adDSX1CommonProvAutoFailoverBERThresh,
+        adDSX1CommonProvT1OpState,
+        adDSX1CommonProvRAI,
+        adDSX1CommonProvEBit
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DSX1 Provisioning."
+   ::= { adDSX1CommonMibGroups 1 }
+
+adDSX1CommonAlmGroup OBJECT-GROUP
+   OBJECTS
+   {
+    adDSX1CommonAlmSetThrsDefaults,
+        adDSX1CommonAlmEnableAllThrsAlarms,
+        adDSX1CommonAlmDisableAllThrsAlarms,
+        adDSX1CommonAlmResetPerfMonRegisters,
+        adDSX1CommonAlmNearQtrThrsEnable,
+        adDSX1CommonAlmNearDayThrsEnable,
+        adDSX1CommonAlmFarQtrThrsEnable,
+        adDSX1CommonAlmFarDayThrsEnable,
+        adDSX1CommonAlmNearQtrThrsESP,
+        adDSX1CommonAlmNearQtrThrsSESP,
+        adDSX1CommonAlmNearQtrThrsSEFSP,
+        adDSX1CommonAlmNearQtrThrsUASP,
+        adDSX1CommonAlmNearQtrThrsCSS,
+        adDSX1CommonAlmNearQtrThrsCVP,
+        adDSX1CommonAlmNearQtrThrsESL,
+        adDSX1CommonAlmNearQtrThrsSESL,
+        adDSX1CommonAlmNearQtrThrsESBP,
+        adDSX1CommonAlmNearQtrThrsDGRM,
+        adDSX1CommonAlmNearQtrThrsCVL,
+        adDSX1CommonAlmFarQtrThrsESPFE,
+        adDSX1CommonAlmFarQtrThrsSESPFE,
+        adDSX1CommonAlmFarQtrThrsSEFSPFE,
+        adDSX1CommonAlmFarQtrThrsUASPFE,
+        adDSX1CommonAlmFarQtrThrsCSSPFE,
+        adDSX1CommonAlmFarQtrThrsCVPFE,
+        adDSX1CommonAlmFarQtrThrsESLFE,
+        adDSX1CommonAlmFarQtrThrsESBPFE,
+        adDSX1CommonAlmFarQtrThrsDGRMPFE,
+        adDSX1CommonAlmNearDayThrsESP,
+        adDSX1CommonAlmNearDayThrsSESP,
+        adDSX1CommonAlmNearDayThrsSEFSP,
+        adDSX1CommonAlmNearDayThrsUASP,
+        adDSX1CommonAlmNearDayThrsCSS,
+        adDSX1CommonAlmNearDayThrsCVP,
+        adDSX1CommonAlmNearDayThrsESL,
+        adDSX1CommonAlmNearDayThrsSESL,
+        adDSX1CommonAlmNearDayThrsESBP,
+        adDSX1CommonAlmNearDayThrsDGRM,
+        adDSX1CommonAlmNearDayThrsCVL,
+        adDSX1CommonAlmFarDayThrsESPFE,
+        adDSX1CommonAlmFarDayThrsSESPFE,
+        adDSX1CommonAlmFarDayThrsSEFSPFE,
+        adDSX1CommonAlmFarDayThrsUASPFE,
+        adDSX1CommonAlmFarDayThrsCSSPFE,
+        adDSX1CommonAlmFarDayThrsCVPFE,
+        adDSX1CommonAlmFarDayThrsESLFE,
+        adDSX1CommonAlmFarDayThrsESBPFE,
+        adDSX1CommonAlmFarDayThrsDGRMPFE,
+        adDSX1CommonAlmPHTLThrsEnable
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DSX1 alarm provisioning."
+   ::= { adDSX1CommonMibGroups 2 }
+
+adDSX1CommonTestGroup OBJECT-GROUP
+   OBJECTS
+   {
+    adDSX1CommonTestFarEndLoopback
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DSX1 Test."
+   ::= { adDSX1CommonMibGroups 3 }
+
+adDSX1CommonStatusGroup OBJECT-GROUP
+   OBJECTS
+   {
+    adDSX1CommonStatusLoopStatus
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DSX1 Status."
+   ::= { adDSX1CommonMibGroups 4 }
+
+adDSX1CommonSLC2PerfGroup OBJECT-GROUP
+   OBJECTS
+   {
+    adDSX1CommonSLC2PerfMonBlockCall,
+    adDSX1CommonSLC2PerfMonAllTrunkBusy,
+    adDSX1CommonSLC2PerfMonNailedTimeSlot,
+    adDSX1CommonSLC2PerfMonPHTL,
+    adDSX1CommonSLC2PerfMonPHTLThreshold
+   }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for DSX1 SLC II Performance."
+   ::= { adDSX1CommonMibGroups 5 }
+
+adDSX1CommonDeprecatedGroup OBJECT-GROUP
+   OBJECTS
+   {
+    adDSX1CommonTestT1ProtectSelect
+   }
+   STATUS deprecated
+   DESCRIPTION
+     "Deprecated objects"
+   ::= { adDSX1CommonMibGroups 6 }
+
+adDSX1CommonEventGroup NOTIFICATION-GROUP
+   NOTIFICATIONS
+   {
+        dsx1almNearQtrThrsESPexeed,
+     dsx1almNearQtrThrsSESPexeed,
+    dsx1almNearQtrThrsSEFSPexeed,
+    dsx1almNearQtrThrsUASPexeed,
+    dsx1almNearQtrThrsCSSexeed,
+    dsx1almNearQtrThrsCVPexeed,
+    dsx1almNearQtrThrsESLexeed,
+    dsx1almNearQtrThrsSESLexeed,
+    dsx1almNearQtrThrsESBPexeed,
+    dsx1almNearQtrThrsDGRMexeed,
+    dsx1almNearQtrThrsCVLexeed,
+    dsx1almFarQtrThrsESPFEexeed,
+    dsx1almFarQtrThrsSESPFEexeed,
+    dsx1almFarQtrThrsSEFSPFEexeed,
+    dsx1almFarQtrThrsuUASPFEexeed,
+    dsx1almFarQtrThrsCSSPFEexeed,
+    dsx1almFarQtrThrsCVPFEexeed,
+    dsx1almFarQtrThrsESLFEexeed,
+    dsx1almFarQtrThrsESBPFEexeed,
+    dsx1almFarQtrThrsDGRMPFEexeed,
+    dsx1almNearDayThrsESPexeed,
+    dsx1almNearDayThrsSESPexeed,
+    dsx1almNearDayThrsSEFSPexeed,
+    dsx1almNearDayThrsUASPexeed,
+    dsx1almNearDayThrsCSSexeed,
+    dsx1almNearDayThrsCVPexeed,
+    dsx1almNearDayThrsESLexeed,
+    dsx1almNearDayThrsSESLexeed,
+    dsx1almNearDayThrsESBPexeed,
+    dsx1almNearDayThrsDGRMexeed,
+    dsx1almNearDayThrsCVLexeed,
+    dsx1almFarDayThrsESPFEexeed,
+    dsx1almFarDayThrsSESFPEexeed,
+    dsx1almFarDayThrsSEFSPFEexeed,
+    dsx1almFarDayThrsUASPFEexeed,
+    dsx1almFarDayThrsCSSPFEexeed,
+    dsx1almFarDayThrsCVPFEexeed,
+    dsx1almFarDayThrsESLFEexeed,
+    dsx1almFarDayThrsESBPFEexeed,
+    dsx1almFarDayThrsDGRMPFEexeed,
+    dsx1almNearQtrThrsCVPRemoteExceeded,
+    dsx1almNearQtrThrsESPRemoteExceeded,
+    dsx1almNearQtrThrsSESPRemoteExceeded,
+    dsx1almNearQtrThrsUASPRemoteExceeded,
+    dsx1almNearQtrThrsCVLRemoteExceeded,
+    dsx1almNearQtrThrsESLRemoteExceeded,
+    dsx1almNearQtrThrsESBPRemoteExceeded,
+    dsx1almNearQtrThrsCSSPRemoteExceeded,
+    dsx1almNearQtrThrsSEFSPRemoteExceeded
+   }
+   STATUS current
+   DESCRIPTION
+      "adDSX1Common Notification Group"
+   ::= { adDSX1CommonMibGroups 7 }
+
+adDSX1CommonPmResetGroup OBJECT-GROUP
+   OBJECTS
+   {
+        adDSX1CommonPmReset
+   }
+   STATUS current
+   DESCRIPTION
+     "PM reset objects"
+   ::= { adDSX1CommonMibGroups 8 }
+
+   END

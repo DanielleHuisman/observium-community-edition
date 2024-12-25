@@ -1,0 +1,2305 @@
+    ADTRAN-TA5K-SM-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN Total Access TA5000 SM MIB
+    -- PRODUCT:   1187020L1
+    -- VERSION:   1.0
+    -- DATE:      Dec 12, 2006
+
+    -- This MIB Contains tables specific to the TA5000 SM
+    --
+
+    -- MIBs supported:
+
+    -- HISTORY:
+    --     05/08/18 tpm First edition: Node, SFP Data, Forwarding Control, Aggregation,
+    --                                 Clocks, Metalic Test access
+    --     09/27/06 aed Changed adTa5kSmCurrentClock from read-write to read-only.
+    --     12/12/06 aed Added SM alarm definitions
+    --     02/01/07 aed Added adTa5KSmFallbackClock.  Added two new enum values for adTa5kSmCurrentClock.
+    --     05/18/07 aed Added external clock quality and preference.
+    --     08/31/07 aed Import sysName from SNMPv2-SMI, not RFC 1213.
+    --	   10/31/07 mguo changed "disable" from "0" to "1" on auto-negotiation.
+    --     11/05/07 aed Add support for IGMP interface mode and S-Tag TPID.
+    --                  Also, sysName should be imported from SNMPv2-MIB, not SNMPv2-SMI.
+    --     11/19/07 aed Add SNMP support for new timing status items: hop count, quality, and priority.
+    --                  Deprecated ExtA & ExtB preference provisioning items, because the range should be 0..255.
+    --	   12/13/07 mguo Add support for SFP internal information on NET1 and NET2.
+    --	   12/14/07 mguo Modified description of SFP TX/RX power levels from 0.1 dBm to 1 dBm.
+    --     02/27/07 aed Deprecate the exisiting timing failure alarm and add two new alarms for primary
+    --                  and secondary timing source failures.
+    --     05/13/08 aed Add two new alarm notifications: node number defaulted to 0, and internal mgmt vlan bad.
+    --     05/16/08 aed Modify the severity definitions for 5 alarms to match the SCM's alarm log severity.
+    --     06/10/08 aed Add support for port mode and lacp mode.  Correct typos in some description fields.
+    --                  Deprecate adTa5kUpstreamChaining and adTa5kDownstreamChaining.
+    --     09/29/08 aed Changes for SR4.1.  Maximum number of nodes is now 64.  Modify the description of adTa5kSmUplink
+    --                  to include information for new SMs that have more than two faceplate ports.
+    --     10/31/08 aed Deprecate Loss of Network STP alarm and Multiple Uplinks alarm.
+    --     06/30/09 aed Deprecate SM-specific OIDs which have been replaced by new generic MIBs:
+    --                  1)  Deprecate the OIDs related to SFPs, in favor of adGenPluggablePort.mi2
+    --                  2)  Deprecate autonegotiation OIDS in favor of genEthIfc.mi2
+    --                  3)  Deprecate SystemTiming OIDs in favor of adGenSystemTiming.mi2
+    --     09/30/09 aed Deprecate system timing alarms.  These alarms have been moved to adGenSystemTiming.mi2
+    --     11/09/09 jmz Documented additional uplink values added in SR5.0.2
+    --     01/29/09 jmz Documented additional port mode values added in SR5.0.2
+    --     2011/02/02 aed  Deprecated adTa5kSmPortMode.  (It has been moved to adTa5kTreeNetworking.mi2)
+    --                     Deprecated adTa5kSmLacpMode.  (It has been moved to adTa5kLinkAggregation.mi2)
+    --                     Added OIDS for provisioning the ethernet default interface.
+    --                     Deprecate adTa5kSmUplink in favor of the ethernet default interface OIDs.
+    --   *** DO NOT ADD REVISION COMMENTS HERE ****
+
+
+    IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Counter32,
+        IpAddress,
+--        Gauge32,
+--        Counter64,
+--        TimeTicks,
+--        Unsigned32,
+        NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+
+        sysName
+            FROM SNMPv2-MIB
+
+        ifIndex,
+        ifDescr,
+        InterfaceIndexOrZero
+--        InterfaceIndex
+            FROM IF-MIB
+
+        DisplayString,
+        TruthValue,
+        RowStatus,
+--        TimeInterval,
+        MacAddress,
+        TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+
+--        SnmpAdminString
+--            FROM SNMP-FRAMEWORK-MIB
+
+        adIdentity,
+        adProducts,
+        adMgmt
+            FROM ADTRAN-MIB
+
+--        IANAifType
+--                FROM IANAifType-MIB
+
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+
+       	adGenPortTrapIdentifier
+            FROM ADTRAN-GENPORT-MIB 
+            
+        adTAeSCUTrapAlarmLevel
+            FROM ADTRAN-TAeSCUEXT1-MIB;
+
+
+
+-- *********************************************************************************************************
+
+    adTa5kSmModuleIdentity MODULE-IDENTITY
+        LAST-UPDATED "202110260000Z"
+        ORGANIZATION
+            "ADTRAN, Inc."
+        CONTACT-INFO
+            "CND Tech Support
+                Postal: ADTRAN, Inc.
+                        901 Explorer Blvd.
+                        Huntsville, AL  35806
+                        Tel: +1 800 726-8663
+                        Fax: +1 256 963 6217
+                        E-mail: support@adtran.com"
+        DESCRIPTION
+            "Total Access 5000 SwitchModule 1187020L1 MIB"
+        
+        REVISION "202110260000Z"
+        DESCRIPTION "Add support for Backplane Incompatible alarm."
+
+        REVISION "201905070000Z"
+        DESCRIPTION "Update TC for EthernetDefaultInterfaceType to include xGigabitEthernet."
+
+        REVISION "201708241050Z"
+        DESCRIPTION "Add support for SM's peer link down alarm."
+
+        REVISION "201410291100Z"
+        DESCRIPTION "Add support for the BpRateFallback alarm enables."
+
+        REVISION "201409171555Z"
+        DESCRIPTION "Add support for the new muxponderSlot type of Ethernet Default Interface."		 
+        
+        REVISION "201404241000Z"
+        DESCRIPTION "Add support for the SM and SMIO hardware mismatch alarms."
+        
+        REVISION "201110261100Z"
+        DESCRIPTION "Add support for the alarm enables."
+
+        REVISION "201110111400Z"
+        DESCRIPTION "Add support for the internal-system-s-tag"
+
+        REVISION "201104122107Z"
+        DESCRIPTION "Add the node number as a varbind for adTa5kSmDuplicateNodeClear and adTa5kSmDuplicateNodeActive."
+        ::= { adIdentity 750 }
+
+-- OBJECT IDENTIFIERS
+    adTa5kSm         OBJECT IDENTIFIER ::= { adMgmt 750 }
+    adTa5kSmTraps    OBJECT IDENTIFIER ::= { adProducts 750 }
+    adTa5kSmAlarms   OBJECT IDENTIFIER ::= { adTa5kSmTraps 0 }
+    adTa5kSmConfig   OBJECT IDENTIFIER ::= { adTa5kSm 1 }
+    adTa5kSmProv     OBJECT IDENTIFIER ::= { adTa5kSm 2 }
+    adTa5kSmStatus   OBJECT IDENTIFIER ::= { adTa5kSm 3 }
+    adTa5kSmTest     OBJECT IDENTIFIER ::= { adTa5kSm 4 }
+    adTa5kSmPerfMon  OBJECT IDENTIFIER ::= { adTa5kSm 5 }
+    adTa5kSmAtpMfg   OBJECT IDENTIFIER ::= { adTa5kSm 6 }
+
+
+    -- ======================================================================
+    -- Config Menu Items
+
+    adTa5kSmSystemTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmSystemEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmConfig 1 }
+
+    adTa5kSmSystemEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmSystemEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kSmSystemTable 1 }
+
+   AdTa5kSmSystemEntry ::=
+       SEQUENCE {
+           adTa5kSmMaxNodes                       Integer32,
+           adTa5kSmMaxShelves                     Integer32,
+           adTa5kSmBootRev                        DisplayString,
+           adTa5kSmNet1SFPDescription             DisplayString,
+           adTa5kSmNet2SFPDescription             DisplayString,
+           adTa5kSmRingGenType                    INTEGER,
+           adTa5kSmSMIOType                       Integer32,
+           adTa5kSmNet1AutoNegoAdmnStat           INTEGER,
+           adTa5kSmNet2AutoNegoAdmnStat           INTEGER,
+           adTa5kSmNet1SFPVendorPartNumber	  DisplayString,
+           adTa5kSmNet1SFPVendorSerialNumber      DisplayString,
+           adTa5kSmNet1SFPRxPowerLevel            Integer32,
+           adTa5kSmNet1SFPTxPowerLevel            Integer32,
+           adTa5kSmNet1SFPTxBias               	  Integer32,
+           adTa5kSmNet1SFPTemperature          	  Integer32,
+           adTa5kSmNet1SFPSupplyVoltage        	  Integer32,
+           adTa5kSmNet2SFPVendorPartNumber	  DisplayString,
+           adTa5kSmNet2SFPVendorSerialNumber      DisplayString,
+           adTa5kSmNet2SFPRxPowerLevel            Integer32,
+           adTa5kSmNet2SFPTxPowerLevel            Integer32,
+           adTa5kSmNet2SFPTxBias               	  Integer32,
+           adTa5kSmNet2SFPTemperature          	  Integer32,
+           adTa5kSmNet2SFPSupplyVoltage        	  Integer32
+       }
+
+   adTa5kSmMaxNodes              OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The max number of nodes supported in a topology of TA5000's.  Value returned is only valid at the COT."
+       ::= { adTa5kSmSystemEntry 1 }
+
+   adTa5kSmMaxShelves            OBJECT-TYPE
+       SYNTAX                    Integer32 (1..32)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The max number of expansion shelves supported.  Value returned is only valid at the COT."
+       ::= { adTa5kSmSystemEntry 2 }
+
+   adTa5kSmBootRev               OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (0..32))
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Displays the boot revision"
+       ::= { adTa5kSmSystemEntry 3 }
+
+   adTa5kSmNet1SFPDescription    OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the description stored in the Net 1 SFP internal ROM."
+       ::= { adTa5kSmSystemEntry 4 }
+
+   adTa5kSmNet2SFPDescription    OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the description stored in the Net 2 SFP internal ROM"
+       ::= { adTa5kSmSystemEntry 5 }
+
+   adTa5kSmRingGenType           OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           internal40REN (1),
+           external (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The type of ring generator that is used to produce ringing on pots and combo cards."
+       ::= { adTa5kSmSystemEntry 6 }
+
+   adTa5kSmSMIOType              OBJECT-TYPE
+       SYNTAX                    Integer32 (0..255)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "The type of backplane interface that connects the Redundant SMs and optionally the SCM."
+       ::= { adTa5kSmSystemEntry 7 }
+
+   adTa5kSmNet1AutoNegoAdmnStat OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enable (1),
+           disable(2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "This is enablement and disablement of auto negotiation of the Net1 PHY"
+       ::= { adTa5kSmSystemEntry 8 }
+
+   adTa5kSmNet2AutoNegoAdmnStat  OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enable (1),
+           disable(2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "This is enablement and disablement of auto negotiation of the Net2 PHY"
+       ::= { adTa5kSmSystemEntry 9 }
+
+   adTa5kSmNet1SFPVendorPartNumber      OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "This displays the part-number stored in the Net 1 SFP internal ROM"
+       ::= { adTa5kSmSystemEntry 10 }
+
+   adTa5kSmNet1SFPVendorSerialNumber      OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the serial number stored in the Net 1 SFP internal ROM"
+       ::= { adTa5kSmSystemEntry 11 }
+
+   adTa5kSmNet1SFPRxPowerLevel      OBJECT-TYPE
+       SYNTAX                    Integer32 (-7000..7000)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays transceiver RX power level in 1 dBm on the Net 1 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 12 }
+
+   adTa5kSmNet1SFPTxPowerLevel      OBJECT-TYPE
+       SYNTAX                    Integer32 (-7000..7000)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays transceiver TX power level in 1 dBm on the Net 1 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 13 }
+
+   adTa5kSmNet1SFPTxBias      OBJECT-TYPE
+       SYNTAX                    Integer32 (0..255)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays transceiver TX bias in 1 mA on the Net 1 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 14 }
+
+   adTa5kSmNet1SFPTemperature      OBJECT-TYPE
+       SYNTAX                    Integer32 (-80..140)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the internal temperature in 1 Celsius on the Net 1 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 15 }
+
+   adTa5kSmNet1SFPSupplyVoltage      OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the supply voltage in 1 mV on the Net 1 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 16 }
+
+
+   adTa5kSmNet2SFPVendorPartNumber      OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the vendor part-number stored in the Net 2 SFP internal ROM"
+       ::= { adTa5kSmSystemEntry 17 }
+
+   adTa5kSmNet2SFPVendorSerialNumber      OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the vendor serial number stored in the Net 2 SFP internal ROM"
+       ::= { adTa5kSmSystemEntry 18 }
+
+   adTa5kSmNet2SFPRxPowerLevel      OBJECT-TYPE
+       SYNTAX                    Integer32 (-7000..7000)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays transceiver RX power level in 1 dBm on the Net 2 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 19 }
+
+   adTa5kSmNet2SFPTxPowerLevel      OBJECT-TYPE
+       SYNTAX                    Integer32 (-7000..7000)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays transceiver TX power level in 1 dBm on the Net 2 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 20 }
+
+   adTa5kSmNet2SFPTxBias      OBJECT-TYPE
+       SYNTAX                    Integer32 (0..255)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays transceiver TX bias in 1 mA on the Net 2 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 21 }
+
+   adTa5kSmNet2SFPTemperature      OBJECT-TYPE
+       SYNTAX                    Integer32 (-80..140)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the internal temperature in 1 Celsius on the Net 2 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 22 }
+
+   adTa5kSmNet2SFPSupplyVoltage      OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "This displays the supply voltage in 1 mV on the Net 2 SFP with SFF-8472 extensions"
+       ::= { adTa5kSmSystemEntry 23 }
+
+    -- ======================================================================
+    -- Provisioning Menu Items
+
+    adTa5kSmProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmProv 1 }
+
+    adTa5kSmProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kSmProvTable 1 }
+
+   AdTa5kSmProvEntry ::=
+       SEQUENCE {
+           adTa5kSmNode                       Integer32,
+           adTa5kSmUplink                     Integer32,
+           adTa5kSmAggregation                INTEGER,
+           adTa5kSmPrimaryClock               INTEGER,
+           adTa5kSmSecondaryClock             INTEGER,
+           adTa5kSmCurrentClock               INTEGER,
+           adTa5kSmClockModeRevertive         INTEGER,
+           adTa5kSmForceClockFailover         INTEGER,
+           adTa5kSmNetworkName                DisplayString,
+           adTa5kSmTopologyChangeCount        Integer32,
+           adTa5kSmTopologyInstance           Integer32,
+           adTa5kSmLoopASource                Integer32,
+           adTa5kSmLoopBSource                Integer32,
+           adTa5kSmExtAType                   INTEGER,
+           adTa5kSmExtBType                   INTEGER,
+           adTa5kSmUpstreamChaining           INTEGER,
+           adTa5kSmDownstreamChaining         INTEGER,
+           adTa5kSmFallbackClock              INTEGER,
+           adTa5kSmExtAQuality                INTEGER,
+           adTa5kSmExtBQuality                INTEGER,
+           adTa5kSmExtAPreference             Integer32,
+           adTa5kSmExtBPreference             Integer32,
+           adTa5kSmUseHopCount                INTEGER,
+           adTa5kSmIGMPInterfaceMode          INTEGER,
+           adTa5kSmSTagTPID                   INTEGER,
+           adTa5kSmExtAPriority               Integer32,
+           adTa5kSmExtBPriority               Integer32,
+           adTa5kSmInternalSTag               Integer32,
+           adTa5kSmBpRateAlarmSeverityLevel	  INTEGER
+       }
+
+   adTa5kSmNode                  OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "The TA5000 node number.  Valid set values are 1..n, where n is adTa5kSmMaxNodes.
+            adTa5kSmNode will return 0 if the node number has not been set."
+       ::= { adTa5kSmProvEntry 1 }
+
+   adTa5kSmUplink                OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "0 = None
+            1 - 22 = Slot number assignment
+            23 = Peer (Used by a special Facility Protect Mode, not used)
+            24 = Uplink is located on an expansion shelf
+            25 = Network port 1
+            26 = Network port 2
+            27 = Aggregation group
+            28 = Network port 3
+            29 = Network port 4
+            30 = ERPS ring 1
+            31 = ERPS ring 2
+            32 = ERPS ring 3
+            33 = ERPS ring 4"
+       ::= { adTa5kSmProvEntry 2 }
+
+   adTa5kSmAggregation           OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Enabling this setting will allow both net1 and net2 to operate as a single link"
+       ::= { adTa5kSmProvEntry 3 }
+
+   adTa5kSmPrimaryClock          OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           local (1),
+           net1  (2),
+           net2  (3),
+           loopA (4),
+           loopB (5),
+           extA  (7),
+           extB  (8)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Select the primary timing source for the system"
+       ::= { adTa5kSmProvEntry 4 }
+
+   adTa5kSmSecondaryClock        OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           local (1),
+           net1  (2),
+           net2  (3),
+           loopA (4),
+           loopB (5),
+           extA  (7),
+           extB  (8)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Select the secondary timing source for the system"
+       ::= { adTa5kSmProvEntry 5 }
+
+   adTa5kSmCurrentClock          OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           primary (1),
+           secondary (2),
+           fallback (3),
+           standby (4)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Read-Only: Displays which clock is currently in use by the system"
+       ::= { adTa5kSmProvEntry 6 }
+
+   adTa5kSmClockModeRevertive   OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Enabling this allows the clock to fail back to the primary should the primary source's
+            health return to normal.  Disabled means the clock will remain on the secondary source after
+            a failover."
+       ::= { adTa5kSmProvEntry 7 }
+
+   adTa5kSmForceClockFailover    OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           failover (1),
+           notavailable (2)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Writing a value to this will cause the clock source to failover, a get will always return 1"
+       ::= { adTa5kSmProvEntry 8 }
+
+   adTa5kSmNetworkName           OBJECT-TYPE
+       SYNTAX                    DisplayString (SIZE (1..32))
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "This is a string that can be bound to this topology."
+       ::= { adTa5kSmProvEntry 10 }
+
+   adTa5kSmTopologyChangeCount   OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "If the topology of the network changes this number will be incremented."
+       ::= { adTa5kSmProvEntry 11 }
+
+   adTa5kSmTopologyInstance      OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Used to index the Tlv table, each time this is called it
+            creates an instance for that viewer to read bulk data."
+       ::= { adTa5kSmProvEntry 12 }
+
+   adTa5kSmLoopASource           OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Designate which slot the LoopA Timing source will listen on."
+       ::= { adTa5kSmProvEntry 13 }
+
+   adTa5kSmLoopBSource           OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Designate which slot the LoopB Timing source will listen on."
+       ::= { adTa5kSmProvEntry 14 }
+
+   adTa5kSmExtAType              OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           bitsD4 (1),
+           bitsOD (2),
+           composite (3),
+           composite8kHz (4)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Select which type the External clock A input should expect."
+       ::= { adTa5kSmProvEntry 15 }
+
+   adTa5kSmExtBType              OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           bitsD4 (1),
+           bitsOD (2),
+           composite (3),
+           composite8kHz (4)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Select which type the External clock B input should expect."
+       ::= { adTa5kSmProvEntry 16 }
+
+   adTa5kSmUpstreamChaining              OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+      }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Enable/Disable Net1 port for redundancy chaining protection.
+            adTa5kUpstreamChaining has been replaced by adTa5kSmPortMode
+            beginning with TA5000 System Release 4.0."
+       ::= { adTa5kSmProvEntry 17 }
+
+   adTa5kSmDownstreamChaining              OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Enable/Disable Net2 port for redundancy chaining protection.
+            adTa5kDownstreamChaining has been replaced by adTa5kSmPortMode
+            beginning with TA5000 System Release 4.0."
+       ::= { adTa5kSmProvEntry 18 }
+
+   adTa5kSmFallbackClock        OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           local (1),
+           net1  (2),
+           net2  (3),
+           loopA (4),
+           loopB (5),
+           none  (6),
+           extA  (7),
+           extB  (8)
+           }
+       MAX-ACCESS                read-write
+       STATUS                    deprecated
+       DESCRIPTION
+           "Select the fallback timing source for the system"
+       ::= { adTa5kSmProvEntry 19 }
+
+   adTa5kSmExtAQuality          OBJECT-TYPE
+        SYNTAX  INTEGER {
+                stratum1 (1),
+                synchronized (2),
+                stratum2 (3),
+                transmitModeClock (4),
+                stratum3e (5),
+                stratum3 (6),
+                sonetClock (7),
+                stratum4or4e (8),
+                doNotUseForSync (15)
+                }
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "Select the quality for External Clock A."
+        ::= {adTa5kSmProvEntry 20 }
+
+   adTa5kSmExtBQuality          OBJECT-TYPE
+        SYNTAX  INTEGER {
+                stratum1 (1),
+                synchronized (2),
+                stratum2 (3),
+                transmitModeClock (4),
+                stratum3e (5),
+                stratum3 (6),
+                sonetClock (7),
+                stratum4or4e (8),
+                doNotUseForSync (15)
+                }
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "Select the quality for External Clock B."
+        ::= {adTa5kSmProvEntry 21 }
+
+   adTa5kSmExtAPreference       OBJECT-TYPE
+        SYNTAX                  Integer32 (0..32)
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "This object has been replaced by adTa5kSmExtAPriority."
+        ::= {adTa5kSmProvEntry 22 }
+
+   adTa5kSmExtBPreference       OBJECT-TYPE
+        SYNTAX                  Integer32 (0..32)
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "This object has been replaced by adTa5kSmExtBPriority."
+        ::= {adTa5kSmProvEntry 23 }
+
+    adTa5kSmUseHopCount         OBJECT-TYPE
+        SYNTAX                  INTEGER {
+                enabled (1),
+                disabled (2)
+                }
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "Enable or disable the hop count in SM timing messages."
+        ::= {adTa5kSmProvEntry 24 }
+
+    adTa5kSmIGMPInterfaceMode  OBJECT-TYPE
+        SYNTAX                    INTEGER {
+           diable (1),
+           proxy (2),
+           snooping (4)
+           }
+        MAX-ACCESS                read-write
+        STATUS                    current
+        DESCRIPTION
+            "This item controls processing of IGMP packets."
+        ::= { adTa5kSmProvEntry 25 }
+
+
+    adTa5kSmSTagTPID   OBJECT-TYPE
+        SYNTAX    INTEGER(0..65535)
+        MAX-ACCESS              read-write
+        STATUS                  current
+        DESCRIPTION
+            "The S-Tag TPID.  The value is intended to be displayed as a hexadecimal number."
+        ::= { adTa5kSmProvEntry 26 }
+
+    adTa5kSmExtAPriority        OBJECT-TYPE
+        SYNTAX                  Integer32 (0..255)
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "Select the priority for External Clock A.
+             Set adTa5kSmExtAPriority to 0 to use the
+             node number as the priority.  Override this
+             default behavior by setting a value from 1 to 255."
+        ::= {adTa5kSmProvEntry 27 }
+
+    adTa5kSmExtBPriority        OBJECT-TYPE
+        SYNTAX                  Integer32 (0..255)
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "Select the priority for External Clock B.
+             Set adTa5kSmExtBPriority to 0 to use the
+             node number as the priority.  Override this
+             default behavior by setting a value from 1 to 255."
+        ::= {adTa5kSmProvEntry 28 }
+
+   adTa5kSmInternalSTag          OBJECT-TYPE
+       SYNTAX                    Integer32 (2..4094)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "S-Tag returned for internal data/configuration traffic."
+       ::= {adTa5kSmProvEntry  29 }  
+           
+   adTa5kSmBpRateAlarmSeverityLevel          OBJECT-TYPE
+       SYNTAX                    INTEGER {
+       							 alert(3),
+       							 minor(4),
+       							 major(5),
+       							 critical(6)
+       							 }       							 
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Provision the severity level of BpRateFallback alarm."
+       ::= {adTa5kSmProvEntry  30 }  
+       
+
+   adTa5kSmNetworkPortProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmNetworkPortProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmProv 2 }
+
+    adTa5kSmNetworkPortProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmNetworkPortProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "This table is indexed by the ifIndex of each Switch Module faceplate port."
+       INDEX { ifIndex }
+       ::= { adTa5kSmNetworkPortProvTable 1 }
+
+    AdTa5kSmNetworkPortProvEntry ::=
+       SEQUENCE {
+           adTa5kSmPortMode                   INTEGER,
+           adTa5kSmLACPMode                   INTEGER
+       }
+
+   adTa5kSmPortMode       OBJECT-TYPE
+        SYNTAX                  INTEGER {
+            unused (1),
+            networkInterface (2),
+            uplink (3),
+            downlink (4),
+            erps (5)
+            }
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+           "This value determines the how this port affects SM redundancy decisions.
+            Unused (1) - this port is ignored in redundancy decisions.  Use this setting
+                          for ports that are not in use, or any port that does not need to be
+                          considered in redundancy decisions.
+            Network Interface (2) - Set adTa5kSmRedundancyMode to 2 only in Node 1, Shelf 1.
+                                    Indicates that this port is connected to an upstream router or other
+                                    non-TA5000 networking equipment.
+            Uplink (3) - Indicates that this port is connected to an upstream TA5000 Node.
+            Downlink (4) - Indicates that this port is connected to a downstream TA5000 Node.
+            ERPS (5) - Indicates that this port participates in an ERPS ring, and thus
+                       supports ERPS timing, but is ignored for redundancy decisions."
+        ::= {adTa5kSmNetworkPortProvEntry 1}
+
+    adTa5kSmLACPMode            OBJECT-TYPE
+        SYNTAX                  INTEGER {
+            disabled (1),
+            active (2),
+            passive (3)
+            }
+        MAX-ACCESS              read-write
+        STATUS                  deprecated
+        DESCRIPTION
+            "LACP Mode for the network port."
+        ::= {adTa5kSmNetworkPortProvEntry 2}
+
+    adTa5kSmEthernetDefaultInterface     OBJECT IDENTIFIER ::= { adTa5kSmProv 3 }
+
+        adTa5kSmEthDefaultInterfaceIndex    OBJECT-TYPE
+                SYNTAX                      InterfaceIndexOrZero
+                MAX-ACCESS                  read-write
+                STATUS                      current
+                DESCRIPTION
+                        "The IfIndex of the ethernet default interface.
+                        A value of zero indicates no ethernet default interface.
+                        ** Warning ** Setting adTa5kSmEthDefaultInterfaceIndex can
+                        disable remote management of this system."
+                ::= { adTa5kSmEthernetDefaultInterface 1 }
+
+	EthernetDefaultInterfaceType ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+                "Specifies the interface types which may be the ethernet default interface."
+        SYNTAX   INTEGER {
+                       none(1),
+                       gigabitEthernet(2),
+                       tenGigabitEthernet(3),
+                       lagGroup(4),
+                       accessModule(5),
+                       efmGroup(6),
+                       efmPort(7),
+                       erps(8),
+                       atmPort(9),
+                       rpr(10),
+                       atmGroup(11),
+                       muxponderSlot(12),
+                       xGigabitEthernet(13)
+                 }
+
+	adTa5kSmEthernetDefaultIfcType            OBJECT-TYPE
+        SYNTAX                 	EthernetDefaultInterfaceType
+        MAX-ACCESS              read-only
+        STATUS                  current
+        DESCRIPTION
+            "The ethernet default interface type."
+        ::= {adTa5kSmEthernetDefaultInterface 2}
+
+	adTa5kSmEthernetDefaultIfcSlot		OBJECT-TYPE
+		SYNTAX					INTEGER(0..65535)
+		MAX-ACCESS				read-only
+		STATUS					current
+		DESCRIPTION
+			"The ethernet default interface slot.
+			 Slots 1-22 represent access module slots.
+			 Slot 239 is the active SM slot.
+			 Slot 252 is SM-A.
+			 Slot 253 is SM-B.
+			 adTa5kSmEthernetDefaultIfcSlot will return 0 if adTa5kSmEthernetDefaultIfcType = none(1)."
+                ::= {adTa5kSmEthernetDefaultInterface 3}
+
+	adTa5kSmEthernetDefaultIfcPort		OBJECT-TYPE
+		SYNTAX					INTEGER(0..255)
+		MAX-ACCESS				read-only
+		STATUS					current
+		DESCRIPTION
+			"The ethernet default interface port.  This value may represent a physical port
+			 or a logical port.  For example, if the ethernet default interface is
+			 gigabit-ethernet 1/A/2, then adTa5kSmEthernetDefaultIfcPort = physical port 2.
+			 If the ethernet default interface is lag-group 1/A/1, then
+			 adTa5kSmEthernetDefaultIfcPort = 1 to indicate lag-group #1 on slot A.
+			 adTa5kSmEthernetDefaultIfcPort will return 0 if adTa5kSmEthernetDefaultIfcType = none(1)."
+
+                ::= {adTa5kSmEthernetDefaultInterface 4}
+
+
+-- ******************************************************************************************
+-- Alarm Provisioning
+-- ******************************************************************************************
+
+    adTa5kSmAlarmProvTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmProv 4 }
+
+    adTa5kSmAlarmProvEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmAlarmProvEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kSmAlarmProvTable 1 }
+
+   AdTa5kSmAlarmProvEntry ::=
+       SEQUENCE {
+           adTa5kSmRingGenFailAlarmEnable	       	        TruthValue,
+           adTa5kSmPowerLimitExceededAlarmEnable  	        TruthValue,
+           adTa5kSmDuplicateNodeAlarmEnable                     TruthValue,
+           adTa5kSmDuplicateScmIpAlarmEnable                    TruthValue,
+           adTa5kSmNodeNumberProvAlarmEnable                    TruthValue,
+           adTa5kSmMgmtVlanFailAlarmEnable                      TruthValue,
+           adTa5kSmioMismatchAlarmEnable                        TruthValue,
+           adTa5kSmBPRateFallbackAlarmEnable                    TruthValue,
+           adTa5kSmPeerLinksDownAlarmEnable                     TruthValue
+       }
+
+   adTa5kSmRingGenFailAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 1 }
+
+   adTa5kSmPowerLimitExceededAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 2 }
+
+   adTa5kSmDuplicateNodeAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 3 }
+
+   adTa5kSmDuplicateScmIpAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 4 }
+
+   adTa5kSmNodeNumberProvAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 5 }
+
+   adTa5kSmMgmtVlanFailAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 6 }
+
+   adTa5kSmioMismatchAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 7 }
+
+   adTa5kSmBPRateFallbackAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 8 }
+
+
+   adTa5kSmPeerLinksDownAlarmEnable OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "True - alarm is enabled"
+
+        DEFVAL {true}
+
+        ::= { adTa5kSmAlarmProvEntry 9 }
+
+-- ***************************************************************
+--  Status Items
+-- ***************************************************************
+
+    adTa5kSmClockStatusTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmClockStatusEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmStatus 1 }
+
+    adTa5kSmClockStatusEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmClockStatusEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kSmClockStatusTable 1 }
+
+   AdTa5kSmClockStatusEntry ::=
+       SEQUENCE {
+           adTa5kSmLoopAClockHealth               INTEGER,
+           adTa5kSmLoopBClockHealth               INTEGER,
+           adTa5kSmBitsAClockHealth               INTEGER,
+           adTa5kSmBitsBClockHealth               INTEGER,
+           adTa5kSmPrimaryClockHealth             INTEGER,
+           adTa5kSmSecondaryClockHealth           INTEGER,
+           adTa5kSmRingVoltagePresent             Integer32,
+           adTa5kSmRingFail                       Integer32,
+           adTa5kSmPeerRingFail                   Integer32,
+           adTa5kSmCurrentHopCount                INTEGER,
+           adTa5kSmCurrentTimingSourcePriority    INTEGER,
+           adTa5kSmCurrentTimingSourceQuality     INTEGER
+       }
+
+   adTa5kSmLoopAClockHealth      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           up (1),
+           down (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Displays the health of the loop A timing source"
+       ::= { adTa5kSmClockStatusEntry 1 }
+
+   adTa5kSmLoopBClockHealth      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           up (1),
+           down (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Displays the health of the loop B timing source"
+       ::= { adTa5kSmClockStatusEntry 2 }
+
+   adTa5kSmBitsAClockHealth      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           up (1),
+           down (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Displays the health of the bits A timing source"
+       ::= { adTa5kSmClockStatusEntry 3 }
+
+   adTa5kSmBitsBClockHealth      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           up (1),
+           down (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Displays the health of the bits B timing source"
+       ::= { adTa5kSmClockStatusEntry 4 }
+
+   adTa5kSmPrimaryClockHealth      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           up (1),
+           down (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Displays the health of the primary timing source"
+       ::= { adTa5kSmClockStatusEntry 5 }
+
+   adTa5kSmSecondaryClockHealth      OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           up (1),
+           down (2)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Displays the health of the secondary timing source"
+       ::= { adTa5kSmClockStatusEntry 6 }
+
+   adTa5kSmRingVoltagePresent    OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "Boolean, 0 - Ring voltage is not present, 1 - Ring voltage is
+            present.  If you are not using an internal ring generator then
+            this could indicate that the external ring voltage source has
+            failed or is not connected."
+       ::= { adTa5kSmClockStatusEntry 7 }
+
+   adTa5kSmRingFail              OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Boolean, 0 - Not Failed, 1 - Failed."
+       ::= { adTa5kSmClockStatusEntry 8 }
+
+   adTa5kSmPeerRingFail              OBJECT-TYPE
+       SYNTAX                    Integer32
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Boolean, 0 - Not Failed, 1 - Failed."
+       ::= { adTa5kSmClockStatusEntry 9 }
+
+   adTa5kSmCurrentHopCount       OBJECT-TYPE
+       SYNTAX                    INTEGER (1..255)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "The number of hops for the current timing source."
+       ::= { adTa5kSmClockStatusEntry 10 }
+
+   adTa5kSmCurrentTimingSourcePriority     OBJECT-TYPE
+       SYNTAX                    INTEGER (0..255)
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "The priority value for the current timing source."
+       ::= { adTa5kSmClockStatusEntry 11 }
+
+   adTa5kSmCurrentTimingSourceQuality      OBJECT-TYPE
+       SYNTAX  INTEGER {
+                stratum1 (1),
+                synchronized (2),
+                stratum2 (3),
+                transmitModeClock (4),
+                stratum3e (5),
+                stratum3 (6),
+                sonetClock (7),
+                stratum4or4e (8),
+                doNotUseForSync (15)
+                }
+       MAX-ACCESS                read-only
+       STATUS                    deprecated
+       DESCRIPTION
+           "The quality of the current timing source."
+       ::= { adTa5kSmClockStatusEntry 12 }
+
+-- ***************************************************************
+
+    adTa5kSmMetalicTestAccessTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmMetalicTestAccessEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmTest 1 }
+
+    adTa5kSmMetalicTestAccessEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmMetalicTestAccessEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kSmMetalicTestAccessTable 1 }
+
+   AdTa5kSmMetalicTestAccessEntry ::=
+       SEQUENCE {
+           adTa5kSmFacilityTR                     INTEGER,
+           adTa5kSmFacilityT1R1                   INTEGER,
+           adTa5kSmEquipmentTR                    INTEGER,
+           adTa5kSmEquipmentT1R1                  INTEGER,
+           adTa5kSmLoopTR                         INTEGER,
+           adTa5kSmLoopT1R1                       INTEGER
+       }
+
+   adTa5kSmFacilityTR            OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kSmMetalicTestAccessEntry 1 }
+
+   adTa5kSmFacilityT1R1          OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kSmMetalicTestAccessEntry 2 }
+
+   adTa5kSmEquipmentTR           OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kSmMetalicTestAccessEntry 3 }
+
+   adTa5kSmEquipmentT1R1         OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kSmMetalicTestAccessEntry 4 }
+
+   adTa5kSmLoopTR                OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kSmMetalicTestAccessEntry 5 }
+
+   adTa5kSmLoopT1R1              OBJECT-TYPE
+       SYNTAX                    INTEGER {
+           enabled (1),
+           disabled (2),
+           notApplicable (3)
+           }
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           ""
+       ::= { adTa5kSmMetalicTestAccessEntry 6 }
+
+
+-- ***************************************************************
+
+    adTa5kSmAtpTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdTa5kSmAtpEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       ::= { adTa5kSmAtpMfg 1 }
+
+    adTa5kSmAtpEntry OBJECT-TYPE
+       SYNTAX      AdTa5kSmAtpEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "..."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adTa5kSmAtpTable 1 }
+
+   AdTa5kSmAtpEntry ::=
+       SEQUENCE {
+           adTa5kSmTemp1                       Integer32,
+           adTa5kSmTemp2                       Integer32,
+           adTa5kSmExpMac                      OCTET STRING,
+           adTa5kSmPeerMac                     OCTET STRING
+       }
+
+   adTa5kSmTemp1              OBJECT-TYPE
+       SYNTAX                    Integer32 (1..32)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Upper Temp sensor: Temperature in tenths of a degrees C."
+       ::= { adTa5kSmAtpEntry 1 }
+
+   adTa5kSmTemp2              OBJECT-TYPE
+       SYNTAX                    Integer32 (1..32)
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Lower Temp sensor: Temperature in tenths of a degrees C."
+       ::= { adTa5kSmAtpEntry 2 }
+
+   adTa5kSmExpMac                OBJECT-TYPE
+       SYNTAX                    OCTET STRING
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Mac Address of the Expansion Port."
+       ::= { adTa5kSmAtpEntry 3 }
+
+   adTa5kSmPeerMac               OBJECT-TYPE
+       SYNTAX                    OCTET STRING
+       MAX-ACCESS                read-only
+       STATUS                    current
+       DESCRIPTION
+           "Mac Address of the internal link between the SM and its peer."
+       ::= { adTa5kSmAtpEntry 4 }
+
+-- -------------------------------------
+-- Switch Module Alarms
+-- -------------------------------------
+
+   adTa5kSmTimingSrcClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the primary and/or secondary timing source alarm has cleared"
+
+         --#TYPE         "Status - Timing Src Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Timing Source Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 2 }
+
+   adTa5kSmTimingSrcFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the primary and/or secondary timing source has failed"
+
+         --#TYPE         "Status - Timing Src Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Timing Source Failure on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 3 }
+
+   adTa5kSmRingGenClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates ring generator alarm clear"
+
+         --#TYPE         "Status - Ring Generator Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Ring Generator Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 4 }
+
+   adTa5kSmRingGenFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the ring generator has failed"
+
+         --#TYPE         "Status - Ring Generator Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Ring Generator Failure on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 5 }
+
+   adTa5kSmPowerLimitAlmClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the power limit alarm has cleared"
+
+         --#TYPE         "Status - Power Limit Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Power Limit Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 6 }
+
+   adTa5kSmPowerLimitExceeded         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the shelf power limit has been exceeded"
+
+         --#TYPE         "Status - Power Limit Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Power Limit Exceeded On"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 7 }
+
+   adTa5kSmUnknownSfpClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the unknown SFP alarm has cleared"
+
+         --#TYPE         "Status - Unknown SFP Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Unknown SFP Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 8 }
+
+   adTa5kSmUnknownSfpAlarm         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the unknown SFP alarm is active"
+
+         --#TYPE         "Status - Unknown SFP Alarm"
+         --#SUMMARY      "TA5000 Switch Module: Unknown SFP Alarm on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 9 }
+
+   adTa5kSmSfpFaultClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the SFP fault has cleared"
+
+         --#TYPE         "Status - SFP Fault Clear"
+         --#SUMMARY      "TA5000 Switch Module: SFP Fault Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 10 }
+
+   adTa5kSmSfpFaultActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the SFP fault is active"
+
+         --#TYPE         "Status - SFP Fault Active"
+         --#SUMMARY      "TA5000 Switch Module: SFP Fault Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 11 }
+
+      adTa5kSmMultipleUplinksClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the multiple uplink alarm has cleared"
+
+         --#TYPE         "Status - Multiple Uplink Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Multiple Uplink Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 12 }
+
+   adTa5kSmMultipleUplinksDetected         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that multiple uplinks have been detected"
+
+         --#TYPE         "Status - Multiple Uplink Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Multiple Uplink Alarm Active on"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 13 }
+
+   adTa5kSmExtAFailureClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the ExtA timing failure has been cleared"
+
+         --#TYPE         "Status - ExtA Timing Failure Clear"
+         --#SUMMARY      "TA5000 Switch Module: ExtA Timing Failure Cleared On"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 14 }
+
+   adTa5kSmExtAFailureActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the ExtA timing has failed"
+
+         --#TYPE         "Status - ExtA Timing Failure Active"
+         --#SUMMARY      "TA5000 Switch Module: ExtA Timing Failure Active On"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 15 }
+
+   adTa5kSmExtBFailureClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the ExtB timing failure has been cleared"
+
+         --#TYPE         "Status - ExtB Timing Failure Clear"
+         --#SUMMARY      "TA5000 Switch Module: ExtB Timing Failure Cleared On"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 16 }
+
+   adTa5kSmExtBFailureActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the ExtA timing has failed"
+
+         --#TYPE         "Status - ExtB Timing Failure Active"
+         --#SUMMARY      "TA5000 Switch Module: ExtB Timing Failure Active On"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 17 }
+
+   adTa5kSmLossOfHeartbeatClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the loss of heartbeat alarm cleared"
+
+         --#TYPE         "Status - Loss of Heartbeat Clear"
+         --#SUMMARY      "TA5000 Switch Module: Loss of Heartbeat Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 18 }
+
+   adTa5kSmLossOfHeartbeatActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the loss of heartbeat alarm is active"
+
+         --#TYPE         "Status - Loss of Heartbeat Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Loss of Heartbeat Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 19 }
+
+   adTa5kSmLossOfNetworkStpClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the loss of network STP alarm cleared"
+
+         --#TYPE         "Status - Loss of Network STP Clear"
+         --#SUMMARY      "TA5000 Switch Module: Loss of Network STP Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 20 }
+
+   adTa5kSmLossOfNetworkStpActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the loss of network STP alarm active"
+
+         --#TYPE         "Status - Loss of Network STP Active"
+         --#SUMMARY      "TA5000 Switch Module: Loss of Network STP Alarm Active on"
+         --#SUMMARY      "Shelf: %s   Slot, Port: %s"
+         --#ARGUMENTS    {1,3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 21 }
+
+   adTa5kSmDuplicateNodeClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adTa5kSmNode 
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the duplicate node alarm has been cleared"
+
+         --#TYPE         "Status - Duplicate Node Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Duplicate Node Alarm Cleared On"
+         --#SUMMARY      "Shelf: %s, Slot %d, Node %d"
+         --#ARGUMENTS    {1, 2, 3}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 22 }
+
+   adTa5kSmDuplicateNodeActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adTa5kSmNode
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the duplicate node alarm is active"
+
+         --#TYPE         "Status - Duplicate Node Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Duplicate Node Alarm Active on"
+         --#SUMMARY      "Shelf: %s, Slot %d, Node %d"
+         --#ARGUMENTS    {1, 2, 3}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 23 }
+
+   adTa5kSmDuplicateScmIpClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the duplicate SCM IP address alarm has been cleared"
+
+         --#TYPE         "Status - Duplicate SCM IP Address Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Duplicate SCM IP Address Alarm Cleared On"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 24 }
+
+   adTa5kSmDuplicateScmIpActive         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the duplicate SCM IP address alarm is active"
+
+         --#TYPE         "Status - Duplicate SCM IP Address Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Duplicate SCM IP Address Alarm on"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 25 }
+
+   adTa5kSmBandwidthFullClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Bandwidth full alarm has been cleared"
+
+         --#TYPE         "Status - Bandwidth Full Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Bandwidth Full Alarm Cleared On"
+         --#SUMMARY      "Shelf: %s, Slot, Node: %s"
+         --#ARGUMENTS    {1, 3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 26 }
+
+   adTa5kSmBandwidthFull         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            adGenPortTrapIdentifier
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Bandwidth full alarm is active"
+
+         --#TYPE         "Status - Bandwidth Full Alarm"
+         --#SUMMARY      "TA5000 Switch Module: Bandwidth Full Alarm Active On"
+         --#SUMMARY      "Shelf: %s, Slot, Node: %s"
+         --#ARGUMENTS    {1, 3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 27 }
+
+   adTa5kSmPriTimingSrcClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the primary timing source alarm has cleared"
+
+         --#TYPE         "Status - Primary Timing Src Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Timing Source Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 28 }
+
+   adTa5kSmPriTimingSrcFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the primary timing source has failed"
+
+         --#TYPE         "Status - Primary Timing Src Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Timing Source Failure on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 29 }
+
+   adTa5kSmSecTimingSrcClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the secondary timing source alarm has cleared"
+
+         --#TYPE         "Status - Secondary Timing Src Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Timing Source Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 30 }
+
+   adTa5kSmSecTimingSrcFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  deprecated
+        DESCRIPTION
+           "Indicates that the secondary timing source has failed"
+
+         --#TYPE         "Status - Secondary Timing Src Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Timing Source Failure on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 31 }
+
+   adTa5kSmNodeNumberProvClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the shelf's node number has been provisioned and is not zero."
+
+         --#TYPE         "Status - SM Node Number Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Node Number Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 32 }
+
+   adTa5kSmNodeNumberDefault         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the shelf's node number has not been provisioned."
+
+         --#TYPE         "Status - SM Node Number Alarm"
+         --#SUMMARY      "TA5000 Switch Module: Node Number Alarm on"
+         --#SUMMARY      "Shelf: %s"
+         --#ARGUMENTS    {1}
+         --#SEVERITY     WARNING
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 33 }
+
+   adTa5kSmMgmtVlanFailClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the SM's failure to communicate the Internal Management VLAN to an access module has cleared."
+
+         --#TYPE         "Status - Internal Mgmt VLAN Alarm Clear"
+         --#SUMMARY      "TA5000 Switch Module: Internal Mgmt VLAN Alarm Cleared on"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 34 }
+
+   adTa5kSmMgmtVlanFail         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the SM has failed to communicate the Internal Management VLAN to an access module."
+
+         --#TYPE         "Status - Internal Mgmt VLAN Alarm"
+         --#SUMMARY      "TA5000 Switch Module: Internal Mgmt VLAN Alarm on"
+         --#SUMMARY      "Shelf: %s, Slot: %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MINOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 35 }        
+      
+   adTa5kSmioMismatchClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that either there is no hardware incompatibility among the  SM cards 
+            and SMIO Or ERPS/CSLAG is not provisioned."
+           
+         --#TYPE         "Status - incompatible SMIO alarm cleared"
+         --#SUMMARY      "TA5000 Switch Module: no hardware incompatibility among the SM and SMIO Or ERPS/CSLAG is not provisioned."
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 36 }
+
+   adTa5kSmioMismatch             NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that attempts for provisioning of ERPS or CSLAG is made and hardware incompatibility detected 
+            among SM and SMIO"
+
+         --#TYPE         "Status - incompatible SMIO"
+         --#SUMMARY      "TA5000 Switch Module: Attempts for provisioning of ERPS or CSLAG is made and hardware incompatibility detected among SM and SMIO"
+         --#SUMMARY      "Shelf: %s, Slot %d"
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 37 }
+
+   adTa5kSmBackPlaneRateFallbackClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            ifIndex,
+            adTAeSCUTrapAlarmLevel
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the AM is out of Backplane Rate Fallback mode.
+            adGenSlotInfoIndex indicates the slot of the card sending the alarm,
+            which is always the active SM.
+            ifIndex indicates the associated backplane port interface at
+            fault."
+
+         --#TYPE         "Status - BackPlane Rate Fallback Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: BackPlane Rate Fallback Alarm on"
+         --#SUMMARY      "Shelf: %s, Slot: %d, Port: %d"
+         --#ARGUMENTS    {1, 2, 3}
+         --#SEVERITY     ALERT
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 38 }
+
+   adTa5kSmBackPlaneRateFallback         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            ifIndex,
+            adTAeSCUTrapAlarmLevel
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the AM is in Backplane Rate Fallback mode.
+            adGenSlotInfoIndex indicates the slot of the card sending the alarm,
+            which is always the active SM.
+            ifIndex indicates the associated backplane port interface at
+            fault."
+
+         --#TYPE         "Status - BackPlane Rate Fallback Alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: BackPlane Rate Fallback Alarm on"
+         --#SUMMARY      "Shelf: %s, Slot: %d, Port: %d"
+         --#ARGUMENTS    {1, 2, 3}
+         --#SEVERITY     ALERT
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 39 }
+
+   adTa5kSmPeerLinkDownClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            ifIndex,
+            ifDescr
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the link status of the high speed peer interface between redundant switch modules is up.
+            ifIndex indicates the associated peer port interface"
+
+         --#TYPE         "Status - peer link down alarm cleared"
+         --#SUMMARY      "TA5000 Switch Module: Peer Link Down Alarm cleared"
+         --#SUMMARY      "Shelf: %s, Slot: %d, Port: %d"
+         --#ARGUMENTS    {1, 2, 3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 40 }
+
+   adTa5kSmPeerLinkDown         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex,
+            ifIndex,
+            ifDescr
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the link status of the high speed peer interface between redundant switch modules is down.
+            ifIndex indicates the associated peer port interface"
+
+         --#TYPE         "Status - peer link down alarm Active"
+         --#SUMMARY      "TA5000 Switch Module: Peer Link Down Alarm on"
+         --#SUMMARY      "Shelf: %s, Slot: %d, Port: %d"
+         --#ARGUMENTS    {1, 2, 3}
+         --#SEVERITY     MAJOR
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 41 }
+      
+   adTa5kSmBackPlaneIncompatibleClear         NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that the Backplane Incompatible alarm has been cleared."
+
+         --#TYPE         "Status - Backplane Incompatible alarm cleared"
+         --#SUMMARY      "TA5000 Switch Module: Slot Backplane Incompatible alarm cleared."
+         --#SUMMARY      "Shelf: %s, Slot: %d, "
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     Major
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 42 }
+
+
+
+   adTa5kSmBackPlaneIncompatibleActive             NOTIFICATION-TYPE
+        OBJECTS {
+            adTrapInformSeqNum,
+            sysName,
+            adGenSlotInfoIndex
+        }
+        STATUS  current
+        DESCRIPTION
+           "Indicates that SM cards are not capable of full backplane speeds to some slots in the chassis."
+
+         --#TYPE         "Status - Backplane Incompatible alarm is active"
+         --#SUMMARY      "TA5000 Switch Module: not capable of full backplane speeds to some slots in the chassis."
+         --#SUMMARY      "Shelf: %s, Slot: %d, "
+         --#ARGUMENTS    {1, 2}
+         --#SEVERITY     Major
+         --#GENERIC      6
+         --#CATEGORY     "Error Events"
+         --#SOURCE_ID    "A"
+         --#TIMEINDEX    0
+      ::= { adTa5kSmAlarms 43 }
+
+
+   END

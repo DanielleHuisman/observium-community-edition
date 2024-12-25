@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -106,6 +106,7 @@ $config['wui']['refresh_disabled'][]  = [ 'page' => 'delsrv' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'deleted-ports' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'user_add' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'user_edit' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'roles' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'settings' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'preferences' ];
 $config['wui']['refresh_disabled'][]  = [ 'page' => 'logout' ];
@@ -272,15 +273,18 @@ $config['icon']['powerfactor']       = "sprite-lightning hue-270";
 
 $config['icon']['impedance']         = "sprite-ohms-2";
 $config['icon']['resistance']        = "sprite-ohms";
+$config['icon']['runtime']           = "sprite-runtime";
+$config['icon']['capacity']          = "sprite-capacity";
 $config['icon']['velocity']          = "sprite-performance";
 $config['icon']['waterflow']         = "sprite-flowrate";
 $config['icon']['volume']            = "sprite-volume";
 $config['icon']['distance']          = "sprite-distance";
 $config['icon']['lflux']             = "sprite-light-bulb";
 $config['icon']['clock']             = "sprite-clock";
+$config['icon']['time']              = "sprite-hourglass";
 $config['icon']['fiber']             = "sprite-laser"; // FIXME need other icon
 $config['icon']['wavelength']        = "sprite-laser"; // FIXME need other icon
-$config['icon']['gauge']             = "sprite-data"; // FIXME need other icon
+$config['icon']['gauge']             = "sprite-data";  // FIXME need other icon
 $config['icon']['distance']          = "sprite-distance";
 
 // Status classes
@@ -292,7 +296,7 @@ $config['icon']['fan']               = $config['icon']['fanspeed'];
 $config['icon']['blower']            = $config['icon']['airflow'];
 $config['icon']['chassis']           = "sprite-nic";          // FIXME need other icon
 $config['icon']['contact']           = "sprite-connected";    // FIXME need other icon
-$config['icon']['breaker']           = "sprite-connected";    // FIXME need other icon
+$config['icon']['breaker']           = "sprite-power";        // FIXME need other icon
 $config['icon']['output']            = "sprite-merge";        // FIXME need other icon
 $config['icon']['powersupply']       = "sprite-power";        // FIXME need other icon
 $config['icon']['rectifier']         = "sprite-frequency-2";  // FIXME need other icon
@@ -300,10 +304,7 @@ $config['icon']['rectifier']         = "sprite-frequency-2";  // FIXME need othe
 $config['icon']['service']           = "sprite-service";
 $config['icon']['servicegroup']      = $config['icon']['service'];
 $config['icon']['vserver']           = "sprite-device";
-
-$config['icon']['runtime']           = "sprite-runtime";
 $config['icon']['apps']              = "sprite-applications";
-$config['icon']['capacity']          = "sprite-capacity";
 $config['icon']['collectd']          = "sprite-collectd";
 $config['icon']['munin']             = "sprite-munin";
 $config['icon']['smokeping']         = "sprite-paper-plane";
@@ -388,7 +389,7 @@ $config['type_class']['ospfIfType'] = [
 ];
 
 $config['type_class']['ospfIfState'] = [
-    'down'                   => [ 'class' => 'error',      'icon' => NULL ],
+    'down'                   => [ 'class' => 'important',  'icon' => NULL ],
     'loopback'               => [ 'class' => 'warning',    'icon' => NULL ],
     'waiting'                => [ 'class' => 'warning',    'icon' => NULL ],
     'pointToPoint'           => [ 'class' => 'success',    'icon' => NULL ],
@@ -398,7 +399,7 @@ $config['type_class']['ospfIfState'] = [
 ];
 
 $config['type_class']['ospfNbrState'] = [
-    'down'                   => [ 'class' => 'error',      'icon' => NULL ],
+    'down'                   => [ 'class' => 'important',  'icon' => NULL ],
     'attempt'                => [ 'class' => 'warning',    'icon' => NULL ],
     'init'                   => [ 'class' => 'warning',    'icon' => NULL ],
     'twoWay'                 => [ 'class' => 'primary',    'icon' => NULL ],
@@ -406,6 +407,19 @@ $config['type_class']['ospfNbrState'] = [
     'exchange'               => [ 'class' => 'suppressed', 'icon' => NULL ],
     'loading'                => [ 'class' => 'primary',    'icon' => NULL ],
     'full'                   => [ 'class' => 'success',    'icon' => NULL ]
+];
+
+$config['type_class']['arch'] = [
+    'arm64'                  => [ 'class' => 'primary',    'icon' => NULL ],
+    'amd64'                  => [ 'class' => 'success',    'icon' => NULL ],
+    'i386'                   => [ 'class' => 'info',       'icon' => NULL ],
+    'all'                    => [ 'class' => 'default',    'icon' => NULL ]
+];
+
+$config['type_class']['pkg'] = [
+    'rpm'                    => [ 'class' => 'important',  'icon' => NULL ],
+    'deb'                    => [ 'class' => 'warning',    'icon' => NULL ],
+    //''                       => [ 'class' => 'default',    'icon' => NULL ]
 ];
 
 // EOF

@@ -6,9 +6,11 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
+
+/* THIS IS ONE BIG VULNERABILITY! */
 
 ini_set('allow_url_fopen', 0);
 
@@ -21,11 +23,9 @@ if (!$config['web_iframe'] && is_iframe()) {
 
 include($config['html_dir'] . "/includes/authenticate.inc.php");
 
-if ($_SERVER['REMOTE_ADDR'] != $_SERVER['SERVER_ADDR']) {
-    if (!$_SESSION['authenticated']) {
-        // not authenticated
-        die("Unauthenticated");
-    }
+if (($_SERVER['REMOTE_ADDR'] != $_SERVER['SERVER_ADDR']) && !$_SESSION['authenticated']) {
+    // not authenticated
+    die("Unauthenticated");
 }
 
 $vars = get_vars('GET');
@@ -37,5 +37,4 @@ if ($_SESSION['userlevel'] > 7) {
     exit;
 }
 
-
-
+// EOF

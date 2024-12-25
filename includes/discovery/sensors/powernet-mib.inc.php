@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -66,7 +66,7 @@ if ($inputs || $outputs) {
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $pindex, NULL, $descr, 1, $value);
+                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $pindex, $descr, 1, $value);
             }
 
             $oid_name = 'upsPhaseInputApparentPower';
@@ -75,7 +75,7 @@ if ($inputs || $outputs) {
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $pindex, NULL, $descr, 1000, $value);
+                discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $pindex, $descr, 1000, $value);
             }
 
             $oid_name = 'upsPhaseInputPowerFactor';
@@ -84,7 +84,7 @@ if ($inputs || $outputs) {
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $pindex, NULL, $descr, 0.01, $value);
+                discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $pindex, $descr, 0.01, $value);
             }
 
             $oid   = ".1.3.6.1.4.1.318.1.1.1.9.2.3.1.3.$pindex";
@@ -100,7 +100,7 @@ if ($inputs || $outputs) {
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $pindex, NULL, $descr . " to Neutral", 1, $value);
+                discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $pindex, $descr . " to Neutral", 1, $value);
             }
         }
 
@@ -146,54 +146,48 @@ if ($inputs || $outputs) {
 
             $oid_name = 'upsPhaseOutputPercentPower';
             $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.16.$pindex";
-            $type     = $mib . '-' . $oid_name;
             $value    = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
                 $options = ['rename_rrd_full' => 'capacity-apc-upsPhaseOutputPercentPower.%index%'];
-                discover_sensor('load', $device, $oid_num, $pindex, $type, "$descr Load", 1, $value, $options);
+                discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $pindex, "$descr Load", 1, $value, $options);
             }
 
             $oid_name = 'upsPhaseOutputLoad';
             $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.7.$pindex";
-            $type     = $mib . '-' . $oid_name;
             $value    = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor('apower', $device, $oid_num, $pindex, $type, $descr, 1, $value);
+                discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $pindex, $descr, 1, $value);
             }
 
             $oid_name = 'upsPhaseOutputPower';
             $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.13.$pindex";
-            //$type     = $mib . '-' . $oid_name;
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $pindex, NULL, $descr, 1, $value);
+                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $pindex, $descr, 1, $value);
             }
 
             $oid_name = 'upsPhaseOutputPowerFactor';
             $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.19.$pindex";
-            //$type     = $mib . '-' . $oid_name;
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $pindex, NULL, $descr, 0.01, $value);
+                discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $pindex, $descr, 0.01, $value);
             }
 
             $oid_name = 'upsPhaseOutputVoltagePN';
             $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.22.$pindex";
-            //$type     = $mib . '-' . $oid_name;
             $value = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
-                discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $pindex, NULL, $descr . " to Neutral", 1, $value);
+                discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $pindex, $descr . " to Neutral", 1, $value);
             }
 
             /*
             $oid_name = 'upsPhaseOutputPercentLoad';
             $oid_num  = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.10.$pindex";
-            $type     = $mib . '-' . $oid_name;
             $value    = $cache['apc'][$pindex][$oid_name];
 
             if ($value != '' && $value != -1) {
@@ -352,7 +346,7 @@ if ($inputs || $outputs) {
             $value = $entry['upsAdvOutputEnergyUsage'];
 
             if ($value != '' && $value != -1) {
-                discover_counter($device, 'energy', $mib, 'upsHighPrecOutputEnergyUsage', $oid, $index, $descr, 1000, $value);
+                discover_counter($device, 'energy', $mib, 'upsAdvOutputEnergyUsage', $oid, $index, $descr, 1000, $value);
             }
         }
 
@@ -567,8 +561,8 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0", "PowerNet-MIB")) {
             } else {
                 $options['limit_low'] = 0;
             }
-            //discover_sensor('frequency', $device, $oid, "atsInputFrequency.$index", 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+
+            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
     }
 
@@ -616,8 +610,7 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0", "PowerNet-MIB")) {
                 $options['limit_low'] = 0;
             }
 
-            //discover_sensor('voltage', $device, $oid_num, $oid_name.$dot_index, 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
 
         // Input Current
@@ -630,8 +623,7 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0", "PowerNet-MIB")) {
                         'limit_high'      => snmp_cache_oid($device, "atsConfigPhaseOverLoadThreshold.$phase", "PowerNet-MIB"),
                         //'limit_low'       => snmp_cache_oid($device, "atsConfigPhaseLowLoadThreshold.$phase",      "PowerNet-MIB"),
                         'limit_high_warn' => snmp_cache_oid($device, "atsConfigPhaseNearOverLoadThreshold.$phase", "PowerNet-MIB")];
-            //discover_sensor('current', $device, $oid_num, $oid_name.$dot_index, 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
 
         // Input Power
@@ -641,9 +633,7 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0", "PowerNet-MIB")) {
 
         if ($value != -1) {
             $options = ['rename_rrd' => 'apc-atsInputPower.%index%'];
-
-            //discover_sensor('power', $device, $oid_num, $oid_name.$dot_index, 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
     }
 }
@@ -680,8 +670,8 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB")) {
             } else {
                 $options['limit_low'] = 0;
             }
-            //discover_sensor('frequency', $device, $oid, "atsOutputFrequency.$index", 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+
+            discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
     }
 
@@ -732,8 +722,7 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB")) {
                 $options['limit_low'] = 0;
             }
 
-            //discover_sensor('voltage', $device, $oid, "atsOutputVoltage.$index.1.1", 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
 
         // Output Current
@@ -746,8 +735,7 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB")) {
                         'limit_high'      => snmp_cache_oid($device, "atsConfigPhaseOverLoadThreshold.$phase", "PowerNet-MIB"),
                         //'limit_low'       => snmp_cache_oid($device, "atsConfigPhaseLowLoadThreshold.$phase",      "PowerNet-MIB"),
                         'limit_high_warn' => snmp_cache_oid($device, "atsConfigPhaseNearOverLoadThreshold.$phase", "PowerNet-MIB")];
-            //discover_sensor('current', $device, $oid, "atsOutputCurrent.$index.1.1", 'apc', $descr, $scale, $value, $limits);
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, 0.1, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, 0.1, $value, $options);
         }
 
         // Output Power
@@ -757,9 +745,7 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB")) {
 
         if ($value != -1) {
             $options = ['rename_rrd' => 'apc-atsOutputPower.%index%'];
-
-            //discover_sensor('power', $device, $oid, "atsOutputPower.$index.1.1", 'apc', $descr, 1, $value);
-            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
 
         // Output Load
@@ -771,7 +757,7 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB")) {
         $value    = $entry[$oid_name];
 
         if ($value != -1) {
-            discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value);
+            discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, $descr, 1, $value);
         }
 
         $oid_name = 'atsOutputPercentLoad';
@@ -779,19 +765,25 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB")) {
         $value    = $entry[$oid_name];
 
         if ($value != -1) {
-            discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value);
+            discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, $descr, 1, $value);
         }
     }
 }
 
 #### PDU #############################################################################################
 
+//rPDU2DevicePropertiesNumOutlets.1 = 24
+//rPDU2DevicePropertiesNumSwitchedOutlets.1 = 24
+//rPDU2DevicePropertiesNumMeteredOutlets.1 = 24
+//rPDU2DeviceTableSize.0 = 1
+
 $outlets = snmp_get_oid($device, "rPDUIdentDeviceNumOutlets.0", "PowerNet-MIB");
+$devices = snmp_get_oid($device, "rPDU2DeviceTableSize.0", "PowerNet-MIB");
 $banks   = snmp_get_oid($device, "rPDULoadDevNumBanks.0", "PowerNet-MIB");
 $loadDev = snmpwalk_cache_oid($device, "rPDULoadDevice", [], "PowerNet-MIB");
 
 // Check if we have values for these, if not, try other code paths below.
-if ($outlets) {
+if ($outlets || $devices) {
     echo(' ');
 
     // FIXME unused
@@ -866,7 +858,7 @@ if ($outlets) {
             $oid   = ".1.3.6.1.4.1.318.1.1.26.4.3.1.17.$index";
             $value = $entry['rPDU2DeviceStatusPowerFactor'];
             if ($value != 0 && $value != -1) {
-                discover_sensor_ng($device, 'powerfactor', $mib, 'rPDU2DeviceStatusPowerFactor', $oid, $index, NULL, $descr, 0.01, $value);
+                discover_sensor_ng($device, 'powerfactor', $mib, 'rPDU2DeviceStatusPowerFactor', $oid, $index, $descr, 0.01, $value);
             }
 
             // rPDU2DeviceStatusEnergy.1 = INTEGER: 170982
@@ -903,15 +895,22 @@ if ($outlets) {
             $phasetable = snmpwalk_cache_oid($device, $table, $phasetable, "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
         }
 
-        if (safe_count($phasetable)) {
+        if (!safe_empty($phasetable)) {
 
             foreach ($phasetable as $index => $entry) {
                 $oid    = ".1.3.6.1.4.1.318.1.1.26.6.3.1.5.$index";
                 $value  = $entry['rPDU2PhaseStatusCurrent'];
-                $limits = ['limit_high'      => $entry['rPDU2PhaseConfigOverloadCurrentThreshold'],
-                           'limit_high_warn' => $entry['rPDU2PhaseConfigNearOverloadCurrentThreshold']];
+
                 $phase  = $entry['rPDU2PhaseStatusNumber'];
                 $unit   = $entry['rPDU2PhaseStatusModule'];
+                $options  = [
+                    'measured_entity_label' => "Phase $phase",
+                    'measured_class' => 'phase'
+                ];
+                $limits = [
+                    'limit_high'      => $entry['rPDU2PhaseConfigOverloadCurrentThreshold'],
+                    'limit_high_warn' => $entry['rPDU2PhaseConfigNearOverloadCurrentThreshold']
+                ];
 
                 if ($loadDev[0]['rPDULoadDevNumPhases'] != 1) {
                     // Multiple phases
@@ -925,41 +924,41 @@ if ($outlets) {
                     // Single phase
                     if ($units > 1) {
                         // Multiple chained PDUs
-                        $descr = "Unit $unit Ouput";
+                        $descr = "Unit $unit Output";
                     } else {
                         $descr = "Output";
                     }
                 }
 
                 if ($value != '' && $value != -1) {
-                    discover_sensor('current', $device, $oid, "rPDU2PhaseStatusCurrent.$index", 'apc', $descr, $scale, $value, $limits);
+                    discover_sensor('current', $device, $oid, "rPDU2PhaseStatusCurrent.$index", 'apc', $descr, $scale, $value, array_merge($options, $limits));
                 }
 
                 $oid   = ".1.3.6.1.4.1.318.1.1.26.6.3.1.6.$index";
                 $value = $entry['rPDU2PhaseStatusVoltage'];
 
                 if ($value != '' && $value != -1) {
-                    discover_sensor('voltage', $device, $oid, "rPDU2PhaseStatusVoltage.$index", 'apc', $descr, 1, $value);
+                    discover_sensor('voltage', $device, $oid, "rPDU2PhaseStatusVoltage.$index", 'apc', $descr, 1, $value, $options);
                 }
 
                 $oid   = ".1.3.6.1.4.1.318.1.1.26.6.3.1.7.$index";
                 $value = $entry['rPDU2PhaseStatusPower'];
 
                 if ($value != '' && $value != -1) {
-                    discover_sensor('power', $device, $oid, "rPDU2PhaseStatusPower.$index", 'apc', $descr, 10, $value);
+                    discover_sensor('power', $device, $oid, "rPDU2PhaseStatusPower.$index", 'apc', $descr, 10, $value, $options);
                 }
 
                 $oid   = ".1.3.6.1.4.1.318.1.1.26.6.3.1.9.$index";
                 $value = $entry['rPDU2PhaseStatusPowerFactor'];
 
                 if ($value != -1) {
-                    discover_sensor_ng($device, 'powerfactor', $mib, 'rPDU2PhaseStatusPowerFactor', $oid, $index, NULL, $descr, 0.01, $value);
+                    discover_sensor_ng($device, 'powerfactor', $mib, 'rPDU2PhaseStatusPowerFactor', $oid, $index, $descr, 0.01, $value, $options);
                 }
 
                 // rPDU2PhaseStatusLoadState.1 = INTEGER: normal(2)
                 $oid   = ".1.3.6.1.4.1.318.1.1.26.6.3.1.4.$index";
                 $value = $entry['rPDU2PhaseStatusLoadState'];
-                discover_status($device, $oid, "rPDU2PhaseStatusLoadState.$index", 'powernet-rpdu2statusload-state', "$descr Load", $value);
+                discover_status($device, $oid, "rPDU2PhaseStatusLoadState.$index", 'powernet-rpdu2statusload-state', "$descr Load", $value, $options);
             }
         }
 
@@ -987,18 +986,22 @@ if ($outlets) {
             foreach ($bank_oids as $index => $entry) {
                 $bank  = $entry['rPDU2BankStatusNumber'];
                 $descr = "Bank $bank";
+                $options = [
+                    'measured_entity_label' => "Bank $bank",
+                    'measured_class' => 'bank'
+                ];
 
                 $oid   = ".1.3.6.1.4.1.318.1.1.26.8.3.1.5.$index";
                 $value = $entry['rPDU2BankStatusCurrent'];
                 if ($value != '' && $value != -1) {
-                    $options = ['limit_high'      => $entry['rPDU2BankConfigOverloadCurrentThreshold'],
-                                'limit_high_warn' => $entry['rPDU2BankConfigNearOverloadCurrentThreshold']];
-                    discover_sensor('current', $device, $oid, "rPDU2BankStatusCurrent.$index", 'apc', $descr, $scale, $value, $options);
+                    $limits = [ 'limit_high'      => $entry['rPDU2BankConfigOverloadCurrentThreshold'],
+                                'limit_high_warn' => $entry['rPDU2BankConfigNearOverloadCurrentThreshold'] ];
+                    discover_sensor('current', $device, $oid, "rPDU2BankStatusCurrent.$index", 'apc', $descr, $scale, $value, array_merge($options, $limits));
                 }
 
                 $oid   = ".1.3.6.1.4.1.318.1.1.26.8.3.1.4.$index";
                 $value = $entry['rPDU2BankStatusLoadState'];
-                discover_status($device, $oid, "rPDU2BankStatusLoadState.$index", 'powernet-rpdu2statusload-state', "$descr Load", $value);
+                discover_status($device, $oid, "rPDU2BankStatusLoadState.$index", 'powernet-rpdu2statusload-state', "$descr Load", $value, $options);
             }
         }
 
@@ -1019,7 +1022,7 @@ if ($outlets) {
                 $descr = 'Power Supply ' . $unit;
                 $oid   = ".1.3.6.1.4.1.318.1.1.12.4.1.$unit.$index";
 
-                discover_status($device, $oid, "$key.$index", $type, $descr, $value, ['entPhysicalClass' => 'power']);
+                discover_status($device, $oid, "$key.$index", $type, $descr, $value, [ 'entPhysicalClass' => 'power' ]);
             }
         }
 
@@ -1155,20 +1158,27 @@ if ($outlets) {
     foreach ($cache['apc'] as $index => $entry) {
         $oid    = ".1.3.6.1.4.1.318.1.1.26.9.4.3.1.6.$index";
         $value  = $entry['rPDU2OutletMeteredStatusCurrent'];
-        $limits = ['limit_high'      => $entry['rPDU2OutletMeteredConfigOverloadCurrentThreshold'],
-                   'limit_low'       => $entry['rPDU2OutletMeteredConfigLowLoadCurrentThreshold'],
-                   'limit_high_warn' => $entry['rPDU2OutletMeteredConfigNearOverloadCurrentThreshold']];
+        $options  = [
+            'measured_entity_label' => "Outlet $index",
+            'measured_class' => 'outlet'
+        ];
+        $limits = [
+            'limit_high'      => $entry['rPDU2OutletMeteredConfigOverloadCurrentThreshold'],
+            'limit_low'       => $entry['rPDU2OutletMeteredConfigLowLoadCurrentThreshold'],
+            'limit_high_warn' => $entry['rPDU2OutletMeteredConfigNearOverloadCurrentThreshold']
+        ];
         $descr  = "Outlet " . $index . " - " . $entry['rPDU2OutletMeteredStatusName'];
 
         if ($value != '' && $value != -1) {
-            discover_sensor('current', $device, $oid, "rPDU2OutletMeteredStatusCurrent.$index", 'apc', $descr, $scale, $value, $limits);
+            discover_sensor('current', $device, $oid, "rPDU2OutletMeteredStatusCurrent.$index", 'apc', $descr, $scale, $value, array_merge($options, $limits));
         }
 
+        // FIXME. Not tested! Probably not power, but load!!!
         $oid   = ".1.3.6.1.4.1.318.1.1.26.9.4.3.1.7.$index";
         $value = $entry['rPDU2OutletMeteredStatusPower'];
 
         if ($value != '' && $value != -1) {
-            discover_sensor('power', $device, $oid, "rPDU2OutletMeteredStatusPower.$index", 'apc', $descr, 1, $value);
+            discover_sensor('power', $device, $oid, "rPDU2OutletMeteredStatusPower.$index", 'apc', $descr, 1, $value, $options);
         }
 
         // Not currently supported: kWh reading: rPDU2OutletMeteredStatusEnergy - "A user resettable energy meter measuring Rack PDU load energy consumption in tenths of kilowatt-hours"
@@ -1227,6 +1237,26 @@ if ($oids) {
 
 #### ENVIRONMENTAL ###################################################################################
 
+// PowerNet-MIB::emsStatusSysTempUnits.0 = INTEGER: celsius(1)
+// PowerNet-MIB::emsProbeStatusProbeIndex.1 = INTEGER: 1
+// PowerNet-MIB::emsProbeStatusProbeName.1 = STRING: "T/RH sensor1: AX01f"
+// PowerNet-MIB::emsProbeStatusProbeTemperature.1 = INTEGER: 21
+// PowerNet-MIB::emsProbeStatusProbeHighTempThresh.1 = INTEGER: 26
+// PowerNet-MIB::emsProbeStatusProbeLowTempThresh.1 = INTEGER: 19
+// PowerNet-MIB::emsProbeStatusProbeHumidity.1 = INTEGER: 51
+// PowerNet-MIB::emsProbeStatusProbeHighHumidityThresh.1 = INTEGER: 70
+// PowerNet-MIB::emsProbeStatusProbeLowHumidityThresh.1 = INTEGER: 30
+// PowerNet-MIB::emsProbeStatusProbeSerialNumber.1 = STRING: "L1"
+// PowerNet-MIB::emsProbeStatusProbeCommStatus.1 = INTEGER: commsEstablished(2)
+// PowerNet-MIB::emsProbeStatusProbeAlarmStatus.1 = INTEGER: 0
+// PowerNet-MIB::emsProbeStatusProbeMaxTempThresh.1 = INTEGER: 27
+// PowerNet-MIB::emsProbeStatusProbeMinTempThresh.1 = INTEGER: 18
+// PowerNet-MIB::emsProbeStatusProbeMaxHumidityThresh.1 = INTEGER: 80
+// PowerNet-MIB::emsProbeStatusProbeMinHumidityThresh.1 = INTEGER: 20
+// PowerNet-MIB::emsProbeStatusProbeVoltage.1 = INTEGER: -1
+// PowerNet-MIB::emsProbeStatusProbeMaxVoltThresh.1 = INTEGER: 50
+// PowerNet-MIB::emsProbeStatusProbeMinVoltThresh.1 = INTEGER: 0
+
 echo(' ');
 
 echo("emsProbeStatusTable ");
@@ -1237,43 +1267,56 @@ foreach ($cache['apc'] as $index => $entry) {
     $descr = $entry['emsProbeStatusProbeName'];
 
     $status = $entry['emsProbeStatusProbeCommStatus'];
-    if ($status != 'commsEstablished') {
+    if ($status !== 'commsEstablished') {
         continue;
     }
 
     // Humidity
     $value   = $entry['emsProbeStatusProbeHumidity'];
     $oid     = ".1.3.6.1.4.1.318.1.1.10.3.13.1.1.6.$index";
-    $options = ['limit_high'      => $entry['emsProbeStatusProbeMaxHumidityThresh'],
-                'limit_low'       => $entry['emsProbeStatusProbeMinHumidityThresh'],
-                'limit_high_warn' => $entry['emsProbeStatusProbeHighHumidityThresh'],
-                'limit_low_warn'  => $entry['emsProbeStatusProbeLowHumidityThresh']];
+    $options = [
+        'limit_high'      => $entry['emsProbeStatusProbeMaxHumidityThresh'],
+        'limit_low'       => $entry['emsProbeStatusProbeMinHumidityThresh'],
+        'limit_high_warn' => $entry['emsProbeStatusProbeHighHumidityThresh'],
+        'limit_low_warn'  => $entry['emsProbeStatusProbeLowHumidityThresh']
+    ];
 
-    if ($value != '' && $value > 0) { // Humidity = 0 or -1 -> Sensor not available
-        //discover_sensor('humidity', $device, $oid, "emsProbeStatusProbeHumidity.$index", 'apc', $descr, 1, $value, $limits);
+    if (!safe_empty($value) && $value > 0) { // Humidity = 0 or -1 -> Sensor not available
         $options['rename_rrd'] = 'apc-emsProbeStatusProbeHumidity.%index%';
-        discover_sensor_ng($device, 'humidity', $mib, 'emsProbeStatusProbeHumidity', $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'humidity', $mib, 'emsProbeStatusProbeHumidity', $oid, $index, $descr, 1, $value, $options);
     }
 
     // Temperature
     $value   = $entry['emsProbeStatusProbeTemperature'];
     $oid     = ".1.3.6.1.4.1.318.1.1.10.3.13.1.1.3.$index";
-    $options = ['limit_high'      => $entry['emsProbeStatusProbeMaxTempThresh'],
-                'limit_low'       => $entry['emsProbeStatusProbeMinTempThresh'],
-                'limit_high_warn' => $entry['emsProbeStatusProbeHighTempThresh'],
-                'limit_low_warn'  => $entry['emsProbeStatusProbeLowTempThresh']];
+    $options = [
+        'limit_high'      => $entry['emsProbeStatusProbeMaxTempThresh'],
+        'limit_low'       => $entry['emsProbeStatusProbeMinTempThresh'],
+        'limit_high_warn' => $entry['emsProbeStatusProbeHighTempThresh'],
+        'limit_low_warn'  => $entry['emsProbeStatusProbeLowTempThresh']
+    ];
 
-    if ($value != '' && $value != -1) { // Temperature = -1 -> Sensor not available
-        $scale_temp = 1;
-        if ($temp_units == 'fahrenheit') {
+    if (!safe_empty($value) && $value != -1) {
+        // Temperature = -1 -> Sensor not available
+        if ($temp_units === 'fahrenheit') {
             $options['sensor_unit'] = 'F';
-        } else {
-            $options['sensor_unit'] = 'C';
+            $options['limit_unit']  = 'F';
         }
 
-        //discover_sensor('temperature', $device, $oid, "emsProbeStatusProbeTemperature.$index", 'apc', $descr, $scale_temp, $value, $options);
         $options['rename_rrd'] = 'apc-emsProbeStatusProbeTemperature.%index%';
-        discover_sensor_ng($device, 'temperature', $mib, 'emsProbeStatusProbeTemperature', $oid, $index, NULL, $descr, $scale_temp, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'emsProbeStatusProbeTemperature', $oid, $index, $descr, 1, $value, $options);
+    }
+
+    // Voltage
+    $value   = $entry['emsProbeStatusProbeVoltage'];
+    $oid     = ".1.3.6.1.4.1.318.1.1.10.3.13.1.1.16.$index";
+    $options = [
+        'limit_high'      => $entry['emsProbeStatusProbeMaxVoltThresh'],
+        'limit_low'       => $entry['emsProbeStatusProbeMinVoltThresh']
+    ];
+
+    if (!safe_empty($value) && $value != -1) {
+        discover_sensor_ng($device, 'voltage', $mib, 'emsProbeStatusProbeVoltage', $oid, $index, $descr, 1, $value, $options);
     }
 }
 
@@ -1303,31 +1346,29 @@ foreach ($cache['apc'] as $index => $entry) {
                 'limit_low_warn'  => $entry['iemConfigProbeLowHumidThreshold']];
 
     if ($value != '' && $value > 0) { // Humidity = 0 or -1 -> Sensor not available
-        //discover_sensor('humidity', $device, $oid, "iemStatusProbeCurrentHumid.$index", 'apc', $descr, 1, $value, $limits);
         $options['rename_rrd'] = 'apc-iemStatusProbeCurrentHumid.%index%';
-        discover_sensor_ng($device, 'humidity', $mib, 'iemStatusProbeCurrentHumid', $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'humidity', $mib, 'iemStatusProbeCurrentHumid', $oid, $index, $descr, 1, $value, $options);
         $iem_sensors['humidity'][] = $descr; // Store for later use in uio code below
     }
 
     // Temperature
     $value   = $entry['iemStatusProbeCurrentTemp'];
     $oid     = ".1.3.6.1.4.1.318.1.1.10.2.3.2.1.4.$index";
-    $options = ['limit_high'      => $entry['iemConfigProbeMaxTempThreshold'],
-                'limit_low'       => $entry['iemConfigProbeMinTempThreshold'],
-                'limit_high_warn' => $entry['iemConfigProbeHighTempThreshold'],
-                'limit_low_warn'  => $entry['iemConfigProbeLowTempThreshold']];
+    $options = [
+        'limit_high'      => $entry['iemConfigProbeMaxTempThreshold'],
+        'limit_low'       => $entry['iemConfigProbeMinTempThreshold'],
+        'limit_high_warn' => $entry['iemConfigProbeHighTempThreshold'],
+        'limit_low_warn'  => $entry['iemConfigProbeLowTempThreshold']
+    ];
 
     if ($value != '' && $value > 0) { // Temperature = -1 -> Sensor not available
-        $scale_temp = 1;
         if ($temp_units == 'fahrenheit') {
             $options['sensor_unit'] = 'F';
-        } else {
-            $options['sensor_unit'] = 'C';
+            $options['limit_unit']  = 'F';
         }
 
-        //discover_sensor('temperature', $device, $oid, "iemStatusProbeCurrentTemp.$index", 'apc', $descr, $scale_temp, $value, $options);
         $options['rename_rrd'] = 'apc-iemStatusProbeCurrentTemp.%index%';
-        discover_sensor_ng($device, 'temperature', $mib, 'iemStatusProbeCurrentTemp', $oid, $index, NULL, $descr, $scale_temp, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'iemStatusProbeCurrentTemp', $oid, $index, $descr, 1, $value, $options);
         $iem_sensors['temperature'][] = $descr; // Store for later use in uio code below
     }
 }
@@ -1379,9 +1420,8 @@ foreach ($cache['apc'] as $index => $entry) {
     if ($value != '' && $value > 0) { // Humidity = 0 or -1 -> Sensor not available
         // Skip if already discovered through iem
         if (!in_array($descr, (array)$iem_sensors['humidity'])) {
-            //discover_sensor('humidity', $device, $oid, "uioSensorStatusHumidity.$index", 'apc', $descr, 1, $value);
             $options = ['rename_rrd' => 'apc-uioSensorStatusHumidity.%index%'];
-            discover_sensor_ng($device, 'humidity', $mib, 'uioSensorStatusHumidity', $oid, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'humidity', $mib, 'uioSensorStatusHumidity', $oid, $index, $descr, 1, $value, $options);
         } else {
             print_debug("Sensor was already found through iem table, skipping uio");
         }
@@ -1395,9 +1435,8 @@ foreach ($cache['apc'] as $index => $entry) {
     if ($value != '' && $value != -1) { // Temperature = -1 -> Sensor not available
         // Skip if already discovered through iem
         if (!in_array($descr, (array)$iem_sensors['temperature'])) {
-            //discover_sensor('temperature', $device, $oid, "uioSensorStatusTemperatureDegC.$index", 'apc', $descr, 1, $value);
             $options = ['rename_rrd' => 'apc-uioSensorStatusTemperatureDegC.%index%'];
-            discover_sensor_ng($device, 'temperature', $mib, 'uioSensorStatusTemperatureDegC', $oid, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'temperature', $mib, 'uioSensorStatusTemperatureDegC', $oid, $index, $descr, 1, $value, $options);
         } else {
             print_debug("Sensor was already found through iem table, skipping uio");
         }
@@ -1426,9 +1465,8 @@ foreach ($cache['apc'] as $index => $entry) {
                 'limit_low_warn' => $entry['rPDU2SensorTempHumidityConfigHumidityLowThresh']];
 
     if ($value != '' && $value != -1 && $entry['rPDU2SensorTempHumidityStatusHumidityStatus'] != 'notPresent') {
-        //discover_sensor('humidity', $device, $oid, "rPDU2SensorTempHumidityStatusRelativeHumidity.$index", 'apc', $descr, 1, $value, $limits);
         $options['rename_rrd'] = 'apc-rPDU2SensorTempHumidityStatusRelativeHumidity.%index%';
-        discover_sensor_ng($device, 'humidity', $mib, 'rPDU2SensorTempHumidityStatusRelativeHumidity', $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'humidity', $mib, 'rPDU2SensorTempHumidityStatusRelativeHumidity', $oid, $index, $descr, 1, $value, $options);
     }
 
     // Temperature
@@ -1438,9 +1476,8 @@ foreach ($cache['apc'] as $index => $entry) {
                 'limit_high_warn' => $entry['rPDU2SensorTempHumidityConfigTempHighThreshC']];
 
     if ($value != '' && $value != -1) {
-        //discover_sensor('temperature', $device, $oid, "rPDU2SensorTempHumidityStatusTempC.$index", 'apc', $descr, $scale, $value, $limits);
         $options['rename_rrd'] = 'apc-rPDU2SensorTempHumidityStatusTempC.%index%';
-        discover_sensor_ng($device, 'temperature', $mib, 'rPDU2SensorTempHumidityStatusTempC', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'rPDU2SensorTempHumidityStatusTempC', $oid, $index, $descr, $scale, $value, $options);
     }
 }
 
@@ -1467,14 +1504,12 @@ foreach ($cache['apc'] as $index => $entry) {
 
     // Exclude already added sensor from emsProbeStatusTable
     if ($value != -1 && !isset($valid['sensor']['temperature']['PowerNet-MIB-emsProbeStatusProbeTemperature'][$ems_index])) {
-        $scale_temp = 1;
+        $options = [];
         if ($temp_units === 'fahrenheit') {
             $options['sensor_unit'] = 'F';
-        } else {
-            $options['sensor_unit'] = 'C';
         }
 
-        discover_sensor('temperature', $device, $oid, "memSensorsTemperature.$index", 'apc', $descr, $scale_temp, $value, $options);
+        discover_sensor('temperature', $device, $oid, "memSensorsTemperature.$index", 'apc', $descr, 1, $value, $options);
     }
 
     $oid   = ".1.3.6.1.4.1.318.1.1.10.4.2.3.1.6.$index";

@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -30,11 +29,14 @@ $groups[1]['colours_out'] = 'blues';
 
 foreach ($groups as $group_id => $group) {
     $iter = 0;
-    foreach ($group['ports'] as $port_id) {
-        $port    = dbFetchRow("SELECT * FROM `ports` AS I, devices as D WHERE I.port_id = ? AND I.device_id = D.device_id", [$port_id]);
+
+    $sql = 'SELECT `ports`.*, `devices`.`hostname` FROM `ports` LEFT JOIN `devices` USING (`device_id`) WHERE ' .
+           generate_query_values($group['ports'], 'ports.port_id');
+    foreach (dbFetchRows($sql) as $port) {
+        //$port    = dbFetchRow("SELECT * FROM `ports` AS I, devices as D WHERE I.port_id = ? AND I.device_id = D.device_id", [$port_id]);
         $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
         if (rrd_is_file($rrdfile)) {
-            humanize_port($port);
+            //humanize_port($port);
             $rrd_list[$i]['filename']  = $rrdfile;
             $rrd_list[$i]['descr']     = $port['hostname'] . " " . $port['ifDescr'];
             $rrd_list[$i]['descr_in']  = $port['hostname'];

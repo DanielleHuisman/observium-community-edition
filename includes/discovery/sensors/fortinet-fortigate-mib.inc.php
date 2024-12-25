@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -57,7 +57,8 @@ foreach ($oids as $index => $entry) {
         $descr = str_replace([' Pwr', ' Power' ], '', $descr);
         $class = 'power';
     } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) ||
-              str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN', 'SOC', 'VMEM' ])) {
+              str_icontains_array($descr, [ 'VCC', 'VPP', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT',
+                                            'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN', 'SOC', 'VMEM' ])) {
         if ($value == 0) {
             continue;
         }
@@ -88,7 +89,7 @@ foreach ($oids as $index => $entry) {
     discover_status_ng($device, $mib, 'fgHwSensorEntAlarmStatus', '.1.3.6.1.4.1.12356.101.4.3.2.1.4.' . $index, $index,
                        'fgHwSensorEntAlarmStatus', $descr, $entry['fgHwSensorEntAlarmStatus']);
 
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 }
 
 // EOF

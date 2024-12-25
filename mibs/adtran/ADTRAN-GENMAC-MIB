@@ -1,0 +1,846 @@
+ADTRAN-GENMAC-MIB
+
+-- TITLE:     The ADTRAN MAC MIB
+-- PRODUCT:   Products supporting MAC address tables
+-- VERSION:   1.0
+-- DATE:      12/10/08
+-- AUTHOR:    Joey Boyd
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN SHARED CND SYSTEM MIB objects
+
+-- HISTORY:
+-- 12/10/08 jlb  STATUS: PRELIMINARY.
+-- 06/16/09 asue Added MAC Lookup
+-- 03/14/11 rajesh perumal Added OIDs to get MAC entries by Bulk and to clear mac table entries
+
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+--==================================================================================================================
+-- IMPORTS
+--==================================================================================================================
+    IMPORTS
+   		OBJECT-TYPE,
+   		NOTIFICATION-TYPE,
+   		MODULE-IDENTITY,
+   		Unsigned32,
+   		Integer32,
+   		Gauge32
+   		   FROM SNMPv2-SMI
+   		DisplayString,
+   		RowStatus,
+                MacAddress
+   		   FROM SNMPv2-TC
+   		sysName
+   		   FROM SNMPv2-MIB
+   		OBJECT-GROUP,
+   		NOTIFICATION-GROUP
+   		   FROM SNMPv2-CONF
+   		InterfaceIndex,
+                InterfaceIndexOrZero,
+   		ifIndex
+   		   FROM IF-MIB
+   		adGenPortTrapIdentifier
+   		   FROM ADTRAN-GENPORT-MIB
+   		adGenMac,
+   		adGenMacID
+   		   FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+                adGenSlotInfoIndex
+                   FROM ADTRAN-GENSLOT-MIB
+                VlanIdOrNone
+                   FROM Q-BRIDGE-MIB
+   	;
+
+--==================================================================================================================
+-- MODULE IDENTITY
+--==================================================================================================================
+adGenMacIdentity MODULE-IDENTITY
+   	LAST-UPDATED "200812100000Z"
+   	ORGANIZATION "Adtran, Inc."
+   	CONTACT-INFO
+     	"CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+                 Tel: +1 800 726-8663
+                 Fax: +1 256 963 6217
+                 E-mail: support@adtran.com"
+   	DESCRIPTION
+      	"This MIB defines the objects for the GenMac MIB."
+   	REVISION "200812100000Z"
+   	DESCRIPTION "Created"
+	::= { adGenMacID 1 }
+
+--==================================================================================================================
+-- OBJECT IDENTIFIERS
+--==================================================================================================================
+	adGenMacEvents                      OBJECT IDENTIFIER ::= {adGenMac 0}
+	adGenMacProvisioning                OBJECT IDENTIFIER ::= {adGenMac 1}
+	adGenMacStatus                	    OBJECT IDENTIFIER ::= {adGenMac 2}
+	adGenMacPerformance                 OBJECT IDENTIFIER ::= {adGenMac 3}   
+	adGenMacBulkMAC                     OBJECT IDENTIFIER ::= {adGenMac 4}   
+
+--==================================================================================================================
+-- PROVISIONING
+--==================================================================================================================
+   	adGenMacProvTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacProvEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC provisioning table."
+      	::= { adGenMacProvisioning 1 }
+
+   	adGenMacProvEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacProvEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC provisioning table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacProvTable 1 }
+
+	AdGenMacProvEntry ::=
+   		SEQUENCE {
+	 		adGenMacProvLimit
+				Integer32,
+	 		adGenMacProvAgingTime
+				Integer32
+      	}
+
+	adGenMacProvLimit OBJECT-TYPE
+   		SYNTAX      Integer32
+      	MAX-ACCESS  read-write
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to set a limit on the number of MAC addresses
+	 	 	 that can be learned on this interface.  A SET to a value of 0 disables
+			 MAC limiting."
+		::= { adGenMacProvEntry 1}
+
+	adGenMacProvAgingTime OBJECT-TYPE
+   		SYNTAX      Integer32
+      	MAX-ACCESS  read-write
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to set the amount of time an entry will remain in
+			 the table before being removed due to inactivity.  A SET to a value of 0 disables
+			 MAC aging."
+		::= { adGenMacProvEntry 2}
+
+-- Clear Mac Addresses 
+
+   adGenClearMACAddressSlotTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenClearMACAddressSlotEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Table to Clear Mac Address Table indexed by Slot"
+       ::= { adGenMacProvisioning 2 }
+
+    adGenClearMACAddressSlotEntry OBJECT-TYPE
+       SYNTAX      AdGenClearMACAddressSlotEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Index is the slot number"
+       INDEX { adGenSlotInfoIndex}
+       ::= { adGenClearMACAddressSlotTable 1 }
+
+    AdGenClearMACAddressSlotEntry ::=
+       SEQUENCE {               	          
+       	   adGenClearSingleMAC  	 MacAddress,
+           adGenClearAllDynamicMAC  INTEGER
+       }           
+       
+	adGenClearSingleMAC OBJECT-TYPE
+   		SYNTAX      MacAddress
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+       		"Enter the MAC Address to be cleared."
+		::= { adGenClearMACAddressSlotEntry 1}
+    
+    adGenClearAllDynamicMAC  OBJECT-TYPE
+       SYNTAX INTEGER         {
+       						    clear(1)
+       						  }
+       MAX-ACCESS             read-write
+       STATUS                 current
+       DESCRIPTION                         
+           "Set this to 1 to clear all dynamic mac addresses on this slot.
+            A get on this OID always returns a 1."
+        ::= { adGenClearMACAddressSlotEntry 2 }    
+       
+-- *******************************************************************************
+   adGenClearMACAddressTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenClearMACAddressEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Table to Clear Mac Address Table indexed by Slot, stag and status." 
+       ::= { adGenMacProvisioning 3 }
+
+    adGenClearMACAddressEntry OBJECT-TYPE
+       SYNTAX      AdGenClearMACAddressEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Indexes are Slot, stag and status"
+       INDEX { adGenSlotInfoIndex, adGenClearMACAddressStag, adGenClearMACAddressStatus }
+       ::= { adGenClearMACAddressTable 1 }
+
+    AdGenClearMACAddressEntry ::=
+       SEQUENCE {              
+       	   adGenClearMACAddressStag   Integer32,
+       	   adGenClearMACAddressStatus INTEGER,
+           adGenClearMACAddressClear  INTEGER
+       }                                                
+
+    adGenClearMACAddressStag    OBJECT-TYPE
+       SYNTAX                    Integer32 (0..4094)
+       MAX-ACCESS                not-accessible
+       STATUS                    current
+       DESCRIPTION
+	   	   "MAC Addresses with this s-tag will be cleared"
+        ::= { adGenClearMACAddressEntry 1 }
+        
+    adGenClearMACAddressStatus	 OBJECT-TYPE
+       SYNTAX INTEGER 			 {
+                                	all(0),   
+                                	static(1),
+                                	dynamic(2),
+                                	multicast(3)
+                      			 }
+       MAX-ACCESS 				 not-accessible
+       STATUS 					 current
+       DESCRIPTION 
+	   	   "MAC Addresses with this status will be cleared"
+	    ::= { adGenClearMACAddressEntry 2 }
+        
+    adGenClearMACAddressClear	OBJECT-TYPE
+       SYNTAX INTEGER           {
+       							  clear(1)
+       							}
+       MAX-ACCESS               read-write
+       STATUS                   current
+       DESCRIPTION                         
+           "Set this to 1 to clear all mac addresses matching the slot, s-tag and Status. 
+            A get on this OID always returns a 1."
+        ::= { adGenClearMACAddressEntry 3 }
+
+-- *******************************************************************************
+   adGenClearMACAddressInterfaceIDTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenClearMACAddressInterfaceIDEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Table to Clear Mac Address Table indexed SNMP Interface ID" 
+       ::= { adGenMacProvisioning 4 }
+
+    adGenClearMACAddressInterfaceIDEntry 	OBJECT-TYPE
+       SYNTAX		AdGenClearMACAddressInterfaceIDEntry
+       MAX-ACCESS  	not-accessible
+       STATUS     	current
+       DESCRIPTION
+           "Index is Interface ID"
+       INDEX {adGenClearMACAddressInterfaceID  }
+       ::= { adGenClearMACAddressInterfaceIDTable 1 }
+
+    AdGenClearMACAddressInterfaceIDEntry ::=
+       SEQUENCE {               	
+           adGenClearMACAddressInterfaceID      InterfaceIndexOrZero,
+           adGenClearMACAddressInterfaceIDClear	INTEGER 
+       }                                                
+    
+	adGenClearMACAddressInterfaceID OBJECT-TYPE
+       SYNTAX                    InterfaceIndexOrZero
+       MAX-ACCESS                not-accessible
+       STATUS                    current
+       DESCRIPTION
+	   	   "All MAC entries on this SNMP Interface ID will be cleared "
+        ::= { adGenClearMACAddressInterfaceIDEntry 1 }
+   
+    adGenClearMACAddressInterfaceIDClear OBJECT-TYPE
+       SYNTAX INTEGER                       {
+       										 clear(1)
+       										}
+       MAX-ACCESS                		    read-write
+       STATUS                    		    current
+       DESCRIPTION                         
+           "Set this to 1 to clear all mac addresses matching the Interface Index
+            A get on this OID always returns a 1."
+        ::= { adGenClearMACAddressInterfaceIDEntry 2 }
+
+--==================================================================================================================
+-- STATUS
+--==================================================================================================================
+   	adGenMacStatusTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacStatusEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC status table."
+      	::= { adGenMacStatus 1 }
+
+   	adGenMacStatusEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacStatusEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC status table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacStatusTable 1 }
+
+	AdGenMacStatusEntry ::=
+   		SEQUENCE {
+	 		adGenMacStatusNumEntries
+				Unsigned32,
+	 		adGenMacStatusMaxLimit
+				Unsigned32,
+	 		adGenMacStatusMinAgingTime
+				Unsigned32,
+	 		adGenMacStatusMaxAgingTime
+				Unsigned32
+      	}
+
+	adGenMacStatusNumEntries OBJECT-TYPE
+   		SYNTAX      Unsigned32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the current number of entries in this MAC table."
+		::= { adGenMacStatusEntry 1}
+
+	adGenMacStatusMaxLimit OBJECT-TYPE
+   		SYNTAX      Unsigned32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the maximum value that can be set for adGenMacProvLimit."
+		::= { adGenMacStatusEntry 2}
+
+	adGenMacStatusMinAgingTime OBJECT-TYPE
+   		SYNTAX      Unsigned32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the minimum value that can be set for adGenMacProvAgingTime."
+		::= { adGenMacStatusEntry 3}
+
+	adGenMacStatusMaxAgingTime OBJECT-TYPE
+   		SYNTAX      Unsigned32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the maximum value that can be set for adGenMacProvAgingTime."
+		::= { adGenMacStatusEntry 4}
+
+--==================================================================================================================
+-- COUNTS
+--==================================================================================================================
+   	adGenMacCountsTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacCountsEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC counts table."
+      	::= { adGenMacStatus 2 }
+
+   	adGenMacCountsEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacCountsEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC status table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacCountsTable 1 }
+
+	AdGenMacCountsEntry ::=
+   		SEQUENCE {
+	 		adGenMacCounts5MinAvgEntries
+				Gauge32
+      	}
+
+	adGenMacCounts5MinAvgEntries OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get a 5-minute rolling average of the number of
+			 entries in the selected MAC address table."
+		::= { adGenMacCountsEntry 1}
+--==================================================================================================================
+-- MAC Look Up Table
+--==================================================================================================================
+   	adGenMacLookUpTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacLookUpEntry
+      	MAX-ACCESS      not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC Look Up Table."
+      	::= { adGenMacStatus 3 }
+
+   	adGenMacLookUpEntry OBJECT-TYPE
+      	SYNTAX      AdGenMacLookUpEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS      current
+      	DESCRIPTION
+         	"An entry in the MAC look up table."
+      	INDEX  { adGenSlotInfoIndex, adGenMacLookUpVlanIndex, adGenMacLookUpMacIndex }
+      	::= { adGenMacLookUpTable 1 }
+
+	AdGenMacLookUpEntry ::=
+   		SEQUENCE {
+	 		        adGenMacLookUpVlanIndex      VlanIdOrNone,
+                                adGenMacLookUpMacIndex       MacAddress,
+                                adGenMacLookUp               InterfaceIndexOrZero
+      	                 }
+
+
+	adGenMacLookUpVlanIndex OBJECT-TYPE
+   	SYNTAX      VlanIdOrNone
+      	MAX-ACCESS  not-accessible
+      	STATUS      current
+      	DESCRIPTION
+        	"VLAN ID Index:  1-4094, 0 for untagged "
+		::= { adGenMacLookUpEntry 1}
+
+	adGenMacLookUpMacIndex OBJECT-TYPE
+   	SYNTAX      MacAddress
+      	MAX-ACCESS  not-accessible
+      	STATUS      current
+      	DESCRIPTION
+        	"MAC Address Index "
+		::= { adGenMacLookUpEntry 2}
+
+	adGenMacLookUp OBJECT-TYPE
+   	SYNTAX      InterfaceIndexOrZero
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This table can be used to retrieve the Interface ID (ifIndex)
+                 from where the MAC and VLAN combination was learned.  A zero will be
+                 returned if the provided MAC/VLAN/Slot does not match any entree in the
+                 MAC table.
+
+                 Input indexes:
+                   Slot   :  Valid slot #
+                   VLAN ID:  1-4094
+                   MAC Add:  ##:##:##:##:##:##
+
+                 Output Value:  ifIndex (32 bit)"
+		::= { adGenMacLookUpEntry 3}
+
+--==================================================================================================================
+-- PERFORMANCE
+--==================================================================================================================
+--==================================================================================================================
+-- 15 MINUTE THRESHOLDS
+--==================================================================================================================
+   	adGenMacThresh15MinTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacThresh15MinEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC 15-minute PM threshold table."
+      	::= { adGenMacPerformance 1 }
+
+   	adGenMacThresh15MinEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacThresh15MinEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC 15-minute PM threshold table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacThresh15MinTable 1 }
+
+	AdGenMacThresh15MinEntry ::=
+   		SEQUENCE {
+	 		adGenMacThresh15MinMaxEntries
+				Unsigned32
+      	}
+
+	adGenMacThresh15MinMaxEntries OBJECT-TYPE
+   		SYNTAX      Unsigned32
+      	MAX-ACCESS  read-write
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to set a the 15-minute threshold for the maximum
+			 number of entries in the MAC table for this interface. Once the threshold has
+			 been crossed, adGenMacEvent15MinMaxEntriesTCA will be sent.  A SET to a value
+			 of 0 disables the threshold crossing alarm."
+		::= { adGenMacThresh15MinEntry 1}
+
+--==================================================================================================================
+-- 24 HOUR THRESHOLDS
+--==================================================================================================================
+   	adGenMacThresh24HrTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacThresh24HrEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC 24-hour PM threshold table."
+      	::= { adGenMacPerformance 2 }
+
+   	adGenMacThresh24HrEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacThresh24HrEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC 24-hour PM threshold table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacThresh24HrTable 1 }
+
+	AdGenMacThresh24HrEntry ::=
+   		SEQUENCE {
+	 		adGenMacThresh24HrMaxEntries
+				Unsigned32
+      	}
+
+	adGenMacThresh24HrMaxEntries OBJECT-TYPE
+   		SYNTAX      Unsigned32
+      	MAX-ACCESS  read-write
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to set a the 24-hour threshold for the maximum
+			 number of entries in the MAC table for this interface. Once the threshold has
+			 been crossed, adGenMacEvent24HrMaxEntriesTCA will be sent.  A SET to a value
+			 of 0 disables the threshold crossing alarm."
+		::= { adGenMacThresh24HrEntry 1}
+
+--==================================================================================================================
+-- 15 MINUTE CURRENT
+--==================================================================================================================
+   	adGenMacPerf15MinTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacPerf15MinEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC current 15-minute PM table."
+      	::= { adGenMacPerformance 3 }
+
+   	adGenMacPerf15MinEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacPerf15MinEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC 15-minute PM table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacPerf15MinTable 1 }
+
+	AdGenMacPerf15MinEntry ::=
+   		SEQUENCE {
+	 		adGenMacPerf15MinMaxEntries
+				Gauge32
+      	}
+
+	adGenMacPerf15MinMaxEntries OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the max number of entries in the MAC address
+			 table during this interval."
+		::= { adGenMacPerf15MinEntry 1}
+
+--==================================================================================================================
+-- 15 MINUTE HISTORIC
+--==================================================================================================================
+   	adGenMacPerf15MinIntTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacPerf15MinIntEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC historic 15-minute PM table."
+      	::= { adGenMacPerformance 4 }
+
+   	adGenMacPerf15MinIntEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacPerf15MinIntEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC historic 15-minute PM table."
+      	INDEX  { ifIndex, adGenMacPerf15MinIntNum }
+      	::= { adGenMacPerf15MinIntTable 1 }
+
+	AdGenMacPerf15MinIntEntry ::=
+   		SEQUENCE {
+	 		adGenMacPerf15MinIntNum
+				Gauge32,
+	 		adGenMacPerf15MinIntMaxEntries
+				Gauge32
+      	}
+
+	adGenMacPerf15MinIntNum OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"Historic interval number.  Valid range is 1 - 96"
+		::= { adGenMacPerf15MinIntEntry 1}
+
+	adGenMacPerf15MinIntMaxEntries OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the max number of entries in the MAC address
+			 table during this interval."
+		::= { adGenMacPerf15MinIntEntry 2}
+
+--==================================================================================================================
+-- 24 HOUR CURRENT
+--==================================================================================================================
+   	adGenMacPerf24HrTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacPerf24HrEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC current 24-hour PM table."
+      	::= { adGenMacPerformance 5 }
+
+   	adGenMacPerf24HrEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacPerf24HrEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC 24-hour PM table."
+      	INDEX  { ifIndex }
+      	::= { adGenMacPerf24HrTable 1 }
+
+	AdGenMacPerf24HrEntry ::=
+   		SEQUENCE {
+	 		adGenMacPerf24HrMaxEntries
+				Gauge32
+      	}
+
+	adGenMacPerf24HrMaxEntries OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the max number of entries in the MAC address
+			 table during this interval."
+		::= { adGenMacPerf24HrEntry 1}
+
+--==================================================================================================================
+-- 24 HOUR HISTORIC
+--==================================================================================================================
+   	adGenMacPerf24HrIntTable OBJECT-TYPE
+      	SYNTAX  	SEQUENCE OF AdGenMacPerf24HrIntEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"The MAC historic 24-hour PM table."
+      	::= { adGenMacPerformance 6 }
+
+   	adGenMacPerf24HrIntEntry OBJECT-TYPE
+      	SYNTAX  	AdGenMacPerf24HrIntEntry
+      	MAX-ACCESS  not-accessible
+      	STATUS  	current
+      	DESCRIPTION
+         	"An entry in the MAC historic 24-hour PM table."
+      	INDEX  { ifIndex, adGenMacPerf24HrIntNum }
+      	::= { adGenMacPerf24HrIntTable 1 }
+
+	AdGenMacPerf24HrIntEntry ::=
+   		SEQUENCE {
+	 		adGenMacPerf24HrIntNum
+				Gauge32,
+	 		adGenMacPerf24HrIntMaxEntries
+				Gauge32
+      	}
+
+	adGenMacPerf24HrIntNum OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"Historic interval number.  Valid range is 1 - 96"
+		::= { adGenMacPerf24HrIntEntry 1}
+
+	adGenMacPerf24HrIntMaxEntries OBJECT-TYPE
+   		SYNTAX      Gauge32
+      	MAX-ACCESS  read-only
+      	STATUS      current
+      	DESCRIPTION
+        	"This variable is used to get the max number of entries in the MAC address
+			 table during this interval."
+		::= { adGenMacPerf24HrIntEntry 2}
+
+--==================================================================================================================
+-- EVENTS
+--==================================================================================================================
+	adGenMacEvent15MinMaxEntriesTCA NOTIFICATION-TYPE
+   		OBJECTS  {
+      		sysName,
+      		adGenPortTrapIdentifier,
+      		ifIndex
+   		}
+   		STATUS  current
+   		DESCRIPTION
+      		"This trap indicates that the maximum number of entries in this MAC table has exceeded the set 15-minute threshold."
+      	--#TYPE         "Status - Alarm"
+      	--#SUMMARY      "15-minute Max Entries Threshold Crossed."
+      	--#SEVERITY     WARNING
+      	--#GENERIC      6
+      	--#CATEGORY     "Error Events"
+      	--#SOURCE_ID    "A"
+      	--#TIMEINDEX    0
+   		::= { adGenMacEvents 1 }
+
+	adGenMacEvent24HrMaxEntriesTCA NOTIFICATION-TYPE
+   		OBJECTS  {
+      		sysName,
+      		adGenPortTrapIdentifier,
+      		ifIndex
+   		}
+   		STATUS  current
+   		DESCRIPTION
+      		"This trap indicates that the maximum number of entries in this MAC table has exceeded the set 24-hour threshold."
+      	--#TYPE         "Status - Alarm"
+      	--#SUMMARY      "24-hour Max Entries Threshold Crossed."
+      	--#SEVERITY     WARNING
+      	--#GENERIC      6
+      	--#CATEGORY     "Error Events"
+      	--#SOURCE_ID    "A"
+      	--#TIMEINDEX    0
+   		::= { adGenMacEvents 11 }
+
+--==================================================================================================================
+-- Bulk MAC table operation
+
+-- Request a TLV Instance to read the MAC Table
+-- adGenMacRequestInstanceBulkMACSlotTable lets you do that
+
+-- Once you obtain the instance number, set the appropriate filters( s-tag, status, interface)
+-- adGenMacBulkMACFilterTable provides OIDs to do that.
+                  
+-- Use the adGenMacBulkMACSlotInstance OID in adGenMacBulkMACFilterTable to build the filtered mac entries 
+-- into TLV data for that instance based on the filters applied/associated with that instance.
+
+-- All the above steps must be performed sequentially
+-- The data stored in the TLV can be obtained by walking the OIDs in the TLV table (TLV-MIB).
+--==================================================================================================================
+
+--==================================================================================================================
+-- Bulk MAC reserve instance
+--==================================================================================================================
+
+    adGenMacReserveInstanceBulkMACSlotTable
+     OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenMacReserveInstanceBulkMACSlotEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Table contains instances that are created when there is a request to reserve a Bulk MAC instance"
+       ::= { adGenMacBulkMAC 1 }
+
+    adGenMacReserveInstanceBulkMACSlotEntry OBJECT-TYPE
+       SYNTAX      AdGenMacReserveInstanceBulkMACSlotEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Index is the slot number."
+       INDEX { adGenSlotInfoIndex }
+       ::= { adGenMacReserveInstanceBulkMACSlotTable 1 }
+
+    AdGenMacReserveInstanceBulkMACSlotEntry ::=
+       SEQUENCE {
+           adGenMacReserveInstanceBulkMACSlotInstance           Integer32
+       }
+
+    adGenMacReserveInstanceBulkMACSlotInstance      OBJECT-TYPE
+       SYNTAX                    		Integer32
+       MAX-ACCESS                		read-only
+       STATUS                    		current
+       DESCRIPTION
+           "Used to index the Tlv table; each time this is called by slot it
+            creates an instance for that viewer"
+        ::= { adGenMacReserveInstanceBulkMACSlotEntry 1 }
+
+--==================================================================================================================
+-- The MAC Filter Table
+--==================================================================================================================
+
+   adGenMacBulkMACFilterTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF AdGenMacBulkMACFilterEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Table contains filters that can be applied on the requested instances"
+       ::= { adGenMacBulkMAC 2 }
+
+    adGenMacBulkMACFilterEntry OBJECT-TYPE
+       SYNTAX      AdGenMacBulkMACFilterEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Indexes are the slot and instance number"
+       INDEX { adGenSlotInfoIndex, adGenMacBulkMACFilterInstance }
+       ::= { adGenMacBulkMACFilterTable 1 }
+
+    AdGenMacBulkMACFilterEntry ::=
+       SEQUENCE {                
+       	   adGenMacBulkMACFilterInstance       Integer32,		
+           adGenMacBulkMACFilterStag           Integer32,
+           adGenMacBulkMACFilterStatus         INTEGER,
+           adGenMacBulkMACFilterInterface      InterfaceIndexOrZero,
+           adGenMacBulkMACSlotInstance         INTEGER
+       }
+
+    adGenMacBulkMACFilterInstance      	OBJECT-TYPE
+       SYNTAX                    		Integer32
+       MAX-ACCESS                		not-accessible
+       STATUS                    		current
+       DESCRIPTION
+           "Used to index the Filter table by TLV Instance number."
+        ::= { adGenMacBulkMACFilterEntry 1 }
+
+  
+    adGenMacBulkMACFilterStag      OBJECT-TYPE
+       SYNTAX                      Integer32 (0..4094)
+       MAX-ACCESS                  read-write
+       STATUS                      current
+       DESCRIPTION
+           "Use this to set the s-tag filter for a specific Bulk MAC instance of the Tlv table"
+        ::= { adGenMacBulkMACFilterEntry 2 }
+        
+    adGenMacBulkMACFilterStatus	 OBJECT-TYPE
+       SYNTAX INTEGER 			 {
+                                	all(0),   
+                                	static(1),
+                                	dynamic(2),
+                                	multicast(3)
+                      			 }
+       MAX-ACCESS 				 read-write
+       STATUS 					 current
+       DESCRIPTION 
+              "Use this to set the Status filter for a specific Bulk MAC instance of the Tlv table"
+	    ::= { adGenMacBulkMACFilterEntry 3 }
+        
+    adGenMacBulkMACFilterInterface OBJECT-TYPE
+       SYNTAX                    InterfaceIndexOrZero
+       MAX-ACCESS                read-write
+       STATUS                    current
+       DESCRIPTION
+           "Use this to set the Interface filter for a specific Bulk MAC instance of the Tlv table
+            The interface id passed here will be the SNMP Interface ID"
+        ::= { adGenMacBulkMACFilterEntry 4 }  
+
+    adGenMacBulkMACSlotInstance    OBJECT-TYPE
+       SYNTAX INTEGER              {
+       								 updateinstance(1)
+       							   }
+       MAX-ACCESS                  read-write
+       STATUS                      current
+       DESCRIPTION
+           "Set this OID to 1 to update the instance with bulk MAC data based on filters.
+            A get on this OID always returns a 1."
+        ::= { adGenMacBulkMACFilterEntry 5 }     
+END                                                   
+

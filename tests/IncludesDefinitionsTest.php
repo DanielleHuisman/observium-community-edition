@@ -17,6 +17,9 @@ include(__DIR__ . '/../includes/definitions.inc.php');
 include(__DIR__ . '/../includes/functions.inc.php');
 
 class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase {
+
+    protected $backupGlobals = FALSE;
+
     /**
     * @dataProvider providerOsRegex
     * @group regex
@@ -391,6 +394,7 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase {
         $array[] = [ '<svg onload=alert(document.domain)>' ];
         $array[] = [ '<div> onmouseover=alert(1)></div>' ];
         $array[] = [ '<style/onload=alert(document.domain)>' ];
+        $array[] = [ 'XXX" onmouseover=alert(1) "xx' ];
 
         // iframe
         $array[] = [ '><iframe src="data:text/html;base64,base64_data"></iframe>' ];
@@ -400,6 +404,11 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase {
         $array[] = [ '<script>eval("al"%2b"ert(1)")</script>' ];
         $array[] = [ '><details ontoggle=eval(atob(\'YWxlcnQoMSk=\')) open>' ];
         $array[] = [ 'eval(atob(\'PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==\'));' ];
+
+        // js concat + '' +
+        $array[] = [ "a'+alert(123)+'a" ];
+        $array[] = [ "a'+alert()+'a" ];
+        $array[] = [ "a'+alert`1`+'a" ];
 
         return $array;
     }

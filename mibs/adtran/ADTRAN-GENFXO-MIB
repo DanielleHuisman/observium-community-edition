@@ -1,0 +1,791 @@
+ADTRAN-GENFXO-MIB
+
+-- TITLE:     The ADTRAN Generic FXO MIB
+-- PRODUCT:   TA5000
+-- VERSION:   1.0
+-- DATE:      02/07/11
+-- AUTHOR:    Peter Kerr
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifiers (OIDs) for the
+-- ADTRAN FxoInterface Component.
+
+-- HISTORY:
+-- 02/07/11 PSK   STATUS: PRELIMINARY.
+-- DO NOT MAKE HISTORY COMMENTS HERE!!!! Revision history now in REVISION/DESCRIPTION clauses below
+-- *****************************************************************************
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+   OBJECT-TYPE,
+   MODULE-IDENTITY,
+   Integer32,
+   Unsigned32
+      FROM SNMPv2-SMI
+
+   TEXTUAL-CONVENTION,
+   DisplayString,
+   TruthValue
+      FROM SNMPv2-TC
+
+   ifIndex,
+   InterfaceIndexOrZero
+      FROM IF-MIB
+
+   adGenFxo,
+   adGenFxoID
+      FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+   ;
+
+
+adGenFxoIdentity MODULE-IDENTITY
+   LAST-UPDATED "201406120000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO
+     "CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+         Tel: +1 800 726-8663
+         Fax: +1 256 963 6217
+         E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for an FXO interface."
+   REVISION "201804040000Z"
+   	  DESCRIPTION "Added support to access the description for FXO ports"
+   REVISION "201406120000Z"
+      DESCRIPTION "Added adGenFxoInterfaceRingTripMuteInterval to adGenFxoInterfaceProvTable."	  
+   REVISION "201208220000Z"
+      DESCRIPTION "Added adGenFxoInterfaceRingTripMode and adGenFxoInterfaceRingTripDuration to adGenFxoInterfaceProvTable."
+   REVISION "201109120000Z"
+      DESCRIPTION "PSK - Added adGenFxoInwardLoopbackTest and adGenFxoOutwardLoopbackTest to adGenFxoInterfaceTestsTable.
+                         Changed all instances of 'read-create' to 'read-write'"
+   REVISION "201102080000Z"
+      DESCRIPTION "Created"
+ ::= { adGenFxoID 1 }
+
+
+--==============================================================================
+-- TEXTUAL CONVENTION
+--==============================================================================
+
+AdGenFxoInterfaceFxsLocation ::= TEXTUAL-CONVENTION
+   STATUS      current
+   DESCRIPTION
+     "Describes the location of an fxs port within the network in the form of
+      an octet string. Used when linking Fxo and Fxs ports (and querying
+      existing links).
+      
+      The first octet defines the type of target, which also defines the format
+      of the rest of the string. Valid types are:
+         1 = none          Used to tear down a connection.
+         2 = ta5k_24p_pots A 24-port TA5000 POTS Access Module.
+         3 = gpon          A GPON remote device.
+         4 = activeE       An Active Ethernet remote device.
+
+      For each type, the octet string format is as follows:
+      (Each numbered item represents one octet.)
+
+      none(1) -
+         1 = type          As described above.
+
+      ta5k_24p_pots(2) -
+         1 = type
+         2 = node_high     Combined with following octet to form 16-bit node.
+         3 = node_low
+         4 = shelf
+         5 = device
+         6 = port
+
+      gpon(3) -
+         1 = type
+         2 = node_high
+         3 = node_low
+         4 = shelf
+         5 = device
+         6 = PON
+         7 = ONT
+         8 = ONT port
+
+      activeE(4) -
+         1 = type
+         2 = node_high
+         3 = node_low
+         4 = shelf
+         5 = device
+         6 = OLT port
+         7 = ONT port"
+   SYNTAX      OCTET STRING (SIZE(1..40))
+
+--==============================================================================
+-- GROUPS
+--==============================================================================
+
+adGenFxoProvisioning                OBJECT IDENTIFIER ::= {adGenFxo 1}
+adGenFxoStatus                      OBJECT IDENTIFIER ::= {adGenFxo 2}
+adGenFxoTest                        OBJECT IDENTIFIER ::= {adGenFxo 3}
+adGenFxoAlarms                      OBJECT IDENTIFIER ::= {adGenFxo 4}
+
+
+--==============================================================================
+-- Groups in FXO interface provisioning
+--==============================================================================
+
+adGenFxoDeviceProv            OBJECT IDENTIFIER  ::= { adGenFxoProvisioning 1 }
+adGenFxoInterfaceProv         OBJECT IDENTIFIER  ::= { adGenFxoProvisioning 2 }
+
+
+--******************************************************************************
+-- This table is for device-level FXO interface provisioning.
+--******************************************************************************
+
+-- Not supporting this at this time, because first product to use this MIB will
+-- not need dynamic tables. Can be added later.
+-- adGenFxoDeviceProvTable OBJECT-TYPE
+--    SYNTAX      SEQUENCE OF AdGenFxoDeviceProvEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--      "This table supports provisioning of device-level FXO interface parameters.
+--       Used in conjunction with adGenFxoDeviceProv."
+--    ::= { adGenFxoDeviceProv 1 }
+
+-- adGenFxoDeviceProvEntry OBJECT-TYPE
+--    SYNTAX      AdGenFxoDeviceProvEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--      "An entry in the adGenFxoDeviceProvTable."
+--    INDEX { ifIndex }
+--    ::= { adGenFxoDeviceProvTable 1 }
+
+-- AdGenFxoDeviceProvEntry ::=
+--    SEQUENCE
+--    {
+--       adGenFxoInterfaceProvCurrentNumber                 Unsigned32,
+--       adGenFxoInterfaceProvLastCreateError               DisplayString
+--    }
+
+-- adGenFxoInterfaceProvCurrentNumber OBJECT-TYPE
+--    SYNTAX      Unsigned32
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--      "Current number of FXO interfaces defined."
+--    ::= { adGenFxoDeviceProvEntry 1 }
+
+-- adGenFxoInterfaceProvLastCreateError OBJECT-TYPE
+--    SYNTAX      DisplayString
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--      "The reason for the last error that occured while attempting to create
+--       an entry in the FxoInterface Component (adGenFxoInterfaceProvTable)."
+--    ::= { adGenFxoDeviceProvEntry 2 }
+
+
+--******************************************************************************
+-- This table is for interface-level FXO provisioning.
+--******************************************************************************
+
+adGenFxoInterfaceProvTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenFxoInterfaceProvEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports provisioning of interface-level FXO parameters.
+      Used in conjunction with adGenFxoInterfaceProv."
+   ::= { adGenFxoInterfaceProv 1 }
+
+adGenFxoInterfaceProvEntry OBJECT-TYPE
+   SYNTAX      AdGenFxoInterfaceProvEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenFxoInterfaceProvTable."
+   INDEX { ifIndex }
+   ::= { adGenFxoInterfaceProvTable 1 }
+
+AdGenFxoInterfaceProvEntry ::=
+   SEQUENCE
+   {
+      adGenFxoInterfaceLastErrorString                   DisplayString,
+
+      adGenFxoInterfaceSignalingMode                     INTEGER,
+      adGenFxoInterfaceTxGain                            Integer32,
+      adGenFxoInterfaceMinTxGain                         Integer32,
+      adGenFxoInterfaceMaxTxGain                         Integer32,
+      adGenFxoInterfaceRxGain                            Integer32,
+      adGenFxoInterfaceMinRxGain                         Integer32,
+      adGenFxoInterfaceMaxRxGain                         Integer32,
+      adGenFxoInterfaceImpedance                         INTEGER,
+      adGenFxoInterfaceCWCIdAckGenDelay                  Unsigned32,
+      adGenFxoInterfaceCWCIdAckGenEnable                 INTEGER,
+      adGenFxoInterfaceTargetFxsLocation                 AdGenFxoInterfaceFxsLocation,
+      adGenFxoInterfaceRingTripMode                      INTEGER,
+      adGenFxoInterfaceRingTripDuration                  Unsigned32,
+      adGenFxoInterfaceRingTripMuteInterval              Unsigned32,
+      adGenFxoCircuitIdentifier							 DisplayString
+   }
+
+adGenFxoInterfaceLastErrorString OBJECT-TYPE
+   SYNTAX       DisplayString
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The reason for the last error that occured while accessing an entry in
+      the FXO Interface Prov Table."
+   ::= { adGenFxoInterfaceProvEntry 1 }
+
+adGenFxoInterfaceSignalingMode OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  loopStart(1),
+                  groundStart(2),
+                  tr08sp(3),
+                  tr08uvg(4)
+                  }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to set signaling mode of the 2-Wire interface.
+         1 = loopStart     Loop-Start signaling.
+         2 = groundStart   Ground-Start signaling.
+         3 = tr08sp        TR-08 Single Party signaling.
+         4 = tr08uvg       TR-08 Universal Voice Grade signaling."
+   ::= { adGenFxoInterfaceProvEntry 2 }
+
+adGenFxoInterfaceTxGain OBJECT-TYPE
+   SYNTAX       Integer32
+   UNITS        "0.1dB"
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Set gain from the line (A/D)."
+   ::= { adGenFxoInterfaceProvEntry 3 }
+
+adGenFxoInterfaceMinTxGain OBJECT-TYPE
+   SYNTAX       Integer32
+   UNITS        "0.1dB"
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "Range of adGenFxoInterfaceTxGain varies by product. Retrieve minimum
+      valid Tx Gain value for use in range checking."
+   ::= { adGenFxoInterfaceProvEntry 4 }
+
+adGenFxoInterfaceMaxTxGain OBJECT-TYPE
+   SYNTAX       Integer32
+   UNITS        "0.1dB"
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "Range of adGenFxoInterfaceTxGain varies by product. Retrieve maximum
+      valid Tx Gain value for use in range checking."
+   ::= { adGenFxoInterfaceProvEntry 5 }
+
+adGenFxoInterfaceRxGain OBJECT-TYPE
+   SYNTAX       Integer32
+   UNITS        "0.1dB"
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Set gain toward the line (D/A)."
+   ::= { adGenFxoInterfaceProvEntry 6 }
+
+adGenFxoInterfaceMinRxGain OBJECT-TYPE
+   SYNTAX       Integer32
+   UNITS        "0.1dB"
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "Range of adGenFxoInterfaceTxGain varies by product. Retrieve minimum
+      valid Rx Gain value for use in range checking."
+   ::= { adGenFxoInterfaceProvEntry 7 }
+
+adGenFxoInterfaceMaxRxGain OBJECT-TYPE
+   SYNTAX       Integer32
+   UNITS        "0.1dB"
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "Range of adGenFxoInterfaceTxGain varies by product. Retrieve maximum
+      valid Rx Gain value for use in range checking."
+   ::= { adGenFxoInterfaceProvEntry 8 }
+
+adGenFxoInterfaceImpedance OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  z600r(1),
+                  z900z(2),
+                  z1(3),
+                  z2(4),
+                  z3(5),
+                  z4(6),
+                  z5(7),
+                  z6(8),
+                  z7(9),
+                  z8(10),
+                  z9(11),
+                  z10(12)
+                  }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to set the terminating impedance of the interface.
+         1 = z600r         600 Ohms.
+         2 = z900z         900 Ohms + 2.16 uF.
+         3 = z1            220 + ( 820 // 115nF).
+         4 = z2            270 + ( 750 // 150nF).
+         5 = z3            270 + ( 750 // 150nF), Zin = 600r.
+         6 = z4            320 + (1050 // 230nF).
+         7 = z5            350 + (1000 // 210nF), Zin = 600r.
+         8 = z6            370 + ( 620 // 310nF).
+         9 = z7            800 // (100 + 50nF), Zin = 900c.
+         10 = z8           1650 // (100 + 5nF), Zin = 900c.
+         11 = z9           900c, Zin = 800 // (100 + 50nF).
+         12 = z10          900c, Zin = 1650 // (100 + 5nF)."
+   ::= { adGenFxoInterfaceProvEntry 9 }
+
+adGenFxoInterfaceCWCIdAckGenDelay OBJECT-TYPE
+   SYNTAX      Unsigned32 (0..100)
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to set the Call-Waiting Caller-ID ACK generation delay."
+   ::= { adGenFxoInterfaceProvEntry 10 }
+
+adGenFxoInterfaceCWCIdAckGenEnable OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  enable(1),
+                  disable(2)
+                  }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to enable/disable Caller-ID ACK generation during Call-Waiting
+      interval."
+   ::= { adGenFxoInterfaceProvEntry 11 }
+
+adGenFxoInterfaceTargetFxsLocation OBJECT-TYPE
+   SYNTAX      AdGenFxoInterfaceFxsLocation
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to connect FXO interface to an FXS interface."
+   ::= { adGenFxoInterfaceProvEntry 12 }
+
+adGenFxoInterfaceRingTripMode OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  normal(1),
+                  forced(2),
+                  delayed(3)
+                  }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to set the ring-trip mode of the interface.
+         1 = normal        Use a normal off-hook to trip ringing voltage.
+         2 = forced        Force a ring-ground on loop to sink ringing current.
+         3 = delayed       Wait until ring pause interval before going off-hook."
+   ::= { adGenFxoInterfaceProvEntry 13 }
+
+adGenFxoInterfaceRingTripDuration OBJECT-TYPE
+   SYNTAX      Unsigned32 (50..300)
+   UNITS       "milliseconds"
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to set duration of the ring-ground interval in 'forced' ring-trip mode."
+   ::= { adGenFxoInterfaceProvEntry 14 }
+
+adGenFxoInterfaceRingTripMuteInterval OBJECT-TYPE
+   SYNTAX      Unsigned32 (0..400)
+   UNITS       "milliseconds"
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Use to set a delay before enabling the voice path when going off-hook, exiting
+      the 'forced' or 'delayed' ring-trip modes.
+      Valid values are <0,20-400> ('0' to disable)."
+   DEFVAL  { 200 }	  
+   ::= { adGenFxoInterfaceProvEntry 15 }
+
+adGenFxoCircuitIdentifier OBJECT-TYPE
+	SYNTAX      DisplayString (SIZE (0..40))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The circuit identifier string for the fxo port."
+    ::= { adGenFxoInterfaceProvEntry 16 }
+
+
+--==============================================================================
+-- Groups in FXO interface status
+--==============================================================================
+
+adGenFxoDeviceStatus          OBJECT IDENTIFIER  ::= { adGenFxoStatus 1 }
+adGenFxoInterfaceStatus       OBJECT IDENTIFIER  ::= { adGenFxoStatus 2 }
+adGenFxoFindFxsMap            OBJECT IDENTIFIER  ::= { adGenFxoStatus 3 }
+
+
+--******************************************************************************
+-- This table is for device-level FXO interface status.
+--******************************************************************************
+
+-- No device-level status at this time.
+-- adGenFxoDeviceStatusTable OBJECT-TYPE
+--    SYNTAX      SEQUENCE OF AdGenFxoDeviceStatusEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--      "This table supports retreival of device-level FXO interface status.
+--       Used in conjunction with adGenFxoDeviceStatus."
+--    ::= { adGenFxoDeviceStatus 1 }
+
+-- adGenFxoDeviceStatusEntry OBJECT-TYPE
+--    SYNTAX      AdGenFxoDeviceStatusEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--      "An entry in the adGenFxoDeviceStatusTable."
+--    INDEX { ifIndex }
+--    ::= { adGenFxoDeviceStatusTable 1 }
+
+-- AdGenFxoDeviceStatusEntry ::=
+--    SEQUENCE
+--    {
+--    }
+
+
+--******************************************************************************
+-- This table is for interface-level FXO status.
+--******************************************************************************
+
+adGenFxoInterfaceStatusTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenFxoInterfaceStatusEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports retrieval of interface-level FXO status.
+      Used in conjunction with adGenFxoInterfaceStatus."
+   ::= { adGenFxoInterfaceStatus 1 }
+
+adGenFxoInterfaceStatusEntry OBJECT-TYPE
+   SYNTAX      AdGenFxoInterfaceStatusEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenFxoInterfaceStatusTable."
+   INDEX { ifIndex }
+   ::= { adGenFxoInterfaceStatusTable 1 }
+
+AdGenFxoInterfaceStatusEntry ::=
+   SEQUENCE
+   {
+      adGenFxoPortActive                                 INTEGER,
+      adGenFxoLoopFeed                                   INTEGER,
+      adGenFxoLoopState                                  INTEGER,
+      adGenFxoTestActive                                 INTEGER,
+
+      adGenFxoRxVoicePackets                             Unsigned32,
+      adGenFxoRxControlPackets                           Unsigned32,
+      adGenFxoTxVoicePackets                             Unsigned32,
+      adGenFxoTxControlPackets                           Unsigned32,
+      adGenFxoClearPortCounters                          INTEGER
+   }
+
+adGenFxoPortActive OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  active(1),
+                  inactive(2),
+                  disabled(3)
+                  }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes whether a call is in progress (active) or not."
+   ::= { adGenFxoInterfaceStatusEntry 1 }
+
+adGenFxoLoopFeed OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  open(1),
+                  closed(2),
+                  ringGround(3)
+                  }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes what the interface is currently presenting to
+      the loop."
+   ::= { adGenFxoInterfaceStatusEntry 2 }
+
+adGenFxoLoopState OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  lcf(1),
+                  rlcf(2),
+                  noBatt(3),
+                  tipOpen(4),
+                  ringing(5)
+                  }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "This object describes the current state of the loop, as it is presented
+      to the interface.
+         1 = lcf           Loop Current Feed (Battery).
+         2 = rlcf          Reverse Loop Current Feed.
+         3 = lcfo          Loop Current Feed Open (No Battery).
+         4 = tipOpen       Tip Open (Battery present on ring lead).
+         5 = ringing       Ringing voltage present."
+   ::= { adGenFxoInterfaceStatusEntry 3 }
+
+adGenFxoTestActive OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  active(1),
+                  inactive(2),
+                  disabled(3)
+                  }
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes whether the interface is currently under test
+      (active) or not."
+   ::= { adGenFxoInterfaceStatusEntry 4 }
+
+adGenFxoRxVoicePackets OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes the number of voice packets received from the
+      network on this interface."
+   ::= { adGenFxoInterfaceStatusEntry 5 }
+
+adGenFxoRxControlPackets OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes the number of control packets received from the
+      network on this interface."
+   ::= { adGenFxoInterfaceStatusEntry 6 }
+
+adGenFxoTxVoicePackets OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes the number of voice packets transmitted to the
+      network on this interface."
+   ::= { adGenFxoInterfaceStatusEntry 7 }
+
+adGenFxoTxControlPackets OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "This object describes the number of control packets transmitted to the
+      network on this interface."
+   ::= { adGenFxoInterfaceStatusEntry 8 }
+
+adGenFxoClearPortCounters OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  clear(1)
+                  }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Write to this object to clear all interface-level packet counters."
+   ::= { adGenFxoInterfaceStatusEntry 9 }
+
+
+--******************************************************************************
+-- This table is for finding links between FXO and FXS ports, indexed by
+-- the far-end FXS port.
+--******************************************************************************
+
+adGenFxoFindFxsMapTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenFxoFindFxsMapEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports discovery of links between FXO and FXS ports, indexed
+      by the far-end FXS port. (For finding links by FXO port, use
+      adGenFxoInterfaceProvTable > adGenFxoInterfaceTargetFxsLocation."
+   ::= { adGenFxoFindFxsMap 1 }
+
+adGenFxoFindFxsMapEntry OBJECT-TYPE
+   SYNTAX      AdGenFxoFindFxsMapEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenFxoFindFxsMapTable."
+   INDEX { ifIndex,  -- This is the device-level index.
+           IMPLIED adGenFxoInterfaceFxsIndex }
+   ::= { adGenFxoFindFxsMapTable 1 }
+
+AdGenFxoFindFxsMapEntry ::=
+   SEQUENCE
+   {
+      adGenFxoInterfaceFxsIndex                          AdGenFxoInterfaceFxsLocation,
+      adGenFxoInterfaceFound                             InterfaceIndexOrZero
+   }
+
+adGenFxoInterfaceFxsIndex OBJECT-TYPE
+   SYNTAX      AdGenFxoInterfaceFxsLocation
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "The FXS Location Index."
+   ::= { adGenFxoFindFxsMapEntry 1 }
+
+adGenFxoInterfaceFound OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The ifIndex of the FXO port associated with the specified FXS location.
+      A value of '0' means that a link was not found on this device."
+   ::= { adGenFxoFindFxsMapEntry 2 }
+
+
+--==============================================================================
+-- Groups in FXO interface test
+--==============================================================================
+
+adGenFxoDeviceTests          OBJECT IDENTIFIER  ::= { adGenFxoTest 1 }
+adGenFxoInterfaceTests       OBJECT IDENTIFIER  ::= { adGenFxoTest 2 }
+
+
+--******************************************************************************
+-- This table is for device-level FXO interface tests.
+--******************************************************************************
+
+-- No device-level tests at this time.
+-- adGenFxoDeviceTestsTable OBJECT-TYPE
+--    SYNTAX      SEQUENCE OF AdGenFxoDeviceTestsEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--      "This table supports the use of device-level FXO tests.
+--       Used in conjunction with adGenFxoDeviceTests."
+--    ::= { adGenFxoDeviceTests 1 }
+
+-- adGenFxoDeviceTestsEntry OBJECT-TYPE
+--    SYNTAX      AdGenFxoDeviceTestsEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--      "An entry in the adGenFxoDeviceTestsTable."
+--    INDEX { ifIndex }
+--    ::= { adGenFxoDeviceTestsTable 1 }
+
+-- AdGenFxoDeviceTestsEntry ::=
+--    SEQUENCE
+--    {
+--    }
+
+
+--******************************************************************************
+-- This table is for interface-level FXO tests.
+--******************************************************************************
+
+adGenFxoInterfaceTestsTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenFxoInterfaceTestsEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports the use of interface-level FXO tests.
+      Used in conjunction with adGenFxoInterfaceTests."
+   ::= { adGenFxoInterfaceTests 1 }
+
+adGenFxoInterfaceTestsEntry OBJECT-TYPE
+   SYNTAX      AdGenFxoInterfaceTestsEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenFxoInterfaceTestsTable."
+   INDEX { ifIndex }
+   ::= { adGenFxoInterfaceTestsTable 1 }
+
+AdGenFxoInterfaceTestsEntry ::=
+   SEQUENCE
+   {
+      adGenFxoPortClearTest                              INTEGER,
+      adGenFxo1004HzToneTest                             INTEGER,
+      adGenFxoLoopStateTest                              INTEGER,
+      adGenFxoInwardLoopbackTest                         INTEGER,
+      adGenFxoOutwardLoopbackTest                        INTEGER
+   }
+
+adGenFxoPortClearTest OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  clear(1)
+                  }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Write to this object to exit all running interface-level tests."
+   ::= { adGenFxoInterfaceTestsEntry 1 }
+
+adGenFxo1004HzToneTest OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  near(1),
+                  far(2),
+                  disable(3)
+                  }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Use to enable or disable a 1004Hz tone test.
+         1 = near          Send tone to the loop.
+         2 = far           Send tone to the network.
+         3 = disable       Turn off tone."
+   ::= { adGenFxoInterfaceTestsEntry 2 }
+
+adGenFxoLoopStateTest OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  disable(1),
+                  open(2),
+                  close(3),
+                  ringGround(4)
+                  }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "This object describes what the interface is currently presenting to
+      the loop."
+   ::= { adGenFxoInterfaceTestsEntry 3 }
+
+adGenFxoInwardLoopbackTest OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  enabled(1),
+                  disabled(2)
+                  }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Use to enable or disable a loopback towards the backplane."
+   ::= { adGenFxoInterfaceTestsEntry 4 }
+
+adGenFxoOutwardLoopbackTest OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  enabled(1),
+                  disabled(2)
+                  }
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Use to enable or disable a loopback towards the loop."
+   ::= { adGenFxoInterfaceTestsEntry 5 }
+
+
+--==============================================================================
+-- Groups in FXO interface alarms
+--==============================================================================
+
+--No Fxo specific alarms defined at this time.
+--adGenFxoAlarmEvents           OBJECT IDENTIFIER  ::= { adGenFxoAlarms 0 }
+
+
+END

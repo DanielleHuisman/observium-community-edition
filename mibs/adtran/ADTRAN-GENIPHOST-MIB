@@ -1,0 +1,442 @@
+ADTRAN-GENIPHOST-MIB
+
+-- TITLE:     The ADTRAN Generic IP Host MIB
+-- PRODUCT:   TA5000
+-- VERSION:   1.0
+-- DATE:      06/17/09
+-- AUTHOR:    Seetha Subramanian
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifiers (OIDs) for the
+-- ADTRAN GENIPHOST MIB objects
+
+-- HISTORY:
+-- 06/17/09 sgs   STATUS: PRELIMINARY.
+-- 06/18/09 sgs   Added
+-- 11/02/09 psk   Updated to reflect recent changes to ip-host architecture.
+-- 11/24/09 sgs   Added adGenIpHostProvIpAssignMode OID   
+-- 07/23/10 sgs   Added adGenIpHostStatTable
+-- 08/23/10 mg    Added adGenIpHostConnectTable
+-- *****************************************************************************
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+   adGenIpHost,
+   adGenIpHostID
+      FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+
+   OBJECT-TYPE,
+   MODULE-IDENTITY,
+   Integer32,
+   IpAddress
+      FROM SNMPv2-SMI
+
+   DisplayString,
+   RowStatus,
+   TruthValue,
+   TEXTUAL-CONVENTION
+      FROM SNMPv2-TC
+
+   ifIndex,  
+   InterfaceIndexOrZero
+      FROM IF-MIB
+   ;
+
+adGenIpHostIdentity MODULE-IDENTITY
+   LAST-UPDATED "201601110000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO
+     "CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+                 Tel: +1 800 726-8663
+                 Fax: +1 256 963 6217
+                 E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the Ip Host MIB."
+   REVISION "201601110000Z"
+   DESCRIPTION "Added a new service for IP-Hosts, RADIUS"
+   REVISION "201201200000Z"
+   DESCRIPTION "Added a new service that can be attached to the IP Host - RF Video"
+   REVISION "200911020000Z"
+   DESCRIPTION "Created"
+::= { adGenIpHostID 1 }
+
+--==============================================================================
+-- PROVISIONING
+--==============================================================================
+
+adGenIpHostProvisioning                OBJECT IDENTIFIER ::= {adGenIpHost 1}      
+adGenIpHostStatus                      OBJECT IDENTIFIER ::= {adGenIpHost 2}  
+adGenIpHostConnect                     OBJECT IDENTIFIER ::= {adGenIpHost 3}
+
+AdGenIpHostServiceOrInterface ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+            "Indicates enumeration value of the services/interfaces"
+        SYNTAX INTEGER {
+                   serviceSIP (1),
+                   serviceMGCP (2),
+                   serviceRFVideo(3),
+                   serviceRADIUS(4),
+                   interfacePseudowire (50),
+                   interfacePacketTiming(51)
+          }
+
+adGenIpHostProvErrorTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIpHostProvErrorEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table allows the reason for the last error that occured while
+     attempting to create an entry in the ip-host provisioning table
+     (adGenIpHostProvTable) for a specific AM."
+   ::= { adGenIpHostProvisioning 1 }
+
+adGenIpHostProvErrorEntry OBJECT-TYPE
+   SYNTAX      AdGenIpHostProvErrorEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenIpHostProvErrorTable. ifIndex can be ONT ifindex or
+      backplane interface index for other TA5000 Access Modules. The backplane
+      interface index should be (((((shelf - 1) * 256) + slot) * 100000) +
+      99999), which is the standard TA5000 mechanism for encoding shelf and
+      slot, but with the port set to a fixed value - the maximum value in the
+      port range."
+   INDEX { ifIndex }
+   ::= { adGenIpHostProvErrorTable 1 }
+
+AdGenIpHostProvErrorEntry ::=
+   SEQUENCE
+   {
+      adGenIpHostProvCurrentNumber                 Integer32,
+      adGenIpHostProvLastCreateError               DisplayString
+   }
+
+adGenIpHostProvCurrentNumber OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Current number of ip-host entries at this ifIndex."
+   ::= { adGenIpHostProvErrorEntry 1 }
+
+adGenIpHostProvLastCreateError OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The reason for the last error that occurred while attempting to create
+      an entry in the ip-host provisioning table (adGenIpHostProvTable)."
+   ::= { adGenIpHostProvErrorEntry 2 }
+
+adGenIpHostProvTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIpHostProvEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports provisioning of an ip-host, which can provide an IP
+      configuration for various services like sip, pwe etc."
+   ::= { adGenIpHostProvisioning 2 }
+
+adGenIpHostProvEntry OBJECT-TYPE
+   SYNTAX      AdGenIpHostProvEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenIpHostProvTable (ifIndex can be ONT ifindex or
+      backplane interface index for TA5000 Access Modules)."
+   INDEX { ifIndex, IMPLIED adGenIpHostEntryIndex }
+   ::= { adGenIpHostProvTable 1 }
+
+AdGenIpHostProvEntry ::=
+   SEQUENCE
+   {
+      adGenIpHostEntryIndex                        DisplayString,
+      adGenIpHostProvRowStatus                     RowStatus,
+      adGenIpHostProvLastErrorString               DisplayString,
+      adGenIpHostProvStatus                        DisplayString,
+
+      adGenIpHostSubInterfaceIndex                 Integer32,
+
+      adGenIpHostProvIpAddress                     IpAddress,
+      adGenIpHostProvIpSubnetMask                  IpAddress,
+      adGenIpHostProvIpDefaultGateway              IpAddress,
+
+      adGenIpHostProvDomainName                    DisplayString,
+      adGenIpHostProvDomainNameAddServer           IpAddress,
+      adGenIpHostProvDomainNameRemoveServer        IpAddress,
+      adGenIpHostProvDomainNameServerList          OCTET STRING,
+      adGenIpHostProvDomainLookup                  TruthValue,
+      adGenIpHostProvIpAssignMode                  INTEGER,
+      adGenIpHostConnectLastErrorString            DisplayString
+   }
+
+adGenIpHostEntryIndex OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE(1..80))
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "The ip-host's name."
+   ::= { adGenIpHostProvEntry 1 }
+
+adGenIpHostProvRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "This object is used to create a new row or modify or delete an existing
+      row in this table."
+   ::= { adGenIpHostProvEntry 2 }
+
+adGenIpHostProvLastErrorString OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The reason for the last error that occured while attempting to write to or
+      read from an object in the IP host Prov Table."
+   ::= { adGenIpHostProvEntry 3 }
+
+adGenIpHostProvStatus OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "This variable provides the ip-host status. If there is no error, the
+      ip-host status will be 'running'. If there is an error and the ip-host
+      cannot be brought up, then adGenIpHostProvStatus will provide more details
+      about the error."
+   ::= { adGenIpHostProvEntry 4 }
+
+adGenIpHostSubInterfaceIndex  OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "This index specificies the sub interface index associated with this
+      ip-host. The CLI is indexed by interface.name, but the name string is not
+      supported by the ethernet interface SNMP table (in regards to the
+      ethernet dslam flow MIB). Instead, an integer sub index representing the
+      ip-host can be retreived from this OID."
+   ::= { adGenIpHostProvEntry 5 }
+
+adGenIpHostProvIpAddress OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Specifies the IP address of the ip-host entry. This object is mandatory
+      for row activation only in STATIC mode."
+   ::= { adGenIpHostProvEntry 6 }
+
+adGenIpHostProvIpSubnetMask OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Specifies the subnet mask. This object is mandatory for row
+      activation only in STATIC mode."
+   ::= { adGenIpHostProvEntry 7 }
+
+adGenIpHostProvIpDefaultGateway OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Specifies the default gateway IP address. This object is mandatory for
+      row activation only in STATIC mode."
+   ::= { adGenIpHostProvEntry 8 }
+
+adGenIpHostProvDomainName OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Specifies the default IP domain name used to resolve unqualified host
+      names. Do not include the initial period that separates the unresolved
+      name from the default domain name."
+   ::= { adGenIpHostProvEntry 9 }
+
+adGenIpHostProvDomainNameAddServer OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Add an IP address to the name server list to use for name-to-address
+      resolution."
+   ::= { adGenIpHostProvEntry 10 }
+
+adGenIpHostProvDomainNameRemoveServer OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Remove a specific IP address from the name server list."
+   ::= { adGenIpHostProvEntry 11 }
+
+adGenIpHostProvDomainNameServerList OBJECT-TYPE
+   SYNTAX      OCTET STRING (SIZE(24))
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "A string containing all the currently provisioned IP addresses in the name
+      server list. IP addresses are formatted as IpAddress TCs. Up to six
+      addresses are supported. The addresses are sorted by priority from left to
+      right (left having the highest priority). If fewer than six addresses have
+      been provisioned, the string will be zero-filled up to a 24-byte length.
+      When using this object to write to the list, all six addresses can be set
+      at once. However, any previously provisioned addresses will be removed
+      before the new ones are added (regardless of how many addresses are in the
+      string being written)."
+   ::= { adGenIpHostProvEntry 12 }
+
+adGenIpHostProvDomainLookup OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "Used to enable the IP domain naming system (DNS), allowing DNS-based host
+      translation (name-to-address)."
+   ::= { adGenIpHostProvEntry 13 }
+
+adGenIpHostProvIpAssignMode OBJECT-TYPE
+   SYNTAX      	INTEGER
+				{
+					dynamic(1),
+					static(2)
+				}
+   MAX-ACCESS   read-create
+   STATUS       current
+   DESCRIPTION
+     "The method by which IP addresses are assigned to this ip host entry.
+	  Static IP addresses are provisioned through this MIB.  Dynamic IP addresses
+	  are provisioned via DHCP or a similar protocol."
+    ::= { adGenIpHostProvEntry 14 }
+                                    
+adGenIpHostConnectLastErrorString OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The reason for the last error that occured while attempting to write to or
+      read from an object in the IP host Connect Table."
+   ::= { adGenIpHostProvEntry 15 }
+
+--==================================================================================================================
+-- Connect 
+--==================================================================================================================
+adGenIpHostConnectTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIpHostConnectEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports the service/interfaces connected to this IpHost."
+   ::= { adGenIpHostConnect 1 }
+
+adGenIpHostConnectEntry OBJECT-TYPE
+   SYNTAX      AdGenIpHostConnectEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenIpHostConnectTable.
+      1) ifIndex: this is the IfIndex of the IpHost;
+      2) adGenIpHostServiceOrInterface: shows if a services or an interface is
+         attached to this IpHost;
+      3) adGenIpHostConnectIfIndex: contains the IfIndex of the interface attached or zero;
+      4) adGenIpHostEntryIndex: Iphost's name."
+   INDEX { ifIndex, adGenIpHostServiceOrInterface, adGenIpHostConnectIfIndex, IMPLIED adGenIpHostEntryIndex }
+   ::= { adGenIpHostConnectTable 1 }
+
+AdGenIpHostConnectEntry ::=
+   SEQUENCE
+   {           
+      adGenIpHostServiceOrInterface      AdGenIpHostServiceOrInterface,
+      adGenIpHostConnectIfIndex          InterfaceIndexOrZero,
+      adGenIpHostConnectRowStatus        RowStatus
+   }
+
+adGenIpHostServiceOrInterface OBJECT-TYPE
+   SYNTAX      AdGenIpHostServiceOrInterface
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "Shows if a services or an interface is attached to this IpHost."
+   ::= { adGenIpHostConnectEntry 1 }
+
+adGenIpHostConnectIfIndex OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "If adGenIpHostServiceOrInteface is set to interface(1), this object contains
+     the ifIndex of the interface to be attached.  Otherwise, it returns zero."
+   ::= { adGenIpHostConnectEntry 2 }
+
+adGenIpHostConnectRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+     "This object is used to create a new row or delete an existing
+      row in this table. The CreateAndGo and Destroy values are
+      the only ones supported."
+   ::= { adGenIpHostConnectEntry 3 }
+
+--==================================================================================================================
+-- STATUS
+--==================================================================================================================
+adGenIpHostStatTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIpHostStatEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports status items related to the
+	  ip host entry."
+   ::= { adGenIpHostStatus 1 }
+
+adGenIpHostStatEntry OBJECT-TYPE
+   SYNTAX      AdGenIpHostStatEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenIpHostStatTable."
+   INDEX { ifIndex, IMPLIED adGenIpHostEntryIndex }
+   ::= { adGenIpHostStatTable 1 }
+
+AdGenIpHostStatEntry ::=
+   SEQUENCE
+   {
+      adGenIpHostStatIpAddress           IpAddress,
+      adGenIpHostStatGateway             IpAddress,
+	  adGenIpHostStatIpSubnetMask        IpAddress
+
+   }
+adGenIpHostStatIpAddress OBJECT-TYPE
+   SYNTAX      	IpAddress
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The IP address of the ip host entry."
+	 ::= { adGenIpHostStatEntry 1 }
+
+adGenIpHostStatGateway OBJECT-TYPE
+   SYNTAX      	IpAddress
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The default gateway of the ip host entry."
+	 ::= { adGenIpHostStatEntry 2 }
+	 
+adGenIpHostStatIpSubnetMask OBJECT-TYPE
+   SYNTAX      	IpAddress
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The subnet mask of the ip host entry."
+	 ::= { adGenIpHostStatEntry 3 }
+
+END

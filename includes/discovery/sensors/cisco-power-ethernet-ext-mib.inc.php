@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -57,7 +57,7 @@ foreach ($oids as $index => $entry) {
     }
 
     // Detect PoE Group and port
-    [$pethPsePortGroupIndex, $cpeExtPsePortIndex] = explode('.', $index);
+    [ $pethPsePortGroupIndex, $cpeExtPsePortIndex ] = explode('.', $index);
 
     $group = $pethPsePortGroupIndex > 1 ? " Group $pethPsePortGroupIndex" : ''; // Add group name if group number greater than 1
 
@@ -90,7 +90,7 @@ foreach ($oids as $index => $entry) {
         unset($options['limit_high']);
     }
 
-    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 }
 
 // EOF

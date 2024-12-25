@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -32,7 +32,7 @@ foreach ($oids as $index => $entry) {
         $oid = ".1.3.6.1.4.1.1991.1.1.3.3.6.1.4.$index";
 
         $options['rename_rrd'] = "brocade-dom-$index";
-        discover_sensor_ng($device, 'current', $mib, 'snIfOpticalMonitoringTxBiasCurrent', $oid, $index, NULL, $descr . " TX Bias Current", 0.001, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, 'snIfOpticalMonitoringTxBiasCurrent', $oid, $index, $descr . " TX Bias Current", 0.001, $value, $options);
     }
 
     $value = $entry['snIfOpticalMonitoringTxPower'];
@@ -41,9 +41,9 @@ foreach ($oids as $index => $entry) {
 
         $options['rename_rrd'] = "brocade-dom-tx-$index";
         if (str_icontains_array($value, 'uWatts')) {
-            discover_sensor_ng($device, 'power', $mib, 'snIfOpticalMonitoringTxPower', $oid, $index, NULL, $descr . " TX Power", 0.000001, $value, $options);
+            discover_sensor_ng($device, 'power', $mib, 'snIfOpticalMonitoringTxPower', $oid, $index, $descr . " TX Power", 0.000001, $value, $options);
         } else {
-            discover_sensor_ng($device, 'dbm', $mib, 'snIfOpticalMonitoringTxPower', $oid, $index, NULL, $descr . " TX Power", 1, $value, $options);
+            discover_sensor_ng($device, 'dbm', $mib, 'snIfOpticalMonitoringTxPower', $oid, $index, $descr . " TX Power", 1, $value, $options);
         }
     }
 
@@ -53,9 +53,9 @@ foreach ($oids as $index => $entry) {
 
         $options['rename_rrd'] = "brocade-dom-rx-$index";
         if (str_icontains_array($value, 'uWatts')) {
-            discover_sensor_ng($device, 'power', $mib, 'snIfOpticalMonitoringRxPower', $oid, $index, NULL, $descr . " RX Power", 0.000001, $value, $options);
+            discover_sensor_ng($device, 'power', $mib, 'snIfOpticalMonitoringRxPower', $oid, $index, $descr . " RX Power", 0.000001, $value, $options);
         } else {
-            discover_sensor_ng($device, 'dbm', $mib, 'snIfOpticalMonitoringRxPower', $oid, $index, NULL, $descr . " RX Power", 1, $value, $options);
+            discover_sensor_ng($device, 'dbm', $mib, 'snIfOpticalMonitoringRxPower', $oid, $index, $descr . " RX Power", 1, $value, $options);
         }
     }
 
@@ -64,7 +64,7 @@ foreach ($oids as $index => $entry) {
         $oid = ".1.3.6.1.4.1.1991.1.1.3.3.6.1.1.$index";
 
         $options['rename_rrd'] = "brocade-dom-$index";
-        discover_sensor_ng($device, 'temperature', $mib, 'snIfOpticalMonitoringTemperature', $oid, $index, NULL, $descr . " Temperature", 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'snIfOpticalMonitoringTemperature', $oid, $index, $descr . " Temperature", 1, $value, $options);
     }
 }
 
@@ -109,7 +109,7 @@ foreach ($oids as $ifIndex => $lanes) {
             $oid_num  = '.1.3.6.1.4.1.1991.1.1.3.3.10.1.2.' . $index;
             $descr    = "$lane_descr Temperature";
 
-            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
 
         if ($entry['snIfOpticalLaneMonitoringTxPower'] !== "NA") {
@@ -119,9 +119,9 @@ foreach ($oids as $ifIndex => $lanes) {
             $descr    = "$lane_descr TX Power";
 
             if (str_icontains_array($value, 'dBm')) {
-                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
             } else {
-                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, 0.000001, $value, $options);
+                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, 0.000001, $value, $options);
             }
         }
 
@@ -132,9 +132,9 @@ foreach ($oids as $ifIndex => $lanes) {
             $descr    = "$lane_descr RX Power";
 
             if (str_icontains_array($value, 'dBm')) {
-                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+                discover_sensor_ng($device, 'dbm', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
             } else {
-                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, 0.000001, $value, $options);
+                discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, 0.000001, $value, $options);
             }
         }
 
@@ -144,7 +144,7 @@ foreach ($oids as $ifIndex => $lanes) {
             $oid_num  = '.1.3.6.1.4.1.1991.1.1.3.3.10.1.5.' . $index;
             $descr    = "$lane_descr TX Bias Current";
 
-            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, 0.001, $value, $options);
+            discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, 0.001, $value, $options);
         }
 
         if ($entry['snIfOpticalLaneMonitoringVoltage'] !== "NA") {
@@ -153,7 +153,7 @@ foreach ($oids as $ifIndex => $lanes) {
             $oid_num  = '.1.3.6.1.4.1.1991.1.1.3.3.10.1.6.' . $index;
             $descr    = "$lane_descr Voltage";
 
-            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+            discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, 1, $value, $options);
         }
     }
 }

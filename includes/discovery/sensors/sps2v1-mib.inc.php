@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -124,7 +124,7 @@ foreach ($oids as $index => $entry) {
             'limit_high'      => $entry['pduDevMgmtInletOverCurrB1CritPh' . $phase] * $scale,
             'limit_high_warn' => $entry['pduDevMgmtInletOverCurrB1WarnPh' . $phase] * $scale
         ];
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Inlet" . $name . $phase_name . ' B2';
         $oid_name = 'pduDevMonInletCurrentPh' . $phase . 'B2';
@@ -135,7 +135,7 @@ foreach ($oids as $index => $entry) {
             'limit_high'      => $entry['pduDevMgmtInletOverCurrB2CritPh' . $phase] * $scale,
             'limit_high_warn' => $entry['pduDevMgmtInletOverCurrB2WarnPh' . $phase] * $scale
         ];
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Inlet" . $name . $phase_name;
         $oid_name = 'pduDevMonInletVoltPh' . $phase;
@@ -146,7 +146,7 @@ foreach ($oids as $index => $entry) {
             'limit_high'      => $entry['pduDevMgmtInletOverVoltCritPh' . $phase] * $scale,
             'limit_high_warn' => $entry['pduDevMgmtInletOverVoltWarnPh' . $phase] * $scale
         ];
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Inlet" . $name . $phase_name . ' B1';
         $oid_name = 'pduDevMonInletPfPh' . $phase . 'B1';
@@ -157,7 +157,7 @@ foreach ($oids as $index => $entry) {
             'limit_low'      => $entry['pduDevMgmtInletOverPfB1CritPh' . $phase] * $scale,
             'limit_low_warn' => $entry['pduDevMgmtInletOverPfB1WarnPh' . $phase] * $scale
         ];
-        discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Inlet" . $name . $phase_name . ' B2';
         $oid_name = 'pduDevMonInletPfPh' . $phase . 'B2';
@@ -168,21 +168,21 @@ foreach ($oids as $index => $entry) {
             'limit_low'      => $entry['pduDevMgmtInletOverPfB2CritPh' . $phase] * $scale,
             'limit_low_warn' => $entry['pduDevMgmtInletOverPfB2WarnPh' . $phase] * $scale
         ];
-        discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'powerfactor', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Inlet" . $name . $phase_name;
         $oid_name = 'pduDevMonInletActPowerPh' . $phase;
         $oid_num  = snmp_translate($oid_name, $mib) . ".$index";
         $value    = $entry[$oid_name];
         $scale    = 0.1;
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
         $descr    = "Inlet" . $name . $phase_name;
         $oid_name = 'pduDevMonInletAppPowerPh' . $phase;
         $oid_num  = snmp_translate($oid_name, $mib) . ".$index";
         $value    = $entry[$oid_name];
         $scale    = 0.1;
-        discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+        discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value);
 
         $descr    = "Inlet" . $name . $phase_name;
         $oid_name = 'pduDevMonInletEvtStatusPh' . $phase;
@@ -232,7 +232,7 @@ if ($outlet_count = snmp_get_oid($device, "pduDevMonOutletMasterPortSize.0", 'SP
             'measured_entity_label' => "Outlet $index",
             'measured_class' => 'outlet'
         ];
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Outlet $index";
         $oid_name = 'pduDevMonOutletMasterPortCurrent';
@@ -245,7 +245,7 @@ if ($outlet_count = snmp_get_oid($device, "pduDevMonOutletMasterPortSize.0", 'SP
             'measured_entity_label' => "Outlet $index",
             'measured_class' => 'outlet'
         ];
-        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Outlet $index";
         $oid_name = 'pduDevMonOutletMasterPortActPower';
@@ -258,7 +258,7 @@ if ($outlet_count = snmp_get_oid($device, "pduDevMonOutletMasterPortSize.0", 'SP
             'measured_entity_label' => "Outlet $index",
             'measured_class' => 'outlet'
         ];
-        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Outlet $index";
         $oid_name = 'pduDevMonOutletMasterPortActPower';
@@ -269,7 +269,7 @@ if ($outlet_count = snmp_get_oid($device, "pduDevMonOutletMasterPortSize.0", 'SP
             'measured_entity_label' => "Outlet $index",
             'measured_class' => 'outlet'
         ];
-        discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
 
         $descr    = "Outlet $index";
         $oid_name = 'pduDevMonOutletMasterPortEnergy';

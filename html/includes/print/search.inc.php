@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -758,7 +758,7 @@ function form_final($data, $form_options, &$used_vars) {
     $string .= '<form method="POST" id="' . $form_options['form_id'] . '" name="' . $form_options['form_id'] . '" action="' . $data['url'] . '" ' .
         generate_html_attribs($form_attribs) . $form_options['form_style'] . '>' . PHP_EOL;
     if ($data['brand']) {
-        $string .= '  <a class="brand">' . $data['brand'] . '</a>' . PHP_EOL;
+        $string .= '  <a class="brand">' . escape_html($data['brand']) . '</a>' . PHP_EOL;
     }
     if ($data['help']) {
         $string .= '  <span class="help-block">' . $data['help'] . '</span>' . PHP_EOL;
@@ -1145,6 +1145,7 @@ STYLE
         $item_end = ' readonly="1"' . $item_end;
     }
 
+    $add_div = FALSE; // do not add /div at end
     if (isset($item['placeholder']) && $item['placeholder'] !== FALSE) {
         if ($item['placeholder'] === TRUE) {
             $item['placeholder'] = $item['name'];
@@ -1155,6 +1156,7 @@ STYLE
     } elseif ($item['type'] === 'text') {
         $string = $item_begin;
     } else {
+        $add_div = TRUE; // add /div at end
         $string = '  <div class="input-prepend">' . PHP_EOL;
         if (!$item['name']) {
             $item['name'] = get_icon('icon-list');
@@ -1163,7 +1165,7 @@ STYLE
         $string .= $item_begin;
     }
     if ($item['size']) {
-        $string .= ' size="' . $item['size'] . '"';
+        $string .= ' size="' . $item['size'] . '" ';
     }
     if ($item['class']) {
         $item_class .= ' ' . $item['class'];
@@ -1233,7 +1235,7 @@ SCRIPT;
     } // end ajax
 
     $string .= '" ' . $item_end . PHP_EOL;
-    $string .= $item['placeholder'] ? PHP_EOL : '  </div>' . PHP_EOL;
+    $string .= $add_div ? '  </div>' . PHP_EOL : PHP_EOL;
 
     return $string;
 }
@@ -1264,7 +1266,7 @@ function generate_element_checkbox($item) {
     if (is_string($item['placeholder'])) {
         // add placeholder text at the right of the element
         $string .= PHP_EOL . '      <label for="' . $item['id'] . '" class="help-inline" style="margin-top: 4px;">' .
-                   get_markdown($item['placeholder'], TRUE, TRUE) . '</label>' . PHP_EOL;
+                   get_markdown_extra($item['placeholder']) . '</label>' . PHP_EOL;
     }
 
     return $string;
@@ -1334,7 +1336,7 @@ function generate_element_toggle($item) {
     }
     // Move placeholder to label
     if (isset($item['placeholder']) && is_string($item['placeholder'])) {
-        $item['attribs']['data-tt-label'] = get_markdown($item['placeholder'], TRUE, TRUE);
+        $item['attribs']['data-tt-label'] = get_markdown_extra($item['placeholder']);
         unset($item['placeholder']);
     }
     $item_attribs = ['size', 'palette', 'group', 'label', 'icon-check', 'label-check', 'icon-uncheck', 'label-uncheck'];
@@ -1544,6 +1546,13 @@ function generate_element_datetime($item) {
     return $string;
 }
 
+/**
+ * See bootstrap-select options here:
+ *     https://developer.snapappointments.com/bootstrap-select/examples/
+ * @param array $item
+ *
+ * @return string
+ */
 function generate_element_select($item) {
     $count_values = safe_count($item['values']);
     if (empty($item['values'])) {
@@ -1646,6 +1655,10 @@ function generate_element_select($item) {
         $optgroup[$group] = '';
         foreach ($entries as $value => $entry) {
             $optgroup[$group] .= '<option value="' . $value . '"'; // already escaped
+            if (isset($entry['content']) && !safe_empty($entry['content'])) {
+                // this replaces Name with html content
+                $optgroup[$group] .= ' data-content="' . str_replace('"', "'", $entry['content']) . '"';
+            }
             if (isset($entry['subtext']) && !safe_empty($entry['subtext'])) {
                 $optgroup[$group] .= ' data-subtext="' . escape_html($entry['subtext']) . '"';
             }

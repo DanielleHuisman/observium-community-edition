@@ -6,20 +6,23 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 $table_rows = [];
 
 // Pre-cache all processors oid
-$query = 'SELECT `processor_oid` FROM `processors` WHERE `device_id` = ? AND `processor_oid` REGEXP ? AND `processor_type` != ?';
+$sql = 'SELECT `processor_oid` FROM `processors` WHERE `device_id` = ? AND `processor_oid` REGEXP ? AND `processor_type` != ?';
+
 // wmi excluded, select only valid numeric OIDs like .1.2.3.3 (excluded ucd-old, hr-average)
-if ($oid_to_cache = dbFetchColumn($query, [$device['device_id'], '^\.?[0-9]+(\.[0-9]+)+$', 'wmi'])) {
+if ($oid_to_cache = dbFetchColumn($sql, [ $device['device_id'], '^\.?[0-9]+(\.[0-9]+)+$', 'wmi' ])) {
     usort($oid_to_cache, 'compare_numeric_oids'); // correctly sort numeric oids
     print_debug_vars($oid_to_cache);
+
     $oid_cache = snmp_get_multi_oid($device, $oid_to_cache, $oid_cache, NULL, NULL, OBS_SNMP_ALL_NUMERIC);
     print_debug_vars($oid_cache);
+    $cache_polled = snmp_endtime();
 }
 
 $sql = "SELECT * FROM `processors` WHERE `device_id` = ?";
@@ -30,19 +33,26 @@ foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $processor) {
     $processor['processor_oid'] = '.' . ltrim($processor['processor_oid'], '.'); // Fix first dot in oid
 
     $file = $config['install_dir'] . "/includes/polling/processors/" . $processor['processor_type'] . ".inc.php";
+    unset($proc_polled);
     if (is_file($file)) {
         include($file);
+        if (!isset($proc_polled)) {
+            // prefer more accurate time when required (see ucd-raw)
+            $proc_polled = time();
+        }
     } elseif (isset($oid_cache[$processor['processor_oid']])) {
         // Use cached OIDs
         $proc = $oid_cache[$processor['processor_oid']];
+        $proc_polled = $cache_polled;
     } else {
-        // Not should be happen, but keep it as last anyway
+        // Not should be happening, but keep it as last anyway
         $proc = snmp_get_oid($device, $processor['processor_oid']);
+        $proc_polled = snmp_endtime();
     }
 
     $unit = NULL;
 
-    // Definition based poller
+    // Definition-based poller
     if (!empty($processor['processor_mib']) && !empty($processor['processor_object']) &&
         isset($config['mibs'][$processor['processor_mib']]['processor'][$processor['processor_object']])) {
 
@@ -77,7 +87,7 @@ foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $processor) {
     rrdtool_update_ng($device, 'processor', [ 'usage' => $proc ], get_processor_rrd($device, $processor, FALSE));
 
     // Update SQL State
-    dbUpdate(['processor_usage' => $proc, 'processor_polled' => time()], 'processors', '`processor_id` = ?', [$processor['processor_id']]);
+    dbUpdate([ 'processor_usage' => $proc, 'processor_polled' => $proc_polled ], 'processors', '`processor_id` = ?', [ $processor['processor_id'] ]);
 
     // Check alerts
     check_entity('processor', $processor, [ 'processor_usage' => $proc ]);

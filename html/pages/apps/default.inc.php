@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -22,11 +21,12 @@ $where_clause = generate_where_clause(['`app_type` = ?', generate_query_permitte
 
 
 // Merge device and app arrays for ease of sorting. This may not scale well to huge numbers of apps.
-$app_devices = [];
+$devices = [];
 foreach (dbFetchRows("SELECT * FROM `applications` " . $where_clause, [$vars['app']]) as $app) {
     $devices[$app['app_id']] = array_merge($app, device_by_id_cache($app['device_id']));
 }
 
+// FIXME. Use db query instead
 $devices = array_sort_by($devices, 'hostname', SORT_ASC, SORT_STRING);
 
 foreach ($devices as $device) {

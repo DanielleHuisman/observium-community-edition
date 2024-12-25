@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -997,9 +997,10 @@ function print_port_permission_box($mode, $perms, $params = []) {
 
             $action_del = $mode === 'role' ? 'role_entity_del' : 'user_perm_del';
             // Elements
-            $form['row'][0]['auth_secret'] = [
+            $form['row'][0]['action'] = [
                 'type'  => 'hidden',
-                'value' => $_SESSION['auth_secret']];
+                'value' => $action_del
+            ];
             $form['row'][0]['entity_id'] = [
                 'type'  => 'hidden',
                 'value' => $port['port_id']
@@ -1036,10 +1037,6 @@ function print_port_permission_box($mode, $perms, $params = []) {
     $form['style'] = 'padding: 7px; margin: 0px;';
 
     // Elements
-    $form['row'][0]['auth_secret'] = [
-        'type'  => 'hidden',
-        'value' => $_SESSION['auth_secret']
-    ];
     if ($mode === 'role') {
         $action_add = 'role_entity_add';
         $form['row'][0]['role_id'] = [

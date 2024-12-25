@@ -200,6 +200,10 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
             array('3.09(W-)', 3.09),
             array('-26.02(A-)', -26.02),
             array('-0.00(A-)', 0.0),
+            // SNMP hex string
+            [ '31 37 2E 33 6B 56 41 00 ', 17.3 ], // 17.3kVA
+            [ '31 37 2E 33 6B 56 41 00 ', 17300.0, 'units' ], // 17.3kVA
+            [ '31', 31 ],
             // Convert some passed units
             array('512 MB', 512),
             array('512 MB', 536870912.0, 'bytes'),
@@ -207,6 +211,8 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
             array('119.1 GB', 127882651238.4, 'bytes'),
             array('0x01', 1, 'hex'),
             array('0x00', 0, 'hex'),
+            [ '17.3kVA', 17.3 ],
+            [ '17.3kVA', 17300.0, 'units' ],
             // More complex
             array('CPU Temperature-Ctlr B: 58 C 136.40F',   58),
             array('Capacitor Cell 1 Voltage-Ctlr B: 2.04V', 2.04),
@@ -214,15 +220,16 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
             array('Current 12V Rail Loc: right-PSU: 9.53A', 9.53),
             array('Capacitor Charge-Ctlr B: 100%',          100),
             array('Spinning at 5160 RPM',                   5160),
-            // Split
-            array('42.50 ,35.97 ,40.64 ,40.38', 42.5,  'split1'),
-            array('42.50 ,35.97 ,40.64 ,40.38', 35.97, 'split2'),
-            array('42.50 ,35.97 ,40.64 ,40.38', 40.64, 'split3'),
-            array('42.50 ,35.97 ,40.64 ,40.38', 40.38, 'split4'),
 
-            array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 0, 'split1'),
-            array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 2, 'split2'),
-            array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 3, 'split3'),
+            // Split
+            [ '42.50 ,35.97 ,40.64 ,40.38', 42.5,  'split1' ],
+            [ '42.50 ,35.97 ,40.64 ,40.38', 35.97, 'split2' ],
+            [ '42.50 ,35.97 ,40.64 ,40.38', 40.64, 'split3' ],
+            [ '42.50 ,35.97 ,40.64 ,40.38', 40.38, 'split4' ],
+
+            [ 'CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 0, 'split1' ],
+            [ 'CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 2, 'split2' ],
+            [ 'CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 3, 'split3' ],
             [ "    5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)", 6.510,  'split1' ],
             [ "    5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)", 7.724,  'split2' ],
             [ "    5 Secs (  6.510%)   60 Secs (  7.724%)  300 Secs (  6.3812%)", 6.3812, 'split3' ],
@@ -230,6 +237,9 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
             [ "20% (cpu1: 28%   cpu2: 13%)", 20 ],
             [ "20% (cpu1: 28%   cpu2: 13%)", 28, 'split1' ],
             [ "20% (cpu1: 28%   cpu2: 13%)", 13, 'split2' ],
+            [ "  6% (cpu1:  5%   cpu2:  7%)", 6 ],
+            [ "  6% (cpu1:  5%   cpu2:  7%)", 5, 'split_cpu1' ],
+            [ "  6% (cpu1:  5%   cpu2:  7%)", 7, 'split_cpu2' ],
         ];
 
         // Split lanes

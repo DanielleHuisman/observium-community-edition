@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -262,7 +262,7 @@ function display_error_page($errno, $errstr, $errfile, $errline, $backtrace) {
     //error_log("Custom error: [$errno] $errstr in $errfile on line $errline");
 
     if (!defined('OBS_MIN_PHP_VERSION')) {
-        define('OBS_MIN_PHP_VERSION', '7.1.30');
+        define('OBS_MIN_PHP_VERSION', '7.2.24');
     }
 
     // If the error is an uncaught exception, get the correct backtrace
@@ -279,14 +279,14 @@ function display_error_page($errno, $errstr, $errfile, $errline, $backtrace) {
     //  return !in_array($trace['function'], ['whimsical_error_handler', 'whimsical_shutdown_handler', 'display_error_page']);
     //});
 
-    // Define color codes
-    $color_red    = "\033[31m";
-    $color_yellow = "\033[33m";
-    $color_green  = "\033[32m";
-    $color_cyan   = "\033[36m";
-    $color_reset  = "\033[0m";
-
     if (PHP_SAPI === "cli") {
+        // Define color codes
+        $color_red    = "\033[31m";
+        $color_yellow = "\033[33m";
+        $color_green  = "\033[32m";
+        $color_cyan   = "\033[36m";
+        $color_reset  = "\033[0m";
+
         // Output text-only error for CLI
         echo "
     ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -368,6 +368,44 @@ function display_error_page($errno, $errstr, $errfile, $errline, $backtrace) {
         echo "\n";
 
         exit();
+    }
+
+    if (is_api() && function_exists('api_json_halt')) {
+        // Use json error in API instead html page
+        $error = [ 'error' => 'Oops! Something went wrong! You may want to report this to the Observium developers.' ];
+
+        // Check and print a warning if the current PHP version is below the minimum required
+        if (version_compare(PHP_VERSION, OBS_MIN_PHP_VERSION, '<')) {
+            $error['php_minimum_required'] = "Your PHP version (" . PHP_VERSION . ") is below the minimum required version (" . OBS_MIN_PHP_VERSION . "). Please upgrade your PHP version before reporting issues.";
+        }
+
+        $error['trace'] = [];
+        //echo "\n{$color_yellow}Stack trace:{$color_reset}\n";
+        foreach ($backtrace as $i => $trace) {
+            $file     = $trace['file'] ?? '(unknown file)';
+            $line     = $trace['line'] ?? '(unknown line)';
+            $function = $trace['function'] ?? '(unknown function)';
+
+            $trace = "#$i: {$function} called at [{$file}:{$line}]\n";
+
+            if (file_exists($file)) {
+                $context_lines = get_context_lines($file, $line);
+
+                foreach ($context_lines['lines'] as $j => $context_line) {
+                    $context_line = trim($context_line);
+                    $line_number  = $context_lines['start'] + $j;
+
+                    if ($line_number == $line) {
+                        $trace .= "{$line_number}: {$context_line}\n";
+                    } else {
+                        $trace .= "{$line_number}: {$context_line}\n";
+                    }
+                }
+            }
+            $error['trace'][$i] = $trace;
+        }
+
+        api_json_halt(500, "$errstr in $errfile:$errline", $error);
     }
 
     // Display the whimsical error page

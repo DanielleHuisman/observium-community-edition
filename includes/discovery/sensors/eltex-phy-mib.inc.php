@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -140,14 +140,11 @@ foreach ($dom_info as $ifIndex => $info) {
                     $class = 'dbm';
 
                     // Limits
-                    $options['limit_high']      = value_to_si($entry['eltexPhyTransceiverDiagnosticHighAlarmThreshold']   * 0.000001, 'w', 'dbm');
-                    $options['limit_high_warn'] = value_to_si($entry['eltexPhyTransceiverDiagnosticHighWarningThreshold'] * 0.000001, 'w', 'dbm');
-                    $options['limit_low']       = value_to_si($entry['eltexPhyTransceiverDiagnosticLowAlarmThreshold']    * 0.000001, 'w', 'dbm');
-                    $options['limit_low_warn']  = value_to_si($entry['eltexPhyTransceiverDiagnosticLowWarningThreshold']  * 0.000001, 'w', 'dbm');
-                    // $options['limit_high']      = $entry['eltexPhyTransceiverDiagnosticHighAlarmThreshold']   * 0.001;
-                    // $options['limit_high_warn'] = $entry['eltexPhyTransceiverDiagnosticHighWarningThreshold'] * 0.001;
-                    // $options['limit_low']       = $entry['eltexPhyTransceiverDiagnosticLowAlarmThreshold']    * 0.001;
-                    // $options['limit_low_warn']  = $entry['eltexPhyTransceiverDiagnosticLowWarningThreshold']  * 0.001;
+                    $options['limit_unit']      = 'W'; // need unit conversion
+                    $options['limit_high']      = $entry['eltexPhyTransceiverDiagnosticHighAlarmThreshold']   * 0.000001;
+                    $options['limit_high_warn'] = $entry['eltexPhyTransceiverDiagnosticHighWarningThreshold'] * 0.000001;
+                    $options['limit_low']       = $entry['eltexPhyTransceiverDiagnosticLowAlarmThreshold']    * 0.000001;
+                    $options['limit_low_warn']  = $entry['eltexPhyTransceiverDiagnosticLowWarningThreshold']  * 0.000001;
                     break;
 
                 case 'rxOpticalPower':
@@ -156,14 +153,11 @@ foreach ($dom_info as $ifIndex => $info) {
                     $class = 'dbm';
 
                     // Limits
-                    $options['limit_high']      = value_to_si($entry['eltexPhyTransceiverDiagnosticHighAlarmThreshold']   * 0.000001, 'w', 'dbm');
-                    $options['limit_high_warn'] = value_to_si($entry['eltexPhyTransceiverDiagnosticHighWarningThreshold'] * 0.000001, 'w', 'dbm');
-                    $options['limit_low']       = value_to_si($entry['eltexPhyTransceiverDiagnosticLowAlarmThreshold']    * 0.000001, 'w', 'dbm');
-                    $options['limit_low_warn']  = value_to_si($entry['eltexPhyTransceiverDiagnosticLowWarningThreshold']  * 0.000001, 'w', 'dbm');
-                    // $options['limit_high']      = $entry['eltexPhyTransceiverDiagnosticHighAlarmThreshold']   * 0.001;
-                    // $options['limit_high_warn'] = $entry['eltexPhyTransceiverDiagnosticHighWarningThreshold'] * 0.001;
-                    // $options['limit_low']       = $entry['eltexPhyTransceiverDiagnosticLowAlarmThreshold']    * 0.001;
-                    // $options['limit_low_warn']  = $entry['eltexPhyTransceiverDiagnosticLowWarningThreshold']  * 0.001;
+                    $options['limit_unit']      = 'W'; // need unit conversion
+                    $options['limit_high']      = $entry['eltexPhyTransceiverDiagnosticHighAlarmThreshold']   * 0.000001;
+                    $options['limit_high_warn'] = $entry['eltexPhyTransceiverDiagnosticHighWarningThreshold'] * 0.000001;
+                    $options['limit_low']       = $entry['eltexPhyTransceiverDiagnosticLowAlarmThreshold']    * 0.000001;
+                    $options['limit_low_warn']  = $entry['eltexPhyTransceiverDiagnosticLowWarningThreshold']  * 0.000001;
                     break;
 
                 default:
@@ -174,7 +168,7 @@ foreach ($dom_info as $ifIndex => $info) {
             $oid_name = 'eltexPhyTransceiverDiagnosticCurrentValue';
             $oid_num  = '.1.3.6.1.4.1.35265.52.1.1.3.2.1.8.' . $index;
             $value    = $entry[$oid_name];
-            discover_sensor_ng($device, $class, 'ELTEX-PHY-MIB', $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+            discover_sensor_ng($device, $class, 'ELTEX-PHY-MIB', $oid_name, $oid_num, $index, $descr, $scale, $value, $options);
         }
     }
 }

@@ -7,7 +7,7 @@
  * @package        observium
  * @subpackage     applications
  * @author         Solomon Seal <slm4996+observium@gmail.com> 2014-04
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 

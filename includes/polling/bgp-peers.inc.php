@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -56,7 +56,7 @@ if (is_numeric($bgpLocalAs) && $bgpLocalAs != 0) {
     $p_list          = [];    // Init founded peers list
     $af_list         = [];
     $force_discovery = FALSE; // Flag for force or not rediscover bgp peers
-    $snmp_incomplete = FALSE; // Flag for detect if snmpwalk fetch complete data (required for force_discovery)
+    $snmp_incomplete = FALSE; // Flag for detecting if snmpwalk fetch complete data (required for force_discovery)
     $table_rows      = [];
     $c_table_rows    = [];
 

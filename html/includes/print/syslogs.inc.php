@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -26,12 +26,11 @@
  * @return null
  *
  */
-function print_syslogs($vars)
-{
+function print_syslogs($vars) {
     // Short events? (no pagination, small out)
-    $short = (isset($vars['short']) && $vars['short']);
+    $short = isset($vars['short']) && $vars['short'];
     // With pagination? (display page numbers in header)
-    $pagination = (isset($vars['pagination']) && $vars['pagination']);
+    $pagination = isset($vars['pagination']) && $vars['pagination'];
     pagination($vars, 0, TRUE); // Get default pagesize/pageno
     $pageno   = $vars['pageno'];
     $pagesize = $vars['pagesize'];
@@ -39,55 +38,57 @@ function print_syslogs($vars)
 
     $device_single = FALSE; // Show syslog entries for single device or multiple (use approximate counts for multiple)
 
-    $param = [];
-    $where = ' WHERE 1 ';
+    $where_array = [];
     foreach ($vars as $var => $value) {
         if (!safe_empty($value)) {
             switch ($var) {
                 case 'device':
                 case 'device_id':
-                    $device_single = is_numeric($value);
-                    $where         .= generate_query_values_and($value, 'device_id');
+                    $device_single = is_numeric($value) && device_permitted($value); // simplify device query
+                    $where_array[] = generate_query_values($value, 'device_id');
                     break;
+
                 case 'priority':
                     $value = get_var_csv($value);
                     foreach ($value as $k => $v) {
                         // Rewrite priority strings to numbers
                         $value[$k] = priority_string_to_numeric($v);
                     }
-                    $where .= generate_query_values_and($value, $var);
+                    $where_array[] = generate_query_values($value, $var);
                     break;
+
                 case 'tag':
                 case 'program':
-                    $condition = str_contains($value, '*') ? 'LIKE' : '=';
+                    $condition = is_string($value) && str_contains($value, '*') ? 'LIKE' : '=';
                     $value     = get_var_csv($value);
-                    $where     .= generate_query_values_and($value, $var, $condition);
+                    $where_array[] = generate_query_values($value, $var, $condition);
                     break;
+
                 case 'message':
                     //FIXME: this should just be a function used for all "text" searchable fields
                     if (preg_match(OBS_PATTERN_REGEXP, $value, $matches)) {
                         // Match regular expression
-                        $where .= generate_query_values_and($matches['pattern'], 'msg', 'REGEXP');
+                        $where_array[] = generate_query_values($matches['pattern'], 'msg', 'REGEXP');
                     } elseif (preg_match('/^!(=)?\s*(?<msg>.+)/', $value, $matches)) {
-                        $where .= generate_query_values_and($matches['msg'], 'msg', '%!=LIKE%');
+                        $where_array[] = generate_query_values($matches['msg'], 'msg', '%!=LIKE%');
                     } else {
-                        $where .= generate_query_values_and($value, 'msg', '%LIKE%');
+                        $where_array[] = generate_query_values($value, 'msg', '%LIKE%');
                     }
                     break;
+
                 case 'timestamp_from':
-                    $where   .= ' AND `timestamp` > ?';
-                    $param[] = $value;
+                    $where_array[] = generate_query_values($value, 'timestamp', '>');
                     break;
+
                 case 'timestamp_to':
-                    $where   .= ' AND `timestamp` < ?';
-                    $param[] = $value;
+                    $where_array[] = generate_query_values($value, 'timestamp', '<');
                     break;
             }
         }
     }
 
     // Show entries only for permitted devices
-    $query_permitted = generate_query_permitted();
+    $query_permitted = !$device_single ? generate_query_permitted_ng() : '';
     /*
     // Convert NOT IN to IN for correctly use indexes
     $devices_permitted = dbFetchColumn('SELECT DISTINCT `device_id` FROM `syslog` WHERE 1 '.$query_permitted, NULL, TRUE);
@@ -96,7 +97,7 @@ function print_syslogs($vars)
     */
 
     $query              = 'FROM `syslog` ';
-    $query              .= $where . $query_permitted;
+    $query              .= generate_where_clause($where_array, $query_permitted);
     $query_count        = 'SELECT COUNT(*) ' . $query;
     $query_count_approx = 'EXPLAIN SELECT * ' . $query; // Fast approximate count
 
@@ -105,18 +106,18 @@ function print_syslogs($vars)
     $query .= "LIMIT $start,$pagesize";
 
     // Query syslog messages
-    $entries = dbFetchRows($query, $param);
+    $entries = dbFetchRows($query);
     // Query syslog count
     if ($pagination && !$short) {
         dbSetVariable('MAX_EXECUTION_TIME', 500); // Set 0.5 sec maximum query execution time
         // Exactly count, but it's very SLOW on huge tables
-        $count = dbFetchCell($query_count, $param);
+        $count = dbFetchCell($query_count);
         dbSetVariable('MAX_EXECUTION_TIME', 0); // Reset maximum query execution time
         //r($count);
         if (!is_numeric($count)) {
             // Approximate count correctly around 100-80%
             dbQuery('ANALYZE TABLE `syslog`;'); // Update INFORMATION_SCHEMA for more correctly count
-            $tmp            = dbFetchRow($query_count_approx, $param);
+            $tmp            = dbFetchRow($query_count_approx);
             $count          = $tmp['rows'];
             $count_estimate = TRUE;
         }
@@ -135,11 +136,12 @@ See <a href="' . OBSERVIUM_DOCS_URL . '/syslog/" target="_blank">Syslog Integrat
     } else {
         // Entries have been returned. Print the table.
 
-        $list = ['device' => FALSE, 'priority' => TRUE]; // For now (temporarily) priority always displayed
-        if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'syslog') {
+        // Temporarily? priority always displayed
+        $list = [ 'device' => FALSE, 'priority' => TRUE ];
+        if (empty($vars['device']) || $vars['page'] === 'syslog') {
             $list['device'] = TRUE;
         }
-        if ($short || !isset($vars['priority']) || empty($vars['priority'])) {
+        if ($short || empty($vars['priority'])) {
             $list['priority'] = TRUE;
         }
 

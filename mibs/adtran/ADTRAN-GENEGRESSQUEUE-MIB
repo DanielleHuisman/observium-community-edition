@@ -1,0 +1,612 @@
+ADTRAN-GENEGRESSQUEUE-MIB
+
+-- TITLE:     The ADTRAN EGRESS QUEUE MIB
+-- PRODUCT:   Egress Queue Based Switching Elements
+-- VERSION:   1.0
+-- DATE:      1/20/09
+-- AUTHOR:    Santhanam Subramani
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN GenEgressQueue MIB objects
+
+-- HISTORY:
+-- 01/21/09 ss Review comments added.
+-- 01/23/09 ss Some of the entries type changed.
+-- 01/26/09 ss CoS and Weight types are changed to INTEGER. This version is SMIc verified.
+-- 01/28/09 ss Error Codes added to the three provisioning table.
+-- 02/09/09 ss Change minimum adGenEgressQueueSchedulerWeight from 0 to 1.
+-- 10/05/10 mm Change adGenEgressQueueCongestionMgmtQueueMaxDepth to 1024 to be used by Unchan DS3.  Others default to 255 in software.
+-- **** DO NOT ADD REVISION HISTORY HERE ******
+
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+--==================================================================================================================
+-- IMPORTS
+--==================================================================================================================
+IMPORTS
+    OBJECT-TYPE,
+    MODULE-IDENTITY,
+    Unsigned32
+        FROM SNMPv2-SMI
+    DisplayString
+        FROM SNMPv2-TC
+    ifIndex
+        FROM IF-MIB
+    adGenEgressQueue,
+    adGenEgressQueueID
+        FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+    adGenSlotInfoIndex
+        FROM ADTRAN-GENSLOT-MIB
+;
+
+adGenEgressQueueIdentity MODULE-IDENTITY
+    LAST-UPDATED "201407300000Z"
+    ORGANIZATION "Adtran, Inc."
+    CONTACT-INFO
+        "CND Tech Support
+        Postal: ADTRAN, Inc.
+                901 Explorer Blvd.
+                Huntsville, AL  35806
+                Tel: +1 800 726-8663
+                Fax: +1 256 963 6217
+                E-mail: support@adtran.com"
+    DESCRIPTION
+        "This MIB defines the objects for the EGRESS QUEUE MIB."
+
+    REVISION "201407300000Z"
+    DESCRIPTION "Add adGenEgressQueueIfIndexStatus Table, 
+                 adGenEgressQueueSchedulerFillLevel, adGenEgressQueueSchedulerMaxDepthGreen,
+                 adGenEgressQueueSchedulerMaxDepthYellow OIDs."
+    
+    REVISION "201207190000Z"
+    DESCRIPTION "Add adGenEgressQueueSchedulerCosMode, 
+                 adGenEgressQueueSchedulerQueueGrouping OIDs."
+
+    REVISION "201106011630Z"
+    DESCRIPTION "Add legacy mode option for CoS Mapping."
+
+    REVISION "201104131611Z"
+    DESCRIPTION "Add system-wide egress queue provisioning.
+                 This includes support for a provisionable number of CoS queues
+                 and priority code point mapping."
+
+    REVISION "200802221413Z"
+    DESCRIPTION "Created"
+    ::= { adGenEgressQueueID 1 }
+
+--==================================================================================================================
+-- OBJECT IDENTIFIERS
+--==================================================================================================================
+adGenEgressQueueSchedulerProvisioning           OBJECT IDENTIFIER ::= { adGenEgressQueue 1 }
+adGenEgressQueueCongestionMgmtProvisioning      OBJECT IDENTIFIER ::= { adGenEgressQueue 2 }
+adGenEgressQueueSystemProvisioning              OBJECT IDENTIFIER ::= { adGenEgressQueue 3 }
+adGenEgressQueueIfIndexStatus                   OBJECT IDENTIFIER ::= { adGenEgressQueue 4 }
+
+--==================================================================================================================
+-- PROVISIONING
+--==================================================================================================================
+-- ******************************************************************************************
+--  Egress Queue Scheduler Provisioning Table
+-- ******************************************************************************************
+    adGenEgressQueueSchedulerTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenEgressQueueSchedulerEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The Egress Queue Scheduler Provisioning table,
+             indexed by ifIndex, queueIndex."
+        ::= {  adGenEgressQueueSchedulerProvisioning 1 }
+
+    adGenEgressQueueSchedulerEntry OBJECT-TYPE
+        SYNTAX      AdGenEgressQueueSchedulerEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "An Egress Queue entry in the Scheduler Provisioning table."
+        INDEX  { ifIndex, adGenEgressQueueSchedulerQueueIndex }
+        ::= { adGenEgressQueueSchedulerTable 1 }
+
+    AdGenEgressQueueSchedulerEntry ::=
+        SEQUENCE
+        {
+            adGenEgressQueueSchedulerQueueIndex
+                Unsigned32,
+            adGenEgressQueueSchedulerCos
+                INTEGER,
+            adGenEgressQueueSchedulerWeight
+                INTEGER,
+            adGenEgressQueueSchedulerLastError
+                DisplayString,
+            adGenEgressQueueSchedulerErrorCode
+                INTEGER,
+            adGenEgressQueueSchedulerCosMode
+                INTEGER,  
+            adGenEgressQueueSchedulerQueueGrouping
+                DisplayString,
+            adGenEgressQueueSchedulerFillLevel
+                Unsigned32,
+            adGenEgressQueueSchedulerMaxDepthGreen
+                Unsigned32,
+            adGenEgressQueueSchedulerMaxDepthYellow
+                Unsigned32
+        }
+
+    adGenEgressQueueSchedulerQueueIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This variable is the egress queue index. The values for this
+            queue index can range from 1 to 8. This identifies the queue within
+            the interface."
+        ::= { adGenEgressQueueSchedulerEntry 1 }
+
+    adGenEgressQueueSchedulerCos OBJECT-TYPE
+        SYNTAX      INTEGER (0..7)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The internal COS value of this queue.  Possible
+            values range from 0 to 7.  Where 7 is the highest
+            priority and 0 is the lowest"
+        ::= { adGenEgressQueueSchedulerEntry 2 }
+
+    adGenEgressQueueSchedulerWeight OBJECT-TYPE
+        SYNTAX      INTEGER (1..101)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The weight of this queue in %. Value 101 indicates that the
+            weight percent is calculated dynamically - remaining weight is
+            equally divided among the qeueus."
+        ::= { adGenEgressQueueSchedulerEntry 3 }
+
+    adGenEgressQueueSchedulerLastError OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The string describing the last error experienced."
+        ::= { adGenEgressQueueSchedulerEntry 4 }
+
+    adGenEgressQueueSchedulerErrorCode OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            noError(1),
+            writeToHardwareFailed(2),
+            weightSpreadExceeded(3),
+            weightExceed100(4)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Error Code returned if the last Scheduler provisioning fails.
+            noError               - Provisioning of entry in this table succeeded.
+            writeToHardwareFailed - Writing to the hardware failed.
+                                    This is a catastrophic error and probably will result in restart of the product.
+            weightSpreadExceeded  - Weights for the queue with the same CoS exceeded 10x limit.
+            weightExceed100       - Total weights exceed 100%."
+        ::= { adGenEgressQueueSchedulerEntry 5 }
+
+   adGenEgressQueueSchedulerCosMode OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            cos(0),
+            groupLowerAdjacent(1)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Set the COS mode.
+            cos               - Use the integer value that has been set using adGenEgressQueueSchedulerCos OID.
+            groupLowerAdjacent- Share a COS among multiple queues and use the resolved COS of the directly adjacent lower numbered queue(s)"
+        ::= { adGenEgressQueueSchedulerEntry 6 } 
+  
+    adGenEgressQueueSchedulerQueueGrouping OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The status string shows the set of queues grouped together mirroring the same scheduler priority (ex: 2,3,4)."
+        ::= { adGenEgressQueueSchedulerEntry 7}
+
+    adGenEgressQueueSchedulerFillLevel OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The internal queue fill level."
+        ::= { adGenEgressQueueSchedulerEntry 8 }
+        
+    adGenEgressQueueSchedulerMaxDepthGreen OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The internal queue maximum depth (green)."
+        ::= { adGenEgressQueueSchedulerEntry 9 }
+
+    adGenEgressQueueSchedulerMaxDepthYellow OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The internal queue maximum depth (yellow)."
+        ::= { adGenEgressQueueSchedulerEntry 10 }
+
+-- ******************************************************************************************
+--  Egress Queue Congestion Managment WRED Time Constant Table
+-- ******************************************************************************************
+    adGenEgressQueueCongestionMgmtWREDTimeConstantTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenEgressQueueCongestionMgmtWREDTimeConstantEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The WRED Time Constant table."
+        ::= { adGenEgressQueueCongestionMgmtProvisioning 1 }
+
+    adGenEgressQueueCongestionMgmtWREDTimeConstantEntry OBJECT-TYPE
+        SYNTAX      AdGenEgressQueueCongestionMgmtWREDTimeConstantEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The WRED Time Constant table."
+        INDEX  { adGenSlotInfoIndex }
+        ::= { adGenEgressQueueCongestionMgmtWREDTimeConstantTable 1 }
+
+    AdGenEgressQueueCongestionMgmtWREDTimeConstantEntry ::=
+        SEQUENCE
+        {
+            adGenEgressQueueCongestionMgmtWREDTimeConstant
+                INTEGER,
+            adGenEgressQueueCongestionMgmtWREDTimeConstantLastError
+                DisplayString,
+            adGenEgressQueueCongestionMgmtWREDTimeConstantErrorCode
+                INTEGER
+        }
+
+    adGenEgressQueueCongestionMgmtWREDTimeConstant OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            delay2ms(1),
+            delay4ms(2),
+            delay8ms(3),
+            delay16ms(4),
+            delay32ms(5),
+            delay62ms(6),
+            delay125ms(7),
+            delay250ms(8),
+            delay500ms(9)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The WRED time constant in mS"
+        ::= { adGenEgressQueueCongestionMgmtWREDTimeConstantEntry 1 }
+
+    adGenEgressQueueCongestionMgmtWREDTimeConstantLastError OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The string describing the last error experienced."
+        ::= { adGenEgressQueueCongestionMgmtWREDTimeConstantEntry 2 }
+
+    adGenEgressQueueCongestionMgmtWREDTimeConstantErrorCode OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            noError(1),
+            writeToHardwareFailed(2),
+            invalidTimeConstant(3)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Error Code returned if the last WRED Time Constant provisioning fails.
+            noError               - Provisiong of entry in this table succeeded.
+            writeToHardwareFailed - Writing to the hardware failed.
+                                    This is a catastrophic error and probably will result in restart of the product.
+            invalidTimeConstant   - Received an invalid time constant."
+
+        ::= { adGenEgressQueueCongestionMgmtWREDTimeConstantEntry 3 }
+
+-- ******************************************************************************************
+--  Egress Queue Congestion Management Provisioning Table
+-- ******************************************************************************************
+    adGenEgressQueueCongestionMgmtTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenEgressQueueCongestionMgmtEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The Queue Provisioning Congestion Management table for queue configurations,
+            indexed by egress queue."
+        ::= { adGenEgressQueueCongestionMgmtProvisioning 2 }
+
+    adGenEgressQueueCongestionMgmtEntry OBJECT-TYPE
+        SYNTAX      AdGenEgressQueueCongestionMgmtEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A Congestion Mgmt entry in the Queue Provisioning table."
+        INDEX  { ifIndex, adGenEgressQueueCongestionMgmtQueueIndex }
+        ::= { adGenEgressQueueCongestionMgmtTable 1 }
+
+    AdGenEgressQueueCongestionMgmtEntry ::=
+        SEQUENCE
+        {
+            adGenEgressQueueCongestionMgmtQueueIndex
+                Unsigned32,
+            adGenEgressQueueCongestionMgmtQueueMaxDepth
+                INTEGER,
+            adGenEgressQueueCongestionMgmtWREDDropProbabilityGreen
+                INTEGER,
+            adGenEgressQueueCongestionMgmtWREDDropProbabilityYellow
+                INTEGER,
+            adGenEgressQueueCongestionMgmtThresholdGreenMax
+                INTEGER,
+            adGenEgressQueueCongestionMgmtThresholdGreenMin
+                INTEGER,
+            adGenEgressQueueCongestionMgmtThresholdYellowMax
+                INTEGER,
+            adGenEgressQueueCongestionMgmtThresholdYellowMin
+                INTEGER,
+            adGenEgressQueueCongestionMgmtAlgorithm
+                INTEGER,
+            adGenEgressQueueCongestionMgmtLastError
+                DisplayString,
+            adGenEgressQueueCongestionMgmtErrorCode
+                INTEGER
+        }
+
+    adGenEgressQueueCongestionMgmtQueueIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This variable is the egress queue index. The values for this
+            queue index can range from 1 to 8. This identifies the queue within
+            the interface."
+        ::= { adGenEgressQueueCongestionMgmtEntry 1 }
+
+    adGenEgressQueueCongestionMgmtQueueMaxDepth OBJECT-TYPE
+        SYNTAX      INTEGER (1..1024)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The max depth of this queue, in packets."
+        ::= { adGenEgressQueueCongestionMgmtEntry 2}
+
+    adGenEgressQueueCongestionMgmtWREDDropProbabilityGreen OBJECT-TYPE
+        SYNTAX      INTEGER (0..100)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The WRED Max Drop Probability in % for Green traffic"
+        ::= { adGenEgressQueueCongestionMgmtEntry 3 }
+
+    adGenEgressQueueCongestionMgmtWREDDropProbabilityYellow OBJECT-TYPE
+        SYNTAX      INTEGER (0..100)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The WRED Max Drop Probability in % for Yellow traffic"
+        ::= { adGenEgressQueueCongestionMgmtEntry 4 }
+
+    adGenEgressQueueCongestionMgmtThresholdGreenMax OBJECT-TYPE
+        SYNTAX      INTEGER (1..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The Max Threshold, in packets, of Green Traffic"
+        ::= { adGenEgressQueueCongestionMgmtEntry 5 }
+
+    adGenEgressQueueCongestionMgmtThresholdGreenMin OBJECT-TYPE
+        SYNTAX      INTEGER (1..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The Min Threshold, in packets, of Green Traffic"
+        ::= { adGenEgressQueueCongestionMgmtEntry 6 }
+
+    adGenEgressQueueCongestionMgmtThresholdYellowMax OBJECT-TYPE
+        SYNTAX      INTEGER (1..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The Max Threshold, in packets, of Yellow Traffic"
+        ::= { adGenEgressQueueCongestionMgmtEntry 7 }
+
+    adGenEgressQueueCongestionMgmtThresholdYellowMin OBJECT-TYPE
+        SYNTAX      INTEGER (1..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The Min Threshold, in packets, of Yellow Traffic"
+        ::= { adGenEgressQueueCongestionMgmtEntry 8 }
+
+    adGenEgressQueueCongestionMgmtAlgorithm OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            tailDrop(1),
+            weightedRandomEarlyDetection(2)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The algorithm of Congestion Managment for this Egress Queue"
+        ::= { adGenEgressQueueCongestionMgmtEntry 9 }
+
+    adGenEgressQueueCongestionMgmtLastError OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The string describing the last error experienced."
+        ::= { adGenEgressQueueCongestionMgmtEntry 10 }
+
+    adGenEgressQueueCongestionMgmtErrorCode OBJECT-TYPE
+        SYNTAX      INTEGER
+        {
+            noError(1),
+            writeToHardwareFailed(2)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Error Code returned if the last Congestion Mgmt provisioning fails.
+            noError               - Provisiong of entry in this table succeeded.
+            writeToHardwareFailed - Writing to the hardware failed.
+                                    This is a catastrophic error and probably will result in restart of the product."
+        ::= { adGenEgressQueueCongestionMgmtEntry 11 }
+
+-- ******************************************************************************************
+-- System-level provisioning items for Egress Queues
+-- ******************************************************************************************
+
+    adGenEgressQueueMaxQueuesSupported   OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The maximum number of Class of Service Queues supported in this system."
+        ::= {adGenEgressQueueSystemProvisioning 1}
+
+    adGenEgressQueueNumberOfQueues   OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Use this item to provision the actual number of Class of Service Queues.
+                     A set will fail if the set value is larger than adGenEgressQueueMaxQueuesSupported."
+        ::= {adGenEgressQueueSystemProvisioning 2}
+
+    adGenEgressQueueCosForPri0         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 0.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 3 }
+
+    adGenEgressQueueCosForPri1         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 1.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 4 }
+
+    adGenEgressQueueCosForPri2         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 2.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 5 }
+
+    adGenEgressQueueCosForPri3         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 3.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 6 }
+
+    adGenEgressQueueCosForPri4         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 4.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 7 }
+
+    adGenEgressQueueCosForPri5         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 5.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 8 }
+
+    adGenEgressQueueCosForPri6         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 6.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 9 }
+
+    adGenEgressQueueCosForPri7         OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Assigns a CoS queue for Priority 7.  Queues are numbered
+             0 - (n-1), where n equals the value of adGenEgressQueueNumberOfQueues.
+             Queue 0 is the lowest priority, and queue (n-1) is highest."
+        ::= { adGenEgressQueueSystemProvisioning 10 }
+
+    adGenEgressQueueCosMode   OBJECT-TYPE
+        SYNTAX      INTEGER {
+                        systemCosMap(0),
+                        legacyCosMap(1)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Set the mode of operation for CoS Mapping.  In legacy mode, some
+                     products will not honor the system-wide mapping.  Instead, they
+                     will use their own default mapping.  In system mode, all products
+                     will honor the system-wide mapping."
+        ::= {adGenEgressQueueSystemProvisioning 11}
+        
+-- ******************************************************************************************
+--  Egress Queue IfIndex Table
+-- ******************************************************************************************
+    adGenEgressQueueIfIndexStatusTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenEgressQueueIfIndexStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Egress Queue IfIndex Status Table."
+        ::= { adGenEgressQueueIfIndexStatus 1 }
+
+    adGenEgressQueueIfIndexStatusEntry OBJECT-TYPE
+        SYNTAX      AdGenEgressQueueIfIndexStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Egress Queue IfIndex Status Table Entry"
+        INDEX  { ifIndex }
+        ::= { adGenEgressQueueIfIndexStatusTable 1 }
+
+    AdGenEgressQueueIfIndexStatusEntry ::=
+        SEQUENCE
+        {
+            adGenEgressQueueIfIndexStatusMaxQueues  Unsigned32
+        }
+
+    adGenEgressQueueIfIndexStatusMaxQueues OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The internal maximum number of queues provisioned for an interface."
+        ::= { adGenEgressQueueIfIndexStatusEntry 1 }
+
+END
+

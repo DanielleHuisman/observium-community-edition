@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -45,7 +44,7 @@ foreach ($entity_array as $index => $entry) {
         $oid_name = 'hpnicfEntityExtTemperature';
 
         $options['rename_rrd'] = "hh3c-entity-ext-mib-hpnicfEntityExtTemperature.$index";
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
     }
 
     // HPN-ICF-ENTITY-EXT-MIB::hpnicfEntityExtVoltage.1 = INTEGER: 0
@@ -63,7 +62,7 @@ foreach ($entity_array as $index => $entry) {
 
         // FIXME scale is unknown, and not documented in the MIB; probably not 1?? My V1910 doesn't have voltage sensors.
         $options['rename_rrd'] = "hh3c-entity-ext-mib-hpnicfEntityExtVoltage.$index";
-        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
     }
 
     //  [hpnicfEntityExtErrorStatus] => normal

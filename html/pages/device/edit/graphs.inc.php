@@ -1,20 +1,19 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
  *
- * @package        observium
- * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 print_message("This page allows you to disable or enable certain Graphs detected for a device.");
 
 $graphs_db = [];
-foreach (dbFetchRows("SELECT `graph`,`enabled` FROM `device_graphs` WHERE `device_id` = ?", [$device['device_id']]) as $entry) {
+foreach (dbFetchRows("SELECT `graph`,`enabled` FROM `device_graphs` WHERE `device_id` = ?", [ $device['device_id'] ]) as $entry) {
     $graph             = $entry['graph'];
     $section           = $config['graph_types']['device'][$graph]['section'];
     $graphs_db[$graph] = (bool)$entry['enabled'];

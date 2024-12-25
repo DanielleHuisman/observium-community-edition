@@ -5,17 +5,17 @@
  *
  * @package    observium
  * @subpackage templates
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
  *
  */
 /**
  * https://core.telegram.org/bots/api#sendmessage
  * Used keys:
- * ALERT_STATE, ALERT_URL, ALERT_MESSAGE, DURATION,
+ * ALERT_STATE_NAME, ALERT_URL, ALERT_MESSAGE, DURATION,
  * ENTITY_NAME, ENTITY_DESCRIPTION,
  * DEVICE_HOSTNAME, DEVICE_UPTIME
  */
-*{{ALERT_STATE}} : {{ALERT_MESSAGE}}*
+*{{ALERT_STATE_NAME}} : {{ALERT_MESSAGE}}*
 _{{ALERT_TIMESTAMP}}_
 
 {{#ENTITY_NAME}}

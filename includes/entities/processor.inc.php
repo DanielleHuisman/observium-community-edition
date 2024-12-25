@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -93,6 +93,9 @@ function discover_processor_definition($device, $mib, $entry) {
         }
 
         // Options
+        if (!empty($unit)) {
+            $options['unit'] = $unit;
+        }
 
         if (isset($entry['idle'])) {
             $options['idle'] = $entry['idle'] ? 1 : 0;
@@ -111,7 +114,7 @@ function discover_processor_definition($device, $mib, $entry) {
 
         $usage = snmp_fix_numeric($processor[$entry['oid']], $unit);
         if (discovery_check_value_valid($device, $usage, $entry, 'processor')) {
-            discover_processor_ng($device, $mib, $entry['object'], $oid_num, $index, NULL, $descr, $precision, $usage, $options);
+            discover_processor_ng($device, $mib, $entry['object'], $oid_num, $index, $descr, $precision, $usage, $options);
             $found = TRUE;
         }
         $i++;
@@ -124,6 +127,9 @@ function discover_processor_definition($device, $mib, $entry) {
 function discover_processor(&$valid, $device, $processor_oid, $processor_index, $processor_type, $processor_descr, $processor_precision = 1, $value = NULL, $entPhysicalIndex = NULL, $hrDeviceIndex = NULL, $processor_returns_idle = 0) {
 
     $options = [ 'idle' => $processor_returns_idle ? 1 : 0 ];
+    if (!safe_empty($processor_type)) {
+        $options['processor_type'] = $processor_type;
+    }
     if (!safe_empty($entPhysicalIndex)) {
         $options['entPhysicalIndex'] = $entPhysicalIndex;
     }
@@ -131,11 +137,32 @@ function discover_processor(&$valid, $device, $processor_oid, $processor_index, 
         $options['hrDeviceIndex'] = $hrDeviceIndex;
     }
 
-    return discover_processor_ng($device, '', '', $processor_oid, $processor_index, $processor_type, $processor_descr, $processor_precision, $value, $options);
+    return discover_processor_ng($device, '', '', $processor_oid, $processor_index, $processor_descr, $processor_precision, $value, $options);
 }
 
 function discover_processor_ng($device, $processor_mib, $processor_object, $processor_oid, $processor_index,
-                               $processor_type, $processor_descr, $processor_precision = 1, $value = NULL, $options = []) {
+                               $processor_descr, $processor_precision = 1, $value = NULL, $options = []) {
+
+    // Old: processor_type
+    // New: mib-object
+    if ($discovery_ng = empty($options['processor_type'])) {
+        if (!empty($processor_object)) {
+            $processor_type = $processor_object;
+        }
+        if (!empty($processor_mib)) {
+            $processor_type = $processor_mib . '-' . $processor_type;
+        }
+    } else {
+        $processor_type = $options['processor_type'];
+    }
+
+    // Split unit need extend type for multiple entities (see NEWTEC-DEVICE-MIB definition)
+    if (!empty($options['unit']) && str_starts_with($options['unit'], 'split_cpu')) {
+        $processor_type .= '-' . $options['unit'];
+    }
+
+    // Idle (100-proc)?
+    $processor_returns_idle = isset($options['idle']) && $options['idle'];
 
     print_debug($device['device_id'] . " -> $processor_oid, $processor_index, $processor_type, $processor_descr, $processor_precision, $value");
 
@@ -153,18 +180,6 @@ function discover_processor_ng($device, $processor_mib, $processor_object, $proc
         print_debug("Skipped by not numeric value: $value, $processor_descr ");
         return FALSE;
     }
-
-    // Old: processor_type
-    // New: mib-object
-    if ($discovery_ng = empty($processor_type)) {
-        if (!empty($processor_object)) {
-            $processor_type = $processor_object;
-        }
-        if (!empty($processor_mib)) {
-            $processor_type = $processor_mib . '-' . $processor_type;
-        }
-    }
-    $processor_returns_idle = isset($options['idle']) && $options['idle'];
 
     // Main params
     $params = [ 'processor_index', 'processor_mib', 'processor_object', 'processor_oid', 'processor_type', 'processor_descr', 'processor_precision' ];

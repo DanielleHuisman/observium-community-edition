@@ -301,10 +301,10 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     public function providerFloatDiv() {
         // Accurate math
         return [
-            array( '18446742978492891134', '0',  0),
-            array('-18446742978492891134', '0',  0),
-            array( '18446742978492891134', '18446742978492891134',  1.0),
-            array('-18446742978492891134', '18446742978492891134', -1.0),
+            [ '18446742978492891134', '0',  0 ],
+            [ '-18446742978492891134', '0',  0 ],
+            [ '18446742978492891134', '18446742978492891134',  1.0 ],
+            [ '-18446742978492891134', '18446742978492891134', -1.0 ],
 
             // Floats
             [ '1111111111111111111111111.6', 0, 0 ],
@@ -315,6 +315,42 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
             [ '7,619,627.6010', 0, 0 ],
             [ 0, '7,619,627.6010', 0 ],
             [ '1,192.0036', 6.3, 189.20692 ]
+        ];
+    }
+
+    /**
+     * @dataProvider providerFloatPow
+     * @group numbers
+     */
+    public function testFloatPow($a, $b, $result) {
+        if (method_exists($this, 'assertEqualsWithDelta')) {
+            $this->assertEqualsWithDelta($result, float_pow($a, $b), 0.00001);
+        } else {
+            $this->assertSame($result, float_pow($a, $b));
+        }
+    }
+
+    public function providerFloatPow() {
+        // Accurate math
+        return [
+            [ '18446742978492891134', '0',  1.0 ],
+            [ '-18446742978492891134', '0',  1.0 ],
+            [ '0', '18446742978492891134',  0 ],
+            [ '0', '-18446742978492891134', 0 ],
+
+            // negative power
+            [ 0, -1, 0 ],
+            [ 0, -1.1, 0 ],
+
+            // Floats
+            [ '11.6', 0, 1.0 ],
+            [ 0, '11.6', 0 ],
+            [ '34.3', '4.6', 11543910.531516898 ],
+
+            // numbers with comma
+            [ '7,619,627.6010', 0, 1.0 ],
+            [ 0, '7,619,627.6010', 0 ],
+            [ '1,192.0036', 1.3, 9980.696216867238 ]
         ];
     }
 
@@ -1022,45 +1058,44 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     return $array;
   }
 
-  /**
-  * @dataProvider providerGetIpType
-  * @group ip
-  */
-  public function testGetIpType($ip, $result)
-  {
-    $this->assertSame($result, get_ip_type($ip));
-  }
-
-  public function providerGetIpType()
-  {
-    return array(
-      array('0.0.0.0',                  'unspecified'),
-      array('::',                       'unspecified'),
-      array('10.255.255.255/32',        'private'), // Do not set /31 and /32 as broadcast!
-      array('10.255.255.255/31',        'private'), // Do not set /31 and /32 as broadcast!
-      array('10.255.255.255/8',         'broadcast'),
-      array('127.0.0.1',                'loopback'),
-      array('::1',                      'loopback'),
-      array('0:0:0:0:0:0:0:1/128',      'loopback'),
-      array('10.12.0.3',                'private'),
-      array('172.16.1.1',               'private'),
-      array('192.168.0.3',              'private'),
-      array('fdf8:f53b:82e4::53',       'private'),
-      array('100.80.76.30',             'cgnat'),
-      array('0:0:0:0:0:ffff:c000:22f',  'ipv4mapped'),
-      array('::ffff:192.0.2.47',        'ipv4mapped'),
-      array('77.222.50.30',             'unicast'),
-      array('2a02:408:7722:5030::5030', 'unicast'),
-      array('169.254.2.47',             'link-local'),
-      array('fe80::200:5aee:feaa:20a2', 'link-local'),
-      array('2001:0000:4136:e378:8000:63bf:3fff:fdd2', 'teredo'),
-      array('198.18.0.1',               'benchmark'),
-      array('2001:0002:0:6C::430',      'benchmark'),
-      array('2001:10:240:ab::a',        'orchid'),
-      array('1:0002:6c::430',           'reserved'),
-      array('ff02::1:ff8b:4d51/0',      'multicast'),
-    );
-  }
+    /**
+    * @dataProvider providerGetIpType
+    * @group ip
+    */
+    public function testGetIpType($ip, $result) {
+        $this->assertSame($result, get_ip_type($ip));
+    }
+    
+    public function providerGetIpType() {
+        return [
+            [ '0.0.0.0',                  'unspecified' ],
+            [ '::',                       'unspecified' ],
+            [ '10.255.255.255/32',        'private' ], // Do not set /31 and /32 as broadcast!
+            [ '10.255.255.255/31',        'private' ], // Do not set /31 and /32 as broadcast!
+            [ '10.255.255.255/8',         'broadcast' ],
+            [ '127.0.0.1',                'loopback' ],
+            [ '::1',                      'loopback' ],
+            [ '0:0:0:0:0:0:0:1/128',      'loopback' ],
+            [ '10.12.0.3',                'private' ],
+            [ '172.16.1.1',               'private' ],
+            [ '192.168.0.3',              'private' ],
+            [ 'fdf8:f53b:82e4::53',       'private' ],
+            [ '100.80.76.30',             'cgnat' ],
+            [ '100.105.0.49',             'cgnat' ],
+            [ '0:0:0:0:0:ffff:c000:22f',  'ipv4mapped' ],
+            [ '::ffff:192.0.2.47',        'ipv4mapped' ],
+            [ '77.222.50.30',             'unicast' ],
+            [ '2a02:408:7722:5030::5030', 'unicast' ],
+            [ '169.254.2.47',             'link-local' ],
+            [ 'fe80::200:5aee:feaa:20a2', 'link-local' ],
+            [ '2001:0000:4136:e378:8000:63bf:3fff:fdd2', 'teredo' ],
+            [ '198.18.0.1',               'benchmark' ],
+            [ '2001:0002:0:6C::430',      'benchmark' ],
+            [ '2001:10:240:ab::a',        'orchid' ],
+            [ '1:0002:6c::430',           'reserved' ],
+            [ 'ff02::1:ff8b:4d51/0',      'multicast' ],
+        ];
+    }
 
   /**
   * @dataProvider providerMatchNetwork
@@ -1374,55 +1409,53 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
             $array3),
     );
   }
-  /**
-  * @dataProvider providerIsPingable
-  * @group network
-  */
-  public function testIsPingable($result, $hostname, $try_a = TRUE)
-  {
-    if (!is_executable($GLOBALS['config']['fping']))
-    {
-      // CentOS 6.8
-      $GLOBALS['config']['fping']  = '/usr/sbin/fping';
-      $GLOBALS['config']['fping6'] = '/usr/sbin/fping6';
-    }
-    $flags = OBS_DNS_ALL;
-    if (!$try_a) { $flags ^= OBS_DNS_A; }
-    $ping = is_pingable($hostname, $flags);
-    $ping = is_numeric($ping) && $ping > 0; // Function returns random float number
-    $this->assertSame($result, $ping);
-  }
 
-  public function providerIsPingable()
-  {
-    $array = array(
-      array(TRUE,  'localhost'),
-      array(TRUE,  '127.0.0.1'),
-      array(FALSE, 'yohoho.i.butylka.roma'),
-      array(FALSE, '127.0.0.1', FALSE), // Try ping IPv4 with IPv6 disabled
-    );
-    $cmd = $GLOBALS['config']['fping6'] . " -c 1 -q ::1 2>&1";
-    exec($cmd, $output, $return); // Check if we have IPv6 support in current system
-    if ($return === 0)
-    {
-      // IPv6 only
-      //$array[] = array(TRUE,  'localhost', FALSE);
-      $array[] = array(TRUE,  '::1',       FALSE);
-      $array[] = array(FALSE, '::ffff',    FALSE);
-      foreach (array('localhost', 'ip6-localhost') as $hostname)
-      {
-        // Debian used ip6-localhost instead localhost.. lol
-        $ip = gethostbyname6($hostname, OBS_DNS_AAAA);
-        if ($ip)
-        {
-          $array[] = array(TRUE,  $hostname, FALSE);
-          //var_dump($hostname);
-          break;
+    /**
+    * @dataProvider providerIsPingable
+    * @group network
+    */
+    public function testIsPingable($hostname, $result, $try_a = TRUE) {
+        if (!is_executable($GLOBALS['config']['fping'])) {
+            // CentOS 6.8
+            $GLOBALS['config']['fping']  = '/usr/sbin/fping';
+            $GLOBALS['config']['fping6'] = '/usr/sbin/fping6';
         }
-      }
+
+        if ($try_a) {
+            $ping = is_pingable($hostname);
+        } else {
+            $ping = is_pingable($hostname, 'ipv6');
+        }
+        $ping = is_numeric($ping) && $ping > 0; // Function returns random float number
+        $this->assertSame($result, $ping);
     }
-    return $array;
-  }
+
+    public function providerIsPingable() {
+        $array = [
+            [ 'localhost',             TRUE ],
+            [ '127.0.0.1',             TRUE ],
+            [ 'yohoho.i.butylka.roma', FALSE ],
+            [ '127.0.0.1',             FALSE, FALSE ], // Try ping IPv4 with IPv6 only
+        ];
+
+        $cmd = $GLOBALS['config']['fping6'] . " -c 1 -q ::1 2>&1";
+        exec($cmd, $output, $return); // Check if we have IPv6 support in a current system
+        if ($return === 0) {
+            // IPv6 only
+            $array[] = [ '::1',     TRUE, FALSE ];
+            $array[] = [ '::ffff', FALSE, FALSE ];
+            foreach ([ 'localhost', 'ip6-localhost' ] as $hostname) {
+                // Debian used ip6-localhost instead localhost.. lol
+                if ($ip = gethostbyname6($hostname, 'ipv6')) {
+                    $array[] = [ $hostname, TRUE, FALSE ];
+                    //var_dump($hostname);
+                    break;
+                }
+            }
+        }
+
+        return $array;
+    }
 
   /**
   * @dataProvider providerCalculateMempoolProperties

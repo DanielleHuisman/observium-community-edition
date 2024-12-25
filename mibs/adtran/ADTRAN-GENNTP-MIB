@@ -1,0 +1,467 @@
+ADTRAN-GENNTP-MIB
+
+-- TITLE:     The ADTRAN NTP MIB
+-- PRODUCT:   ADTRAN products supporting NTP
+-- VERSION:   1.0
+-- DATE:      9/17/08
+-- AUTHOR:    Josh Horton
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN GENNTP MIB objects
+
+-- HISTORY:
+-- 09/16/08 jmh STATUS: PRELIMINARY.
+-- 10/03/08 jmh Updated description strings.  Fixed 3 compile errors.
+-- 10/03/08 jlb Moved the conformance items to be located under ComplianceShared
+-- 10/14/08 jmh Added adGenNtpEntStatusMaxNumberOfRefSources OID
+--              Changed MAX-ACCESS of adGenNtpAssocAddress to NOT-ACCESSIBLE
+--              Added explaniation of how to create a row in adGenNtpAssociationTable
+--              Changed UNSIGNED32 values with range to INTEGER32
+--              Put size limits on DisplayString objects
+-- 10/21/08 jmh Added adGenNtpEntStatusReferenceDateTime OID
+--              Converted adGenNtpEntStatusReferenceNtpTime to String syntax
+--              Removed adGenNtpAssocAddress from list of compliance OIDs
+--              Removed NtpStratum and NtpDateTime Text conventions
+-- 11/05/08 jmh Changed DisplayString Size to 0..15 for adGenNtpAssocRefId
+-- 11/07/08 jlb Removed adGenNtpEntStatusNtpTime from adGenNtpEntObjectsGroup1
+
+-- MIBs supported:
+--      NTP textual conventions & line variables (NTPv4-MIB,
+--           defined in  draft-ietf-ntp-ntpv4-mib-05 under review by IETF).
+-- *********************************************************************
+
+DEFINITIONS ::= BEGIN
+
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, Unsigned32, Counter32
+        FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, OBJECT-GROUP
+        FROM SNMPv2-CONF
+    DisplayString, TEXTUAL-CONVENTION, TruthValue, RowStatus
+        FROM SNMPv2-TC
+    InetAddress
+        FROM INET-ADDRESS-MIB
+     adGenNtpID, adGenNtp, adGenNtpCompliance
+        FROM ADTRAN-SHARED-CND-SYSTEM-MIB;
+
+adGenNtpMIB MODULE-IDENTITY
+   LAST-UPDATED "201406020000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO "http://www.adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the NTP MIB."
+
+   REVISION "201406020000Z"
+   DESCRIPTION "Added the following OIDs for configuring NTP Broadcast Client:
+      adGenNtpAssociationBroadcast,
+      adGenNtpAssociationPeriodicVolley"
+
+   REVISION "200809170000Z"
+   DESCRIPTION "Created"
+
+::= { adGenNtpID 1 }
+
+
+adGenNtpMIBObjects  OBJECT IDENTIFIER ::= { adGenNtp 1 }
+
+-- MIB contains 2 groups
+
+adGenNtpEntStatus       OBJECT IDENTIFIER ::= { adGenNtpMIBObjects 1 }
+adGenNtpAssociation     OBJECT IDENTIFIER ::= { adGenNtpMIBObjects 2 }
+adGenNtpAssociationScalars OBJECT IDENTIFIER ::= { adGenNtpAssociation 2 }
+
+--
+-- Section 1: Current NTP status
+--
+-- The adGenNtpEntStatus OIDs below are a superset of the OIDs defined in
+-- the draft NTPv4-MIB.
+
+adGenNtpEntStatusCurrentMode OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..31))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual mode of NTP as a string"
+    --- possible strings:
+    --- "not running" : NTP is not running
+    --- "not synchronized" : NTP is not synchronized to any time source
+    --- "none configured" : NTP is not synchronized and does not have a
+    ---                     server configured
+    --- "sync to local" : NTP is synchronized to own local clock
+    --- "sync to refclock" : NTP is synchronized to a local hardware
+    --- "sync to remote server" : NTP is synchronized to a remote NTP
+    --- "unknown" : The state of NTP is unknown.
+    ::= { adGenNtpEntStatus 1 }
+
+adGenNtpEntStatusCurrentModeVal OBJECT-TYPE
+    SYNTAX      INTEGER {
+                            notRunning(1),
+                            notSynchronized(2),
+                            noneConfigured(3),
+                            syncToLocal(4),
+                            syncToRefclock(5),
+                            syncToRemoteServer(6),
+                            unknown(99)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current mode of the NTP as an integer value."
+    -- see ntpEntStatusCurrentMode
+    DEFVAL { unknown }
+    ::= { adGenNtpEntStatus 2 }
+
+adGenNtpEntStatusStratum OBJECT-TYPE
+    SYNTAX      Integer32 (1..16)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Stratum value of this NTP client."
+    DEFVAL { 16 }
+    ::= { adGenNtpEntStatus 3 }
+
+adGenNtpEntStatusActiveRefSourceId OBJECT-TYPE
+    SYNTAX      Integer32 ( 0..99999 )
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The association reference clock ID."
+    DEFVAL { 0 }
+    ::= { adGenNtpEntStatus 4 }
+
+adGenNtpEntStatusActiveRefSourceName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..15))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the reference clock."
+    ::= { adGenNtpEntStatus 5 }
+
+adGenNtpEntStatusActiveOffset OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..7))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time offset for the selected server."
+    ::= { adGenNtpEntStatus 6 }
+
+adGenNtpEntStatusNumberOfRefSources OBJECT-TYPE
+    SYNTAX      Integer32 (0..99)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of NTP servers configured."
+    DEFVAL { 0 }
+    ::= { adGenNtpEntStatus 7 }
+
+adGenNtpEntStatusDispersion OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..7))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The root dispersion for the NTP client."
+    DEFVAL { "n/a" }
+    ::= { adGenNtpEntStatus 8 }
+
+adGenNtpEntStatusEntityUptime OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "NTP uptime."
+    DEFVAL { 0 }
+    ::= { adGenNtpEntStatus 9 }
+
+adGenNtpEntStatusReferenceNtpTime OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..31))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Reference date/time in 64-bit NTP time format
+         NTP time format. Ref: draft-ietf-ntp-ntpv4-proto-06,
+         section 6:
+          The 64-bit timestamp format is used in packet headers and other
+          places with limited word size.  It includes a 32-bit unsigned seconds
+          field spanning 136 years and a 32-bit fraction field resolving 232
+          picoseconds."
+    ::= { adGenNtpEntStatus 10 }
+
+adGenNtpEntStatusLeapSecond OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Date of the next leap second.  This will be 0 if no leap
+	 second has been announced."
+    DEFVAL { 0 }
+    ::= { adGenNtpEntStatus 11 }
+
+adGenNtpEntStatusLeapSecDirection OBJECT-TYPE
+    SYNTAX      Integer32 (-1..1)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Direction of next leap second. This will be
+	 0 if no leap second has been announced."
+    DEFVAL { 0 }
+    ::= { adGenNtpEntStatus 12 }
+
+adGenNtpEntStatusInPkts OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of NTP packets received by the client."
+    ::= { adGenNtpEntStatus 13 }
+
+adGenNtpEntStatusOutPkts OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of NTP packets transmitted by the client."
+    ::= { adGenNtpEntStatus 14 }
+
+adGenNtpEntStatusMaxNumberOfRefSources OBJECT-TYPE
+    SYNTAX      Integer32 (0..99)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Maximum number of NTP servers allowed."
+    DEFVAL { 0 }
+    ::= { adGenNtpEntStatus 15 }
+
+adGenNtpEntStatusReferenceDateTime OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..31))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Reference date/time standard format
+         i.e. Tue Oct 21 2008 20:00:24.172"
+    ::= { adGenNtpEntStatus 16 }
+
+
+--
+-- Section 2: The configuration and status of all associations
+--
+
+adGenNtpAssociationTable OBJECT-TYPE
+    SYNTAX           SEQUENCE OF AdGenNtpAssociationEntry
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+	"This table is a superset of the table defined in the
+         draft NTPv4-MIB to provide NTP configuration options.
+         It is indexed by adGenNtpAssocAddress.  When
+         setting adGenNtpAssocRowStatus to active you must set
+         the adGenNtpAssocAddress.  All other parameters are
+         optional at row creation."
+    ::= { adGenNtpAssociation 1 }
+
+adGenNtpAssociationEntry OBJECT-TYPE
+    SYNTAX      AdGenNtpAssociationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This table is a superset of the table defined in the
+         draft NTPv4-MIB to provide NTP configuration options."
+    INDEX       { adGenNtpAssocAddress }
+    ::= { adGenNtpAssociationTable 1 }
+
+AdGenNtpAssociationEntry   ::= SEQUENCE {
+	adGenNtpAssocRowStatus           RowStatus,
+        adGenNtpAssocAddress             InetAddress,
+        adGenNtpAssocVersion             Integer32,
+        adGenNtpAssocPrefer              TruthValue,
+        adGenNtpAssocRefId               DisplayString,
+        adGenNtpAssocOffset              DisplayString,
+        adGenNtpAssocStratum             Integer32,
+        adGenNtpAssocStatusJitter        DisplayString,
+        adGenNtpAssocStatusDelay         DisplayString,
+        adGenNtpAssocStatusDispersion    DisplayString
+}
+
+adGenNtpAssocRowStatus  OBJECT-TYPE
+    SYNTAX  	RowStatus
+    MAX-ACCESS  read-create
+    STATUS  	current
+    DESCRIPTION
+       "This object is used to create a new row or modify or delete an
+        existing row in this table."
+    ::= { adGenNtpAssociationEntry 1 }
+
+adGenNtpAssocAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the association. This is set by the
+         agent when the row is created."
+    ::= { adGenNtpAssociationEntry 2 }
+
+adGenNtpAssocVersion OBJECT-TYPE
+    SYNTAX      Integer32 ( 3..4 )
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The version of NTP packets sent to the association."
+    ::= { adGenNtpAssociationEntry 3 }
+
+adGenNtpAssocPrefer OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The prefernece of this peer over other associations."
+    ::= { adGenNtpAssociationEntry 4 }
+
+adGenNtpAssocRefId   OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..15))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The association reference clock ID."
+    ::= { adGenNtpAssociationEntry 5 }
+
+adGenNtpAssocOffset  OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..7))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The association time offset."
+    ::= { adGenNtpAssociationEntry 6 }
+
+adGenNtpAssocStratum OBJECT-TYPE
+    SYNTAX      Integer32 (1..16)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The association stratum value."
+    ::= { adGenNtpAssociationEntry 7 }
+
+adGenNtpAssocStatusJitter OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..7))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The association jitter in miliseconds."
+    ::= { adGenNtpAssociationEntry 8 }
+
+adGenNtpAssocStatusDelay OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..7))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The association delay delay in miliseconds."
+    ::= { adGenNtpAssociationEntry 9 }
+
+adGenNtpAssocStatusDispersion OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..7))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The associations root dispersion."
+    ::= { adGenNtpAssociationEntry 10 }
+
+adGenNtpAssociationBroadcast OBJECT-TYPE
+    SYNTAX           TruthValue
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+	"True means the NTP client will process received broadcast NTP server
+     messages.  False means it will not and is the default value.
+     When enabled, the NTP client will listen for broadcast NTP server messages
+     with the following IPv6 destination addresses:
+     FF02::101
+     FF04::101
+     FF05::101
+     FF08::101
+     FF0E::101
+     Note: IPv6 NTP associations will not appear in the 
+     adGenNtpAssociationTable as its index contains InetAddress which is
+     limited to only representing IPv4 addresses."
+    ::= { adGenNtpAssociationScalars 1 }
+
+adGenNtpAssociationPeriodicVolley OBJECT-TYPE
+    SYNTAX           Unsigned32
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+	"Configure the duration, in seconds, between client-server volleys for
+     associations where the server sends broadcast NTP messages. The volley is
+     used to periodically measure the network delay variable used as an input
+     to the NTP clock filtering algorithm.  
+     0 means the volley function is disabled and is the default value.
+     900 to 86400 means the volley is enabled."
+    ::= { adGenNtpAssociationScalars 2 }
+
+--
+-- Conformance/Compliance statements
+--
+
+adGenNtpEntConformance OBJECT IDENTIFIER ::= { adGenNtpCompliance 1 }
+
+adGenNtpEntCompliances OBJECT IDENTIFIER ::= { adGenNtpEntConformance 1 }
+adGenNtpEntGroups      OBJECT IDENTIFIER ::= { adGenNtpEntConformance 2 }
+
+adGenNtpEntNTPCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for device support of NTP."
+    MODULE  -- this module
+        MANDATORY-GROUPS {
+                           adGenNtpEntObjectsGroup1,
+                           adGenNtpEntObjectsGroup2
+        }
+        ::= { adGenNtpEntCompliances 1 }
+
+adGenNtpEntSNTPCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for device support of NTP."
+    MODULE  -- this module
+        MANDATORY-GROUPS {
+                           adGenNtpEntObjectsGroup1
+        }
+        ::= { adGenNtpEntCompliances 2 }
+
+adGenNtpEntObjectsGroup1 OBJECT-GROUP
+    OBJECTS {
+              adGenNtpEntStatusEntityUptime,
+              adGenNtpAssocRowStatus,
+              adGenNtpAssocVersion,
+              adGenNtpAssocPrefer
+    }
+    STATUS      current
+    DESCRIPTION
+        "Implementation of this group is mandatory for NTP support."
+    ::= { adGenNtpEntGroups 1 }
+
+adGenNtpEntObjectsGroup2 OBJECT-GROUP
+    OBJECTS {
+              adGenNtpEntStatusStratum,
+              adGenNtpEntStatusActiveRefSourceId,
+              adGenNtpEntStatusActiveRefSourceName,
+              adGenNtpEntStatusActiveOffset,
+              adGenNtpEntStatusNumberOfRefSources,
+              adGenNtpEntStatusDispersion,
+              adGenNtpEntStatusLeapSecond,
+              adGenNtpEntStatusLeapSecDirection,
+              adGenNtpEntStatusInPkts,
+              adGenNtpEntStatusOutPkts,
+              adGenNtpEntStatusMaxNumberOfRefSources,
+              adGenNtpEntStatusReferenceDateTime,
+              adGenNtpAssocOffset,
+              adGenNtpAssocStratum,
+              adGenNtpAssocStatusJitter,
+              adGenNtpAssocStatusDelay,
+              adGenNtpAssocStatusDispersion
+    }
+    STATUS      current
+    DESCRIPTION
+        "Implementation of this group is optional for NTP support."
+    ::= { adGenNtpEntGroups 2 }
+
+END

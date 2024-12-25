@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -107,6 +107,7 @@ if (!device_permitted($device['device_id'])) {
     print_device_header($device);
 } else {
     // Device permitted, show full info
+    //register_html_panel(generate_device_panel($device));
 
     // Print the device header
     print_device_header($device, [ 'div-class' => 'hidden-xl' ]);
@@ -591,7 +592,7 @@ if (!device_permitted($device['device_id'])) {
             $navbar['options']['tools']['suboptions']['perf']  = [ 'text' => 'Performance Data', 'icon' => $config['icon']['device-poller'] ];
         }
         $navbar['options']['tools']['suboptions']['data'] = [ 'text' => 'Device Data', 'icon' => $config['icon']['device-data'] ];
-        if ($config['web_show_tech']) {
+        if ($config['web_show_tech'] || $_SESSION['userlevel'] == 10) {
             $navbar['options']['tools']['suboptions']['showtech'] = [ 'text' => 'Show Tech-Support', 'icon' => $config['icon']['techsupport'] ];
         }
         $navbar['options']['tools']['suboptions']['divider_1'] = [ 'divider' => TRUE ];
@@ -610,9 +611,8 @@ if (!device_permitted($device['device_id'])) {
             'action' => 1
         ];
 
-        $navbar['options']['tools']['suboptions']['delete']['url']       = "#modal-delete_device";
+        $navbar['options']['tools']['suboptions']['delete']['url']       = generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'edit', 'section' => 'delete' ]);
         $navbar['options']['tools']['suboptions']['delete']['text']      = 'Delete Device';
-        $navbar['options']['tools']['suboptions']['delete']['link_opts'] = 'data-toggle="modal"';
         $navbar['options']['tools']['suboptions']['delete']['icon']      = $config['icon']['minus'];
 
         $navbar['options']['tools']['suboptions']['divider_3'] = ['divider' => TRUE];
@@ -717,69 +717,6 @@ if (!device_permitted($device['device_id'])) {
     print_navbar($navbar);
     unset($navbar);
 }
-
-// Delete device modal
-
-$form = [
-    'type'                => 'horizontal',
-    'entity_write_permit' => [ 'entity_type' => 'device', 'entity_id' => $device['device_id'] ],
-    'id'                  => 'modal-delete_device',
-    'title'               => 'Delete Device "' . $device['hostname'] . '"',
-    'icon'                => $config['icon']['device-delete'],
-    'url'                 => 'delhost/'
-];
-
-$form['row'][0]['id'] = [
-    'type'     => 'hidden',
-    'fieldset' => 'body',
-    'value'    => $device['device_id']
-];
-$form['row'][4]['confirm'] = [
-    'type'     => 'checkbox',
-    'fieldset' => 'body',
-    'name'     => 'Confirm Deletion',
-    'onchange' => "javascript: toggleAttrib('disabled', 'delete_modal');",
-    'value'    => 'confirm'
-];
-/*
-$form['row'][5]['deleterrd'] = array(
-                                'type'        => 'checkbox',
-                                'fieldset'    => 'body',
-                                'name'        => 'Delete RRDs',
-                                'onchange'    => "javascript: showDiv(this.checked, 'warning_".$device['device_id']."_div');",
-                                'value'       => 'confirm');
-$form['row'][7]['warning_'.$device['device_id']] = array(
-                                'type'        => 'html',
-                                'fieldset'    => 'body',
-                                'html'        => '<h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>' .
-                                                 ' This will delete this device from Observium including all logging entries, but will not delete the RRDs.',
-                                //'div_style'   => 'display: none', // hide initially
-                                'div_class'   => 'alert alert-warning');
-*/
-
-$form['row'][9]['close'] = [
-    'type'      => 'submit',
-    'fieldset'  => 'footer',
-    'div_class' => '', // Clean default form-action class!
-    'name'      => 'Close',
-    'icon'      => '',
-    'attribs'   => [ 'data-dismiss' => 'modal',  // dismiss modal
-                     'aria-hidden'  => 'true' ]  // do not send any value
-];
-$form['row'][9]['delete_modal'] = [
-    'type'      => 'submit',
-    'fieldset'  => 'footer',
-    'div_class' => '', // Clean default form-action class
-    'name'      => 'Delete device',
-    'icon'      => 'icon-remove icon-white',
-    //'right'       => TRUE,
-    'class'     => 'btn-danger',
-    'disabled'  => TRUE
-];
-
-echo generate_form_modal($form);
-unset($form);
-
 
 // Check that the user can view the device, or is viewing a permitted port on the device
 if (device_permitted($device['device_id']) || $permit_tabs[$tab]) {

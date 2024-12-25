@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -133,43 +133,6 @@ if ($instance['ospfASBdrRtrStatus'] === "true") {
 <?php
 
     echo generate_box_close();
-
-    /**
-     * Old style
-
-
-    echo generate_box_open();
-    echo '<table class="table table-hover  table-striped table-condensed">';
-
-    $cols = [
-      [NULL, 'class="state-marker"'],
-      ['Router Id', 'style="width: 160px;"'],
-      'Status',
-      'ABR',
-      'ASBR',
-      'Areas',
-      'Ports',
-      'Neighbours'
-    ];
-
-    echo get_table_header($cols, $vars);
-    //echo('<thead><tr><th class="state-marker"></th><th>Router Id</th><th>Status</th><th>ABR</th><th>ASBR</th><th>Areas</th><th>Ports</th><th>Neighbours</th></tr></thead>');
-    echo('<tr class="' . $row_class . '">');
-    echo('  <td class="state-marker"></td>');
-    echo('  <td class="entity-title">' . $instance_id . '</td>');
-    echo('  <td>' . $enabled . '</td>');
-    echo('  <td>' . $abr . '</td>');
-    echo('  <td>' . $asbr . '</td>');
-    echo('  <td>' . $area_count . '</td>');
-    echo('  <td>' . $port_count . '(' . $port_count_enabled . ')</td>');
-    echo('  <td>' . $nbr_count . '</td>');
-    echo('</tr>');
-
-    echo '</table>';
-
-    echo generate_box_close();
-*/
-
 
     echo '<div class="row">';
     echo '<div class="col-md-6">';

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage syslog
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -120,10 +120,10 @@ function process_syslog($line, $update) {
                                   ], 'syslog');
         }
 
-//$req_dump = print_r(array($entry, $rules, $device_rules), TRUE);
-//$fp = fopen('/tmp/syslog.log', 'a');
-//fwrite($fp, $req_dump);
-//fclose($fp);
+        //$req_dump = print_r(array($entry, $rules, $device_rules), TRUE);
+        //$fp = fopen('/tmp/syslog.log', 'a');
+        //fwrite($fp, $req_dump);
+        //fclose($fp);
 
         // Add syslog alert into notification queue
         $notification_type = 'syslog';
@@ -227,58 +227,68 @@ function syslog_generate_tags($entry, $rule) {
     $severity_def = $GLOBALS['config']['syslog']['priorities'][$severity];
     $alert_emoji  = $severity_def['emoji'];
     $alert_color  = $severity_def['color'];
+
     // Custom alert statuses
-    $entry['alert_status'] = 0; // Currently always ALERT
-    $alert_status_custom = $GLOBALS['config']['alerts']['status'][$entry['alert_status']] ?? $entry['alert_status'];
+    $cfg          = $GLOBALS['config']['alerts'];
+    $entry['alert_status'] = 0; // Currently always ALERT. FIXME. Change to reserved number 9
+    $alert_status_custom = $cfg['status'][$entry['alert_status']] ?? $entry['alert_status'];
+    if (isset($cfg['status_name'][9]) &&
+        is_alpha($cfg['status_name'][9])) {
+        // Ability for set custom alert status name (override default)
+        $alert_status_name = strtoupper($cfg['status_name'][9]);
+    } else {
+        $alert_status_name = 'SYSLOG';
+    }
 
     $device = device_by_id_cache($entry['device_id']);
 
     $message_tags = [
-      'ALERT_STATE'      => "SYSLOG",
-      'ALERT_EMOJI'      => get_icon_emoji($alert_emoji),   // https://unicodey.com/emoji-data/table.htm
-      'ALERT_EMOJI_NAME' => $alert_emoji,
-      'ALERT_STATUS'     => $entry['alert_status'],         // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED)
-      'ALERT_STATUS_CUSTOM' => $alert_status_custom,        // Tag for templates (as defined in $config['alerts']['status'] array)
-      'ALERT_SEVERITY'   => ucfirst($severity_def['name']), // Critical, Warning, Informational, Other
-      'ALERT_COLOR'      => ltrim($alert_color, '#'),
-      'ALERT_URL'        => generate_url([ 'page'    => 'device',
-                                           'device'  => $device['device_id'],
-                                           'tab'     => 'logs',
-                                           'section' => 'logalert',
-                                           'la_id'   => $la_id ]),
-      'ALERT_UNIXTIME'          => $alert_unixtime,                        // Standard unixtime
-      'ALERT_TIMESTAMP'         => date('Y-m-d H:i:s P', $alert_unixtime), //           ie: 2000-12-21 16:01:07 +02:00
-      'ALERT_TIMESTAMP_RFC2822' => date('r', $alert_unixtime),             // RFC 2822, ie: Thu, 21 Dec 2000 16:01:07 +0200
-      'ALERT_TIMESTAMP_RFC3339' => date(DATE_RFC3339, $alert_unixtime),    // RFC 3339, ie: 2005-08-15T15:52:01+00:00
-      'ALERT_ID'                => $la_id,
-      'ALERT_MESSAGE'           => $rule['la_descr'],
-      'CONDITIONS'              => $rule['la_rule'],
-      'METRICS'                 => $entry['msg'],
+        'ALERT_STATE'             => "SYSLOG",
+        'ALERT_STATE_NAME'        => $alert_status_name,
+        'ALERT_EMOJI'             => get_icon_emoji($alert_emoji),   // https://unicodey.com/emoji-data/table.htm
+        'ALERT_EMOJI_NAME'        => $alert_emoji,
+        'ALERT_STATUS'            => $entry['alert_status'],         // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED)
+        'ALERT_STATUS_CUSTOM'     => $alert_status_custom,        // Tag for templates (as defined in $config['alerts']['status'] array)
+        'ALERT_SEVERITY'          => ucfirst($severity_def['name']), // Critical, Warning, Informational, Other
+        'ALERT_COLOR'             => ltrim($alert_color, '#'),
+        'ALERT_URL'               => generate_url([ 'page'    => 'device',
+                                                    'device'  => $device['device_id'],
+                                                    'tab'     => 'logs',
+                                                    'section' => 'logalert',
+                                                    'la_id'   => $la_id ]),
+        'ALERT_UNIXTIME'          => $alert_unixtime,                        // Standard unixtime
+        'ALERT_TIMESTAMP'         => date('Y-m-d H:i:s P', $alert_unixtime), //           ie: 2000-12-21 16:01:07 +02:00
+        'ALERT_TIMESTAMP_RFC2822' => date('r', $alert_unixtime),             // RFC 2822, ie: Thu, 21 Dec 2000 16:01:07 +0200
+        'ALERT_TIMESTAMP_RFC3339' => date(DATE_RFC3339, $alert_unixtime),    // RFC 3339, ie: 2005-08-15T15:52:01+00:00
+        'ALERT_ID'                => $la_id,
+        'ALERT_MESSAGE'           => $rule['la_descr'],
+        'CONDITIONS'              => $rule['la_rule'],
+        'METRICS'                 => $entry['msg'],
 
-      // Syslog TAGs
-      'SYSLOG_RULE'             => $rule['la_rule'],
-      'SYSLOG_MESSAGE'          => $entry['msg'],
-      'SYSLOG_PROGRAM'          => $entry['program'],
-      'SYSLOG_TAG'              => $entry['tag'],
-      'SYSLOG_FACILITY'         => $entry['facility'],
+        // Syslog TAGs
+        'SYSLOG_RULE'             => $rule['la_rule'],
+        'SYSLOG_MESSAGE'          => $entry['msg'],
+        'SYSLOG_PROGRAM'          => $entry['program'],
+        'SYSLOG_TAG'              => $entry['tag'],
+        'SYSLOG_FACILITY'         => $entry['facility'],
 
-      // Device TAGs
-      'DEVICE_HOSTNAME'         => $device['hostname'],
-      'DEVICE_SYSNAME'          => $device['sysName'],
-      //'DEVICE_SYSDESCR'     => $device['sysDescr'],
-      'DEVICE_DESCRIPTION'      => $device['purpose'],
-      'DEVICE_ID'               => $device['device_id'],
-      'DEVICE_URL'              => generate_device_url($device),
-      'DEVICE_LINK'             => generate_device_link($device),
-      'DEVICE_HARDWARE'         => $device['hardware'],
-      'DEVICE_OS'               => $device['os_text'] . ' ' . $device['version'] . ($device['features'] ? ' (' . $device['features'] . ')' : ''),
-      'DEVICE_TYPE'             => $device['type'],
-      'DEVICE_LOCATION'         => $device['location'],
-      'DEVICE_UPTIME'           => device_uptime($device),
-      'DEVICE_REBOOTED'         => format_unixtime($device['last_rebooted']),
+        // Device TAGs
+        'DEVICE_HOSTNAME'         => $device['hostname'],
+        'DEVICE_SYSNAME'          => $device['sysName'],
+        //'DEVICE_SYSDESCR'     => $device['sysDescr'],
+        'DEVICE_DESCRIPTION'      => $device['purpose'],
+        'DEVICE_ID'               => $device['device_id'],
+        'DEVICE_URL'              => generate_device_url($device),
+        'DEVICE_LINK'             => generate_device_link($device),
+        'DEVICE_HARDWARE'         => $device['hardware'],
+        'DEVICE_OS'               => $device['os_text'] . ' ' . $device['version'] . ($device['features'] ? ' (' . $device['features'] . ')' : ''),
+        'DEVICE_TYPE'             => $device['type'],
+        'DEVICE_LOCATION'         => $device['location'],
+        'DEVICE_UPTIME'           => device_uptime($device),
+        'DEVICE_REBOOTED'         => format_unixtime($device['last_rebooted']),
     ];
 
-    $message_tags['TITLE'] = alert_generate_subject($device, 'SYSLOG', $message_tags);
+    $message_tags['TITLE'] = alert_generate_subject($device, $alert_status_name, $message_tags);
 
     return $message_tags;
 }
@@ -294,8 +304,7 @@ function syslog_generate_tags($entry, $rule) {
  *
  * @return array|false Array with processed syslog entry, or FALSE if incorrect/filtered msg.
  */
-function process_syslog_line($line)
-{
+function process_syslog_line($line) {
     global $config;
 
     // Compatibility with old param as array
@@ -480,6 +489,10 @@ function process_syslog_line($line)
                 // Remove prior seqno and timestamp from msg
                 $entry['msg'] = preg_replace('/^\s*(?<seq>\d+:)*\s*(?<timestamp>.*?\d+\:\d+\:\d+(?:\.\d+)?(?:\ [\w\-\+]+)?): /', '', $entry['msg']);
             }
+            if (str_contains($entry['tag'], ',')) {
+                // Intersect with Origin-ID, remove 6 digits from tags
+                $entry['tag'] = preg_replace('/,\d{6}$/', '', $entry['tag']);
+            }
         } elseif ($os_group === 'juniper') {
             //1.1.1.1||9||6||6||/usr/sbin/cron[1305]:||2015-04-08 14:30:01|| (root) CMD (   /usr/libexec/atrun)||
             if (str_contains($entry['tag'], '/')) {
@@ -653,9 +666,22 @@ function process_syslog_line($line)
             }
         }
 
-        // Always clear timestamp from beginning of message (if still left), test strings:
+        // Filter by program or tags (after message parsing)
+        if (!safe_empty($config['syslog']['filter_program']) &&
+            in_iarray($entry['program'], $config['syslog']['filter_program'])) {
+             return FALSE;
+        }
+        if (!safe_empty($config['syslog']['filter_tag'])) {
+            foreach (explode(',', $entry['tag']) as $tag) {
+                if (in_iarray($tag, $config['syslog']['filter_tag'])) {
+                    return FALSE;
+                }
+            }
+        }
+
+        // Always clear timestamp from the beginning of message (if still left), test strings:
         //2018-10-16T18:13:03+02:00 hostname
-        $pettern_timestamp_rfc3339 = '/^\s*\*?(?<year>[0-9]{4})\-(?<month>[0-9]{2})\-(?<day>[0-9]{2})(?:[Tt](?<hour>[0-9]{2}):(?<minute>[0-9]{2}):(?<second>(?:[0-9]{2})(?:\.[0-9]+)?)?)(?<tz>(?:[Zz]|[+\-](?:[0-9]{2}):(?:[0-9]{2})))?/';
+        $pattern_timestamp_rfc3339 = '/^\s*\*?(?<year>[0-9]{4})\-(?<month>[0-9]{2})\-(?<day>[0-9]{2})(?:[Tt](?<hour>[0-9]{2}):(?<minute>[0-9]{2}):(?<second>(?:[0-9]{2})(?:\.[0-9]+)?)?)(?<tz>(?:[Zz]|[+\-](?:[0-9]{2}):(?:[0-9]{2})))?/';
         //Wed Mar 26 12:54:17 2014 :
         //May 30 15:33:20.636 UTC :
         //May 30 15:33:20.636 2014 UTC :
@@ -673,10 +699,10 @@ function process_syslog_line($line)
         // without TZ, example:
         //Mar 21 13:07:05 netflow syslogd:
         $pattern_timestamp_wo_tz = '/^\s*\*?(?<wmd>(?<week>[a-z]{3,} +)?(?<month>[a-z]{3,} +)(?<date>\d{1,2} +)(?<year0>[12]\d{3} +)?)?(?<hms>\d{1,2}\:\d{1,2}\:\d{1,2}(?:\.\d+)?)(?<year>\s+[12]\d{3})?/i';
-        $entry['msg']            = preg_replace([$pattern_timestamp, $pattern_timestamp_wo_tz, $pettern_timestamp_rfc3339], '', $entry['msg']);
+        $entry['msg']            = preg_replace([$pattern_timestamp, $pattern_timestamp_wo_tz, $pattern_timestamp_rfc3339], '', $entry['msg']);
 
         if (safe_empty($entry['msg'])) {
-            // Something wrong, msg empty
+            // Something wrong, msg is empty
             return FALSE;
         }
 
@@ -700,7 +726,7 @@ function process_syslog_line($line)
                     $entry['unixtime'] = $unixtime;
                 } else {
                     // Seems as wrong time synchronization on device/server or something else.
-                    // Use self time in this case
+                    // Use self-time in this case
                     $entry['unixtime']  = $start_time;
                     $entry['timestamp'] = date('Y-m-d H:i:s', $start_time);
                 }

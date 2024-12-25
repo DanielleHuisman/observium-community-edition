@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -26,6 +26,6 @@ if (isset($config['os'][$device['os']]['virtual-machines'])) {
 $include_dir = "includes/discovery/virtual-machines";
 include($config['install_dir'] . "/includes/include-dir-mib.inc.php");
 
-echo(PHP_EOL);
+//echo(PHP_EOL);
 
 // EOF

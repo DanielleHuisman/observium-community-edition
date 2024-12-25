@@ -1,0 +1,377 @@
+    ADTRAN-GENUPGRADE-MIB
+
+    DEFINITIONS ::= BEGIN
+
+    -- ADTRAN Proprietary and Confidential
+    --
+    -- TITLE:       The ADTRAN Generic Upgrade MIB
+    -- PRODUCT:     All chassis type products
+    -- VERSION:     1.0
+    -- DATE:        02/01/28
+    -- AUTHOR:      Kevin Earnst
+    -- SNMP:        SNMPv1
+    -- MIB ARC:     adtran.adShared.adGenericShelves.adGenUpgrade
+    --
+    -- This is a generic MIB pertaining to Software upgrades.
+    -- The various linecards will define their level of support
+    --   for this MIB, if any.
+    --
+    -- Contact Information:
+    --                CND Tech Support
+    --                Postal: ADTRAN, Inc.
+    --                        901 Explorer Blvd.
+    --                        Huntsville, AL  35806
+    --                Tel:    +1 800 726-8663
+    --                Fax:    +1 256 963 6217
+    --                E-mail: support@adtran.com
+    --
+    -- HISTORY: (yy/mm/dd)
+    --   03/06/17 kle Initial Version
+    --   04/10/04 kle Added adIncompatibleSWAlarm and adClrIncompatibleSWAlarm.
+    --                This supports linecards that can't always return the 
+    --                adGenUpgradeFailureStatus varbind with the adSWFailAlarm.
+
+    IMPORTS
+        OBJECT-TYPE
+            FROM RFC-1212
+        sysName,
+        DisplayString
+            FROM RFC1213-MIB
+        TRAP-TYPE
+            FROM RFC-1215
+        adGenericShelves
+            FROM ADTRAN-GENCHASSIS-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adGenSlotInfoIndex,
+        adGenSlotAlarmStatus
+            FROM ADTRAN-GENSLOT-MIB;
+
+
+    -- OBJECT IDENTIFIERS
+
+        adGenUpgrade   OBJECT IDENTIFIER ::= { adGenericShelves 4 }
+
+
+        --###############################################################
+        --                  S T A T U S
+        --###############################################################
+
+        adGenUpgradeStatus  OBJECT IDENTIFIER
+                ::= { adGenUpgrade 1 }
+
+         adGenUpgradeStatusTable OBJECT-TYPE
+             SYNTAX  SEQUENCE OF AdGenUpgradeStatusEntry
+             ACCESS  not-accessible
+             STATUS  mandatory
+             DESCRIPTION
+                 "The software status table."
+            ::= { adGenUpgradeStatus 1 }
+
+         adGenUpgradeStatusEntry OBJECT-TYPE
+             SYNTAX  AdGenUpgradeStatusEntry
+             ACCESS  not-accessible
+             STATUS  mandatory
+             DESCRIPTION
+                 "An entry in the software status table."
+            INDEX   { adGenSlotInfoIndex }
+            ::= { adGenUpgradeStatusTable 1 }
+
+         AdGenUpgradeStatusEntry ::=
+             SEQUENCE {
+                 adGenUpgradeFailureStatus
+                     INTEGER,
+                 adGenUpgradeSoftwareStatus
+                     INTEGER,
+                 adGenUpgradeSoftwarePercentageStatus
+                     INTEGER,
+                 adGenUpgradeSwUpgradeability
+                     INTEGER
+             }
+
+        adGenUpgradeFailureStatus OBJECT-TYPE
+                SYNTAX  INTEGER {
+                        noFailure(1),
+                        genericFailure(2),
+                        ymodemProtocolFailure(3),
+                        wrongSoftwareSentFailure(4),
+                        softwareValidationFailure(5)
+                        }
+                ACCESS  read-only
+                STATUS  mandatory
+                DESCRIPTION
+                    "The failure status of the software upgrade process.
+                     Cards that have never been upgraded should return the
+                     noFailure(1) status.  The genericFailure(2) status should
+                     be returned when the card is not capable of determining
+                     the specific reason for the upgrade failure."
+                ::= { adGenUpgradeStatusEntry 1 }
+
+        adGenUpgradeSoftwareStatus OBJECT-TYPE
+                SYNTAX  INTEGER {
+                        upgradeNotInProgress(1),
+                        ymodemNegotiation(2),
+                        ymodemInProgress(3),
+                        tftpNegotiation(4),
+                        tftpInProgress(5),
+                        validatingSoftware(6),
+                        erasingEntireSoftware(7),
+                        erasingNonBootblockSoftware(8),
+                        writingSoftware(9),
+                        rebooting(10)
+                        }
+                ACCESS  read-only
+                STATUS  optional
+                DESCRIPTION
+                    "The software status of the upgrade process."
+                ::= { adGenUpgradeStatusEntry 2 }
+
+        adGenUpgradeSoftwarePercentageStatus OBJECT-TYPE
+                SYNTAX  INTEGER(0..101)
+                ACCESS  read-only
+                STATUS  optional
+                DESCRIPTION
+                    "The completion percentage associated with the upgrade
+                     software status (see adGenUpgradeSoftwareStatus).
+                     For example, an integer of 95 would indicate a 95%
+                     completion of the software validation (assuming
+                     adGenUpgradeSoftwareStatus = validatingSoftware(6) )
+                     The value of 101 is a special value used to convey
+                     that the completion percentage is not available."
+                ::= { adGenUpgradeStatusEntry 3 }
+
+        adGenUpgradeSwUpgradeability OBJECT-TYPE
+                SYNTAX  INTEGER {
+                        upgradeable(1),
+                        notUpgradeable(2)
+                        }
+                ACCESS  read-only
+                STATUS  mandatory
+                DESCRIPTION
+                    "Indicates whether the card's software is upgradeable."
+                ::= { adGenUpgradeStatusEntry 4 }
+
+
+
+        --###############################################################
+        --                  C O N F I G U R A T I O N
+        --###############################################################
+
+        adGenUpgradeConfig  OBJECT IDENTIFIER
+                ::= { adGenUpgrade 2 }
+
+         adGenUpgradeConfigTable OBJECT-TYPE
+             SYNTAX  SEQUENCE OF AdGenUpgradeConfigEntry
+             ACCESS  not-accessible
+             STATUS  mandatory
+             DESCRIPTION
+                 "The software status table."
+            ::= { adGenUpgradeConfig 1 }
+
+         adGenUpgradeConfigEntry OBJECT-TYPE
+             SYNTAX  AdGenUpgradeConfigEntry
+             ACCESS  not-accessible
+             STATUS  mandatory
+             DESCRIPTION
+                 "An entry in the software status table."
+            INDEX   { adGenSlotInfoIndex }
+            ::= { adGenUpgradeConfigTable 1 }
+
+         AdGenUpgradeConfigEntry ::=
+             SEQUENCE {
+                 adGenUpgradeSwConfiguration
+                     INTEGER,
+                 adGenUpgradeSwConfigDescription
+                     DisplayString,
+                 adGenUpgradeProdMainSwVersion
+                     DisplayString,
+                 adGenUpgradeProdStandbySwVersion
+                     DisplayString,
+                 adGenUpgradeProdMainBootSwVersion
+                     DisplayString,
+                 adGenUpgradeProdStandbyBootSwVersion
+                     DisplayString
+             }
+
+        adGenUpgradeSwConfiguration OBJECT-TYPE
+                SYNTAX  INTEGER {
+                        mainCodeOnly(1),
+                        mainAndStandbyCode(2),
+                        mainCodeWithBootSector(3),
+                        mainAndStandbyWithBootSector(4),
+                        noneOfTheAbove(5)
+                        }
+                ACCESS  read-only
+                STATUS  optional
+                DESCRIPTION
+                    "The software configuration of the card. mainCodeOnly(1)
+                     typically means that there is one and only one
+                     functionally complete set of code.  mainAndStandbyCode(2)
+                     typically means that two independent functionally complete
+                     sets of code exist on the card.  mainCodeWithBootSector(3)
+                     typically means that two independent sets of code exist
+                     on the card.  The first set referred to as the main code,
+                     usually contains functionally complete code with the
+                     exception of being able to download software.  The second
+                     set referred to as the boot code, usually only contains
+                     enough functional code to be able to download new
+                     software.  mainAndStandbyWithBootSector(4) typically means
+                     that three or four sets of code exist on the card: main
+                     code #1, boot code #1, main code #2, and possibly a boot
+                     code #2.  The functionality of the main code is typically
+                     more complete than the boot code, and the boot code most
+                     likely is the code that allows for software upgrades."
+                ::= { adGenUpgradeConfigEntry 1 }
+
+        adGenUpgradeSwConfigDescription  OBJECT-TYPE
+                SYNTAX  DisplayString
+                ACCESS  read-only
+                STATUS  optional
+                DESCRIPTION
+                    "A software configuration description that may accompany
+                     adGenUpgradeSwConfiguration with any special notes or
+                     clarification text."
+                ::= { adGenUpgradeConfigEntry 2 }
+
+        adGenUpgradeProdMainSwVersion  OBJECT-TYPE
+                SYNTAX  DisplayString
+                ACCESS  read-only
+                STATUS  mandatory
+                DESCRIPTION
+                    "The Adtran Product Software Version Number of the main
+                     code. If this item is not applicable to the card, the card
+                     should return a string of N/A or n/a"
+                ::= { adGenUpgradeConfigEntry 3 }
+
+        adGenUpgradeProdStandbySwVersion  OBJECT-TYPE
+                SYNTAX  DisplayString
+                ACCESS  read-only
+                STATUS  mandatory
+                DESCRIPTION
+                    "The Adtran Product Software Version Number of the standby
+                     code. If this item is not applicable to the card, the card
+                     should return a string of N/A or n/a"
+                ::= { adGenUpgradeConfigEntry 4 }
+
+        adGenUpgradeProdMainBootSwVersion  OBJECT-TYPE
+                SYNTAX  DisplayString
+                ACCESS  read-only
+                STATUS  mandatory
+                DESCRIPTION
+                    "The Adtran Product Software Version Number of the main
+                     boot code. In a card with two boot sectors, as identified
+                     by mainAndStandbyWithBootSector(4) in the
+                     adGenUpgradeSwConfiguration, this is boot code #1. If this
+                     item is not applicable to the card, the card should return
+                     a string of N/A or n/a"
+                ::= { adGenUpgradeConfigEntry 5 }
+
+        adGenUpgradeProdStandbyBootSwVersion  OBJECT-TYPE
+                SYNTAX  DisplayString
+                ACCESS  read-only
+                STATUS  mandatory
+                DESCRIPTION
+                    "The Adtran Product Software Version Number of the standby
+                     boot code. In a card with two boot sectors, as identified
+                     by mainAndStandbyWithBootSector(4) in the
+                     adGenUpgradeSwConfiguration, this is boot code #2. If this
+                     item is not applicable to the card, the card should return
+                     a string of N/A or n/a"
+                ::= { adGenUpgradeConfigEntry 6 }
+
+
+        --###############################################################
+        --###############################################################
+        --           A L A R M S
+        --###############################################################
+        --###############################################################
+
+	-- For any new traps, make sure that the trap type name is less
+	-- than or equal to 20 characters in length to support HPOpenview.
+
+        adClrSWFailAlarm   TRAP-TYPE
+                ENTERPRISE      adGenUpgrade
+                VARIABLES       {
+                        adTrapInformSeqNum,
+                        sysName,
+                        adGenSlotInfoIndex,
+                        adGenUpgradeFailureStatus
+                        }
+                DESCRIPTION
+                        "Software Failure Alarm clear "
+        --#TYPE      "Major - Software Failure Alarm clear"
+        --#SUMMARY   "FIRMWARE 1001340: Software Failure Alarm cleared on"
+        --#SUMMARY   "shelf: %s, slot: %d"
+        --#ARGUMENTS { 1, 2 }
+        --#SEVERITY  NORMAL
+        --#GENERIC   6
+        --#CATEGORY  "Error Events"
+        --#SOURCE_ID "A"
+        --#TIMEINDEX 0
+        ::= 1001340
+
+        adSWFailAlarm      TRAP-TYPE
+                ENTERPRISE      adGenUpgrade
+                VARIABLES       {
+                        adTrapInformSeqNum,
+                        sysName,
+                        adGenSlotInfoIndex,
+                        adGenUpgradeFailureStatus
+                        }
+                DESCRIPTION
+                        "Software Failure Alarm active"
+        --#TYPE      "Major - Software Failure Alarm active"
+        --#SUMMARY   "FIRMWARE 1001341: Software Failure Alarm active on"
+        --#SUMMARY   "shelf: %s, slot: %d"
+        --#ARGUMENTS { 1, 2 }
+        --#SEVERITY  MAJOR
+        --#GENERIC   6
+        --#CATEGORY  "Error Events"
+        --#SOURCE_ID "A"
+        --#TIMEINDEX 0
+        ::= 1001341
+
+        adClrIncompatibleSWAlarm   TRAP-TYPE
+                ENTERPRISE      adGenUpgrade
+                VARIABLES       {
+                        adTrapInformSeqNum,
+                        sysName,
+                        adGenSlotInfoIndex,
+                        adGenUpgradeFailureStatus
+                        }
+                DESCRIPTION
+                        "Incompatible Software Alarm clear"
+        --#TYPE      "Minor - Incompatible Software Alarm clear"
+        --#SUMMARY   "FIRMWARE 1001342: Incompatible Software Alarm cleared on"
+        --#SUMMARY   "shelf: %s, slot: %d"
+        --#ARGUMENTS { 1, 2 }
+        --#SEVERITY  NORMAL
+        --#GENERIC   6
+        --#CATEGORY  "Error Events"
+        --#SOURCE_ID "A"
+        --#TIMEINDEX 0
+        ::= 1001342
+
+        adIncompatibleSWAlarm      TRAP-TYPE
+                ENTERPRISE      adGenUpgrade
+                VARIABLES       {
+                        adTrapInformSeqNum,
+                        sysName,
+                        adGenSlotInfoIndex,
+                        adGenUpgradeFailureStatus
+                        }
+                DESCRIPTION
+                        "Incompatible Software Alarm active"
+        --#TYPE      "Minor - Incompatible Software Alarm active"
+        --#SUMMARY   "FIRMWARE 1001343: Incompatible Software Alarm active on"
+        --#SUMMARY   "shelf: %s, slot: %d"
+        --#ARGUMENTS { 1, 2 }
+        --#SEVERITY  MAJOR
+        --#GENERIC   6
+        --#CATEGORY  "Error Events"
+        --#SOURCE_ID "A"
+        --#TIMEINDEX 0
+        ::= 1001343
+
+
+END

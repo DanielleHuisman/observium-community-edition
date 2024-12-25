@@ -6,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -17,29 +17,36 @@
 // Darwin hostname.local 19.4.0 Darwin Kernel Version 19.4.0: Wed Mar 4 22:28:40 PST 2020; root:xnu-6153.101.6~15/RELEASE_X86_64 x86_64
 // Darwin hostname.local 19.5.0 Darwin Kernel Version 19.5.0: Tue May 26 20:41:44 PDT 2020; root:xnu-6153.121.2~2/RELEASE_X86_64 x86_64
 // Darwin hostname.local 20.3.0 Darwin Kernel Version 20.3.0: Thu Jan 21 00:07:06 PST 2021; root:xnu-7195.81.3~1/RELEASE_X86_64 x86_64
+// Darwin hostname.local 24.2.0 Darwin Kernel Version 24.2.0: Fri Dec  6 19:02:12 PST 2024; root:xnu-11215.61.5~2/RELEASE_ARM64_T6031 arm64
 if (preg_match('/Darwin Kernel Version (?<kernel>\d\S+): .* root\S+ (?<arch>\S+)/', $poll_device['sysDescr'], $matches)) {
     $kernel = $matches['kernel'];
     $arch   = $matches['arch'];
 
     $macos_kernels = [
         // Cats
-        9  => ['version' => '10.5', 'name' => 'Leopard', 'icon' => ''],
-        10 => ['version' => '10.6', 'name' => 'Snow Leopard', 'icon' => ''],
-        11 => ['version' => '10.7', 'name' => 'Lion', 'icon' => 'macos-lion'],
-        12 => ['version' => '10.8', 'name' => 'Mountain Lion', 'icon' => 'macos-mountain-lion'],
+        9  => [ 'version' => '10.5', 'name' => 'Leopard',       'icon' => '' ],
+        10 => [ 'version' => '10.6', 'name' => 'Snow Leopard',  'icon' => '' ],
+        11 => [ 'version' => '10.7', 'name' => 'Lion',          'icon' => 'macos-lion' ],
+        12 => [ 'version' => '10.8', 'name' => 'Mountain Lion', 'icon' => 'macos-mountain-lion' ],
         // Mountains
-        13 => ['version' => '10.9', 'name' => 'Mavericks', 'icon' => 'macos-mavericks'],
-        14 => ['version' => '10.10', 'name' => 'Yosemite', 'icon' => 'macos-yosemite'],
-        15 => ['version' => '10.11', 'name' => 'El Capitan', 'icon' => 'macos-el-capitan'],
-        16 => ['version' => '10.12', 'name' => 'Sierra', 'icon' => 'macos-sierra'],
-        17 => ['version' => '10.13', 'name' => 'High Sierra', 'icon' => 'macos-high-sierra'],
-        18 => ['version' => '10.14', 'name' => 'Mojave', 'icon' => 'macos-mojave'],
-        19 => ['version' => '10.15', 'name' => 'Catalina', 'icon' => 'macos-catalina'],
-        20 => ['version' => '11.0', 'name' => 'Big Sur', 'icon' => 'macos-big-sur'],
+        13 => [ 'version' => '10.9',  'name' => 'Mavericks',   'icon' => 'macos-mavericks' ],
+        14 => [ 'version' => '10.10', 'name' => 'Yosemite',    'icon' => 'macos-yosemite' ],
+        15 => [ 'version' => '10.11', 'name' => 'El Capitan',  'icon' => 'macos-el-capitan' ],
+        16 => [ 'version' => '10.12', 'name' => 'Sierra',      'icon' => 'macos-sierra' ],
+        17 => [ 'version' => '10.13', 'name' => 'High Sierra', 'icon' => 'macos-high-sierra' ],
+        18 => [ 'version' => '10.14', 'name' => 'Mojave',      'icon' => 'macos-mojave' ],
+        19 => [ 'version' => '10.15', 'name' => 'Catalina',    'icon' => 'macos-catalina' ],
+        // Places
+        20 => [ 'version' => '11',    'name' => 'Big Sur',     'icon' => 'macos-big-sur' ],
+        21 => [ 'version' => '12',    'name' => 'Monterey',    'icon' => 'macos-monterey' ],
+        22 => [ 'version' => '13',    'name' => 'Ventura',     'icon' => 'macos-ventura' ],
+        23 => [ 'version' => '14',    'name' => 'Sonoma',      'icon' => 'macos-sonoma' ],
+        24 => [ 'version' => '15',    'name' => 'Sequoia',     'icon' => 'macos-sequoia' ],
     ];
 
     // 19.5.0 -> 10.15.5, 14.0.0 -> 10.10
-    [$k1, $k2, $k3] = explode('.', $kernel);
+    // 24.2.0 -> 15.2, 20.3.0 -> 11.3
+    [ $k1, $k2, $k3 ] = explode('.', $kernel);
     if (isset($macos_kernels[$k1])) {
         $version = $macos_kernels[$k1]['version'] . '.' . $k2;
         if ($k3 > 0) {

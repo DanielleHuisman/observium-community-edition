@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -451,7 +451,7 @@ foreach ($oids as $index => $entry) {
             //discover_sensor('airflow', $device, $oid, $prefix.'.'.$index, 'geist-mib-v3', $descr, 1, $value, $limits);
             // Air Flow: 0 to 100 (relative value)
             // I not keep compatibility, because previously used incorrect class
-            discover_sensor_ng($device, 'load', 'GEIST-MIB-V3', 'airFlowSensorFlow', $oid, $index, NULL, $descr, 1, $value, $limits);
+            discover_sensor_ng($device, 'load', 'GEIST-MIB-V3', 'airFlowSensorFlow', $oid, $index, $descr, 1, $value, $limits);
         }
 
         $descr  = $entry['airFlowSensorName'] . ' Humidity';
@@ -596,7 +596,7 @@ foreach ($oids as $index => $entry) {
             //discover_sensor('airflow', $device, $oid, $prefix.'.'.$index, 'geist-mib-v3', $descr, 1, $value, $limits);
             // Air Flow: 0 to 100 (relative value)
             // I not keep compatibility, because previously used incorrect class
-            discover_sensor_ng($device, 'load', 'GEIST-MIB-V3', 'climateAirflow', $oid, $index, NULL, $descr, 1, $value, $limits);
+            discover_sensor_ng($device, 'load', 'GEIST-MIB-V3', 'climateAirflow', $oid, $index, $descr, 1, $value, $limits);
         }
 
         $descr  = $entry['climateName'] . ' Humidity';

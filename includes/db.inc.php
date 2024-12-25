@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -214,10 +214,13 @@ function dbQuery($sql, $parameters = [], $print_query = FALSE) {
             print_sql($fullSql);
             echo(']' . PHP_EOL);
         } elseif ($print_query === 'log') {
-            logfile('db.log', 'Requested Query: ' . print_sql($fullSql, 'log'));
+            $backtrace = debug_backtrace();
+            logfile('db.log', 'Requested Query ' . $backtrace[3]['function'] . '->' . $backtrace[2]['function'] . '->' . $backtrace[1]['function'] .
+                            '(): ' . print_sql($fullSql, 'log'));
+        } elseif ($print_query === 'dump') {
+            bdump(print_sql($fullSql, 'log'));
         } else {
             print_sql($fullSql);
-            //print_sql($fullSql, 'html');
         }
     }
 
@@ -1163,9 +1166,11 @@ function generate_query_values($value, $column, $condition = NULL, $options = []
             $num   = str_starts_with($condition, '<') ? min($value) : max($value);
             $value = array_shift($value);
             if (is_numeric($num)) {
+                // Numeric compare
                 $where = $column . " $condition " . $num;
             } elseif (!empty($value) && !str_contains($value, ';')) {
-                $where = $column . " $condition " . dbEscape($value);
+                // Strings, like timestamp: 2024-09-16 09:25:00
+                $where = $column . " $condition '" . dbEscape($value) . "'";
             } else {
                 // Empty values
                 $where = $negative ? '1' : '0';

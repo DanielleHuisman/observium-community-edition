@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -28,10 +28,14 @@ include($config['html_dir'] . "/includes/alerting-navbar.inc.php");
 
 // print_vars($vars);
 
-if (!isset($vars['entity_type'])) {
+if (empty($vars['entity_type']) || !isset($config['entities'][$vars['entity_type']])) {
+
+    if (!empty($vars['entity_type'])) {
+        print_warning("Unknown Entity Type, please select a valid entity type from the list.");
+    }
 
     register_html_title('Add Alert Checker: Select Entity Type');
-    print generate_box_open(['title' => 'Select Alert Checker Entity Type', 'padding' => TRUE, 'header-border' => TRUE]);
+    echo generate_box_open([ 'title' => 'Select Alert Checker Entity Type', 'padding' => TRUE, 'header-border' => TRUE ]);
 
     //echo '<h4>Select Entity Type</h4>';
 
@@ -42,15 +46,13 @@ if (!isset($vars['entity_type'])) {
         if (!$entity_type_array['hide']) {
             //echo '<option value="' . generate_url(array('page' => 'group_add', 'entity_type' => $entity_type)) . '" ' . ($entity_type == $vars['entity_type'] ? ' selected' : '') . '>' . $entity_type . '</option>';
 
-            echo '<btn class="btn" style="margin: 5px;"><a href="' . generate_url(['page' => 'add_alert_check', 'entity_type' => $entity_type]) . '" ' . ($entity_type == $vars['entity_type'] ? ' selected' : '') . '">
-                                        <i class="' . $config['entities'][$entity_type]['icon'] . '"></i> ' . nicecase($entity_type) . '</a></btn>';
-
+            echo '<btn class="btn" style="margin: 5px;"><a href="' . generate_url([ 'page' => 'add_alert_check', 'entity_type' => $entity_type ]) . '">' .
+                 get_icon($config['entities'][$entity_type]['icon']) . ' ' . nicecase($entity_type) . '</a></btn>';
 
         }
     }
 
     echo generate_box_close();
-
 
     echo '<script type="text/javascript">
     $(document).ready(function () {
@@ -111,22 +113,13 @@ if (!isset($vars['entity_type'])) {
    // End duplication of existing checks
  */
 
+
 } else {
 
     register_html_title('Add Alert Checker');
 
-    if (isset($vars['duplicate_id']) && $alert_dupe = get_alert_test_by_id($vars['duplicate_id'])) {
-        humanize_alert_check($alert_dupe);
-        $conditions           = safe_json_decode($alert_dupe['conditions']);
-        $condition_text_block = [];
-        foreach ($conditions as $condition) {
-            $condition_text_block[] = $condition['metric'] . ' ' . $condition['condition'] . ' ' .
-                                      str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
-        }
-        $vars['alert_conditions'] = implode(PHP_EOL, $condition_text_block);
-        $vars                     = array_merge($vars, $alert_dupe);
-    }
-    //r($vars);
+    // Duplicate alert checker when requested by $vars['duplicate_id']
+    alert_test_duplicate($vars);
 
     ?>
 
@@ -153,17 +146,19 @@ if (!isset($vars['entity_type'])) {
                         <label class="control-label" for="entity_type">Entity Type</label>
                         <div class="controls">
                            <?php
-                    $item = ['id'          => 'entity_type',
-                             'live-search' => FALSE,
-                             'width'       => '220px',
-                             'value'       => $vars['entity_type']];
+                    $item = [
+                        'id'          => 'entity_type',
+                        'live-search' => FALSE,
+                        'width'       => '220px',
+                        'value'       => $vars['entity_type']
+                    ];
                     foreach ($config['entities'] as $entity_type => $entity_type_array) {
                         if (!$entity_type_array['hide']) { // ignore this type if it's a meta-entity
                             if (!isset($entity_type_array['icon'])) {
                                 $entity_type_array['icon'] = $config['entity_default']['icon'];
                             }
-                            $item['values'][$entity_type] = ['name' => nicecase($entity_type),
-                                                             'icon' => $entity_type_array['icon']];
+                            $item['values'][$entity_type] = [ 'name' => nicecase($entity_type),
+                                                              'icon' => $entity_type_array['icon'] ];
                         }
                     }
                     echo(generate_form_element($item, 'select'));
@@ -176,7 +171,7 @@ if (!isset($vars['entity_type'])) {
                         <label class="control-label" for="group_name">Entity Type</label>
 
                         <div class="controls">
-                            <?php echo '<i class="' . $config['entities'][$vars['entity_type']]['icon'] . '"></i> <span class="entity">' . nicecase($vars['entity_type']) . '</span>'; ?>
+                            <?php echo get_icon($config['entities'][$vars['entity_type']]['icon']) . ' <span class="entity">' . nicecase($vars['entity_type']) . '</span>'; ?>
 
                         </div>
                     </div>
@@ -380,7 +375,7 @@ if (!isset($vars['entity_type'])) {
       var formData = JSON.stringify({
                                 action: 'alert_check_add',
                                 alert_assoc: JSON.stringify(result),
-                                entity_type: '" . $vars['entity_type'] . "',
+                                entity_type: '" . escape_html($vars['entity_type']) . "',
                                 alert_name: document.getElementById('alert_name').value,
                                 alert_message: document.getElementById('alert_message').value,
                                 alert_delay: document.getElementById('alert_delay').value,

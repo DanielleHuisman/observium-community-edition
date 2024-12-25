@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package        observium
  * @subpackage     webui
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -54,8 +53,10 @@ if ($vars['app'] && is_alpha($vars['app'])) {
     $include = $config['html_dir'] . '/pages/apps/' . $vars['app'] . '.inc.php';
     if (is_file($include)) {
         include($include);
-    } else {
+    } elseif (dbExist('applications', generate_where_clause([ '`app_type` = ?', generate_query_permitted_ng([ 'devices' ]) ]), [ $vars['app'] ])) {
         include($config['html_dir'] . '/pages/apps/default.inc.php');
+    } else {
+        print_warning('The application "' . $vars['app'] . '" does not exist.');
     }
 } else {
     include($config['html_dir'] . '/pages/apps/overview.inc.php');

@@ -4,22 +4,18 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) Adam Armstrong
  *
  */
 
 if (!is_array($vars['type'])) {
-    $vars['type'] = [$vars['type']];
+    $vars['type'] = [ $vars['type'] ];
 }
 
-$where = 'WHERE 1';
-$where .= generate_query_values_and($vars['type'], 'port_descr_type', 'LIKE');
-$where .= generate_query_permitted(['port']);
-//$where .= $cache['where']['ports_permitted'];
+$where = generate_where_clause(generate_query_values($vars['type'], 'port_descr_type', 'LIKE'), $cache['where']['ports_permitted']);
 
-//$ports = dbFetchRows('SELECT * FROM `ports` AS I, `devices` AS D '.$where.' AND I.`device_id` = D.`device_id` ORDER BY I.`ifAlias`');
 $ports = dbFetchRows('SELECT * FROM `ports` ' . $where . ' ORDER BY `ifAlias`');
 
 $port_list = [];
@@ -97,7 +93,7 @@ if ($port_count) {
              <td style="width: 150px;" class="strong">' . generate_port_link_short($port) . '</td>
              <td style="width: 75px;">' . $port['port_descr_speed'] . '</td>
              <td style="width: 150px;">' . $port['port_descr_circuit'] . '</td>
-             <td>' . $port['port_descr_notes'] . '</td>');
+             <td>' . escape_html($port['port_descr_notes']) . '</td>');
 
         echo('</tr><tr><td colspan="6">');
 

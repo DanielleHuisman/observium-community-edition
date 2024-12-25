@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -27,12 +27,15 @@ $start         = utime();
 $runtime_stats = [];
 
 if (isset($options['V'])) {
-    print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION);
     if (is_array($options['V'])) {
+        // Show more detailed Observium version and installed software versions
         print_versions();
+    } else {
+        print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION_LONG);
     }
     exit;
 }
+
 if (isset($options['M'])) {
     print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION);
 
@@ -185,17 +188,19 @@ if ($config['version_check'] && ($options['h'] !== 'new' || $options['u'])) {
 }
 
 if (!$where) {
+
     // Only update Group/Alert tables
     if (isset($options['a'])) {
 
-        if (OBS_DISTRIBUTED && function_exists('run_action_queue')) {
+//        Distributed handling doesn't make sense here. It's just database action.
+//        if (OBS_DISTRIBUTED && function_exists('run_action_queue')) {
             //run_action_queue('device_add');
             //run_action_queue('device_rename');
             //run_action_queue('device_delete');
 
             // Update alert and group tables
-            run_action_queue('tables_update', $options);
-        } else {
+//            run_action_queue('tables_update', $options);
+//        } else {
             $silent = isset($options['q']);
             if (function_exists('update_group_tables')) {
                 update_group_tables($silent);
@@ -203,7 +208,7 @@ if (!$where) {
             if (function_exists('update_alert_tables')) {
                 update_alert_tables($silent);
             }
-        }
+//        }
     }
 
     exit;
@@ -215,6 +220,7 @@ if ($options['h'] !== 'new' && !isset($options['f'])) {
     $params[] = 1;
 }
 
+// Discovered device counter
 $discovered_devices = 0;
 
 print_cli_heading("%WStarting discovery run at " . date("Y-m-d H:i:s"), 0);
@@ -224,13 +230,18 @@ $params[] = $config['poller_id'];
 
 foreach (dbFetchRows("SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER BY `last_discovered_timetaken` ASC", $params) as $device) {
     // Additional check if device SNMPable, because during
-    // discovery many devices (long time), the some device can be switched off
+    // discovery many devices (long time), some device can be switched off
     if ($options['h'] === 'new' || is_snmpable($device)) {
-        discover_device($device, $options);
+        $discover_status = discover_device($device, $options);
     } else {
         $string = "Device '" . $device['hostname'] . "' skipped, because switched off during runtime discovery process.";
         print_debug($string);
         logfile($argv[0] . ": $string");
+        $discover_status = FALSE;
+    }
+
+    if ($discover_status !== FALSE) {
+        $discovered_devices++;
     }
 }
 
@@ -248,7 +259,8 @@ if (($discovered_devices && !isset($options['m'])) || isset($options['a'])) {
     } else {
         // Not exist in CE
         if (function_exists('update_group_tables')) {
-            update_group_tables($silent);
+//            update_group_tables($silent);
+            update_group_tables();
         }
         if (function_exists('update_alert_tables')) {
             update_alert_tables($silent);

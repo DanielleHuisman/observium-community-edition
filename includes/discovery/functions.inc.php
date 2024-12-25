@@ -6,12 +6,11 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
-function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $remote_platform = '', $device = NULL, $port = [])
-{
+function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $remote_platform = '', $device = NULL, $port = []) {
     global $config;
 
     // We really have too small cases, where need use $source,
@@ -38,17 +37,16 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         $protocol = strtoupper($source);
     }
 
-    // Check if source is enabled for autodiscovery
+    // Check if a source is enabled for autodiscovery
     if (!$config['autodiscovery'][$source]) {
         print_debug("Autodiscovery for protocol $protocol ($source) disabled.");
         return FALSE;
     }
 
     // All sources except XDP passed IP address instead hostname
-    $orig_hostname = $hostname;
-    $ip_key        = safe_ip_hostname_key($hostname, $remote_ip);
-
-    $flags = OBS_DNS_ALL;
+    //$orig_hostname = $hostname;
+    $remote_ip_type = get_ip_type($remote_ip);
+    $ip_key         = safe_ip_hostname($hostname, $remote_ip);
 
     print_cli_data("Trying to discover host", "$hostname ($remote_ip) through $protocol ($source)", 3);
 
@@ -67,8 +65,7 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
     }
 
     // By first detect hostname is IP or domain name (IPv4/6 == 4/6, hostname == FALSE)
-    $ip_version = get_ip_version($hostname);
-    if ($ip_version) {
+    if ($ip_version = get_ip_version($hostname)) {
         // Hostname is IPv4/IPv6
         $use_ip   = TRUE;
         $hostname = ip_compress($hostname);
@@ -76,17 +73,24 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
     } else {
         $use_ip = FALSE;
 
-        $remote_ip_type = get_ip_type($remote_ip);
-        if ($remote_ip_type === 'unspecified' && is_valid_hostname($hostname, TRUE) &&
-            $ip_dns = gethostbyname6($hostname, $flags)) {
-            // When discovery protocol return valid FQDN hostname but invalid IP (0.0.0.0), try use dns IP
+        $ip = is_valid_hostname($hostname) ? gethostbyname6($hostname) : FALSE;
+
+        $hostname_mydomain = $hostname . '.' . $config['mydomain'];
+        if (!empty($config['mydomain']) && !$ip && is_valid_hostname($hostname_mydomain, TRUE) &&
+            $ip_dns   = gethostbyname6($hostname_mydomain)) {
+            $hostname = $hostname_mydomain;
+            $ip       = $ip_dns;
+        }
+        if ($remote_ip_type === 'unspecified' && $ip) {
+            // When discovery protocol returns valid FQDN hostname but invalid IP (0.0.0.0), try use dns IP
             // See: https://jira.observium.org/browse/OBS-4117
-            $remote_ip      = $ip_dns;
+            $remote_ip      = $ip;
             $remote_ip_type = get_ip_type($remote_ip);
         }
-        if ($remote_ip_type && $remote_ip_type === 'unspecified') { // 0.0.0.0, ::
+
+        if ($remote_ip_type === 'unspecified') { // 0.0.0.0, ::
             // In case when passed valid hostname and invalid IP, do not autodiscovery anyway
-            print_debug("$hostname passed with invalid IP ($remote_ip), not permitted for autodiscovery.");
+            print_debug("$hostname passed with invalid IP ($ip_key), not permitted for autodiscovery.");
             $insert = [
                 //'poller_id'        => $config['poller_id'],
                 'device_id' => $device['device_id'],
@@ -100,15 +104,9 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
             return FALSE;
         }
 
-        // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
-        if (!empty($config['mydomain']) && is_domain_resolves($hostname . '.' . $config['mydomain'], $flags)) {
-            $hostname .= '.' . $config['mydomain'];
-        }
-
         // Determine v4 vs v6
-        $ip = gethostbyname6($hostname, $flags);
         if ($ip) {
-            // DNS correct, but not same as discovered by protocol
+            // DNS correct, but different from discovered by protocol
             if ($remote_ip_type && $remote_ip != $ip) {
                 if (str_contains($ip, ':') || !match_network($ip, $config['autodiscovery']['ip_nets'])) {
                     // Force autodiscovery by IP only if hostname resolved to IPv6
@@ -144,7 +142,6 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         }
     }
 
-    $ip_version = get_ip_version($ip);
     if (isset($config['autodiscovery']['ignore_ip_types']) &&
         !in_array(get_ip_type($ip), $config['autodiscovery']['ignore_ip_types'])) {
         print_debug("IP $ip ($hostname) not permitted inside \$config['autodiscovery']['ignore_ip_types'] in config.");
@@ -175,17 +172,15 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         return FALSE;
     }
 
-    if ($ip_version == 6) {
-        $flags ^= OBS_DNS_A; // Exclude IPv4
-    }
-
     print_debug("Host $hostname ($ip) founded inside configured nets, trying to add:");
 
+    $ip_version = get_ip_version($ip);
+
     // By first check if pingable
-    if (isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip']) {
-        $flags |= OBS_PING_SKIP; // Add skip pings flag
-    }
-    $pingable = is_pingable($ip, $flags);
+    $dns_options = $ip_version == 6 ? 'ipv6' : 'all'; // Exclude IPv4
+    $ping_skip   = isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip'];
+
+    $pingable = is_pingable($ip, $dns_options, $ping_skip);
     if (!$pingable) {
         print_debug("Host $hostname not pingable. You can try set in config: \$config['autodiscovery']['ping_skip'] = TRUE;");
         $insert = [
@@ -201,11 +196,11 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         return FALSE;
     }
 
-    // Check if device duplicated by IP
+    // Check if a device duplicated by IP
     $ip_hex = binary_to_hex(inet_pton($ip));
     $db     = dbFetchRow('SELECT `hostname` FROM `ipv' . $ip_version . '_addresses`
                    LEFT JOIN `devices` USING(`device_id`)
-                   WHERE `disabled` = 0 AND `ipv' . $ip_version . '_binary` = ? LIMIT 1', [[$ip_hex]]);
+                   WHERE `disabled` = 0 AND `ipv' . $ip_version . '_binary` = ? LIMIT 1', [ [$ip_hex] ]);
     if ($db) {
         print_debug('Already have device ' . $db['hostname'] . " with IP $ip");
         $insert = [
@@ -222,7 +217,7 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
     }
 
     // Detect snmp transport, net-snmp needs udp6 for ipv6
-    $snmp_transport = ($ip_version == 4 ? 'udp' : 'udp6');
+    $snmp_transport = $ip_version == 4 ? 'udp' : 'udp6';
     $snmp_port      = 161;
 
     // Detect snmp auth
@@ -249,10 +244,10 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         $snmphost = snmp_get_oid($new_device, 'sysName.0', 'SNMPv2-MIB');
         if ($snmphost) {
             // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
-            if (!empty($config['mydomain']) && is_domain_resolves($snmphost . '.' . $config['mydomain'], $flags)) {
+            if (!empty($config['mydomain']) && is_domain_resolves($snmphost . '.' . $config['mydomain'], $dns_options)) {
                 $snmphost .= '.' . $config['mydomain'];
             }
-            $snmp_ip = gethostbyname6($snmphost, $flags);
+            $snmp_ip = gethostbyname6($snmphost, $dns_options);
         }
 
         if ($snmp_ip == $ip) {
@@ -263,10 +258,10 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
             $ptr = gethostbyaddr6($ip);
             if ($ptr) {
                 // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
-                if (!empty($config['mydomain']) && is_domain_resolves($ptr . '.' . $config['mydomain'], $flags)) {
+                if (!empty($config['mydomain']) && is_domain_resolves($ptr . '.' . $config['mydomain'], $dns_options)) {
                     $ptr .= '.' . $config['mydomain'];
                 }
-                $ptr_ip = gethostbyname6($ptr, $flags);
+                $ptr_ip = gethostbyname6($ptr, $dns_options);
             }
 
             if ($ptr && $ptr_ip == $ip) {
@@ -309,9 +304,9 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
     }
 
     $new_device['hostname'] = $hostname;
-    // Check if we already have same device
+    // Check if we already have a same device
     if (check_device_duplicated($new_device)) {
-        // When detected duplicate device, this mean it already SNMPable and not need check next auth!
+        // When detected a duplicate device, this mean it already SNMPable and not need check next auth!
         print_debug("Already have device $hostname with IP $ip");
         $insert = [
             //'poller_id'        => $config['poller_id'],
@@ -326,12 +321,12 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         return FALSE;
     }
 
-    // Add new device to db
+    // Add a new device to db
     $snmp = [
-      'community' => $new_device['snmp_community'],
-      'version'   => $new_device['snmp_version'],
-      'port'      => $new_device['snmp_port'],
-      'transport' => $new_device['snmp_transport']
+        'community' => $new_device['snmp_community'],
+        'version'   => $new_device['snmp_version'],
+        'port'      => $new_device['snmp_port'],
+        'transport' => $new_device['snmp_transport']
     ];
     if ($new_device['snmp_version'] === 'v3') {
         $snmp['snmp_authlevel']  = $new_device['snmp_authlevel'];
@@ -345,7 +340,8 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
     $remote_device_id = create_device($new_device['hostname'], $snmp);
 
     if ($remote_device_id) {
-        if (is_flag_set(OBS_PING_SKIP, $flags)) {
+        // Set skip pings option for remote device
+        if ($ping_skip) {
             set_entity_attrib('device', $remote_device_id, 'ping_skip', 1);
         }
         //$remote_device = device_by_id_cache($remote_device_id, 1);
@@ -368,31 +364,29 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
         ];
         set_autodiscovery($hostname, 'ok', $insert);
         return $remote_device_id;
-    } else {
-
-        $insert = [
-            //'poller_id'        => $config['poller_id'],
-            'device_id' => $device['device_id'],
-            //'remote_hostname'  => $hostname,
-            'remote_ip' => $ip,
-            //'remote_device_id' => NULL,
-            'protocol'  => $protocol,
-            //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
-        ];
-        set_autodiscovery($hostname, 'no_db', $insert);
     }
+
+    $insert = [
+        //'poller_id'        => $config['poller_id'],
+        'device_id' => $device['device_id'],
+        //'remote_hostname'  => $hostname,
+        'remote_ip' => $ip,
+        //'remote_device_id' => NULL,
+        'protocol'  => $protocol,
+        //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'no_db', $insert);
 
     return FALSE;
 }
 
-function set_autodiscovery($hostname, $reason = 'unknown', $options = [])
-{
+function set_autodiscovery($hostname, $reason = 'unknown', $options = []) {
     global $cache;
 
     if (isset($options['remote_address'])) {
         $options['remote_ip'] = $options['remote_address'];
     }
-    $ip_key = safe_ip_hostname_key($hostname, $options['remote_ip']);
+    $ip_key = safe_ip_hostname($hostname, $options['remote_ip']);
 
     // Cache autodiscovery entry
     $db_entry = get_autodiscovery_entry($hostname, $options['remote_ip'], $options['device_id']);
@@ -406,12 +400,8 @@ function set_autodiscovery($hostname, $reason = 'unknown', $options = [])
       //'protocol'         => $protocol,
       'last_reason'     => $reason
     ];
-    foreach (['device_id', 'remote_ip', 'remote_device_id', 'protocol'] as $param) {
-        if (strlen($options[$param])) {
-            // normalize ip address
-            if ($param === 'remote_ip') {
-                $options[$param] = ip_compress($options[$param]);
-            }
+    foreach ([ 'device_id', 'remote_ip', 'remote_device_id', 'protocol' ] as $param) {
+        if (!safe_empty($options[$param])) {
             $insert[$param] = $options[$param];
         }
     }
@@ -427,30 +417,30 @@ function set_autodiscovery($hostname, $reason = 'unknown', $options = [])
         $db_params[] = 'protocol';
     }
     // BGP and OSPF (and others not XDP protocols not pass hostname, do not update it)
-    $hostname_update = !in_array(strtolower($insert['protocol']), ['bgp', 'ospf']);
+    $hostname_update = !in_array(strtolower($insert['protocol']), [ 'bgp', 'ospf' ]);
 
     if (is_array($db_entry)) {
         // already discovered
-        $db_id = $db_entry['autodiscovery_id'];
+        $autodiscovery_id = $db_entry['autodiscovery_id'];
         foreach ($db_params as $param) {
             // Skip hostname update for non-xdp protocols
             if ($param === 'remote_hostname' && !$hostname_update) {
                 continue;
             }
 
-            if ($db_entry[$param] != $insert[$param] && strlen($insert[$param])) {
-                $db_update[$param] = $insert[$param];
+            if ($db_entry[$param] != $insert[$param]) {
+                $db_update[$param] = !safe_empty($insert[$param]) ? $insert[$param] : [ 'NULL' ];
             }
         }
 
-        if (!count($db_update)) {
+        if (empty($db_update)) {
             // not changed, but force update for increase last_checked
-            dbUpdate(['last_checked' => ['CURRENT_TIMESTAMP()']], 'autodiscovery', '`autodiscovery_id` = ?', [$db_id]);
+            dbUpdate([ 'last_checked' => [ 'CURRENT_TIMESTAMP()' ] ], 'autodiscovery', '`autodiscovery_id` = ?', [ $autodiscovery_id ]);
 
             // Clear cache entry
             unset($cache['autodiscovery'][$hostname][$ip_key]);
 
-            return $db_id;
+            return $autodiscovery_id;
         }
     }
 
@@ -508,23 +498,22 @@ function set_autodiscovery($hostname, $reason = 'unknown', $options = [])
     }
     */
 
-    if (count($db_update)) {
-        dbUpdate($db_update, 'autodiscovery', '`autodiscovery_id` = ?', [$db_id]);
+    if (!safe_empty($db_update)) {
+        dbUpdate($db_update, 'autodiscovery', '`autodiscovery_id` = ?', [ $autodiscovery_id ]);
         print_debug("AUTODISCOVERY UPDATED");
 
         // Clear cache entry
         unset($cache['autodiscovery'][$hostname][$ip_key]);
     } else {
-        $insert['added'] = ['NOW()'];
-        $db_id           = dbInsert($insert, 'autodiscovery');
+        $insert['added']  = [ 'NOW()' ];
+        $autodiscovery_id = dbInsert($insert, 'autodiscovery');
         print_debug("AUTODISCOVERY INSERTED");
     }
 
-    return $db_id;
+    return $autodiscovery_id;
 }
 
-function check_autodiscovery($hostname, $ip = NULL)
-{
+function check_autodiscovery($hostname, $ip = NULL) {
     global $config, $cache;
 
     if (get_ip_type($ip) === 'unspecified' && is_valid_hostname($hostname, TRUE) &&
@@ -534,57 +523,26 @@ function check_autodiscovery($hostname, $ip = NULL)
         $ip = $ip_dns;
     }
 
-    $ip_key = safe_ip_hostname_key($hostname, $ip);
+    $ip_key = safe_ip_hostname($hostname, $ip);
 
     // Invalid hostname && IP
     $valid_hostname = is_valid_hostname($hostname);
-    if (!$valid_hostname && $ip_key === '__') {
+    if (!$valid_hostname && empty($ip)) {
         print_debug("Invalid hostname $hostname and empty IP, skipped.");
         return FALSE;
     }
 
     // Cache autodiscovery entry
-    if (!isset($cache['autodiscovery'][$hostname][$ip_key])) {
-        if (!$valid_hostname && $ip_key === '__') {
-            $cache['autodiscovery'][$hostname][$ip_key] = NULL;
-            return NULL;
-        }
-
-        $sql    = 'SELECT `autodiscovery`.*, UNIX_TIMESTAMP(`last_checked`) AS `last_checked_unixtime` FROM `autodiscovery` WHERE `poller_id` = ? ';
-        $params = [$GLOBALS['config']['poller_id']];
-        if ($ip == $hostname || !$valid_hostname) {
-            // print_vars($ip);
-            // print_vars($ip_key);
-            // print_vars($hostname);
-            // Search by IP
-            $sql      .= 'AND `remote_ip` = ?';
-            $params[] = $ip;
-        } elseif ($ip_key === '__') {
-            // Undefined IP
-            $sql      .= 'AND `remote_hostname` = ? AND (`remote_ip` IS NULL OR `remote_ip` IN (?, ?))';
-            $params[] = $hostname;
-            $params[] = '0.0.0.0';
-            $params[] = '::';
-        } else {
-            // Search by $hostname/$ip
-            $sql      .= 'AND `remote_hostname` = ? AND `remote_ip` = ?';
-            $params[] = $hostname;
-            $params[] = $ip;
-        }
-
-        if ($entry = dbFetchRow($sql, $params)) {
-            $cache['autodiscovery'][$hostname][$ip_key] = $entry;
-        }
-    }
+    get_autodiscovery_entry($hostname, $ip);
 
     if (isset($cache['autodiscovery'][$hostname][$ip_key])) {
         // already discovered
         $db_entry = $cache['autodiscovery'][$hostname][$ip_key];
         //$remote_device_id = $db_entry['remote_device_id'];
         print_debug("AUTODISCOVERY DEVEL: hostname & ip DB found");
-    } elseif (isset($cache['autodiscovery'][$hostname]['__']) && $ip_key !== '__') {
+    } elseif (isset($cache['autodiscovery'][$hostname]['0.0.0.0']) && $ip_key !== '0.0.0.0') {
         // already discovered, but without ip
-        $db_entry = $cache['autodiscovery'][$hostname]['__'];
+        $db_entry = $cache['autodiscovery'][$hostname]['0.0.0.0'];
         //$remote_device_id = $db_entry['remote_device_id'];
         print_debug("AUTODISCOVERY DEVEL: hostname DB found");
     }
@@ -626,47 +584,50 @@ function check_autodiscovery($hostname, $ip = NULL)
     return TRUE;
 }
 
-function get_autodiscovery_entry($hostname, $ip = NULL, $exclude_device_id = NULL)
-{
+function get_autodiscovery_entry($hostname, $ip = NULL, $exclude_device_id = NULL) {
     global $cache;
 
-    $ip_key = safe_ip_hostname_key($hostname, $ip);
+    // ip key for empty or unspecified always 0.0.0.0
+    $ip_key = safe_ip_hostname($hostname, $ip);
 
     if (!isset($cache['autodiscovery'][$hostname][$ip_key])) {
         $valid_hostname = is_valid_hostname($hostname);
-        if (!$valid_hostname && $ip_key === '__') {
+        if (!$valid_hostname && empty($ip)) {
+            // Not valid hostname & ip, do not query db
             $cache['autodiscovery'][$hostname][$ip_key] = NULL;
             return NULL;
         }
 
-        $sql    = 'SELECT `autodiscovery`.*, UNIX_TIMESTAMP(`last_checked`) AS `last_checked_unixtime` FROM `autodiscovery` WHERE `poller_id` = ?';
-        $params = [$GLOBALS['config']['poller_id']];
+        $where  = [ '`poller_id` = ?' ];
+        $params = [ $GLOBALS['config']['poller_id'] ];
         if ($ip == $hostname || !$valid_hostname) {
-            // Search by IP
+            // Hostname and IP same, search by IP
             // print_vars($ip);
             // print_vars($ip_key);
             // print_vars($hostname);
-            $sql      .= ' AND `remote_ip` = ?';
+            $where[]  = '`remote_ip` = ?';
             $params[] = $ip;
-        } elseif ($ip_key === '__') {
-            // Undefined IP
-            $sql      .= ' AND `remote_hostname` = ? AND (`remote_ip` IS NULL OR `remote_ip` IN (?, ?))';
+        } elseif (empty($ip)) {
+            // Undefined IP (always use NULL in db)
+            $where[]  = '`remote_hostname` = ?';
+            $where[]  = '`remote_ip` IS NULL';
             $params[] = $hostname;
-            $params[] = '0.0.0.0';
-            $params[] = '::';
+            //$params[] = '0.0.0.0';
         } else {
-            // Search by $hostname/$ip
-            $sql      .= ' AND `remote_hostname` = ? AND `remote_ip` = ?';
+            // Search by valid hostname and ip
+            $where[]  = '`remote_hostname` = ?';
+            $where[]  = '`remote_ip` = ?';
             $params[] = $hostname;
             $params[] = $ip;
         }
         // Exclude local device
         if (is_numeric($exclude_device_id)) {
-            $sql      .= ' AND (`remote_device_id` IS NULL OR `remote_device_id` != ?)';
+            $where[]  = '(`remote_device_id` IS NULL OR `remote_device_id` != ?)';
             $params[] = $exclude_device_id;
         }
 
-        if ($entry = dbFetchRow($sql, $params)) {
+        $sql = 'SELECT `autodiscovery`.*, UNIX_TIMESTAMP(`last_checked`) AS `last_checked_unixtime` FROM `autodiscovery`';
+        if ($entry = dbFetchRow($sql . generate_where_clause($where), $params)) {
             $cache['autodiscovery'][$hostname][$ip_key] = $entry;
         }
     }
@@ -676,21 +637,21 @@ function get_autodiscovery_entry($hostname, $ip = NULL, $exclude_device_id = NUL
 
 // Note return numeric device_id if already found, if not found: FALSE (for cached results) or NULL for not cached
 function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL) {
-    global $cache;
+    global $config, $cache;
 
-    $ip_type = get_ip_type($ip);
-    if ($ip_type === 'unspecified' && is_valid_hostname($hostname, TRUE) &&
+    $ip_key = safe_ip_hostname($hostname, $ip);
+    if (empty($ip) && is_valid_hostname($hostname, TRUE) &&
         $ip_dns = gethostbyname6($hostname)) {
         // When discovery protocol return valid FQDN hostname but invalid IP (0.0.0.0), try use dns IP
         // See: https://jira.observium.org/browse/OBS-4117
-        $ip      = $ip_dns;
-        $ip_type = get_ip_type($ip);
+        $ip     = $ip_dns;
+        $ip_key = safe_ip_hostname($hostname, $ip);
     }
-    $ip_key = safe_ip_hostname_key($hostname, $ip);
 
     // Check if cached
     if (isset($cache['autodiscovery_remote_device_id'][$hostname]) &&
         array_key_exists($ip_key, $cache['autodiscovery_remote_device_id'][$hostname])) {
+
         print_debug("AUTODISCOVERY DEVEL: remote_device_id from cache");
         // Set to false, for prevent caching with NULL
         if (empty($cache['autodiscovery_remote_device_id'][$hostname][$ip_key])) {
@@ -699,14 +660,14 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
         return $cache['autodiscovery_remote_device_id'][$hostname][$ip_key];
     }
 
+    $ip_type = get_ip_type($ip);
+
     // Always check by mac for private IPs
     $check_mac = $ip_type === 'private' && !safe_empty($mac);
 
     // Check previous autodiscovery rounds as mostly correct!
     if (!$check_mac) {
-        print_debug("Autodiscovery skipped for Private IPs [$ip] and checks by MAC address [$mac].");
-        //$sql = 'SELECT `remote_device_id` FROM `autodiscovery` WHERE `remote_hostname` = ? AND `remote_ip` = ? AND `last_reason` = ?';
-        //$remote_device_id = dbFetchCell($sql, [ $hostname, $ip, 'ok' ]);
+        print_debug("AUTODISCOVERY DEVEL: skipped for Private IPs [$ip] and checks by MAC address [$mac].");
         $autodiscovery_entry = get_autodiscovery_entry($hostname, $ip, $device['device_id']);
         if (isset($autodiscovery_entry['last_reason']) && $autodiscovery_entry['last_reason'] === 'ok') {
             $remote_device_id = $autodiscovery_entry['remote_device_id'];
@@ -719,9 +680,8 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
     }
 
     // We can also use IP address to find remote device.
-    if (!$remote_device_id && $ip_type && !in_array($ip_type, ['unspecified', 'loopback'])) { // 'link-local' ?
+    if (!$remote_device_id && $ip_type && !in_array($ip_type, [ 'unspecified', 'loopback' ])) { // 'link-local' ?
 
-        //$remote_device_id = dbFetchCell("SELECT `device_id` FROM `ports` LEFT JOIN `ipv4_addresses` on `ports`.`port_id`=`ipv4_addresses`.`port_id` WHERE `deleted` = '0' AND `ipv4_address` = ? LIMIT 1;", array($entry['mtxrNeighborIpAddress']));
         $peer_where = generate_query_values_and($device['device_id'], 'device_id', '!=');     // Additional filter for exclude self IPs
         // Fetch all devices with peer IP and filter by UP
         if ($ids = get_entity_ids_ip_by_network('device', $ip, $peer_where)) {
@@ -745,15 +705,24 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
     // Check if device already exist by hostname
     if (!$remote_device_id) {
         $remote_device_id = get_device_id_by_hostname($hostname);
+
+        // Try with mydomain option
+        $hostname_mydomain = $hostname . '.' . $config['mydomain'];
+        if (!$remote_device_id && $config['mydomain'] && is_valid_hostname($hostname_mydomain, TRUE) &&
+            $remote_device_id = get_device_id_by_hostname($hostname_mydomain)) {
+                $hostname = $hostname_mydomain;
+        }
+
         // If hostname is FQDN, also try by sysName
         $hostname_valid = is_valid_hostname($hostname, TRUE);
         if (!$remote_device_id && $hostname_valid) {
-            $remote_device_id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `sysName` = ? AND `disabled` = ?", [$hostname, 0]);
+            $remote_device_id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `sysName` = ? AND `disabled` = ?", [ $hostname, 0 ]);
         }
         // Last chance if hostname not FQDN and not an default sysname
         if (!$remote_device_id && !$hostname_valid && strlen($hostname) > 6 &&
-            !in_array(strtolower($hostname), $GLOBALS['config']['devices']['ignore_sysname'], TRUE)) {
-            $remote_devices = dbFetchRows("SELECT * FROM `devices` WHERE `sysName` = ? AND `disabled` = ?", [$hostname, 0]);
+            !in_array(strtolower($hostname), $config['devices']['ignore_sysname'], TRUE)) {
+
+            $remote_devices = dbFetchRows("SELECT * FROM `devices` WHERE `sysName` = ? AND `disabled` = ?", [ $hostname, 0 ]);
             $remote_count   = safe_count($remote_devices);
             if ($remote_count === 1) {
                 // Use only unique sysName!
@@ -788,11 +757,15 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
     return $remote_device_id;
 }
 
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function discover_device($device, $options = NULL)
-{
-    global $config, $valid, $cache_discovery, $discovered_devices;
+
+/**
+ * @param array      $device
+ * @param array|null $options
+ *
+ * @return false|float
+ */
+function discover_device($device, $options = NULL) {
+    global $config, $valid, $cache_discovery;
 
     // Initialise variables
     $valid             = []; // Reset $valid array
@@ -830,10 +803,10 @@ function discover_device($device, $options = NULL)
     }
 
     if (OBS_DEBUG > 1) {
-        // Cache cleanup for new device
+        // Cache cleanup for a new device
         $device_discovery_cache_keys = array_keys($GLOBALS['cache']);
         print_vars($device_discovery_cache_keys);
-        // Show full list permitted MIBs
+        // Show a full list permitted MIBs
         print_vars(get_device_mibs_permitted($device));
     }
 
@@ -894,11 +867,12 @@ function discover_device($device, $options = NULL)
         }
     }
 
-    $device_end  = utime();
-    $device_run  = $device_end - $device_start;
-    $device_time = round($device_run, 4);
+    $device_time = elapsed_time($device_start, 4);
 
-    $update_array = ['last_discovered' => ['NOW()'], 'type' => $device['type'], 'last_discovered_timetaken' => $device_time, 'force_discovery' => 0];
+    $update_array = [ 'last_discovered' => [ 'NOW()' ],
+                      'type'            => $device['type'],
+                      'last_discovered_timetaken' => $device_time,
+                      'force_discovery' => 0 ];
 
     // Store device stats and history data (only) if we're not doing a single-module poll
     if (!$options['m']) {
@@ -907,7 +881,7 @@ function discover_device($device, $options = NULL)
         $old_device_state = safe_unserialize($old_device_state);
 
         // Add first entry
-        $discovery_history = [(int)$device_start => $device_time]; // start => duration
+        $discovery_history = [ (int)$device_start => $device_time ]; // start => duration
         // Adds and keeps not more than 100 last entries
         if (isset($old_device_state['discovery_history'])) {
             print_debug_vars($old_device_state['discovery_history']);
@@ -929,10 +903,10 @@ function discover_device($device, $options = NULL)
 
         $update_array['device_state'] = serialize($device_state);
 
-        // Not worth putting discovery data into rrd. it's not done every 5 mins :)
+        // Not worth putting discovery data into rrd. It's not done every 5 minutes :)
     }
 
-    dbUpdate($update_array, 'devices', '`device_id` = ?', [$device['device_id']]);
+    dbUpdate($update_array, 'devices', '`device_id` = ?', [ $device['device_id'] ]);
 
     // Clean force discovery
     if (isset($attribs['force_discovery_modules'])) {
@@ -944,7 +918,6 @@ function discover_device($device, $options = NULL)
     print_cli_data("Discovery time", $device_time . " seconds", 1);
 
     echo(PHP_EOL);
-    $discovered_devices++;
 
     // Clean
     if (OBS_DEBUG > 1) {
@@ -953,10 +926,11 @@ function discover_device($device, $options = NULL)
         //print_vars($GLOBALS['cache']);
     }
     del_process_info($device); // Remove process info
-    // Used by ENTITY-MIB
-    unset($cache_discovery, $GLOBALS['cache']['snmp']);
-    // Per-Pable / per-OID cache
-    unset($GLOBALS['cache_snmp'][$device['device_id']]);
+
+    // Clean cache vars
+    unset($cache_discovery, $GLOBALS['cache']['snmp'], $GLOBALS['cache_snmp'][$device['device_id']]);
+
+    return $device_time;
 }
 
 function get_discovery_modules($device, $options = NULL, &$modules_forced = []) {
@@ -1059,9 +1033,8 @@ function discover_virtual_machine(&$valid, $device, $options = [])
 
     $options['protocol'] = $options['protocol'] ?? $options['type'];
 
-    //if (dbFetchCell("SELECT COUNT(`vm_id`) FROM `vminfo` WHERE `device_id` = ? AND `vm_name` = ? AND `vm_type` = ? AND `vm_source` = ?",
-    if (!dbExist('vminfo', '`device_id` = ? AND `vm_name` = ? AND `vm_type` = ? AND `vm_source` = ?',
-                 [$device['device_id'], $options['name'], $options['type'], $options['source']])) {
+    if (!dbExist('vminfo', '`device_id` = ? AND `vm_uuid` = ? AND `vm_name` = ? AND `vm_type` = ? AND `vm_source` = ?',
+                 [$device['device_id'], $options['id'], $options['name'], $options['type'], $options['source']])) {
         $vm_insert = ['device_id'   => $device['device_id'],
                       'vm_type'     => $options['type'],
                       'vm_uuid'     => $options['id'],
@@ -1072,6 +1045,11 @@ function discover_virtual_machine(&$valid, $device, $options = [])
                       'vm_state'    => $options['status'],
                       'vm_source'   => $options['source']];
         $vm_id     = dbInsert($vm_insert, 'vminfo');
+
+        //echo('\ndevice_id` = ? AND `vm_uuid` = ? AND `vm_name` = ? AND `vm_type` = ? AND `vm_source` = ?\n');
+        //var_dump([$device['device_id'], $options['id'], $options['name'], $options['type'], $options['source']]);
+        //var_dump($vm_insert);
+
         echo('+');
         log_event("Virtual Machine added: " . $options['name'] . ' (' . format_bi($options['memory']) . 'B RAM, ' . $options['cpucount'] . ' CPU)', $device, 'virtualmachine', $vm_id);
 
@@ -1081,18 +1059,57 @@ function discover_virtual_machine(&$valid, $device, $options = [])
             autodiscovery_device($options['name'], NULL, $options['protocol'], $options['os'], $device);
         }
     } else {
-        $vm = dbFetchRow("SELECT * FROM `vminfo` WHERE `device_id` = ? AND `vm_uuid` = ? AND `vm_type` = ?", [$device['device_id'], $options['id'], $options['type']]);
-        if ($vm['vm_state'] != $options['status'] || $vm['vm_name'] != $options['name'] ||
-            $vm['vm_cpucount'] != $options['cpucount'] || $vm['vm_guestos'] != $options['os'] ||
-            $vm['vm_memory'] != $options['memory'] / 1024 / 1024) {
+        $vm = dbFetchRow("SELECT * FROM `vminfo` WHERE `device_id` = ? AND `vm_uuid` = ? AND `vm_name` = ? AND `vm_type` = ? AND `vm_source` = ?",
+                                                      [ $device['device_id'], $options['id'], $options['name'], $options['type'], $options['source']]);
+
+// Define the fields to check in pairs (vm field => options field)
+$fieldsToCheck = [
+    'vm_state'    => 'status',
+//    'vm_name'     => 'name',
+    'vm_cpucount' => 'cpucount',
+    'vm_guestos'  => 'os',
+    'vm_memory'   => 'memory' // Memory will be divided by 1024^2 in the check
+];
+
+// Initialize an empty array to store mismatched fields
+$mismatches = [];
+
+//var_dump($vm);
+//var_dump($options);
+
+// Iterate over the fields and compare vm to options
+foreach ($fieldsToCheck as $vmField => $optionsField) {
+    $vmValue = $vm[$vmField];
+    $optionsValue = $options[$optionsField];
+
+    // For 'vm_memory', convert memory from bytes to MB
+    if ($vmField === 'vm_memory') {
+        $optionsValue /= 1024 * 1024; // Convert options['memory'] from bytes to MB
+    }
+
+    // If values don't match, add the field to mismatches
+    if ($vmValue != $optionsValue) {
+        $mismatches[] = $vmField;
+
+        echo("Mismatch: $vmfield || Old: $vmValue || New: $optionsValue\n");
+
+    }
+}
+
+
+// If there are mismatches, perform the update
+if (!empty($mismatches)) {
+
+//print_vars($mismatches);
+
             $update = [
               'vm_state'    => $options['status'],
               'vm_guestos'  => $options['os'],
-              'vm_name'     => $options['name'],
+              //'vm_name'     => $options['name'],
               'vm_memory'   => $options['memory'] / 1024 / 1024,
               'vm_cpucount' => $options['cpucount']
             ];
-            dbUpdate($update, 'vminfo', "device_id = ? AND vm_type = ? AND vm_uuid = ? AND vm_source = ?", [$device['device_id'], $options['type'], $options['id'], $options['source']]);
+            dbUpdate($update, 'vminfo', "device_id = ? AND vm_type = ? AND vm_name = ? AND vm_uuid = ? AND vm_source = ?", [$device['device_id'], $options['type'], $options['name'], $options['id'], $options['source']]);
             echo('U');
             /// FIXME eventlog changed fields
         } else {
@@ -1164,7 +1181,10 @@ function discover_fetch_oids($device, $mib, $def, $table_oids) {
     } else {
         // Walk the whole table
         $flags = get_def_snmp_flags($def);
-        $array = snmp_cache_table($device, $def['table'], [], $mib, NULL, $flags);
+        $array = [];
+        foreach ((array)$def['table'] as $table) {
+            $array = snmp_cache_table($device, $table, $array, $mib, NULL, $flags);
+        }
         // Append oid_extra
         if (isset($def['oid_extra']) && in_array('oid_extra', $table_oids, TRUE)) {
             foreach ((array)$def['oid_extra'] as $get_oid) {
@@ -1277,7 +1297,7 @@ function fetch_def_oids_entphysical($device, $def, &$array) {
             if (isset($def['entPhysical_parent']) && $def['entPhysical_parent']) {
                 $oidlist = [ 'entPhysicalContainedIn' ];
             } else {
-                $oidlist = [ 'entPhysicalContainedIn', 'entPhysicalDescr', 'entPhysicalAlias', 'entPhysicalName' ];
+                $oidlist = [ 'entPhysicalContainedIn', 'entPhysicalDescr', 'entPhysicalAlias', 'entPhysicalName', 'entPhysicalClass' ];
             }
 
             foreach ($oidlist as $oid_tmp) {
@@ -1513,7 +1533,7 @@ function discover_neighbour($port, $protocol, $neighbour)
 
     // Autodiscovery id
     $hostname = $neighbour['remote_hostname'];
-    safe_ip_hostname_key($hostname, $neighbour['remote_address']);
+    safe_ip_hostname($hostname, $neighbour['remote_address']);
     $autodiscovery_entry           = get_autodiscovery_entry($hostname, $neighbour['remote_address'], $port['device_id']);
     $neighbour['autodiscovery_id'] = $autodiscovery_entry['autodiscovery_id'];
 

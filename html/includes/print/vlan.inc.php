@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -78,6 +78,7 @@ function print_vlan_ports_row($device, $vlan, $vars) {
     }
 
     $graph_type = isset($vars['graph']) ? 'port_' . $vars['graph'] : 'port_bits';
+    $filters    = $vars['filters'] ?? [ 'deleted' => TRUE ];
 
     echo('<tr>');
 
@@ -95,13 +96,13 @@ function print_vlan_ports_row($device, $vlan, $vars) {
     $params = [ $device['device_id'], $vlan['vlan_vlan'] ];
     $vlan_ports = [];
     $sql = "SELECT * FROM `ports_vlans` LEFT JOIN `ports` USING(`device_id`, `port_id`)";
-    $sql .= generate_where_clause('`device_id` = ? AND `vlan` = ?' , build_ports_where_filter($device, $vars['filters']));
+    $sql .= generate_where_clause('`device_id` = ? AND `vlan` = ?' , build_ports_where_filter($device, $filters));
     foreach (dbFetchRows($sql, $params) as $otherport) {
         $vlan_ports[$otherport['ifIndex']] = $otherport;
     }
 
     $sql = "SELECT * FROM `ports`";
-    $sql .= generate_where_clause('`device_id` = ? AND `ifVlan` = ?' , build_ports_where_filter($device, $vars['filters']));
+    $sql .= generate_where_clause('`device_id` = ? AND `ifVlan` = ?' , build_ports_where_filter($device, $filters));
     foreach (dbFetchRows($sql, $params) as $otherport) {
         $vlan_ports[$otherport['ifIndex']] = array_merge($otherport, [ 'untagged' => '1' ]);
     }

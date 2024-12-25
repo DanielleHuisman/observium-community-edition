@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -480,6 +480,8 @@ $config['obsolete_config'][] = ['old' => 'web_enable_showtech', 'new' => 'web_sh
 $config['obsolete_config'][] = ['old' => 'show_overview_tab',   'new' => 'web_show_overview', 'info' => 'changed since 23.5.12832'];
 
 $config['obsolete_config'][] = ['old' => 'show_locations', 'new' => 'web_show_locations', 'info' => 'changed since 23.7.12893'];
+
+$config['obsolete_config'][] = ['old' => 'alerts->interval', 'new' => 'alerts->critical->interval', 'info' => 'changed since 24.6.13574'];
 
 // do not keep in memory this setting, use get_defined_settings($key)
 $config['hide_config'] = [

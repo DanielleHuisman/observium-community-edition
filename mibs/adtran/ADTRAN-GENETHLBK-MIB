@@ -1,0 +1,488 @@
+ADTRAN-GENETHLBK-MIB
+
+DEFINITIONS ::= BEGIN
+
+    -- TITLE:     The ADTRAN Ethernet Loopback MIB
+    -- PRODUCT:   ADTRAN CND Products
+    -- VERSION:   1.0
+    -- DATE:      February 29, 2012
+
+    -- This MIB contains tables that support managing Ethernet loopbacks
+
+
+
+  IMPORTS
+    adGenEthLbk,
+    adGenEthLbkID
+      FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+    OBJECT-TYPE,
+    MODULE-IDENTITY
+      FROM SNMPv2-SMI
+    MacAddress,
+    RowStatus,
+    DisplayString,
+    TruthValue
+      FROM SNMPv2-TC
+    sysName
+      FROM SNMPv2-MIB
+    ifIndex,
+    InterfaceIndex,
+    InterfaceIndexOrZero
+      FROM IF-MIB
+    ;
+
+adGenEthLbkMIB MODULE-IDENTITY
+   LAST-UPDATED "201301180000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO
+     "CND Tech Support
+         Postal: ADTRAN, Inc.
+                 901 Explorer Blvd.
+                 Huntsville, AL  35806
+                 Tel: +1 800 726 8663
+                 Fax: +1 256 963 6217
+                 E-mail: support@adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the Ethernet Loopback MIB."
+   REVISION "201301180000Z"
+   DESCRIPTION 
+        "Added ability for loopbacks to filter on a MAC Source Address.
+         Added adGenEthLbkFacMatchMACSAExplicit, adGenEthLbkFacMatchMACSAMode,
+         adGenEthLbkTermMatchMACSAExplicit and adGenEthLbkTermMatchMACSAMode."
+   REVISION "201202290000Z"
+   DESCRIPTION "Created"
+::= { adGenEthLbk 1 }
+
+
+adGenEthLbkScalars        OBJECT IDENTIFIER ::= {adGenEthLbk 1}
+adGenEthLbkProvisioning   OBJECT IDENTIFIER ::= {adGenEthLbk 2}
+
+--==================================================================================================================
+-- SYSTEM PROVISIONING
+--==================================================================================================================
+
+adGenEthLbkSystemMACAddress         OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to configure a system level MAC address that can be used by the loopback objects.  The value
+         returned may or not be considered valid.  See adGenEthLbkSystemMACAddressValid for a detailed behavior description."
+    ::= {adGenEthLbkScalars 1}
+
+adGenEthLbkSystemMACAddressValid    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates whether or not the value returned by adGenEthLbkSystemMACAddress is valid.  This object
+         will automatically be set to true(1) if a valid SET to adGenEthLbkSystemMACAdress is performed.  A SET on this
+         object to false(2) will automatically set adGenEthLbkSystemMACAddress to 00:00:00:00:00:00."
+    ::= { adGenEthLbkScalars 2 }
+
+adGenEthLbkSystemMACAddressError    OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the reason why the last SET of adGenEthLbkSystemMACAddress failed."
+    ::= { adGenEthLbkScalars 3 }
+
+
+--==================================================================================================================
+-- ELEMENT PROVISIONING
+--==================================================================================================================
+adGenEthLbkElementProvTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthLbkElementProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table is used for provisioning at the element level."
+    ::= { adGenEthLbkProvisioning 1 }
+
+adGenEthLbkElementProvEntry         OBJECT-TYPE
+    SYNTAX      AdGenEthLbkElementProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the element provisioning table."
+    INDEX { adGenEthLbkElementIndex }
+    ::= { adGenEthLbkElementProvTable 1 }
+
+AdGenEthLbkElementProvEntry ::=
+    SEQUENCE
+    {
+        adGenEthLbkElementIndex               InterfaceIndex,
+        adGenEthLbkElementLastFacCreateError  DisplayString,
+        adGenEthLbkElementLastTermCreateError DisplayString
+    }
+
+adGenEthLbkElementIndex             OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Index used to access an element in the system.  While the type is InterfaceIndex,
+         the value contained refers to an element rather than an interface."
+    ::= { adGenEthLbkElementProvEntry 1 }
+
+adGenEthLbkElementLastFacCreateError   OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the error encountered during the last failed
+         facility loopback creation attempt.  A blank string indicates no failure has
+         occured."
+    ::= { adGenEthLbkElementProvEntry 2 }
+
+adGenEthLbkElementLastTermCreateError   OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the error encountered during the last failed
+         terminal loopback creation attempt.  A blank string indicates no failure has
+         occured."
+    ::= { adGenEthLbkElementProvEntry 3 }
+
+
+--==================================================================================================================
+-- FACILITY LOOPBACK PROVISIONING
+--==================================================================================================================
+adGenEthLbkFacProvTable             OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthLbkFacProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table is used for provisioning of a facility Ethernet loopback
+         In a facility loopback, a flow ingressing the specified MEN port is turned back toward
+         that MEN port immediately upon entering the switch fabric.  Prior to egress, the source
+         and destination MAC addresses are swapped."
+    ::= { adGenEthLbkProvisioning 2 }
+
+adGenEthLbkFacProvEntry             OBJECT-TYPE
+    SYNTAX      AdGenEthLbkFacProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the facility loopback provisioning table."
+    INDEX { adGenEthLbkElementIndex, IMPLIED adGenEthLbkFacName }
+    ::= { adGenEthLbkFacProvTable 1 }
+
+AdGenEthLbkFacProvEntry ::=
+    SEQUENCE
+    {
+        adGenEthLbkFacName                  DisplayString,
+        adGenEthLbkFacRowStatus             RowStatus,
+        adGenEthLbkFacAdminState            INTEGER,
+        adGenEthLbkFacRunningStatus         INTEGER,
+        adGenEthLbkFacRunningStatusString   DisplayString,
+        adGenEthLbkFacInterface             InterfaceIndexOrZero,
+        adGenEthLbkFacMatchStag             INTEGER,
+        adGenEthLbkFacMatchPbit             INTEGER,
+        adGenEthLbkFacMatchMACDAExplicit    MacAddress,
+        adGenEthLbkFacMatchMACDAMode        INTEGER,
+        adGenEthLbkFacMatchMACSAExplicit    MacAddress,
+        adGenEthLbkFacMatchMACSAMode        INTEGER
+    }
+
+adGenEthLbkFacName                  OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..50))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Name of the facility Ethernet loopback.  This name is unique
+         amongst all facility loopbacks residing on an element."
+    ::= { adGenEthLbkFacProvEntry 1 }
+
+adGenEthLbkFacRowStatus             OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object is used to create a new loopback or modify or delete an
+         existing loopback."
+    ::= { adGenEthLbkFacProvEntry 2 }
+
+adGenEthLbkFacAdminState            OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    enable(1),
+                    disable(2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object is used to control the administrative state of the loopback."
+    ::= { adGenEthLbkFacProvEntry 3 }
+
+adGenEthLbkFacRunningStatus         OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    disabled(0),
+                    running(1),
+                    notRunning(2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current status of the loopback.  If the status is notRunning(2),
+         adGenEthLbkFacRunningStatusString will contain the reason."
+    ::= { adGenEthLbkFacProvEntry 4 }
+
+adGenEthLbkFacRunningStatusString   OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A string representation of the current status.  If adGenEthLbkFacRunningStatus
+         returns notRunning(2), this object will contain the reason it isn't running."
+    ::= { adGenEthLbkFacProvEntry 5 }
+
+adGenEthLbkFacInterface             OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The interface the loopback is to be applied to.  The specified interface must be configured
+         as an active MEN port, i.e. connected to a running EVC.  Traffic ingressing this interface
+         that matches specified criteria will be looped back and have the source and destination
+         MAC address swapped upon egress into the MEN.  A value of 0 means the interface hasn't been specified."
+    ::= { adGenEthLbkFacProvEntry 6 }
+
+adGenEthLbkFacMatchStag             OBJECT-TYPE
+    SYNTAX      INTEGER (-1|2..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the s-tag used to filter out the loopback traffic.  A value of -1 indicates the traffic
+        isn't being filtered by an s-tag value."
+    ::= { adGenEthLbkFacProvEntry 7 }
+
+adGenEthLbkFacMatchPbit             OBJECT-TYPE
+    SYNTAX      INTEGER (-1..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the p-bit used to filter out the loopback traffic.  A value of -1 indicates the traffic
+        isn't being filtered by a p-bit value."
+    ::= { adGenEthLbkFacProvEntry 8 }
+
+adGenEthLbkFacMatchMACDAExplicit    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the destination MAC address used to filter out the loopback traffic.  If adGenEthLbkFacMatchMACDAMode
+         is not set to explicit(1), then the value of this object is meaningless."
+    ::= { adGenEthLbkFacProvEntry 9 }
+
+adGenEthLbkFacMatchMACDAMode        OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    none(0),
+                    explicit(1),
+                    system(2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specifies how/if a specified MAC address is being used as a loopback traffic filter.
+            none(0) means no MAC address is being used
+            explicit(1) means the MAC address specified in adGenEthLbkFacMatchMACDAExplicit is being used
+            system(2) meand the MAC address specified in adGenEthLbkSystemMACAddress is being used."
+    ::= { adGenEthLbkFacProvEntry 10 }
+
+adGenEthLbkFacMatchMACSAExplicit    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the source MAC address used to filter out the loopback traffic.  If adGenEthLbkFacMatchMACSAMode
+         is not set to explicit(1), then the value of this object is meaningless."
+    ::= { adGenEthLbkFacProvEntry 11 }
+adGenEthLbkFacMatchMACSAMode        OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    none(0),
+                    explicit(1)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specifies how/if a specified MAC address is being used as a loopback traffic filter.
+            none(0) means no MAC address is being used
+            explicit(1) means the MAC address specified in adGenEthLbkFacMatchMACSAExplicit is being used."
+    ::= { adGenEthLbkFacProvEntry 12 }
+
+--==================================================================================================================
+-- TERMINAL LOOPBACK PROVISIONING
+--==================================================================================================================
+adGenEthLbkTermProvTable            OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthLbkTermProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table is used for provisioning of a terminal Ethernet loopback
+         In a terminal loopback, a flow is turned back at the UNI prior to where that flow would otherwise
+         egress the UNI.  Prior to egress into the MEN, the source and destination MAC addresses are swapped."
+    ::= { adGenEthLbkProvisioning 3 }
+
+adGenEthLbkTermProvEntry            OBJECT-TYPE
+    SYNTAX      AdGenEthLbkTermProvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the terminal loopback provisioning table."
+    INDEX { adGenEthLbkElementIndex, IMPLIED adGenEthLbkTermName }
+    ::= { adGenEthLbkTermProvTable 1 }
+
+AdGenEthLbkTermProvEntry ::=
+    SEQUENCE
+    {
+        adGenEthLbkTermName                  DisplayString,
+        adGenEthLbkTermRowStatus             RowStatus,
+        adGenEthLbkTermAdminState            INTEGER,
+        adGenEthLbkTermRunningStatus         INTEGER,
+        adGenEthLbkTermRunningStatusString   DisplayString,
+        adGenEthLbkTermInterface             InterfaceIndexOrZero,
+        adGenEthLbkTermMatchStag             INTEGER,
+        adGenEthLbkTermMatchPbit             INTEGER,
+        adGenEthLbkTermMatchMACDAExplicit    MacAddress,
+        adGenEthLbkTermMatchMACDAMode        INTEGER,
+        adGenEthLbkTermMatchMACSAExplicit    MacAddress,
+        adGenEthLbkTermMatchMACSAMode        INTEGER
+    }
+
+adGenEthLbkTermName                 OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..50))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Name of the terminal Ethernet loopback.  This name is unique
+         amongst all terminal loopbacks residing on an element."
+    ::= { adGenEthLbkTermProvEntry 1 }
+
+adGenEthLbkTermRowStatus            OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object is used to create a new loopback or modify or delete an
+         existing loopback."
+    ::= { adGenEthLbkTermProvEntry 2 }
+
+adGenEthLbkTermAdminState            OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    enable(1),
+                    disable(2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object is used to control the administrative state of the loopback."
+    ::= { adGenEthLbkTermProvEntry 3 }
+
+adGenEthLbkTermRunningStatus        OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    disabled(0),
+                    running(1),
+                    notRunning(2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current status of the loopback.  If the status is notRunning(2),
+         adGenEthLbkTermRunningStatusString will contain the reason."
+    ::= { adGenEthLbkTermProvEntry 4 }
+
+adGenEthLbkTermRunningStatusString  OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A string representation of the current status.  If adGenEthLbkTermRunningStatus
+         returns notRunning(2), this object will contain the reason it isn't running."
+    ::= { adGenEthLbkTermProvEntry 5 }
+
+adGenEthLbkTermInterface            OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The interface the loopback is to be applied to.  The specified interface must be configured
+         as an active UNI port, i.e. connected to a running EVC-map.  Traffic that matches specified criteria
+         that normally would egress this interface will be looped back and have the source and destination
+         MAC address swapped upon egress into the MEN.  A value of 0 means the interface hasn't been specified."
+    ::= { adGenEthLbkTermProvEntry 6 }
+
+adGenEthLbkTermMatchStag            OBJECT-TYPE
+    SYNTAX      INTEGER (-1|2..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the s-tag used to filter out the loopback traffic.  A value of -1 indicates the traffic
+        isn't being filtered by an s-tag value."
+    ::= { adGenEthLbkTermProvEntry 7 }
+
+adGenEthLbkTermMatchPbit            OBJECT-TYPE
+    SYNTAX      INTEGER (-1..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the p-bit used to filter out the loopback traffic.  A value of -1 indicates the traffic
+        isn't being filtered by a p-bit value."
+    ::= { adGenEthLbkTermProvEntry 8 }
+
+adGenEthLbkTermMatchMACDAExplicit   OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the destination MAC address used to filter out the loopback traffic.  If adGenEthLbkTermMatchMACDAMode
+         is not set to explicit(1), then the value of this object is meaningless."
+    ::= { adGenEthLbkTermProvEntry 9 }
+
+adGenEthLbkTermMatchMACDAMode       OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    none(0),
+                    explicit(1),
+                    system(2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specifies how/if a specified MAC address is being used as a loopback traffic filter.
+            none(0) means no MAC address is being used
+            explicit(1) means the MAC address specified in adGenEthLbkTermMatchMACDAExplicit is being used
+            system(2) meand the MAC address specified in adGenEthLbkSystemMACAddress is being used."
+    ::= { adGenEthLbkTermProvEntry 10 }
+
+adGenEthLbkTermMatchMACSAExplicit   OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the source MAC address used to filter out the loopback traffic.  If adGenEthLbkTermMatchMACSAMode
+         is not set to explicit(1), then the value of this object is meaningless."
+    ::= { adGenEthLbkTermProvEntry 11 }
+
+adGenEthLbkTermMatchMACSAMode       OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    none(0),
+                    explicit(1)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specifies how/if a specified MAC address is being used as a loopback traffic filter.
+            none(0) means no MAC address is being used
+            explicit(1) means the MAC address specified in adGenEthLbkTermMatchMACSAExplicit is being used"
+    ::= { adGenEthLbkTermProvEntry 12 }
+END
+

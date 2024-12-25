@@ -1,0 +1,2011 @@
+ADTRAN-EFMEXT-MIB
+
+-- TITLE:     The ADTRAN EFMV2 MIB
+-- PRODUCT:   ADTRAN EFM PRODUCTS
+-- VERSION:   1.0
+-- DATE:      3/25/2008
+-- AUTHOR:    Tim Cox
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN EFMEXT MIB objects. This will be a supplement to the existing genefm.mi2.
+
+-- HISTORY:
+-- 03/24/08 twc STATUS: Split the adGenEfmStatTable from genefm.mi2 into two separate
+--    status tables (indexed by Group and Link). Also created new versions of the
+--    genefm.mi2 Alarm Traps but replaced adGenPortTrapIdentifier with ifDescr because
+--    these traps are for logical links, not physical.
+-- 04/03/08 jlb Added the following alarms
+--                    adGenEfmExtLinkXCVThreshExceededClr
+--                    adGenEfmExtLinkXCVThreshExceededAct
+--                    adGenEfmExtLinkRemovedXCVThreshExceededClr
+--                    adGenEfmExtLinkRemovedXCVThreshExceededAct
+--                    adGenEfmExtLinkRemovedFarEndLbkDetectedClr
+--                    adGenEfmExtLinkRemovedFarEndLbkDetectedAct
+-- 05/15/08 jlb Changed some of the alarm severities to match the code.
+-- 05/19/08 cjw Changed the alarm severities for
+--                    adGenEfmExtLinkRemovedXCVThreshExceededClr
+--                    adGenEfmExtLinkRemovedXCVThreshExceededAct
+-- 05/20/08 jayboles    Changed alarm severity of adGenEfmExtGroupDownPartialAct from MAJOR to
+--                      MINOR
+--
+-- 05/21/08 jlb Added adGenEfmExtGroupRemoteLoopbackClr, adGenEfmExtGroupRemoteLoopbackAct,
+--                    adGenEfmExtGroupLocalLoopbackClr and adGenEfmExtGroupLocalLoopbackAct
+-- 06/02/08 jlb Fixed multiple complier errors found by the SMI compiler.
+-- 06/09/08 jlb Changed adGenEfmExtGroupDownPartialClr and adGenEfmExtGroupDownPartialClr to
+--                      adGenEfmExtGroupUpPartialClr and adGenEfmExtGroupUpPartialClr.
+-- 06/16/08 jlb Changed adGenEfmExtGroupUpPartialClr severity to MINOR to match adGenEfmExtGroupUpPartialAct
+-- 06/17/09 jlb Added EFM Port PM, Thresholds, and alarms.
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+   IMPORTS
+        Integer32,
+		Unsigned32,
+        Gauge32,
+        OBJECT-TYPE,
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+   OBJECT-GROUP,
+        NOTIFICATION-GROUP
+            FROM SNMPv2-CONF
+        sysName
+            FROM SNMPv2-MIB
+        ifIndex,
+   ifDescr
+            FROM IF-MIB
+        adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        adGenSlotInfoIndex
+            FROM ADTRAN-GENSLOT-MIB
+        adGenEfmExt,
+        adGenEfmExtID
+            FROM ADTRAN-SHARED-EFM-MIB
+        DisplayString
+            FROM SNMPv2-TC
+        ;
+
+adGenEfmExtMIB MODULE-IDENTITY
+   LAST-UPDATED "201109280000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO "http://www.adtran.com"
+   DESCRIPTION
+      "This MIB defines the objects for the EFMEXT MIB."
+
+   REVISION "201109280000Z"
+   DESCRIPTION "Added adGenEfmExtStatLinkFeId"
+
+   REVISION "201108100000Z"
+   DESCRIPTION "Added adGenEfmExtGroupSecondaryDownstreamBandwidthClr, adGenEfmExtGroupSecondaryDownstreamBandwidthAct, adGenEfmExtGroupSecondaryUpstreamBandwidthClr, adGenEfmExtGroupSecondaryUpstreamBandwidthAct"
+
+   REVISION "201104140000Z"
+   DESCRIPTION "Added adGenEfmExtStatLinkStatus to the adGenEfmExtStatLinkTable"
+
+   REVISION "200803240000Z"
+   DESCRIPTION "Created"
+::= { adGenEfmExtID 1 }
+
+-- OBJECT IDENTIFIERS
+adGenEfmExtStatus             OBJECT IDENTIFIER ::= {adGenEfmExt 1}
+adGenEfmExtMibConformance       OBJECT IDENTIFIER ::= {adGenEfmExt 2 }
+adGenEfmExtMibGroups            OBJECT IDENTIFIER ::= {adGenEfmExtMibConformance 1 }
+adGenEfmExtPerformance			OBJECT IDENTIFIER ::= {adGenEfmExt 3}
+
+adGenEfmExtAlarmsPrefix         OBJECT IDENTIFIER ::= {adGenEfmExt 10}
+adGenEfmExtAlarms               OBJECT IDENTIFIER ::= {adGenEfmExtAlarmsPrefix 0}
+
+-- ******************************************************************************************
+-- EFM Group Status
+-- ******************************************************************************************
+adGenEfmExtStatGroupTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtStatGroupEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports group status entries."
+    ::= { adGenEfmExtStatus 1 }
+
+adGenEfmExtStatGroupEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtStatGroupEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtStatGroupTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtStatGroupTable 1 }
+
+AdGenEfmExtStatGroupEntry ::=
+   SEQUENCE
+   {
+   adGenEfmExtStatGroupStatus           INTEGER,
+   adGenEfmExtStatGroupSize             Integer32,
+   adGenEfmExtStatGroupNumActiveLinks   Integer32,
+   adGenEfmExtStatGroupUAS              Gauge32,
+   adGenEfmExtStatGroupFailures         Gauge32
+   }
+
+adGenEfmExtStatGroupStatus OBJECT-TYPE
+   SYNTAX      INTEGER
+   {
+        up(1),
+        down(2),
+        testing(3),
+        noLinksInGroup(4),
+        upPartial(5)
+   }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "The current status of the selected group."
+   ::= { adGenEfmExtStatGroupEntry 1 }
+
+adGenEfmExtStatGroupSize OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns the number of links currently
+      assigned to this group."
+   ::= { adGenEfmExtStatGroupEntry 2 }
+
+adGenEfmExtStatGroupNumActiveLinks OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns the number of links, assigned to
+      this group, that are currently active."
+   ::= { adGenEfmExtStatGroupEntry 3 }
+
+adGenEfmExtStatGroupUAS OBJECT-TYPE
+   SYNTAX      Gauge32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns the number of Unavailable Seconds
+      for this group."
+   ::= { adGenEfmExtStatGroupEntry 4 }
+
+adGenEfmExtStatGroupFailures OBJECT-TYPE
+   SYNTAX      Gauge32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns the number of failures
+      for this group."
+   ::= { adGenEfmExtStatGroupEntry 5 }
+
+
+-- ******************************************************************************************
+-- EFM Link Status
+-- ******************************************************************************************
+adGenEfmExtStatLinkTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtStatLinkEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports link status entries."
+   ::= { adGenEfmExtStatus 2 }
+
+adGenEfmExtStatLinkEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtStatLinkEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtStatLinkTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtStatLinkTable 1 }
+
+AdGenEfmExtStatLinkEntry ::=
+   SEQUENCE
+   {
+   adGenEfmExtStatLinkNeTcSync         INTEGER,
+   adGenEfmExtStatLinkFeTcSync         INTEGER,
+   adGenEfmExtStatLinkSkew             Integer32,
+   adGenEfmExtStatLinkStatus           DisplayString,
+   adGenEfmExtStatLinkFeId             Integer32
+   }
+
+adGenEfmExtStatLinkNeTcSync OBJECT-TYPE
+   SYNTAX      INTEGER
+   {
+        yes(1),
+        no(2)
+   }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns whether or not the near-end of
+      the selected link has achieved 64/65
+      octet synchronization."
+   ::= { adGenEfmExtStatLinkEntry 1 }
+
+adGenEfmExtStatLinkFeTcSync OBJECT-TYPE
+   SYNTAX      INTEGER
+   {
+        yes(1),
+        no(2)
+   }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns whether or not the far-end of
+      the selected link has achieved 64/65
+      octet synchronization."
+   ::= { adGenEfmExtStatLinkEntry 2 }
+
+adGenEfmExtStatLinkSkew OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns the skew of the link in the group."
+   ::= { adGenEfmExtStatLinkEntry 3 }
+
+adGenEfmExtStatLinkStatus OBJECT-TYPE
+  SYNTAX         DisplayString
+  MAX-ACCESS     read-only
+  STATUS         current
+  DESCRIPTION
+     "Returns the current status of the link."
+  ::= { adGenEfmExtStatLinkEntry 4 }
+
+adGenEfmExtStatLinkFeId OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns the far end link number associated with this link.  This is
+      used for physical link topology."
+   ::= { adGenEfmExtStatLinkEntry 5 }
+
+
+
+
+-- ******************************************************************************************
+-- Performance
+-- ******************************************************************************************
+
+-- ********************************************
+-- EFM Port Performance, Current 15-Minute
+-- ********************************************
+adGenEfmExtPerfPortCurr15MinTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPortCurr15MinEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports EFM Port Current Performance"
+   ::= { adGenEfmExtPerformance 1 }
+
+adGenEfmExtPerfPortCurr15MinEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPortCurr15MinEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPortCurr15MinTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtPerfPortCurr15MinTable 1 }
+
+AdGenEfmExtPerfPortCurr15MinEntry ::=
+   SEQUENCE
+   {
+		adGenEfmExtPerfPort15MinValidIntervals		Integer32,
+        adGenEfmExtPerfPortCurr15MinTxOctets       	Gauge32,
+        adGenEfmExtPerfPortCurr15MinTxFrames       	Gauge32,
+        adGenEfmExtPerfPortCurr15MinRxOctets       	Gauge32,
+        adGenEfmExtPerfPortCurr15MinRxFrames       	Gauge32,
+        adGenEfmExtPerfPortCurr15MinRxCodingErrors  Gauge32
+   }
+
+adGenEfmExtPerfPort15MinValidIntervals OBJECT-TYPE
+   SYNTAX      	Integer32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of valid 15-Minute intervals."
+   ::= { adGenEfmExtPerfPortCurr15MinEntry 1 }
+
+adGenEfmExtPerfPortCurr15MinTxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets transmitted over this EFM Port
+	  during the current 15-Minute interval."
+   ::= { adGenEfmExtPerfPortCurr15MinEntry 2 }
+
+adGenEfmExtPerfPortCurr15MinTxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames transmitted over this EFM Port
+	  during the current 15-Minute interval."
+   ::= { adGenEfmExtPerfPortCurr15MinEntry 3 }
+
+adGenEfmExtPerfPortCurr15MinRxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets received over this EFM Port
+	  during the current 15-Minute interval."
+   ::= { adGenEfmExtPerfPortCurr15MinEntry 4 }
+
+adGenEfmExtPerfPortCurr15MinRxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames received over this EFM Port
+	  during the current 15-Minute interval."
+   ::= { adGenEfmExtPerfPortCurr15MinEntry 5 }
+
+adGenEfmExtPerfPortCurr15MinRxCodingErrors OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of 64/65-octet encapsulation errors detected
+	  by the 64/65-octet receive function during the current
+	  15-Minute interval."
+   ::= { adGenEfmExtPerfPortCurr15MinEntry 6 }
+
+-- ********************************************
+-- EFM Port Performance, 15-Minute Interval
+-- ********************************************
+adGenEfmExtPerfPort15MinIntTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPort15MinIntEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports EFM Port Performance Intervals"
+   ::= { adGenEfmExtPerformance 2 }
+
+adGenEfmExtPerfPort15MinIntEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPort15MinIntEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPort15MinIntTable."
+   INDEX { ifIndex, adGenEfmExtPerfPort15MinIntNumber }
+   ::= { adGenEfmExtPerfPort15MinIntTable 1 }
+
+AdGenEfmExtPerfPort15MinIntEntry ::=
+   SEQUENCE
+   {
+        adGenEfmExtPerfPort15MinIntNumber           Integer32,
+        adGenEfmExtPerfPort15MinIntTxOctets       	Gauge32,
+        adGenEfmExtPerfPort15MinIntTxFrames       	Gauge32,
+        adGenEfmExtPerfPort15MinIntRxOctets       	Gauge32,
+        adGenEfmExtPerfPort15MinIntRxFrames       	Gauge32,
+        adGenEfmExtPerfPort15MinIntRxCodingErrors  	Gauge32
+   }
+
+adGenEfmExtPerfPort15MinIntNumber OBJECT-TYPE
+   SYNTAX       Integer32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "15-minute performance interval.  Interval 1 represents the most recent
+	  previous interval.  Interval 96 represents 24 hours ago.  Intervals 2
+	  through 96 are optional."
+   ::= { adGenEfmExtPerfPort15MinIntEntry 1 }
+
+adGenEfmExtPerfPort15MinIntTxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets transmitted over this EFM Port
+	  during the selected 15-Minute interval."
+   ::= { adGenEfmExtPerfPort15MinIntEntry 2 }
+
+adGenEfmExtPerfPort15MinIntTxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames transmitted over this EFM Port
+	  during the selected 15-Minute interval."
+   ::= { adGenEfmExtPerfPort15MinIntEntry 3 }
+
+adGenEfmExtPerfPort15MinIntRxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets received over this EFM Port
+	  during the selected 15-Minute interval."
+   ::= { adGenEfmExtPerfPort15MinIntEntry 4 }
+
+adGenEfmExtPerfPort15MinIntRxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames received over this EFM Port
+	  during the selected 15-Minute interval."
+   ::= { adGenEfmExtPerfPort15MinIntEntry 5 }
+
+adGenEfmExtPerfPort15MinIntRxCodingErrors OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of 64/65-octet encapsulation errors detected
+	  by the 64/65-octet receive function during the current
+	  15-Minute interval."
+   ::= { adGenEfmExtPerfPort15MinIntEntry 6 }
+
+-- ********************************************
+-- EFM Port Performance, Current 24-Hour
+-- ********************************************
+adGenEfmExtPerfPortCurr24HrTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPortCurr24HrEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports EFM Port Current Performance"
+   ::= { adGenEfmExtPerformance 3 }
+
+adGenEfmExtPerfPortCurr24HrEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPortCurr24HrEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPortCurr24HrTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtPerfPortCurr24HrTable 1 }
+
+AdGenEfmExtPerfPortCurr24HrEntry ::=
+   SEQUENCE
+   {
+		adGenEfmExtPerfPort24HrValidIntervals		Integer32,
+        adGenEfmExtPerfPortCurr24HrTxOctets       	Gauge32,
+        adGenEfmExtPerfPortCurr24HrTxFrames       	Gauge32,
+        adGenEfmExtPerfPortCurr24HrRxOctets       	Gauge32,
+        adGenEfmExtPerfPortCurr24HrRxFrames       	Gauge32,
+        adGenEfmExtPerfPortCurr24HrRxCodingErrors  	Gauge32
+   }
+
+adGenEfmExtPerfPort24HrValidIntervals OBJECT-TYPE
+   SYNTAX      	Integer32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of valid 24-Hour intervals."
+   ::= { adGenEfmExtPerfPortCurr24HrEntry 1 }
+
+adGenEfmExtPerfPortCurr24HrTxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets transmitted over this EFM Port
+	  during the current 24-Hour interval."
+   ::= { adGenEfmExtPerfPortCurr24HrEntry 2 }
+
+adGenEfmExtPerfPortCurr24HrTxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames transmitted over this EFM Port
+	  during the current 24-Hour interval."
+   ::= { adGenEfmExtPerfPortCurr24HrEntry 3 }
+
+adGenEfmExtPerfPortCurr24HrRxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets received over this EFM Port
+	  during the current 24-Hour interval."
+   ::= { adGenEfmExtPerfPortCurr24HrEntry 4 }
+
+adGenEfmExtPerfPortCurr24HrRxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames received over this EFM Port
+	  during the current 24-Hour interval."
+   ::= { adGenEfmExtPerfPortCurr24HrEntry 5 }
+
+adGenEfmExtPerfPortCurr24HrRxCodingErrors OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of 64/65-octet encapsulation errors detected
+	  by the 64/65-octet receive function during the current
+	  15-Min interval."
+   ::= { adGenEfmExtPerfPortCurr24HrEntry 6 }
+
+-- ********************************************
+-- EFM Port Performance, 24-Hour Interval
+-- ********************************************
+adGenEfmExtPerfPort24HrIntTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPort24HrIntEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports EFM Port Performance Intervals"
+   ::= { adGenEfmExtPerformance 4 }
+
+adGenEfmExtPerfPort24HrIntEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPort24HrIntEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPort24HrIntTable."
+   INDEX { ifIndex, adGenEfmExtPerfPort24HrIntNumber }
+   ::= { adGenEfmExtPerfPort24HrIntTable 1 }
+
+AdGenEfmExtPerfPort24HrIntEntry ::=
+   SEQUENCE
+   {
+        adGenEfmExtPerfPort24HrIntNumber           	Integer32,
+        adGenEfmExtPerfPort24HrIntTxOctets       	Gauge32,
+        adGenEfmExtPerfPort24HrIntTxFrames       	Gauge32,
+        adGenEfmExtPerfPort24HrIntRxOctets       	Gauge32,
+        adGenEfmExtPerfPort24HrIntRxFrames       	Gauge32,
+        adGenEfmExtPerfPort24HrIntRxCodingErrors  	Gauge32
+   }
+
+adGenEfmExtPerfPort24HrIntNumber OBJECT-TYPE
+   SYNTAX       Integer32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "24-Hour performance interval.  Interval 1 represents the most recent
+	  previous interval.  Interval 96 represents 24 hours ago.  Intervals 2
+	  through 96 are optional."
+   ::= { adGenEfmExtPerfPort24HrIntEntry 1 }
+
+adGenEfmExtPerfPort24HrIntTxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets transmitted over this EFM Port
+	  during the selected 24-Hour interval."
+   ::= { adGenEfmExtPerfPort24HrIntEntry 2 }
+
+adGenEfmExtPerfPort24HrIntTxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames transmitted over this EFM Port
+	  during the selected 24-Hour interval."
+   ::= { adGenEfmExtPerfPort24HrIntEntry 3 }
+
+adGenEfmExtPerfPort24HrIntRxOctets OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of octets received over this EFM Port
+	  during the selected 24-Hour interval."
+   ::= { adGenEfmExtPerfPort24HrIntEntry 4 }
+
+adGenEfmExtPerfPort24HrIntRxFrames OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of frames received over this EFM Port
+	  during the selected 24-Hour interval."
+   ::= { adGenEfmExtPerfPort24HrIntEntry 5 }
+
+adGenEfmExtPerfPort24HrIntRxCodingErrors OBJECT-TYPE
+   SYNTAX       Gauge32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+     "The number of 64/65-octet encapsulation errors detected
+	  by the 64/65-octet receive function during the current
+	  24-Hour interval."
+   ::= { adGenEfmExtPerfPort24HrIntEntry 6 }
+
+-- ************************************************
+-- EFM Port Performance, 15-Minute Threshold Table
+-- ************************************************
+adGenEfmExtPerfPort15MinThreshTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPort15MinThreshEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports EFM Link Current Performance"
+   ::= { adGenEfmExtPerformance 5 }
+
+adGenEfmExtPerfPort15MinThreshEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPort15MinThreshEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPort15MinThreshTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtPerfPort15MinThreshTable 1 }
+
+AdGenEfmExtPerfPort15MinThreshEntry ::=
+   SEQUENCE
+   {
+        adGenEfmExtPerfPort15MinThreshRxCodingErrors         Unsigned32
+   }
+
+adGenEfmExtPerfPort15MinThreshRxCodingErrors OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "The threshold for the number of 64/65-octet encapsulation errors detected
+	  by the 64/65-octet receive function during the current
+	  15-Minute interval."
+   ::= { adGenEfmExtPerfPort15MinThreshEntry 6 }
+
+-- ************************************************
+-- EFM Port Performance, 24-Hour Threshold Table
+-- ************************************************
+adGenEfmExtPerfPort24HrThreshTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPort24HrThreshEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports EFM Link Current Performance"
+   ::= { adGenEfmExtPerformance 6 }
+
+adGenEfmExtPerfPort24HrThreshEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPort24HrThreshEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPort24HrThreshTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtPerfPort24HrThreshTable 1 }
+
+AdGenEfmExtPerfPort24HrThreshEntry ::=
+   SEQUENCE
+   {
+        adGenEfmExtPerfPort24HrThreshRxCodingErrors         Unsigned32
+   }
+
+adGenEfmExtPerfPort24HrThreshRxCodingErrors OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "The threshold for the number of 64/65-octet encapsulation errors detected
+	  by the 64/65-octet receive function during the current
+	  24-Hour interval."
+   ::= { adGenEfmExtPerfPort24HrThreshEntry 6 }
+
+-- ********************************************
+-- EFM Port Performance, Reset Table
+-- ********************************************
+adGenEfmExtPerfPortResetTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenEfmExtPerfPortResetEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports the resetting of EFM Performance"
+   ::= { adGenEfmExtPerformance 7 }
+
+adGenEfmExtPerfPortResetEntry OBJECT-TYPE
+   SYNTAX      AdGenEfmExtPerfPortResetEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry in the adGenEfmExtPerfPortResetTable."
+   INDEX { ifIndex }
+   ::= { adGenEfmExtPerfPortResetTable 1 }
+
+AdGenEfmExtPerfPortResetEntry ::=
+   SEQUENCE
+   {
+        adGenEfmExtPerfPortResetData      	INTEGER
+   }
+
+adGenEfmExtPerfPortResetData OBJECT-TYPE
+   SYNTAX       INTEGER
+   				{
+				reset(1)
+				}
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+     "Resets the port performance data on the selected interface."
+   ::= { adGenEfmExtPerfPortResetEntry 1 }
+
+
+-- ******************************************************************************************
+-- MIB Groups
+-- ******************************************************************************************
+
+adGenEfmExtStatGroup OBJECT-GROUP
+   OBJECTS
+   {
+        adGenEfmExtStatGroupStatus,
+        adGenEfmExtStatGroupSize,
+        adGenEfmExtStatGroupNumActiveLinks,
+        adGenEfmExtStatGroupUAS,
+        adGenEfmExtStatGroupFailures,
+        adGenEfmExtStatLinkNeTcSync,
+        adGenEfmExtStatLinkFeTcSync,
+        adGenEfmExtStatLinkSkew
+ }
+   STATUS current
+   DESCRIPTION
+     "These objects provide support for the reporting of status
+      of EFM groups and links"
+   ::= { adGenEfmExtMibGroups 1}
+
+
+adGenEfmExtEventGroup  NOTIFICATION-GROUP
+   NOTIFICATIONS  {
+        adGenEfmExtGroupDownClr,
+        adGenEfmExtGroupDownAct,
+        adGenEfmExtLinkDownClr,
+        adGenEfmExtLinkDownAct,
+        adGenEfmExtGroupUpPartialClr,
+        adGenEfmExtGroupUpPartialAct,
+        adGenEfmExtGroupDownstreamBandwidthClr,
+        adGenEfmExtGroupDownstreamBandwidthAct,
+        adGenEfmExtGroupUpstreamBandwidthClr,
+        adGenEfmExtGroupUpstreamBandwidthAct,
+        adGenEfmExtGroupDownstream4xRateViolationClr,
+        adGenEfmExtGroupDownstream4xRateViolationAct,
+        adGenEfmExtGroupUpstream4xRateViolationClr,
+        adGenEfmExtGroupUpstream4xRateViolationAct,
+        adGenEfmExtGroup15MinRxBadFragmentsAct,
+        adGenEfmExtGroup15MinRxLostFragmentsAct,
+        adGenEfmExtGroup15MinRxLostStartsAct,
+        adGenEfmExtGroup15MinRxLostEndsAct,
+        adGenEfmExtGroup24HrRxBadFragmentsAct,
+        adGenEfmExtGroup24HrRxLostFragmentsAct,
+        adGenEfmExtGroup24HrRxLostStartsAct,
+        adGenEfmExtGroup24HrRxLostEndsAct,
+        adGenEfmExtLink15MinRxErroredFragmentsAct,
+        adGenEfmExtLink15MinRxSmallFragmentsAct,
+        adGenEfmExtLink15MinRxLargeFragmentsAct,
+        adGenEfmExtLink15MinRxDiscardedFragmentsAct,
+        adGenEfmExtLink15MinRxFcsErrorsAct,
+        adGenEfmExtLink15MinRxCodingErrorsAct,
+        adGenEfmExtLink24HrRxErroredFragmentsAct,
+        adGenEfmExtLink24HrRxSmallFragmentsAct,
+        adGenEfmExtLink24HrRxLargeFragmentsAct,
+        adGenEfmExtLink24HrRxDiscardedFragmentsAct,
+        adGenEfmExtLink24HrRxFcsErrorsAct,
+        adGenEfmExtLink24HrRxCodingErrorsAct,
+        adGenEfmExtLinkXCVThreshExceededClr,
+        adGenEfmExtLinkXCVThreshExceededAct,
+        adGenEfmExtLinkRemovedXCVThreshExceededClr,
+        adGenEfmExtLinkRemovedXCVThreshExceededAct,
+        adGenEfmExtLinkRemovedFarEndLbkDetectedClr,
+        adGenEfmExtLinkRemovedFarEndLbkDetectedAct,
+        adGenEfmExtGroupRemoteLoopbackClr,
+        adGenEfmExtGroupRemoteLoopbackAct,
+        adGenEfmExtGroupLocalLoopbackClr,
+        adGenEfmExtGroupLocalLoopbackAct,
+        adGenEfmExtGroupSecondaryDownstreamBandwidthClr,
+        adGenEfmExtGroupSecondaryDownstreamBandwidthAct,
+        adGenEfmExtGroupSecondaryUpstreamBandwidthClr,
+        adGenEfmExtGroupSecondaryUpstreamBandwidthAct
+ }
+ STATUS current
+ DESCRIPTION "GenEFM Notification Group"
+ ::= {adGenEfmExtMibGroups 2}
+
+
+-- ******************************************************************************************
+-- Alarms
+-- ******************************************************************************************
+adGenEfmExtGroupDownClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+          ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Down - Cleared. All the links in the Group are
+                     not down."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Down - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MAJOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 2}
+
+adGenEfmExtGroupDownAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Down - Active. All the links in the Group are
+                     down."
+
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Down - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MAJOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 3}
+
+adGenEfmExtLinkDownClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Link Down - Cleared. TC-SYNC has been achieved for this
+                     EFM Link."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Down - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 4}
+
+adGenEfmExtLinkDownAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Link Down - Active. There is no TC-SYNC on this EFM
+                     Link."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Down - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 5}
+
+adGenEfmExtGroupUpPartialClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Up Partial - Cleared. The number of active links
+                     in the group are greater than or equal to the minimum
+                     number of links provisioned for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Up Partial - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 6}
+
+adGenEfmExtGroupUpPartialAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Up Partial - Active. The number of active
+                     links in this group are either down or less than the
+                     minimum number of links provisioned for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Up Partial - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 7}
+
+adGenEfmExtGroupDownstreamBandwidthClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Downstream Bandwidth - Cleared.
+                     The cumulative downstream rate of all the links in the
+                     group is less than the service rate for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Downstream Bandwidth - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 8}
+
+adGenEfmExtGroupDownstreamBandwidthAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Downstream Bandwidth - Active.
+                     The cumulative downstream rate of all the links in the
+                     group is less than the service rate for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Downstream Bandwidth - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 9}
+
+adGenEfmExtGroupUpstreamBandwidthClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Upstream Bandwidth - Cleared.
+                     The cumulative upstream rate of all the links in the
+                     group is less than the service rate for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Upstream Bandwidth - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 10}
+
+adGenEfmExtGroupUpstreamBandwidthAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Upstream Bandwidth - Active.
+                     The cumulative upstream rate of all the links in the
+                     group is less than the service rate for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Upstream Bandwidth - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 11}
+
+adGenEfmExtGroupDownstream4xRateViolationClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Downstream 4x Rate Violation - Cleared.
+                     Links in the group are violating the 4x constraint."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Downstream 4x Rate Violation - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 12}
+
+adGenEfmExtGroupDownstream4xRateViolationAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Downstream 4x Rate Violation - Active.
+                     Links in the group are violating the 4x constraint."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Downstream 4x Rate Violation - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 13}
+
+adGenEfmExtGroupUpstream4xRateViolationClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Upstream 4x Rate Violation - Cleared.
+                     Links in the group are violating the 4x constraint."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Upstream 4x Rate Violation - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 14}
+
+adGenEfmExtGroupUpstream4xRateViolationAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Upstream 4x Rate Violation - Active.
+                     Links in the group are violating the 4x constraint."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Upstream 4x Rate Violation - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 15}
+
+adGenEfmExtGroupRemoteLoopbackClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Remote Loopback - Cleared"
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Remote Loopback"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 16}
+
+adGenEfmExtGroupRemoteLoopbackAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Remote Loopback - Active"
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Remote Loopback"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 17}
+
+adGenEfmExtGroupLocalLoopbackClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Local Loopback - Cleared"
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Local Loopback"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 18}
+
+adGenEfmExtGroupLocalLoopbackAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Local Loopback - Active"
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Local Loopback"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 19}
+
+-- ******************************************************************************************
+-- Threshold Alarms
+-- ******************************************************************************************
+adGenEfmExtGroup15MinRxBadFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Bad Fragments 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Bad Fragments 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 20}
+
+adGenEfmExtGroup15MinRxLostFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Lost Fragments 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Lost Fragments 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 21}
+
+adGenEfmExtGroup15MinRxLostStartsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Lost Starts 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Lost Starts 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 22}
+
+adGenEfmExtGroup15MinRxLostEndsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Lost Ends 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Lost Ends 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 23}
+
+adGenEfmExtGroup24HrRxBadFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Bad Fragments 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Bad Fragments 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 24}
+
+adGenEfmExtGroup24HrRxLostFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Lost Fragments 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Lost Fragments 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 25}
+
+adGenEfmExtGroup24HrRxLostStartsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Lost Starts 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Lost Starts 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 26}
+
+adGenEfmExtGroup24HrRxLostEndsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Group Rx Lost Ends 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Rx Lost Ends 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 27}
+
+adGenEfmExtLink15MinRxErroredFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Errored Fragments 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Errored Fragments 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 28}
+
+adGenEfmExtLink15MinRxSmallFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Small Fragments 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Small Fragments 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 29}
+
+adGenEfmExtLink15MinRxLargeFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Large Fragments 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Large Fragments 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 30}
+
+adGenEfmExtLink15MinRxDiscardedFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Discarded Fragments 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Discarded Fragments 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 31}
+
+adGenEfmExtLink15MinRxFcsErrorsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx FCS Errors 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx FCS Errors 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 32}
+
+adGenEfmExtLink15MinRxCodingErrorsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Coding Errors 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Coding Errors 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 33}
+
+adGenEfmExtLink24HrRxErroredFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Errored Fragments 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Errored Fragments 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 34}
+
+adGenEfmExtLink24HrRxSmallFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Small Fragments 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Small Fragments 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 35}
+
+adGenEfmExtLink24HrRxLargeFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Large Fragments 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Large Fragments 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 36}
+
+adGenEfmExtLink24HrRxDiscardedFragmentsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Discarded Fragments 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Discarded Fragments 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 37}
+
+adGenEfmExtLink24HrRxFcsErrorsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx FCS Errors 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx FCS Errors 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 38}
+
+adGenEfmExtLink24HrRxCodingErrorsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Rx Coding Errors 24 Hour Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Rx Coding Errors 24 Hour Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 39}
+
+-- ******************************************************************************************
+-- Other Alarms
+-- ******************************************************************************************
+adGenEfmExtLinkXCVThreshExceededClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link XCV Threshold Exceeded - Cleared"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link XCV Threshold Exceeded - Cleared"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 50}
+
+adGenEfmExtLinkXCVThreshExceededAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link XCV Threshold Exceeded - Active"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link XCV Threshold Exceeded - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 51}
+
+adGenEfmExtLinkRemovedXCVThreshExceededClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Removed - XCV Threshold Exceeded - Cleared"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Removed - XCV Threshold Exceeded - Cleared"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 52}
+
+adGenEfmExtLinkRemovedXCVThreshExceededAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Removed - XCV Threshold Exceeded - Active"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Removed - XCV Threshold Exceeded - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 53}
+
+adGenEfmExtLinkRemovedFarEndLbkDetectedClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Removed - Far End Loopback Detected - Cleared"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Removed - Far End Loopback Detected - Cleared"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 54}
+
+adGenEfmExtLinkRemovedFarEndLbkDetectedAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Link Removed - Far End Loopback Detected - Active"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Link Removed - Far End Loopback Detected - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 55}
+
+
+-- ******************************************************************************************
+-- EFM Port Alarms
+-- ******************************************************************************************
+adGenEfmExtPortDownClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Port Down - Cleared. TC-SYNC has been achieved for this
+                     EFM Port."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Port Down - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 80}
+
+adGenEfmExtPortDownAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Port Down - Active. There is no TC-SYNC on this EFM
+                     Port."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Port Down - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 81}
+
+adGenEfmExtPort15MinRxCodingErrorsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Port Rx Coding Errors 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Port Rx Coding Errors 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 91}
+
+adGenEfmExtPort24HrRxCodingErrorsAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION
+                    "EFM Port Rx Coding Errors 15 Minute Threshold Crossed"
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Port Rx Coding Errors 15 Minute Threshold Crossed"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     WARNING
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 92}
+
+adGenEfmExtGroupSecondaryDownstreamBandwidthClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Secondary Downstream Bandwidth - Cleared.
+                              Clear this alarm when at least one member link is operationally 
+                              up and the cumulative downstream rate of all the links in the 
+                              group is equal to or more than the downstream secondary 
+                              bandwidth threshold (OID: adGenBridgeSecondaryDownstreamRate)
+                              for the group. Or clear when the bonded group administrative 
+                              state is set to down"
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Secondary Downstream Bandwidth - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 93}
+
+adGenEfmExtGroupSecondaryDownstreamBandwidthAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Secondary Downstream Bandwidth - Active.
+                              Raise this alarm when the bonded group administrative 
+                              state is up, at least one member link is operationally up 
+                              and the cumulative downstream rate of all the links in the 
+                              group is less than the downstream secondary bandwidth 
+                              threshold (OID: adGenBridgeSecondaryDownstreamRate)
+                              for the group."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Secondary Downstream Bandwidth - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 94}
+
+adGenEfmExtGroupSecondaryUpstreamBandwidthClr   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Secondary Upstream Bandwidth - Cleared.
+                              Clear this alarm when at least one member link is operationally 
+                              up and the cumulative upstream rate of all the links in the group 
+                              is equal to or more than the upstream secondary bandwidth 
+                              threshold (OID: adGenBridgeSecondaryUpstreamRate) for the 
+                              group. Or clear alarm when the bonded group administrative 
+                              state is set to down."
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Secondary Upstream Bandwidth - Cleared"
+    --#SUMMARY      "cleared at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 95}
+
+adGenEfmExtGroupSecondaryUpstreamBandwidthAct   NOTIFICATION-TYPE
+    OBJECTS         {
+                    adTrapInformSeqNum,
+                    sysName,
+                    adGenSlotInfoIndex,
+                    ifDescr,
+                    ifIndex
+                    }
+    STATUS          current
+    DESCRIPTION     "EFM Group Secondary Upstream Bandwidth - Active.
+                              Raise this alarm when the bonded group administrative 
+                              state is up enabled, at least one member link is 
+                              operationally up and the cumulative downstream rate 
+                              of all the links in the group is less than the downstream 
+                              secondary bandwidth threshold (OID: adGenBridgeSecondaryUpstreamRate) 
+                              for the group "
+
+    --#TYPE         "Status - Alarm"
+    --#SUMMARY      "EFM Group Secondary Upstream Bandwidth - Active"
+    --#SUMMARY      "detected at shelf: %s, slot: %d, interface %d"
+    --#ARGUMENTS    {1,2,4}
+    --#SEVERITY     MINOR
+    --#GENERIC      6
+    --#CATEGORY     "Alarm Events"
+    --#SOURCE_ID    "A"
+    --#TIMEINDEX    0
+    ::= {adGenEfmExtAlarms 96}
+
+
+-- ******************************************************************************************
+
+END

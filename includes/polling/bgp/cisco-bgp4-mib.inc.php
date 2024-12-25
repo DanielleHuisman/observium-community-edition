@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -17,6 +17,7 @@
  * @var array  $entry
  * @var string $bgpLocalAs
  * @var array  $bgp_oids
+ * @var array  $cbgp_defs
  * @var array  $p_list
  * @var bool   $check_vrfs
  * @var string $vrf_name
@@ -24,21 +25,27 @@
 
 $cisco_version = $entry['cisco_version'];
 
+// Prefixes (Cisco v1/2)
+$c_prefixes = [];
+
 if ($check_vrfs) {
     // Derp, VRFs need separate versions, need in BGP4-MIB
     $cisco_version_vrf[$vrf_name] = $entry['cisco_version'];
-}
 
-// Prefixes (Cisco v1/2)
-$c_prefixes = [];
-// $cbgp_defs = [ 'PeerAcceptedPrefixes', 'PeerDeniedPrefixes', 'PeerPrefixAdminLimit', 'PeerPrefixThreshold',
-//                'PeerPrefixClearThreshold', 'PeerAdvertisedPrefixes', 'PeerSuppressedPrefixes', 'PeerWithdrawnPrefixes' ];
-foreach ($cbgp_defs as $def_oid) {
-    $c_oid = $def['oids'][$def_oid]['oid'];
-    if ($cisco_version < 2) {
-        $c_oid = str_replace('cbgpPeer2', 'cbgpPeer', $c_oid);
+    // Table walk for speedup polling (many) VRFs
+    $c_prefixes_table = $cisco_version < 2 ? 'cbgpPeerAddrFamilyPrefixTable' : 'cbgpPeer2AddrFamilyPrefixTable';
+    print_debug("Polling BGP table $c_prefixes_table in VRF");
+
+    $c_prefixes = snmpwalk_cache_oid($device, $c_prefixes_table, $c_prefixes, 'CISCO-BGP4-MIB');
+} else {
+    // Main table polling per OID for prevention timeout issues
+    foreach ($cbgp_defs as $def_oid) {
+        $c_oid = $def['oids'][$def_oid]['oid'];
+        if ($cisco_version < 2) {
+            $c_oid = str_replace('cbgpPeer2', 'cbgpPeer', $c_oid);
+        }
+        $c_prefixes = snmpwalk_cache_oid($device, $c_oid, $c_prefixes, 'CISCO-BGP4-MIB');
     }
-    $c_prefixes = snmpwalk_cache_oid($device, $c_oid, $c_prefixes, 'CISCO-BGP4-MIB');
 }
 
 foreach ($c_prefixes as $c_index => $c_entry) {
@@ -81,11 +88,19 @@ foreach ($c_prefixes as $c_index => $c_entry) {
     }
 }
 
-unset($c_prefixes);
+// Clean
+unset($c_prefixes, $c_prefixes_table);
 
 if ($cisco_version > 1) {
     // Check Cisco cbgpPeer2Table
-    $cisco_peers = snmpwalk_cache_oid($device, 'cbgpPeer2RemoteAs', [], 'CISCO-BGP4-MIB');
+
+    if ($check_vrfs) {
+        // Table walk for speedup polling (many) VRFs
+        $cisco_peers = snmpwalk_cache_oid($device, 'cbgpPeer2Table', [], 'CISCO-BGP4-MIB');
+    } else {
+        // Main table polling per OID for prevention timeout issues
+        $cisco_peers = snmpwalk_cache_oid($device, 'cbgpPeer2RemoteAs', [], 'CISCO-BGP4-MIB');
+    }
 
     if (safe_empty($cisco_peers)) {
         return;
@@ -93,22 +108,25 @@ if ($cisco_version > 1) {
 
     // #2 - Request not completed
     // #1002 - Request timeout
-    if (in_array(snmp_error_code(), [OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED,
-                                     OBS_SNMP_ERROR_REQUEST_TIMEOUT,
-                                     OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT], TRUE)) {
+    // #1004 - Bulk Request timeout
+    if (in_array(snmp_error_code(), [ OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED,
+                                      OBS_SNMP_ERROR_REQUEST_TIMEOUT,
+                                      OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT ], TRUE)) {
         $snmp_incomplete = TRUE;
     }
 
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerState']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerAdminStatus']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInUpdates']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerOutUpdates']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInTotalMessages']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerOutTotalMessages']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerFsmEstablishedTime']['oid'], $cisco_peers, $mib);
-    $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInUpdateElapsedTime']['oid'], $cisco_peers, $mib);
-    //$cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerLocalAddr']['oid'],          $cisco_peers, $mib);
-    //$cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerIdentifier']['oid'],         $cisco_peers, $mib);
+    if (!$check_vrfs) {
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerState']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerAdminStatus']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInUpdates']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerOutUpdates']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInTotalMessages']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerOutTotalMessages']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerFsmEstablishedTime']['oid'], $cisco_peers, $mib);
+        $cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInUpdateElapsedTime']['oid'], $cisco_peers, $mib);
+        //$cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerLocalAddr']['oid'],          $cisco_peers, $mib);
+        //$cisco_peers = snmpwalk_cache_oid($device, $def['oids']['PeerIdentifier']['oid'],         $cisco_peers, $mib);
+    }
 
     // Collect founded peers
     foreach ($cisco_peers as $index => $cisco_entry) {

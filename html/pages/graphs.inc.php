@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2024 Observium Limited
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -426,7 +426,7 @@ $navbar['options_right']['showcommand'] = ['text' => 'RRD Command'];
 foreach ([ 'options' => $navbar['options'], 'options_right' => $navbar['options_right'] ] as $side => $options) {
     foreach ($options as $option => $array) {
         if ($array['inverse']) {
-            if (isset($vars[$option]) && get_var_false($vars[$option])) {
+            if (get_var_false($vars[$option] ?? '')) {
                 $navbar[$side][$option]['url'] = generate_url($vars, ['page' => "graphs", $option => NULL]);
             } else {
                 $navbar[$side][$option]['url']   = generate_url($vars, ['page' => "graphs", $option => 'no']);

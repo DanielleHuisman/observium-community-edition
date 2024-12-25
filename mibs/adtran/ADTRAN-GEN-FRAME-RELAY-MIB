@@ -1,0 +1,2329 @@
+ADTRAN-GEN-FRAME-RELAY-MIB
+
+DEFINITIONS ::= BEGIN
+
+    -- ******************************************************************
+    -- TITLE:     ADTRAN GEN FRAME RELAY CLIENT MIB
+    -- DATE:      September 9, 2010
+    --
+    -- HISTORY:
+    -- yy/mm/dd
+    -- 2010/03/24 cb STATUS: PRELIMINARY.
+	-- 2010/03/29 jlb - Changed adGenFrameRelayId to adGenFrameRelayID.
+	--					adGenFrameRelay and adGenFrameRelayID are now imported from adGenCndSystem.
+	-- 2010/04/30 cb  - Added adGenFrPVCOperStatus and adGenFrPVCLastChange.  Corrected enumerated
+	--                  values for adGenFrPVCState.
+	-- 2010/05/03 cb  - Changed read-write types to read-create and moved previous scalars
+	--                  for Group and PVC information to appropriate slot tables and the
+	--                  adFrGroupTable.
+	-- 2010/06/25 na  - Added PM intervals for groups and PVCs
+	-- 2010/09/02 cb  - Removed adGenFrPVC* oids related to secondary IP gateway
+	--                  address and primary and secondary gateway subnet masks
+	-- 2010/09/09 cb  - Added adGenFrPVCDescription and adGenFrPVCMtu
+	-- 2010/09/30 glf - correct varbinds in the adGenFrGroupDownAlarmClr, add ifOperStatus so varbinds will 
+	--                  match the adGenFrGroupDownAlarmAct alarm
+
+    -- ******************************************************************
+
+    IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32,
+        TimeTicks,
+        Unsigned32               FROM SNMPv2-SMI    -- [RFC2578]
+        sysName                  FROM SNMPv2-MIB
+        RowStatus,
+        TruthValue,
+        DisplayString            FROM SNMPv2-TC     -- [RFC2579]
+        InterfaceIndex,
+        ifIndex,
+        ifOperStatus             FROM IF-MIB        -- [RFC2863]
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP       FROM SNMPv2-CONF   -- [RFC2580]
+        InetAddressType,
+        InetAddress              FROM INET-ADDRESS-MIB  -- [RFC2851]
+        adGenFrameRelay,
+        adGenFrameRelayID        FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+        adTrapInformSeqNum       FROM ADTRAN-GENTRAPINFORM-MIB
+        adTAeSCUTrapAlarmLevel   FROM ADTRAN-TAeSCUEXT1-MIB
+        adGenPortTrapIdentifier  FROM ADTRAN-GENPORT-MIB
+        adGenSlotInfoIndex       FROM ADTRAN-GENSLOT-MIB
+        ;
+
+    adGenFrameRelayMib   MODULE-IDENTITY
+        LAST-UPDATED "201009090000Z"    -- 9/9/2010 00:00GMT
+        ORGANIZATION "ADTRAN"
+        CONTACT-INFO
+           "WG-URL:
+            WG-EMail: http://www.adtran.com
+
+            Contact:  ADTRAN
+                      901 Explorer Blvd
+                      Huntsville, AL 35806
+
+            E-mail:
+
+           "
+       DESCRIPTION
+         "ADTRAN Generic Frame Relay Management Module"
+
+       REVISION "201009090000Z"    -- 9/9/2010 00:00GMT
+       DESCRIPTION
+		  "cb  - Added adGenFrPVCDescription and adGenFrPVCMtu"
+
+       REVISION "201009020000Z"    -- 9/2/2010 00:00GMT
+       DESCRIPTION
+		  "cb  - Removed adGenFrPVC* oids related to secondary IP gateway
+		         address and primary and secondary gateway subnet masks"
+
+       REVISION "201006250000Z"    -- 6/25/2010 00:00GMT
+       DESCRIPTION
+		  "na  - Added PM intervals for groups and PVCs."
+
+       REVISION "201005030000Z"    -- 5/3/2010 00:00GMT
+       DESCRIPTION
+		  "cb  - Changed read-write types to read-create and moved previous scalars
+	             for Group and PVC information to appropriate slot tables and the
+	             adFrGroupTable."
+
+       REVISION "201004300000Z"    -- 4/30/2010 00:00GMT
+       DESCRIPTION
+		  "cb  - Added adGenFrPVCOperStatus and adGenFrPVCLastChange.  Corrected enumerated
+	             values for adGenFrPVCState."
+
+       REVISION "201003290000Z"    -- 3/29/2010 00:00GMT
+       DESCRIPTION
+		  "jlb - Changed adGenFrameRelayId to adGenFrameRelayID.
+			 	 adGenFrameRelay and adGenFrameRelayID are now imported from adGenCndSystem."
+
+       REVISION "201003240000Z"    -- 3/24/2010 00:00GMT
+       DESCRIPTION
+          ""
+         ::= { adGenFrameRelayID 1 }
+
+    adGenFrameRelayMIBObjects      OBJECT IDENTIFIER  ::= { adGenFrameRelay 1 }
+
+    -- ******************************************************************
+    -- Tables
+    -- ******************************************************************
+
+    adGenFrGroup        OBJECT IDENTIFIER ::= { adGenFrameRelayMIBObjects 1 }
+    adGenFrLink         OBJECT IDENTIFIER ::= { adGenFrameRelayMIBObjects 2 }
+    adGenFrPVC          OBJECT IDENTIFIER ::= { adGenFrameRelayMIBObjects 3 }
+    adGenFrSlot         OBJECT IDENTIFIER ::= { adGenFrameRelayMIBObjects 4 }
+
+    adGenFrAlarmsPrefix OBJECT IDENTIFIER ::= {adGenFrameRelay 2 }
+    adGenFrAlarms       OBJECT IDENTIFIER ::= {adGenFrAlarmsPrefix 0 }
+
+    -- ******************************************************************
+    -- Textual conventions
+    -- ******************************************************************
+
+    -- ******************************************************************
+    -- The Frame Relay Group Provisioning Table
+    -- ******************************************************************
+    
+    adGenFrGroupTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrGroupEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table provides provisioning and status information
+                     on all frame relay groups / bearer channels."
+         ::= { adGenFrGroup 2 }
+
+    adGenFrGroupEntry OBJECT-TYPE
+        SYNTAX      AdGenFrGroupEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The Frame Relay Group provisioning and status table entry.  To
+                     create a frame relay group, the following procedures are used:
+
+                     (1) The management application creates Frame Relay Group
+                         entry in the adGenFrGroupTable by setting the
+                         adGenFrGroupRowStatus to createAndWait(5).
+
+                         This may fail for the following reasons which are reported
+                         through the adGenFrSlotGroupLastCreateError object:
+
+                         - The selected ifIndex specifies an invalid interface
+                         - The selected ifIndex is already in use by another Frame
+                           Relay Group
+
+                         Otherwise, upon successful creation of the row, the group
+                         is reserved and a corresponding row (identical ifIndex)
+                         in the frMgtVcSigTable is created.
+
+                     (2) The manager sets other provisioning rows in the
+                         adGenFrGroupTable and the frMgtVCSigTable that are
+                         appropriate for the service that is to be provided.
+
+                     (3) Connect a frame relay link to the group to specify which
+                         interface is to provide service to the group.  See the
+                         adGenFrLinkTable description for more information.
+
+                     (4) If no detectable errors or conflicts in the group
+                         provisioning is detected, the adGenFrSlotGroupLastCreateError
+                         object will contain an empty (zero length) string and
+                         and can be enabled by setting adGenFrGroupRowStatus to active(1).
+                         
+                     (*) Signaling errors (if enabled) and any provisioning failures
+                         after setting the adGenFrGroupRowStatus to active(1) can be
+                         detected by examining the ifTable's ifOperStatus object.  If
+                         this value is not up(1), the adGenFrSlotGroupLastCreateError
+                         object will contain further diagnostic information as to the
+                         cause of any failure.
+                     "
+        INDEX       { ifIndex }
+         ::= { adGenFrGroupTable 1 }
+
+    AdGenFrGroupEntry ::= SEQUENCE {
+          adGenFrGroupRowStatus            RowStatus,
+          adGenFrGroupStatusString         DisplayString,
+          adGenFrGroupAdminStatus          INTEGER,
+          adGenFrGroupLmiType              INTEGER,
+          adGenFrGroupLmiStatus            INTEGER,
+          adGenFrGroupLmiEnquiryIn         Counter32,
+          adGenFrGroupLmiEnquiryOut        Counter32,
+          adGenFrGroupLmiStatusIn          Counter32,
+          adGenFrGroupLmiStatusOut         Counter32,
+          adGenFrGroupLmiInvalidIn         Counter32,
+          adGenFrGroupLmiStatusEnqTimeouts Counter32,
+          adGenFrGroupLmiStatusTimeouts    Counter32,
+          adGenFrGroupClearCounters        INTEGER,
+          adGenFrGroupClearPmHistory       INTEGER,
+          adGenFrGroupLinkLastCreateError  DisplayString,
+          adGenFrGroupPvcLastCreateError   DisplayString
+       }
+
+    adGenFrGroupRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The adGenFrGroupRowStatus object allows create, change, and
+                     delete operations on the Frame Relay Group / Bearer Channel."
+         ::= { adGenFrGroupEntry 1 }
+
+    adGenFrGroupStatusString OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The reason, if any, why the why the group is not in an
+                     operational state due to provisioning or hardware limitations."
+         ::= { adGenFrGroupEntry 2 }
+         
+    adGenFrGroupAdminStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              up(1),
+                              down(2),
+                              testing(3)
+                            }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The desired state of the frame relay group.  This object
+                     must be set to up(1) or testing(3) to enable user data
+                     transmission on PVCs of this group and for enabling of
+                     any signaling protocol for this group."
+        DEFVAL      { down }
+        ::= { adGenFrGroupEntry 3 }
+
+    adGenFrGroupLmiType OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              none(1),        -- No signaling
+                              ansi617d1994(3) -- ANSI T1.617a-1994 Annex D
+                            }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The value of this object identifies the local in-channel signaling
+                     protocol that is used for this frame relay UNI/NNI logical port."
+        REFERENCE   "American National Standard T1.617-1991, American National Standard
+                     T1.617a-1994, ITU-T Recommendation Q.933 (03/93)."
+        DEFVAL      { ansi617d1994 }
+        ::= { adGenFrGroupEntry 5 }
+
+    adGenFrGroupLmiStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              up(1),
+                              down(2)
+                            }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The value of this object identifies status of local in-channel signaling
+                     protocol.  If the signaling protocol is 'none', then this object will
+                     report 'up'."
+        ::= { adGenFrGroupEntry 6 }
+
+    adGenFrGroupLmiEnquiryIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages received.  If the logical
+                     port is not performing network-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupEntry 7 }
+
+    adGenFrGroupLmiEnquiryOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages transmitted.  If the logical
+                     port is not performing user-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupEntry 8 }
+
+    adGenFrGroupLmiStatusIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages received.  If the logical port
+                     is not performing user-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupEntry 9 }
+
+    adGenFrGroupLmiStatusOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages transmitted.  If the logical port
+                     is not performing network-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupEntry 10 }
+
+    adGenFrGroupLmiInvalidIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of invalid LMI messages received by this logical port."
+        ::= { adGenFrGroupEntry 11 }
+
+    adGenFrGroupLmiStatusEnqTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status Enquiry message in T392 seconds.  If the logical port is
+                     not performing network-side or bidirectional procedures then this
+                     object is not applicable."
+        ::= { adGenFrGroupEntry 12 }
+
+    adGenFrGroupLmiStatusTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status message in a polling interval (within T391 seconds).  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupEntry 13 }
+
+    adGenFrGroupClearCounters OBJECT-TYPE
+        SYNTAX      INTEGER { reset(1) }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Writing a value of 1 will reset the interface and signaling
+                     statistics for this logical port."
+         ::= { adGenFrGroupEntry 14 }
+
+    adGenFrGroupClearPmHistory OBJECT-TYPE
+        SYNTAX      INTEGER { reset(1) }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Writing a value of 1 will reset the interface performance
+                     monitoring statistics/intervals for this logical port."
+         ::= { adGenFrGroupEntry 15 }
+                                               
+    adGenFrGroupLinkLastCreateError OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The reason for the last error that occurred while attempting to
+                     create an entry in the Frame Relay Link Table (adGenFrLinkTable)
+                     for this specific frame relay group."
+         ::= { adGenFrGroupEntry 16 }
+                                               
+    adGenFrGroupPvcLastCreateError OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The reason for the last error that occurred while attempting to
+                     create an entry in the Frame Relay PVC Table (adGenFrPVCTable)
+                     for this specific frame relay group."
+         ::= { adGenFrGroupEntry 17 }
+
+    -- ******************************************************************
+    -- The Frame Relay Group Current Table
+    -- ******************************************************************
+    
+    adGenFrGroupCurrentTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrGroupCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR Group current table contains performance
+                     monitoring data for the current 15-minute interval."
+         ::= { adGenFrGroup 3 }
+
+    adGenFrGroupCurrentEntry OBJECT-TYPE
+        SYNTAX      AdGenFrGroupCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR Group current table"
+        INDEX       { ifIndex }
+         ::= { adGenFrGroupCurrentTable 1 }
+
+    AdGenFrGroupCurrentEntry ::= SEQUENCE {
+        adGenFrGroupCurrentInOctets             Counter32,
+        adGenFrGroupCurrentInPkts               Counter32,
+        adGenFrGroupCurrentInDiscards           Counter32,
+        adGenFrGroupCurrentInErrors             Counter32,
+        adGenFrGroupCurrentOutOctets            Counter32,
+        adGenFrGroupCurrentOutPkts              Counter32,
+        adGenFrGroupCurrentOutDiscards          Counter32,
+        adGenFrGroupCurrentOutErrors            Counter32,
+        adGenFrGroupCurrentLmiEnquiryIn         Counter32,
+        adGenFrGroupCurrentLmiEnquiryOut        Counter32,
+        adGenFrGroupCurrentLmiStatusIn          Counter32,
+        adGenFrGroupCurrentLmiStatusOut         Counter32,
+        adGenFrGroupCurrentLmiInvalidIn         Counter32,
+        adGenFrGroupCurrentLmiStatusEnqTimeouts Counter32,
+        adGenFrGroupCurrentLmiStatusTimeouts    Counter32,
+        adGenFrGroupCurrentNetworkInactive      Counter32
+    }
+
+    adGenFrGroupCurrentInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 1 }
+
+    adGenFrGroupCurrentInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 2 }
+
+    adGenFrGroupCurrentInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 3 }
+
+    adGenFrGroupCurrentInErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets received on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 4 }
+
+    adGenFrGroupCurrentOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 5 }
+
+    adGenFrGroupCurrentOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 6 }
+
+    adGenFrGroupCurrentOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 7 }
+
+    adGenFrGroupCurrentOutErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupCurrentEntry 8 }
+
+    adGenFrGroupCurrentLmiEnquiryIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages received.  If the logical
+                     port is not performing network-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 9 }
+
+    adGenFrGroupCurrentLmiEnquiryOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages transmitted.  If the logical
+                     port is not performing user-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 10 }
+
+    adGenFrGroupCurrentLmiStatusIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages received.  If the logical port
+                     is not performing user-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 11 }
+
+    adGenFrGroupCurrentLmiStatusOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages transmitted.  If the logical port
+                     is not performing network-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 12 }
+
+    adGenFrGroupCurrentLmiInvalidIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of invalid LMI messages received by this logical port."
+        ::= { adGenFrGroupCurrentEntry 13 }
+
+    adGenFrGroupCurrentLmiStatusEnqTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status Enquiry message in T392 seconds.  If the logical port is
+                     not performing network-side or bidirectional procedures then this
+                     object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 14 }
+
+    adGenFrGroupCurrentLmiStatusTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status message in a polling interval (within T391 seconds).  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 15 }
+    
+    adGenFrGroupCurrentNetworkInactive OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "TODO.  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupCurrentEntry 16 }
+    
+    -- ******************************************************************
+    -- The FR Group Interval Table
+    -- ******************************************************************
+    
+    adGenFrGroupIntervalTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrGroupIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR Group Interval Table contains various statistics
+                     collected by each Frame Relay Group over the previous
+                     24 hours of operation. The past 24 hours are broken
+                     into 96 completed 15-minute intervals.  Each row in
+                     this table represents one such interval (identified by
+                     adGenFrGroupIntervalNumber) and for one specific
+                     interface (identifed by ifIndex)."
+         ::= { adGenFrGroup 4 }
+
+    adGenFrGroupIntervalEntry OBJECT-TYPE
+        SYNTAX      AdGenFrGroupIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR Group Interval table"
+        INDEX       { ifIndex, adGenFrGroupIntervalNumber }
+         ::= { adGenFrGroupIntervalTable 1 }
+
+    AdGenFrGroupIntervalEntry ::= SEQUENCE {
+        adGenFrGroupIntervalNumber               INTEGER,
+        adGenFrGroupIntervalTimeStamp            DisplayString,
+        adGenFrGroupIntervalInOctets             Counter32,
+        adGenFrGroupIntervalInPkts               Counter32,
+        adGenFrGroupIntervalInDiscards           Counter32,
+        adGenFrGroupIntervalInErrors             Counter32,
+        adGenFrGroupIntervalOutOctets            Counter32,
+        adGenFrGroupIntervalOutPkts              Counter32,
+        adGenFrGroupIntervalOutDiscards          Counter32,
+        adGenFrGroupIntervalOutErrors            Counter32,
+        adGenFrGroupIntervalLmiEnquiryIn         Counter32,
+        adGenFrGroupIntervalLmiEnquiryOut        Counter32,
+        adGenFrGroupIntervalLmiStatusIn          Counter32,
+        adGenFrGroupIntervalLmiStatusOut         Counter32,
+        adGenFrGroupIntervalLmiInvalidIn         Counter32,
+        adGenFrGroupIntervalLmiStatusEnqTimeouts Counter32,
+        adGenFrGroupIntervalLmiStatusTimeouts    Counter32,
+        adGenFrGroupIntervalNetworkInactive      Counter32
+    }
+    
+    adGenFrGroupIntervalNumber OBJECT-TYPE
+        SYNTAX      INTEGER (1..96)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A number between 1 and 96, where 1 is the most
+                     recently completed 15-minute interval and 96 is the least
+                     recently completed 15-minute interval (assuming that all
+                     96 intervals are valid)."
+        ::= { adGenFrGroupIntervalEntry 1 }
+    
+    adGenFrGroupIntervalTimeStamp OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Timestamp of the 15-minute interval"
+
+        ::= { adGenFrGroupIntervalEntry 2 }
+
+    adGenFrGroupIntervalInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 3 }
+
+    adGenFrGroupIntervalInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 4 }
+
+    adGenFrGroupIntervalInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 5 }
+
+    adGenFrGroupIntervalInErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets received on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 6 }
+
+    adGenFrGroupIntervalOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 7 }
+
+    adGenFrGroupIntervalOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 8 }
+
+    adGenFrGroupIntervalOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 9 }
+
+    adGenFrGroupIntervalOutErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupIntervalEntry 10 }
+
+    adGenFrGroupIntervalLmiEnquiryIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages received.  If the logical
+                     port is not performing network-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 11 }
+
+    adGenFrGroupIntervalLmiEnquiryOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages transmitted.  If the logical
+                     port is not performing user-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 12 }
+
+    adGenFrGroupIntervalLmiStatusIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages received.  If the logical port
+                     is not performing user-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 13 }
+
+    adGenFrGroupIntervalLmiStatusOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages transmitted.  If the logical port
+                     is not performing network-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 14 }
+
+    adGenFrGroupIntervalLmiInvalidIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of invalid LMI messages received by this logical port."
+        ::= { adGenFrGroupIntervalEntry 15 }
+
+    adGenFrGroupIntervalLmiStatusEnqTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status Enquiry message in T392 seconds.  If the logical port is
+                     not performing network-side or bidirectional procedures then this
+                     object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 16 }
+
+    adGenFrGroupIntervalLmiStatusTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status message in a polling interval (within T391 seconds).  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 17 }
+    
+    adGenFrGroupIntervalNetworkInactive OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "TODO.  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupIntervalEntry 18 }
+    
+    -- ******************************************************************
+    -- The Frame Relay Group Current Day Table
+    -- ******************************************************************
+    
+    adGenFrGroupDayCurrentTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrGroupDayCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR Group current day table contains performance
+                     monitoring data for the current 24-hour interval."
+         ::= { adGenFrGroup 5 }
+
+    adGenFrGroupDayCurrentEntry OBJECT-TYPE
+        SYNTAX      AdGenFrGroupDayCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR Group current day table"
+        INDEX       { ifIndex }
+         ::= { adGenFrGroupDayCurrentTable 1 }
+
+    AdGenFrGroupDayCurrentEntry ::= SEQUENCE {
+        adGenFrGroupDayCurrentInOctets             Counter32,
+        adGenFrGroupDayCurrentInPkts               Counter32,
+        adGenFrGroupDayCurrentInDiscards           Counter32,
+        adGenFrGroupDayCurrentInErrors             Counter32,
+        adGenFrGroupDayCurrentOutOctets            Counter32,
+        adGenFrGroupDayCurrentOutPkts              Counter32,
+        adGenFrGroupDayCurrentOutDiscards          Counter32,
+        adGenFrGroupDayCurrentOutErrors            Counter32,
+        adGenFrGroupDayCurrentLmiEnquiryIn         Counter32,
+        adGenFrGroupDayCurrentLmiEnquiryOut        Counter32,
+        adGenFrGroupDayCurrentLmiStatusIn          Counter32,
+        adGenFrGroupDayCurrentLmiStatusOut         Counter32,
+        adGenFrGroupDayCurrentLmiInvalidIn         Counter32,
+        adGenFrGroupDayCurrentLmiStatusEnqTimeouts Counter32,
+        adGenFrGroupDayCurrentLmiStatusTimeouts    Counter32,
+        adGenFrGroupDayCurrentNetworkInactive      Counter32
+    }
+
+    adGenFrGroupDayCurrentInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 1 }
+
+    adGenFrGroupDayCurrentInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 2 }
+
+    adGenFrGroupDayCurrentInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 3 }
+
+    adGenFrGroupDayCurrentInErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets received on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 4 }
+
+    adGenFrGroupDayCurrentOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 5 }
+
+    adGenFrGroupDayCurrentOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 6 }
+
+    adGenFrGroupDayCurrentOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 7 }
+
+    adGenFrGroupDayCurrentOutErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupDayCurrentEntry 8 }
+
+    adGenFrGroupDayCurrentLmiEnquiryIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages received.  If the logical
+                     port is not performing network-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 9 }
+
+    adGenFrGroupDayCurrentLmiEnquiryOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages transmitted.  If the logical
+                     port is not performing user-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 10 }
+
+    adGenFrGroupDayCurrentLmiStatusIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages received.  If the logical port
+                     is not performing user-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 11 }
+
+    adGenFrGroupDayCurrentLmiStatusOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages transmitted.  If the logical port
+                     is not performing network-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 12 }
+
+    adGenFrGroupDayCurrentLmiInvalidIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of invalid LMI messages received by this logical port."
+        ::= { adGenFrGroupDayCurrentEntry 13 }
+
+    adGenFrGroupDayCurrentLmiStatusEnqTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status Enquiry message in T392 seconds.  If the logical port is
+                     not performing network-side or bidirectional procedures then this
+                     object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 14 }
+
+    adGenFrGroupDayCurrentLmiStatusTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status message in a polling interval (within T391 seconds).  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 15 }
+    
+    adGenFrGroupDayCurrentNetworkInactive OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "TODO.  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupDayCurrentEntry 16 }
+        
+    -- ******************************************************************
+    -- The FR Group Day Interval Table
+    -- ******************************************************************
+    
+    adGenFrGroupDayIntervalTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrGroupDayIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR Group Day Interval Table contains various statistics
+                     collected by each Frame Relay Group over the previous 7 days of
+                     operation.  The past 7 days are broken into completed 24-hour
+                     intervals.  Each row in this table represents one such interval
+                     (identified by adGenFrGroupDayIntervalNumber) and for one specific
+                     interface (identifed by ifIndex)."
+         ::= { adGenFrGroup 6 }
+
+    adGenFrGroupDayIntervalEntry OBJECT-TYPE
+        SYNTAX      AdGenFrGroupDayIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR Group Interval table"
+        INDEX       { ifIndex, adGenFrGroupDayIntervalNumber }
+         ::= { adGenFrGroupDayIntervalTable 1 }
+
+    AdGenFrGroupDayIntervalEntry ::= SEQUENCE {
+        adGenFrGroupDayIntervalNumber               INTEGER,
+        adGenFrGroupDayIntervalTimeStamp            DisplayString,
+        adGenFrGroupDayIntervalInOctets             Counter32,
+        adGenFrGroupDayIntervalInPkts               Counter32,
+        adGenFrGroupDayIntervalInDiscards           Counter32,
+        adGenFrGroupDayIntervalInErrors             Counter32,
+        adGenFrGroupDayIntervalOutOctets            Counter32,
+        adGenFrGroupDayIntervalOutPkts              Counter32,
+        adGenFrGroupDayIntervalOutDiscards          Counter32,
+        adGenFrGroupDayIntervalOutErrors            Counter32,
+        adGenFrGroupDayIntervalLmiEnquiryIn         Counter32,
+        adGenFrGroupDayIntervalLmiEnquiryOut        Counter32,
+        adGenFrGroupDayIntervalLmiStatusIn          Counter32,
+        adGenFrGroupDayIntervalLmiStatusOut         Counter32,
+        adGenFrGroupDayIntervalLmiInvalidIn         Counter32,
+        adGenFrGroupDayIntervalLmiStatusEnqTimeouts Counter32,
+        adGenFrGroupDayIntervalLmiStatusTimeouts    Counter32,
+        adGenFrGroupDayIntervalNetworkInactive      Counter32
+    }
+    
+    adGenFrGroupDayIntervalNumber OBJECT-TYPE
+        SYNTAX      INTEGER (1..7)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A number between 1 and 7, where 1 is the most
+                     recently completed 24-hour interval and 96 is the least
+                     recently completed 24-hour interval (assuming that all
+                     7 intervals are valid)."
+        ::= { adGenFrGroupDayIntervalEntry 1 }
+    
+    adGenFrGroupDayIntervalTimeStamp OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Timestamp of the 15-minute interval"
+
+        ::= { adGenFrGroupDayIntervalEntry 2 }
+
+    adGenFrGroupDayIntervalInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 3 }
+
+    adGenFrGroupDayIntervalInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 4 }
+
+    adGenFrGroupDayIntervalInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 5 }
+
+    adGenFrGroupDayIntervalInErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets received on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 6 }
+
+    adGenFrGroupDayIntervalOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 7 }
+
+    adGenFrGroupDayIntervalOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 8 }
+
+    adGenFrGroupDayIntervalOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 9 }
+
+    adGenFrGroupDayIntervalOutErrors OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of errored packets transmitted on the FR Group."
+
+        ::= { adGenFrGroupDayIntervalEntry 10 }
+
+    adGenFrGroupDayIntervalLmiEnquiryIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages received.  If the logical
+                     port is not performing network-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 11 }
+
+    adGenFrGroupDayIntervalLmiEnquiryOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status Enquiry messages transmitted.  If the logical
+                     port is not performing user-side or bidirectional procedures
+                     then this object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 12 }
+
+    adGenFrGroupDayIntervalLmiStatusIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages received.  If the logical port
+                     is not performing user-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 13 }
+
+    adGenFrGroupDayIntervalLmiStatusOut OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of Status messages transmitted.  If the logical port
+                     is not performing network-side or bidirectional procedures then
+                     this object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 14 }
+
+    adGenFrGroupDayIntervalLmiInvalidIn OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of invalid LMI messages received by this logical port."
+        ::= { adGenFrGroupDayIntervalEntry 15 }
+
+    adGenFrGroupDayIntervalLmiStatusEnqTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status Enquiry message in T392 seconds.  If the logical port is
+                     not performing network-side or bidirectional procedures then this
+                     object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 16 }
+
+    adGenFrGroupDayIntervalLmiStatusTimeouts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of times this logical port has failed to receive a
+                     Status message in a polling interval (within T391 seconds).  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 17 }
+    
+    adGenFrGroupDayIntervalNetworkInactive OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "TODO.  If
+                     the logical port is not performing user-side or bidirectional
+                     procedures then this object is not applicable."
+        ::= { adGenFrGroupDayIntervalEntry 18 }
+    
+    -- ******************************************************************
+    -- The Frame Relay Link Provisioning Table
+    -- ******************************************************************
+
+    adGenFrLinkTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrLinkEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table provides provisioning and status information
+                     on all frame relay links."
+         ::= { adGenFrLink 2 }
+
+    adGenFrLinkEntry OBJECT-TYPE
+        SYNTAX      AdGenFrLinkEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The Frame Relay Link provisioning and status table entry."
+        INDEX       { adGenFrLinkGroupIfIndex, adGenFrLinkIfIndex, adGenFrLinkBundleId }
+         ::= { adGenFrLinkTable 1 }
+
+    AdGenFrLinkEntry ::= SEQUENCE {
+          adGenFrLinkGroupIfIndex       InterfaceIndex,
+          adGenFrLinkIfIndex            InterfaceIndex,
+          adGenFrLinkBundleId           INTEGER,
+          adGenFrLinkRowStatus          RowStatus,
+          adGenFrLinkTimeslots          DisplayString,
+          adGenFrLinkStatusString       DisplayString
+       }
+
+     adGenFrLinkGroupIfIndex OBJECT-TYPE
+        SYNTAX      InterfaceIndex
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This object represents the frame relay group to which
+                     this frame relay link is to be connected."
+     ::= { adGenFrLinkEntry 1 }
+
+     adGenFrLinkIfIndex OBJECT-TYPE
+        SYNTAX      InterfaceIndex
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This object represents the physical T1/E1 link to which
+                     this frame relay link is to constructed from."
+     ::= { adGenFrLinkEntry 2 }
+
+     adGenFrLinkBundleId OBJECT-TYPE
+        SYNTAX      INTEGER (1..32)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This object represents the ds0 bundle ID number for this
+                     frame relay link.  Some hardware implementations will
+                     only support a single ds0 bundle per T1/E1 link.  For
+                     implementations with this limitation, the bundle ID may
+                     only be 1."
+     ::= { adGenFrLinkEntry 3 }
+
+    adGenFrLinkRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The adGenFrLinkRowStatus object allows create, change, and
+                     delete operations on the Frame Relay link."
+         ::= { adGenFrLinkEntry 4 }
+
+    adGenFrLinkTimeslots OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The adGenFrLinkTimeslots is a string representation of
+        	         the timeslot or timeslot range that describes the active
+        	         ds0's for this link.
+
+        	         For example:
+
+        	         To indicate that timeslots 3 through 8 are active, the
+        	         string would be '3-8'.
+
+        	         To indicate a single ds0, such as timeslot 18, the string
+        	         would be '18'."
+         DEFVAL      { "1-24" }
+         ::= { adGenFrLinkEntry 5 }
+
+    adGenFrLinkStatusString OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The reason, if any, why the frame relay link is
+                     not in an operational state due to provisioning or
+                     hardware limitations."
+         ::= { adGenFrLinkEntry 7 }
+
+    -- ******************************************************************
+    -- The Frame Relay PVC Provisioning Table
+    -- ******************************************************************
+
+    -- adGenFrPVC      OBJECT IDENTIFIER ::= { adGenFrameRelayMIBObjects 3 }
+
+    adGenFrPVCTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrPVCEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table provides provisioning and status information
+                     on all frame relay virtual circuits (PVCs)."
+         ::= { adGenFrPVC 4 }
+
+    adGenFrPVCEntry OBJECT-TYPE
+        SYNTAX      AdGenFrPVCEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The Frame Relay PVC supplemental provisioning and status
+                    table entry.  To create a Frame Relay PVC, the following
+                    procedures are used:
+
+                     (1) The management application creates Frame Relay PVC by
+                         creating entry in the frPVCEndptTable by setting the
+                         frPVCEndPtRowStatus to createAndWait(5).
+
+                         This may fail for the following reasons which are reported
+                         through the associated frame-relay group's 
+                         adGenFrGroupPvcLastCreateError object.
+
+                         - The selected adGenFrPVCIfIndex specifies an invalid interface
+                         - The selected frPVCEndptDLCIIndex specifies an invalid or
+                           reserved DLCI value
+                         - The selected frPVCEndptDLCIIndex is already in use by
+                           another Frame Relay PVC on this group
+                         - The maximum number of PVCs for this access module has
+                           been created and resources are not available for creation
+                           of another PVC.
+
+                         Otherwise, upon successful creation of the row, the PVC
+                         is reserved and a corresponding row (identical ifIndex
+                         (adGenFrPVCIfIndex) and  DLCI (adGenFrPVCDLCIIndex) in
+                         this table is created.
+
+                     (2) The manager sets other provisioning rows in the
+                         adGenFrPVCTable and the frPVCEndptTable that are
+                         appropriate for the service that is to be provided.
+
+                     (3) Provisioning failures or conflicts with other provisioning
+                         for a PVC can be detected by examining the adGenFrPVCStatus
+                         string.
+                     "
+        INDEX       { ifIndex, adGenFrPVCDLCIIndex }
+         ::= { adGenFrPVCTable 1 }
+
+    AdGenFrPVCEntry ::= SEQUENCE {
+        adGenFrPVCIfIndex                         InterfaceIndex,
+        adGenFrPVCDLCIIndex                       Integer32,
+        adGenFrPVCStatusString                    DisplayString,
+        adGenFrPVCAdminStatus                     INTEGER,
+        adGenFrPVCState                           INTEGER,
+
+        adGenFrPVCEncapsulation                   INTEGER,
+        adGenFrPVCPrimaryPeerIpAddressType        InetAddressType,
+        adGenFrPVCPrimaryPeerIpAddress            InetAddress,
+        adGenFrPVCSecondaryPeerAddressType        InetAddressType,
+        adGenFrPVCSecondaryPeerIpAddress          InetAddress,
+        adGenFrPVCPrimaryGatewayAddressType       InetAddressType,
+        adGenFrPVCPrimaryGatewayAddress           InetAddress,
+        adGenFrPVCInverseArpEnable                TruthValue,
+        adGenFrPVCLearnedPrimaryPeerIpAddressType InetAddressType,
+        adGenFrPVCLearnedPrimaryPeerIpAddress     InetAddress,
+        adGenFrPVCLearnedSecondaryPeerAddressType InetAddressType,
+        adGenFrPVCLearnedSecondaryPeerIpAddress   InetAddress,
+        adGenFrPVCClearCounters                   INTEGER,
+        adGenFrPVCClearPmHistory                  INTEGER,
+        adGenFrPVCOperStatus                      INTEGER,
+        adGenFrPVCLastChange                      TimeTicks,
+        adGenFrPVCDescription                     DisplayString,
+        adGenFrPVCMtu                             Integer32
+    }
+                      
+    adGenFrPVCIfIndex OBJECT-TYPE
+        SYNTAX      InterfaceIndex
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The value of this object is equal to the ifIndex
+                    value for this PVC end-point."
+         ::= { adGenFrPVCEntry 1 }
+
+    adGenFrPVCDLCIIndex OBJECT-TYPE
+        SYNTAX      Integer32 (16..991)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The value of this object is equal to the DLCI
+                    value for this PVC end-point.
+
+                    The values are restricted to the legal range for
+                    the size of address field supported by the
+                    application which is currently 10-bits."
+        REFERENCE   "ITU Q.922"
+
+         ::= { adGenFrPVCEntry 2 }
+
+     adGenFrPVCStatusString OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The reason, if any, why the why the PVC is not in an
+                     operational state due to provisioning or hardware limitations."
+         ::= { adGenFrPVCEntry 3 }
+
+    adGenFrPVCAdminStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              up(1),
+                              down(2),
+                              testing(3)
+                            }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The desired state of the frame relay PVC.  This object
+                     must be set to up(1) or testing(3) to enable user data
+                     transmission on the PVC."
+        DEFVAL      { down }
+        ::= { adGenFrPVCEntry 4 }
+
+    adGenFrPVCState OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              new(1),     -- PVC is new
+                              none(2),    -- in-channel signaling is disabled or starting
+                              active(3),  -- PVC is operational
+                              inactive(4),-- PVC is not operational
+                              deleted(5)  -- PVC is marked for deletion
+                            }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "This object provides the operation state information of
+                     the PVC."
+        ::= { adGenFrPVCEntry 5 }
+
+    adGenFrPVCEncapsulation OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              ipv4(1)
+                            }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The network protocol encapsulated on this frame relay PVC."
+        DEFVAL      { ipv4 }
+        ::= { adGenFrPVCEntry 6 }
+
+    adGenFrPVCPrimaryPeerIpAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "IP address type (ipv4 or ipv6) represented by in the
+                     adGenFrPVCPrimaryPeerIpAddress column.  This oid is only
+                     significant if the adGenFrPVCEncapsulation is ipv4 or ipv6."
+        DEFVAL      { ipv4 }
+        ::= { adGenFrPVCEntry 7 }
+
+    adGenFrPVCPrimaryPeerIpAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Provisioned Primary Peer IP address.  If this object
+                     is set to a valid non-zero IP address and Inverse ARP
+                     is enabled, the address much match that learned from
+                     the Inverse ARP protocol.  If they do not match, nor
+                     does the adGenFrPVCSecondaryIpAddress match, then
+                     user data transmission over the PVC will be disabled
+                     and the adGenFrPVCState object will report inactive(3)."
+        ::= { adGenFrPVCEntry 8 }
+
+    adGenFrPVCSecondaryPeerAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "IP address type (ipv4 or ipv6) represented by in the
+                     adGenFrPVCSecondaryPeerIpAddress column.  This oid is only
+                     significant if the adGenFrPVCEncapsulation is ipv4 or ipv6."
+        DEFVAL      { ipv4 }
+        ::= { adGenFrPVCEntry 9 }
+
+    adGenFrPVCSecondaryPeerIpAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Provisioned Secondary Peer IP address.  If this object
+                     is set to a valid non-zero IP address and Inverse ARP
+                     is enabled, the address much match that learned from
+                     the Inverse ARP protocol.  If they do not match, nor
+                     does the adGenFrPVCPrimaryIpAddress match, then
+                     user data transmission over the PVC will be disabled
+                     and the adGenFrPVCState object will report inactive(3)."
+        ::= { adGenFrPVCEntry 10 }
+
+    adGenFrPVCPrimaryGatewayAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "IP address type (ipv4 or ipv6) represented by in the
+                     adGenFrPVCPrimaryGatewayAddress column.  This oid is only
+                     significant if the adGenFrPVCEncapsulation is ipv4 or ipv6."
+        DEFVAL      { ipv4 }
+        ::= { adGenFrPVCEntry 11 }
+
+    adGenFrPVCPrimaryGatewayAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The primary gateway IP address for the peer.  This oid is only
+                     significant if the adGenFrPVCEncapsulation is ipv4 or ipv6."
+        ::= { adGenFrPVCEntry 12 }
+
+    adGenFrPVCInverseArpEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Setting this value to true enables transmission of Inverse ARP
+                     requests by this frame relay PVC.   If the encapsulation protocol
+                     is not ipv4, this oid has no effect.  Note that if InARP request
+                     transmissions are disabled and an InARP request is received from
+                     the peer, a InARP response will be transmitted if appropriate."
+        DEFVAL      { true }
+        ::= { adGenFrPVCEntry 19 }
+
+    adGenFrPVCLearnedPrimaryPeerIpAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Learned IP address type (ipv4 or ipv6) represented by in the
+                     adGenFrPVCLearnedPrimaryPeerIpAddress column.  This oid is only
+                     significant if the adGenFrPVCEncapsulation is ipv4 or ipv6."
+        ::= { adGenFrPVCEntry 20 }
+
+    adGenFrPVCLearnedPrimaryPeerIpAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Learned Primary Peer IP address.  This value
+                     is learned through the Inverse ARP protocol mechanism."
+        ::= { adGenFrPVCEntry 21 }
+
+    adGenFrPVCLearnedSecondaryPeerAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Learned IP address type (ipv4 or ipv6) represented by in the
+                     adGenFrPVCLearnedSecondaryPeerIpAddress column.  This oid is only
+                     significant if the adGenFrPVCEncapsulation is ipv4 or ipv6."
+        ::= { adGenFrPVCEntry 22 }
+
+    adGenFrPVCLearnedSecondaryPeerIpAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Learned Secondary Peer IP address.  This value
+                     is learned through the Inverse ARP protocol mechanism."
+        ::= { adGenFrPVCEntry 23 }
+        
+    adGenFrPVCClearCounters OBJECT-TYPE
+        SYNTAX      INTEGER { reset(1) }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Writing a value of 1 will reset the PVC statistics for
+                     this logical port."
+         ::= { adGenFrPVCEntry 24 }
+
+    adGenFrPVCClearPmHistory OBJECT-TYPE
+        SYNTAX      INTEGER { reset(1) }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Writing a value of 1 will reset the interface performance
+                     monitoring statistics/intervals for this logical port."
+         ::= { adGenFrPVCEntry 25 }
+
+    adGenFrPVCOperStatus OBJECT-TYPE
+       SYNTAX  INTEGER {
+                   up(1),        -- ready to pass packets
+                   down(2),
+                   testing(3),   -- not expected
+                   unknown(4),   -- status can not be determined
+                                 -- for some reason.
+                   dormant(5),
+                   notPresent(6),    -- some component is missing
+                   lowerLayerDown(7) -- down due to state of
+                                     -- lower-layer interface(s)
+               }
+
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+               "The current operational state of the PVC."
+       ::= { adGenFrPVCEntry 26 }
+
+   adGenFrPVCLastChange OBJECT-TYPE
+       SYNTAX      TimeTicks
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+               "The value of sysUpTime at the time the PVC
+               entered its current operational state.  If the current
+               state was entered prior to the last re-initialization
+               of the local network management subsystem, then this
+               object contains a zero value."
+       ::= { adGenFrPVCEntry 27 }
+
+   adGenFrPVCDescription OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+               "A descriptive name for the PVC"
+       ::= { adGenFrPVCEntry 28 }
+
+   adGenFrPVCMtu OBJECT-TYPE
+       SYNTAX      Integer32 (262..1600)
+       UNITS       "Octets"
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+               "The size of the largest packet which can be
+               sent/received on the interface, specified in octets.
+               For a PVC, this is the size of the frame relay payload
+               and does not count the HDLC start/end flags, Frame Relay
+               address field, or the CRC-16 trailer."
+       DEFVAL      { 1500 }
+       ::= { adGenFrPVCEntry 29 }
+
+    -- ******************************************************************
+    -- The Frame Relay PVC Current Table
+    -- ******************************************************************
+
+    adGenFrPVCCurrentTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrPVCCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR PVC current table contains performance
+                     monitoring data for the current 15-minute interval."
+         ::= { adGenFrPVC 5 }
+
+    adGenFrPVCCurrentEntry OBJECT-TYPE
+        SYNTAX      AdGenFrPVCCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR PVC Current table"
+        INDEX       { ifIndex, adGenFrPVCDLCIIndex }
+         ::= { adGenFrPVCCurrentTable 1 }
+
+    AdGenFrPVCCurrentEntry ::= SEQUENCE {
+        adGenFrPVCCurrentInOctets                        Counter32,
+        adGenFrPVCCurrentInPkts                          Counter32,
+        adGenFrPVCCurrentInDiscards                      Counter32,
+        adGenFrPVCCurrentOutOctets                       Counter32,
+        adGenFrPVCCurrentOutPkts                         Counter32,
+        adGenFrPVCCurrentOutDiscards                     Counter32,
+        adGenFrPVCCurrentPktsFECN1In                     Counter32,
+        adGenFrPVCCurrentPktsFECN1Out                    Counter32,
+        adGenFrPVCCurrentPktsBECN1In                     Counter32,
+        adGenFrPVCCurrentPktsBECN1Out                    Counter32,
+        adGenFrPVCCurrentPktsDE1In                       Counter32,
+        adGenFrPVCCurrentPktsDE1Out                      Counter32,
+        adGenFrPVCCurrentOctetsDE1In                     Counter32,
+        adGenFrPVCCurrentOctetsDE1Out                    Counter32
+    }
+    
+    adGenFrPVCCurrentInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR PVC."
+
+        ::= { adGenFrPVCCurrentEntry 1 }
+
+    adGenFrPVCCurrentInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR PVC."
+
+        ::= { adGenFrPVCCurrentEntry 2 }
+
+    adGenFrPVCCurrentInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCCurrentEntry 3 }
+
+    adGenFrPVCCurrentOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCCurrentEntry 5 }
+
+    adGenFrPVCCurrentOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCCurrentEntry 6 }
+
+    adGenFrPVCCurrentOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCCurrentEntry 7 }
+
+    adGenFrPVCCurrentPktsFECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 9 }
+
+    adGenFrPVCCurrentPktsFECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 10 }
+
+    adGenFrPVCCurrentPktsBECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 11 }
+
+    adGenFrPVCCurrentPktsBECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 12 }
+
+    adGenFrPVCCurrentPktsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 13 }
+
+    adGenFrPVCCurrentPktsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 14 }
+
+    adGenFrPVCCurrentOctetsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 15 }
+    
+    adGenFrPVCCurrentOctetsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCCurrentEntry 16 }
+
+    -- ******************************************************************
+    -- The Frame Relay PVC Interval Table
+    -- ******************************************************************
+
+    adGenFrPVCIntervalTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrPVCIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR PVC Interval Table contains various statistics
+                     collected by each Frame Relay PVC over the previous
+                     24 hours of operation. The past 24 hours are broken
+                     into 96 completed 15-minute intervals.  Each row in
+                     this table represents one such interval (identified by
+                     adGenFrPVCIntervalNumber) and for one specific
+                     interface (identifed by ifIndex and
+                     adGenFrPVCDLCIIndex)."
+         ::= { adGenFrPVC 6 }
+
+    adGenFrPVCIntervalEntry OBJECT-TYPE
+        SYNTAX      AdGenFrPVCIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR PVC Interval table"
+        INDEX       { ifIndex, adGenFrPVCDLCIIndex, adGenFrPVCIntervalNumber }
+         ::= { adGenFrPVCIntervalTable 1 }
+
+    AdGenFrPVCIntervalEntry ::= SEQUENCE {
+        adGenFrPVCIntervalNumber                          INTEGER,
+        adGenFrPVCIntervalTimeStamp                       DisplayString,
+        adGenFrPVCIntervalInOctets                        Counter32,
+        adGenFrPVCIntervalInPkts                          Counter32,
+        adGenFrPVCIntervalInDiscards                      Counter32,
+        adGenFrPVCIntervalOutOctets                       Counter32,
+        adGenFrPVCIntervalOutPkts                         Counter32,
+        adGenFrPVCIntervalOutDiscards                     Counter32,
+        adGenFrPVCIntervalPktsFECN1In                     Counter32,
+        adGenFrPVCIntervalPktsFECN1Out                    Counter32,
+        adGenFrPVCIntervalPktsBECN1In                     Counter32,
+        adGenFrPVCIntervalPktsBECN1Out                    Counter32,
+        adGenFrPVCIntervalPktsDE1In                       Counter32,
+        adGenFrPVCIntervalPktsDE1Out                      Counter32,
+        adGenFrPVCIntervalOctetsDE1In                     Counter32,
+        adGenFrPVCIntervalOctetsDE1Out                    Counter32
+    }
+
+    adGenFrPVCIntervalNumber OBJECT-TYPE
+        SYNTAX      INTEGER (1..96)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A number between 1 and 96, where 1 is the most
+                     recently completed 15-minute interval and 96 is the least
+                     recently completed 15-minute interval (assuming that all
+                     96 intervals are valid)."
+        ::= { adGenFrPVCIntervalEntry 1 }
+    
+    adGenFrPVCIntervalTimeStamp OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Timestamp of the 15-minute interval"
+
+        ::= { adGenFrPVCIntervalEntry 2 }
+
+    adGenFrPVCIntervalInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR PVC."
+
+        ::= { adGenFrPVCIntervalEntry 3 }
+
+    adGenFrPVCIntervalInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR PVC."
+
+        ::= { adGenFrPVCIntervalEntry 4 }
+
+    adGenFrPVCIntervalInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCIntervalEntry 5 }
+
+    adGenFrPVCIntervalOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCIntervalEntry 7 }
+
+    adGenFrPVCIntervalOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCIntervalEntry 8 }
+
+    adGenFrPVCIntervalOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCIntervalEntry 9 }
+
+    adGenFrPVCIntervalPktsFECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 11 }
+
+    adGenFrPVCIntervalPktsFECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 12 }
+
+    adGenFrPVCIntervalPktsBECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 13 }
+
+    adGenFrPVCIntervalPktsBECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 14 }
+
+    adGenFrPVCIntervalPktsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 15 }
+
+    adGenFrPVCIntervalPktsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 16 }
+
+    adGenFrPVCIntervalOctetsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 17 }
+    
+    adGenFrPVCIntervalOctetsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCIntervalEntry 18 }
+
+    -- ******************************************************************
+    -- The Frame Relay PVC Day Current Table
+    -- ******************************************************************
+
+    adGenFrPVCDayCurrentTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrPVCDayCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR PVC current day table contains performance
+                     monitoring data for the current 24-hour interval."
+         ::= { adGenFrPVC 7 }
+
+    adGenFrPVCDayCurrentEntry OBJECT-TYPE
+        SYNTAX      AdGenFrPVCDayCurrentEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR PVC current day table"
+        INDEX       { ifIndex, adGenFrPVCDLCIIndex }
+         ::= { adGenFrPVCDayCurrentTable 1 }
+
+    AdGenFrPVCDayCurrentEntry ::= SEQUENCE {
+        adGenFrPVCDayCurrentInOctets                        Counter32,
+        adGenFrPVCDayCurrentInPkts                          Counter32,
+        adGenFrPVCDayCurrentInDiscards                      Counter32,
+        adGenFrPVCDayCurrentOutOctets                       Counter32,
+        adGenFrPVCDayCurrentOutPkts                         Counter32,
+        adGenFrPVCDayCurrentOutDiscards                     Counter32,
+        adGenFrPVCDayCurrentPktsFECN1In                     Counter32,
+        adGenFrPVCDayCurrentPktsFECN1Out                    Counter32,
+        adGenFrPVCDayCurrentPktsBECN1In                     Counter32,
+        adGenFrPVCDayCurrentPktsBECN1Out                    Counter32,
+        adGenFrPVCDayCurrentPktsDE1In                       Counter32,
+        adGenFrPVCDayCurrentPktsDE1Out                      Counter32,
+        adGenFrPVCDayCurrentOctetsDE1In                     Counter32,
+        adGenFrPVCDayCurrentOctetsDE1Out                    Counter32
+    }
+    
+    adGenFrPVCDayCurrentInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR PVC."
+
+        ::= { adGenFrPVCDayCurrentEntry 1 }
+
+    adGenFrPVCDayCurrentInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR PVC."
+
+        ::= { adGenFrPVCDayCurrentEntry 2 }
+
+    adGenFrPVCDayCurrentInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCDayCurrentEntry 3 }
+
+    adGenFrPVCDayCurrentOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCDayCurrentEntry 5 }
+
+    adGenFrPVCDayCurrentOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCDayCurrentEntry 6 }
+
+    adGenFrPVCDayCurrentOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCDayCurrentEntry 7 }
+
+    adGenFrPVCDayCurrentPktsFECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 9 }
+
+    adGenFrPVCDayCurrentPktsFECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 10 }
+
+    adGenFrPVCDayCurrentPktsBECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 11 }
+
+    adGenFrPVCDayCurrentPktsBECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 12 }
+
+    adGenFrPVCDayCurrentPktsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 13 }
+
+    adGenFrPVCDayCurrentPktsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 14 }
+
+    adGenFrPVCDayCurrentOctetsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 15 }
+    
+    adGenFrPVCDayCurrentOctetsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayCurrentEntry 16 }
+    
+    -- ******************************************************************
+    -- The Frame Relay PVC Day Interval Table
+    -- ******************************************************************
+
+    adGenFrPVCDayIntervalTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrPVCDayIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The FR PVC Day Interval Table contains various statistics
+                     collected by each Frame Relay PVC over the previous
+                     7 days of operation. The past 7 days are broken
+                     into completed 24-hour intervals.  Each row in
+                     this table represents one such interval (identified by
+                     adGenFrPVCIntervalNumber) and for one specific
+                     interface (identifed by ifIndex and
+                     adGenFrPVCDLCIIndex)."
+         ::= { adGenFrPVC 8 }
+
+    adGenFrPVCDayIntervalEntry OBJECT-TYPE
+        SYNTAX      AdGenFrPVCDayIntervalEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "An entry in the FR PVC Day Interval table"
+        INDEX       { ifIndex, adGenFrPVCDLCIIndex, adGenFrPVCDayIntervalNumber }
+         ::= { adGenFrPVCDayIntervalTable 1 }
+
+    AdGenFrPVCDayIntervalEntry ::= SEQUENCE {
+        adGenFrPVCDayIntervalNumber                          INTEGER,
+        adGenFrPVCDayIntervalTimeStamp                       DisplayString,
+        adGenFrPVCDayIntervalInOctets                        Counter32,
+        adGenFrPVCDayIntervalInPkts                          Counter32,
+        adGenFrPVCDayIntervalInDiscards                      Counter32,
+        adGenFrPVCDayIntervalOutOctets                       Counter32,
+        adGenFrPVCDayIntervalOutPkts                         Counter32,
+        adGenFrPVCDayIntervalOutDiscards                     Counter32,
+        adGenFrPVCDayIntervalPktsFECN1In                     Counter32,
+        adGenFrPVCDayIntervalPktsFECN1Out                    Counter32,
+        adGenFrPVCDayIntervalPktsBECN1In                     Counter32,
+        adGenFrPVCDayIntervalPktsBECN1Out                    Counter32,
+        adGenFrPVCDayIntervalPktsDE1In                       Counter32,
+        adGenFrPVCDayIntervalPktsDE1Out                      Counter32,
+        adGenFrPVCDayIntervalOctetsDE1In                     Counter32,
+        adGenFrPVCDayIntervalOctetsDE1Out                    Counter32
+    }
+
+    adGenFrPVCDayIntervalNumber OBJECT-TYPE
+        SYNTAX      INTEGER (1..7)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A number between 1 and 7, where 1 is the most
+                     recently completed 24-hour interval and 96 is the least
+                     recently completed 24-hour interval (assuming that all
+                     7 intervals are valid)."
+        ::= { adGenFrPVCDayIntervalEntry 1 }
+    
+    adGenFrPVCDayIntervalTimeStamp OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Timestamp of the 15-minute interval"
+
+        ::= { adGenFrPVCDayIntervalEntry 2 }
+
+    adGenFrPVCDayIntervalInOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received on the FR PVC."
+
+        ::= { adGenFrPVCDayIntervalEntry 3 }
+
+    adGenFrPVCDayIntervalInPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received on the FR PVC."
+
+        ::= { adGenFrPVCDayIntervalEntry 4 }
+
+    adGenFrPVCDayIntervalInDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of received packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCDayIntervalEntry 5 }
+
+    adGenFrPVCDayIntervalOutOctets OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCDayIntervalEntry 7 }
+
+    adGenFrPVCDayIntervalOutPkts OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted on the FR PVC."
+
+        ::= { adGenFrPVCDayIntervalEntry 8 }
+
+    adGenFrPVCDayIntervalOutDiscards OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of transmit packets discarded on the FR PVC."
+
+        ::= { adGenFrPVCDayIntervalEntry 9 }
+
+    adGenFrPVCDayIntervalPktsFECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 11 }
+
+    adGenFrPVCDayIntervalPktsFECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Forward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 12 }
+
+    adGenFrPVCDayIntervalPktsBECN1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 13 }
+
+    adGenFrPVCDayIntervalPktsBECN1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Backward Explicit
+                     Congestion Notification bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 14 }
+
+    adGenFrPVCDayIntervalPktsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 15 }
+
+    adGenFrPVCDayIntervalPktsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of packets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 16 }
+
+    adGenFrPVCDayIntervalOctetsDE1In OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets received with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 17 }
+    
+    adGenFrPVCDayIntervalOctetsDE1Out OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The number of octets transmitted with the Discard Eligible
+                     bit set to 1."
+        ::= { adGenFrPVCDayIntervalEntry 18 }
+
+    -- ******************************************************************
+    -- The Frame Relay Slot Specific Table
+    -- ******************************************************************
+
+    adGenFrSlotTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AdGenFrSlotEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table provides frame relay group/bearer channel
+                     and PVC slot specific information."
+         ::= { adGenFrSlot 1 }
+
+    adGenFrSlotEntry OBJECT-TYPE
+        SYNTAX      AdGenFrSlotEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Slot specific Frame Relay Group information."
+        INDEX       { adGenSlotInfoIndex }
+         ::= { adGenFrSlotTable 1 }
+
+    AdGenFrSlotEntry ::= SEQUENCE {
+          adGenFrSlotGroupLastCreateError   DisplayString,
+          adGenFrSlotPVCMaxNumber           Unsigned32,
+          adGenFrSlotPVCCurrentNumber       Unsigned32
+       }
+   
+    adGenFrSlotGroupLastCreateError OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The reason for the last error that occurred while attempting to
+                     create an entry in the Frame Relay Group Table (adGenFrGroupTable)
+                     on a specific slot."
+     ::= { adGenFrSlotEntry 1 }
+        
+    adGenFrSlotPVCMaxNumber OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Maximum number of allowed Frame Relay PVCs on this slot.  Each access
+                     module provides a pool of available PVC resources that may
+                     be assigned to any Frame Relay Group."
+     ::= { adGenFrSlotEntry 2 }
+
+    adGenFrSlotPVCCurrentNumber OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The current number of Frame Relay PVC resources currently in
+                     use on this slot.  Each access module provides a pool of available PVC
+                     resources that may be assigned to any Frame Relay Group.  This
+                     object reports the number currently assigned to carry user data."
+     ::= { adGenFrSlotEntry 3 }
+
+    -- ******************************************************************
+    -- Frame Relay Notifications
+    -- ******************************************************************
+
+    adGenFrGroupDownAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                   sysName,
+                   ifIndex,
+                   ifOperStatus,
+                   adTAeSCUTrapAlarmLevel,
+                   adGenFrGroupLmiStatus
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenFrGroupDownAlarm clear is sent when the local in-channel
+                  signaling protocol indicates that it is in the active(2) state.
+                  If Frame Relay signaling is disabled, then group LMI status is
+                  based on the operStatus of the frame-relay group."
+
+         	--#TYPE         "Major - Frame Relay Group Down - Cleared"
+    	 	--#SUMMARY      "Frame Relay Group Down - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface: %d"
+    	 	--#ARGUMENTS    {1,2,3}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenFrAlarms 1 }
+
+    adGenFrGroupDownAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                   sysName,
+                   ifIndex,
+                   ifOperStatus,
+                   adTAeSCUTrapAlarmLevel,
+                   adGenFrGroupLmiStatus
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenFrGroupDownAlarm active is sent when the local in-channel
+                  signaling protocol indicates that it is in a state other than
+                  active(2).  If Frame Relay signaling is disabled, then group 
+                  LMI status is based on the operStatus of the frame-relay group."
+
+         	--#TYPE         "Major - Frame Relay Group Down - Active"
+    	 	--#SUMMARY      "Frame Relay Group Down - Active"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface: %d"
+    	 	--#ARGUMENTS    {1,2,3,4}
+    	 	--#SEVERITY     "MAJOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenFrAlarms 2 }
+
+    adGenFrDlciDownAlarmClr NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                   sysName,
+                   adGenFrPVCIfIndex,
+                   adGenFrPVCDLCIIndex,
+                   adTAeSCUTrapAlarmLevel,
+                   adGenFrPVCState
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenFrDlciDownAlarm clear is sent when data DLCI is in the
+                  active(2) state and is capable of passing user traffic."
+
+         	--#TYPE         "Minor - Frame Relay DLCI Inactive - Cleared"
+    	 	--#SUMMARY      "Frame Relay DLCI Inactive - Cleared"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface: %d, dlci: %u"
+    	 	--#ARGUMENTS    {1,2,3,4}
+    	 	--#SEVERITY     "MINOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenFrAlarms 3 }
+
+    adGenFrDlciDownAlarmAct NOTIFICATION-TYPE
+         OBJECTS { adTrapInformSeqNum,
+                   sysName,
+                   adGenFrPVCIfIndex,
+                   adGenFrPVCDLCIIndex,
+                   adTAeSCUTrapAlarmLevel,
+                   adGenFrPVCState
+                 }
+         STATUS  current
+         DESCRIPTION
+                 "A adGenFrDlciDownAlarm clear is sent when data DLCI is in a
+                  state other than active(2) and is incapable of passing user traffic."
+
+         	--#TYPE         "Minor - Frame Relay DLCI Down - Active"
+    	 	--#SUMMARY      "Frame Relay DLCI Down - Active"
+    	 	--#SUMMARY      "cleared at shelf: %s, slot: %d, interface: %d, dlci: %u"
+    	 	--#ARGUMENTS    {1,2,3,4}
+    	 	--#SEVERITY     "MINOR"
+    	 	--#GENERIC      6
+    	 	--#CATEGORY     "Alarm Events"
+    		--#SOURCE_ID    "A"
+    	 	--#TIMEINDEX    0
+          ::= { adGenFrAlarms 4 }
+END

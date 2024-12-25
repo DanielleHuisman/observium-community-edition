@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -89,7 +89,7 @@ foreach ($oids as $index => $entry) {
     if ($ok) {
         $multilane[$chassis][$ifIndex][$class] = 1;
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
     }
 
     // Tx Bias
@@ -121,7 +121,7 @@ foreach ($oids as $index => $entry) {
     if ($ok) {
         $multilane[$chassis][$ifIndex][$class] = 1;
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
     }
 
     // Tx Power
@@ -150,7 +150,7 @@ foreach ($oids as $index => $entry) {
     if ($ok) {
         $multilane[$chassis][$ifIndex][$class] = 1;
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
     }
 
     // Rx Power
@@ -180,7 +180,7 @@ foreach ($oids as $index => $entry) {
     if ($ok) {
         $multilane[$chassis][$ifIndex][$class] = 1;
 
-        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
     }
 
     //$multilane[$chassis][$ifIndex] = 1;
@@ -387,7 +387,7 @@ foreach ($oids as $chassis => $transeiver) {
         }
 
         if ($ok && !isset($multilane[$chassis][$ifIndex][$class])) {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
         }
 
         // Voltage
@@ -442,7 +442,7 @@ foreach ($oids as $chassis => $transeiver) {
         }
 
         if ($ok && !isset($multilane[$chassis][$ifIndex][$class])) {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
         }
 
         if (isset($multilane[$chassis][$ifIndex])) {
@@ -497,7 +497,7 @@ foreach ($oids as $chassis => $transeiver) {
         }
 
         if ($ok) {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
         }
 
         // Tx Power
@@ -550,7 +550,7 @@ foreach ($oids as $chassis => $transeiver) {
         }
 
         if ($ok) {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
         }
 
         // Rx Power
@@ -611,7 +611,7 @@ foreach ($oids as $chassis => $transeiver) {
         $sensor_options['limit_low_warn']  = $entry['tmnxDDMRxOpticalPowerLowWarning'] * $scale;
 
         if ($ok) {
-            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, $descr, $scale, $value, $sensor_options);
         }
     }
 }

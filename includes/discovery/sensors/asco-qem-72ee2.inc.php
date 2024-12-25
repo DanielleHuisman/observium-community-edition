@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -54,19 +54,19 @@ if ($oids = snmp_get_multi_oid($device, 'normal_frequency.0 normal_voltage_phase
     ## Input frequency
     $oid   = '.1.3.6.1.4.1.7777.1.1.2.0';
     $value = $oids[0]['normal_frequency'];
-    discover_sensor_ng($device, 'frequency', $mib, 'normal_frequency', $oid, '0', NULL, 'Input', $scale_frequency, $value);
+    discover_sensor_ng($device, 'frequency', $mib, 'normal_frequency', $oid, '0', 'Input', $scale_frequency, $value);
 
     $oid   = ".1.3.6.1.4.1.7777.1.1.12.0";
     $value = $oids[0]['normal_voltage_phase_AB'];
-    discover_sensor_ng($device, 'voltage', $mib, 'normal_voltage_phase_AB', $oid, '0', NULL, 'Phase AB', $scale_voltage, $value);
+    discover_sensor_ng($device, 'voltage', $mib, 'normal_voltage_phase_AB', $oid, '0', 'Phase AB', $scale_voltage, $value);
 
     $oid   = ".1.3.6.1.4.1.7777.1.1.13.0";
     $value = $oids[0]['normal_voltage_phase_BC'];
-    discover_sensor_ng($device, 'voltage', $mib, 'normal_voltage_phase_BC', $oid, '0', NULL, 'Phase BC', $scale_voltage, $value);
+    discover_sensor_ng($device, 'voltage', $mib, 'normal_voltage_phase_BC', $oid, '0', 'Phase BC', $scale_voltage, $value);
 
     $oid   = ".1.3.6.1.4.1.7777.1.1.14.0";
     $value = $oids[0]['normal_voltage_phase_CA'];
-    discover_sensor_ng($device, 'voltage', $mib, 'normal_voltage_phase_CA', $oid, '0', NULL, 'Phase CA', $scale_voltage, $value);
+    discover_sensor_ng($device, 'voltage', $mib, 'normal_voltage_phase_CA', $oid, '0', 'Phase CA', $scale_voltage, $value);
 }
 
 // ASCO-QEM-72EE2::main_on_normal.0 = INTEGER: 1

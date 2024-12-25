@@ -1,24 +1,24 @@
 CISCOSB-TIMESYNCHRONIZATION-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
-    switch001                                   FROM CISCOSB-MIB
     Unsigned32, Integer32, IpAddress,
     MODULE-IDENTITY, OBJECT-TYPE                FROM SNMPv2-SMI
     InetAddressType, InetAddress                FROM INET-ADDRESS-MIB
     DisplayString, TEXTUAL-CONVENTION   ,
     RowStatus, TruthValue                       FROM SNMPv2-TC
-    InterfaceIndex                              FROM IF-MIB;
+    InterfaceIndex                              FROM IF-MIB
+    switch001                                    FROM CISCOSB-MIB;
 
 rlTimeSynchronization MODULE-IDENTITY
       LAST-UPDATED "200408030024Z"
-      ORGANIZATION "Cisco Systems, Inc."
+                ORGANIZATION "Cisco Systems, Inc."
+                CONTACT-INFO
+                "Postal: 170 West Tasman Drive
+                San Jose , CA 95134-1706
+                USA
 
-      CONTACT-INFO
-      "Postal: 170 West Tasman Drive
-      San Jose , CA 95134-1706
-      USA
-      
-      Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
+                
+                Website:  Cisco Small Business Support Community <http://www.cisco.com/go/smallbizsupport>"
 
       DESCRIPTION
               "The MIB module describes the private MIB for SNTP & TIME definitions."
@@ -92,6 +92,17 @@ RlTimeSyncMethod  ::= TEXTUAL-CONVENTION
                     sntp(2),
                     ntp(3)
                   }
+
+RlClockStatus   ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "Method to be used for time synchronization in the device."
+    SYNTAX          INTEGER {
+                       invalid(1),
+                       manuallySet(2),
+                       synchronizedBySntp(3),
+                       setByRtc(4),
+                       setByPnP(5)
+                    }
 
 RlDaylightSavingTimeMode  ::= TEXTUAL-CONVENTION
    STATUS current
@@ -438,17 +449,12 @@ rlTimeZoneDataDynamicConfSource OBJECT-TYPE
 
 
 rlClockStatus OBJECT-TYPE
-        SYNTAX      INTEGER {
-                       invalid(1),
-                       manuallySet(2),
-                       synchronizedBySntp(3),
-		       setByRtc(4)
-                    }
+        SYNTAX      RlClockStatus
         MAX-ACCESS  read-only
         STATUS      current
         DESCRIPTION "Current status of the clock. The value 'invalid' means time is meaninglesss,
                      since it has not been manually configured, or achieved as a result
-                     of SNTP synchronization or set by RTC."
+                     of SNTP synchronization or set by RTC or set by PnP."
         ::=  {rlTimeSyncMethodMode 16 }
 
 rlDhcpTimezoneOptionEnabled OBJECT-TYPE
@@ -492,6 +498,49 @@ rlTimeAndDateHaveBeenSet OBJECT-TYPE
         ::=  {rlTimeSyncMethodMode 19 }
 
 
+rlTimeSyncManagedDateTimeTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF RlTimeSyncManagedDateTimeEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION   "Date and time information entry including source."
+  ::= { rlTimeSyncMethodMode 20 }
+
+rlTimeSyncManagedDateTimeEntry OBJECT-TYPE
+   SYNTAX      RlTimeSyncManagedDateTimeEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "The row definition for this table."
+   INDEX { rlTimeSyncManagedDateTimeIndex }
+::= { rlTimeSyncManagedDateTimeTable 1 }
+
+RlTimeSyncManagedDateTimeEntry ::= SEQUENCE {
+    rlTimeSyncManagedDateTimeIndex       INTEGER,
+    rlTimeSyncManagedDateTime            DisplayString (SIZE(12)),
+    rlTimeSyncManagedDateTimeSource      RlClockStatus
+}
+
+rlTimeSyncManagedDateTimeIndex OBJECT-TYPE
+    SYNTAX      INTEGER (1)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry index."
+    ::= { rlTimeSyncManagedDateTimeEntry 1 }
+
+rlTimeSyncManagedDateTime OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(12))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The date and time will be sent in the format ddmmyyhhmmss"
+    ::= { rlTimeSyncManagedDateTimeEntry 2 }
+
+rlTimeSyncManagedDateTimeSource OBJECT-TYPE
+    SYNTAX      RlClockStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Current status of the clock. The value 'invalid' means time is meaninglesss,
+                    since it has not been manually configured, or achieved as a result
+                    of SNTP synchronization or set by RTC or set by PnP."
+    ::= { rlTimeSyncManagedDateTimeEntry 3 }
 
 -- ----------------------------------------------------------------------
 -- SNTP/NTP client configuration parameters
@@ -1932,7 +1981,7 @@ rlSntpTimeSinceLastSync OBJECT-TYPE
         SYNTAX      Unsigned32
         MAX-ACCESS  read-only
         STATUS      current
-        DESCRIPTION "SNTP time in seconds since last sync."        
+        DESCRIPTION "SNTP time in seconds since last sync."
         ::= { rlSntpConfig 20 }
 
 END

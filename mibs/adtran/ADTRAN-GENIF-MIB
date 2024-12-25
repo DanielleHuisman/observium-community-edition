@@ -1,0 +1,539 @@
+ADTRAN-GENIF-MIB
+
+-- TITLE:     The ADTRAN GENIF MIB
+-- PRODUCT:   ADTRAN PRODUCTS
+-- VERSION:   1.0
+-- DATE:      11/17/2008
+-- AUTHOR:    Chip Gusler
+-- STATUS:    PRELIMINARY
+
+-- This MIB defines the object identifier (OID) for the
+-- ADTRAN-GENIF-MIB objects. This will is a supplement to the existing
+-- IF-MIB. It is intended to provide Adtran generic extensions on a
+-- per-interface basis.
+
+-- HISTORY:
+-- 11/17/08 ltg Created
+-- 06/15/09 glf Modified to add Auto In Service Feature
+-- 07/09/09 glf Modified to add new OID adGenIfAutoInServiceTimeOutCounter and to
+--				change enums to adGenIfAutoInServiceStatus
+-- 09/22/09 srao Added traps for interface service state OOS-MA active/clear and an OID for enabling/disabling this alarm.
+-- 10/28/09 srao Interchanged the values of enable/disable of the OID adGenIfServiceStateOOSMAAlarmEnable
+-- 02/28/11 twc Deprecated adGenIfResetCounters, added adGenIfResetAllPM and adGenIfResetAllCounters
+-- ******************************************************************************************
+
+DEFINITIONS ::= BEGIN
+
+   IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32,Counter64,Gauge32,Counter32,
+        NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+		sysName
+            FROM SNMPv2-MIB
+        ifIndex, ifDescr, ifAdminStatus FROM IF-MIB
+        TruthValue FROM SNMPv2-TC
+        adGenIf, adGenIfID
+            FROM ADTRAN-SHARED-CND-SYSTEM-MIB
+		adGenSlotInfoIndex FROM ADTRAN-GENSLOT-MIB
+		adTrapInformSeqNum
+            FROM ADTRAN-GENTRAPINFORM-MIB
+        ;
+
+adGenIfMIB MODULE-IDENTITY
+   LAST-UPDATED "201305310000Z"
+   ORGANIZATION "Adtran, Inc."
+   CONTACT-INFO "http://www.adtran.com"
+   DESCRIPTION
+     "Adtran enterprise generic IF-MIB extensions."
+
+   REVISION "201305310000Z"
+   DESCRIPTION "Obsolete the Port OOS-MA alarm and the associated enable/disable provisioning."
+
+   REVISION "201112160000Z"
+   DESCRIPTION "Added discards to 15 minute and 24 hour PM"
+
+   REVISION "201112060000Z"
+   DESCRIPTION "Multicast, unicast and broadcast counter OIDs"
+
+   REVISION "201102280000Z"
+   DESCRIPTION "New generic reset PM and reset counter OIDs"
+
+   REVISION "200811170000Z"
+   DESCRIPTION "Created"
+::= { adGenIfID 1 }
+
+-- OBJECT IDENTIFIERS
+adGenIfMIBObjects              OBJECT IDENTIFIER ::= {adGenIf 1}
+
+
+-- ******************************************************************************************
+-- adGenIfTable
+-- ******************************************************************************************
+
+adGenIfTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIfEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports Adtran per-interface IF-MIB extensions.
+      The number of entries is given by the value of ifNumber."
+    ::= { adGenIfMIBObjects 1 }
+
+
+adGenIfEntry OBJECT-TYPE
+   SYNTAX      AdGenIfEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry containing Adtran specific control/information applicable
+      to the indexed interface."
+   INDEX { ifIndex }
+   ::= { adGenIfTable 1 }
+
+
+AdGenIfEntry ::=
+   SEQUENCE
+   {
+     adGenIfResetCounters                 	INTEGER,    -- deprecated
+     adGenIfAutoInServiceEnable			TruthValue,
+     adGenIfAutoInServiceTimeOut		INTEGER,
+     adGenIfAutoInServiceTimeOutCounter		Integer32,
+     adGenIfAutoInServiceStatus			INTEGER,
+     adGenIfServiceStateOOSMAAlarmEnable	INTEGER,
+     adGenIfResetAllCounters                    INTEGER,
+     adGenIfResetAllPM                          INTEGER,
+     adGenIfInUnicastOctets                    Counter64,
+     adGenIfOutUnicastOctets                   Counter64,
+     adGenIfInBroadcastOctets                  Counter64,
+     adGenIfOutBroadcastOctets                 Counter64,
+     adGenIfOutDiscardedOctets                 Counter64,
+     adGenIfInMulticastOctets                  Counter64,
+     adGenIfOutMulticastOctets                 Counter64,
+     adGenIfInFrames						   Counter64,
+     adGenIfOutFrames						   Counter64
+   }
+
+
+adGenIfResetCounters OBJECT-TYPE        -- deprecated
+   SYNTAX      INTEGER
+   {
+        all(1),              -- Reset both PM history and current counters
+        pmhistory(2),        -- Reset PM history counters
+        current(3)           -- Reset current counters
+   }
+   MAX-ACCESS  read-write
+   STATUS      deprecated
+   DESCRIPTION
+     "This object is deprecated due to confusion among users regarding its intended
+      purpose. Two new objects (adGenIfResetAllPM and adGenIfResetAllCounters) should
+      be used instead. The original description text is below:
+      Selection of counter types to reset/clear for the indexed interface.
+      The counter types are performance monitoring intervals (PM history)
+      which typically consist of 15 minute/24 hour interval data,
+      and current counters. A read will always return all(1)."
+   ::= { adGenIfEntry 1 }
+
+adGenIfAutoInServiceEnable OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Set to true to enable and false to disable auto in service on this interface."
+   DEFVAL {false}
+   ::= { adGenIfEntry 2 }
+
+adGenIfAutoInServiceTimeOut OBJECT-TYPE
+   SYNTAX      INTEGER (1..9999)
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "Sets the timeout value in minutes "
+   DEFVAL {480}
+   ::= { adGenIfEntry 3 }
+
+adGenIfAutoInServiceTimeOutCounter OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+     "Returns time remaining on the AINS timer "
+
+   ::= { adGenIfEntry 4 }
+
+adGenIfAutoInServiceStatus OBJECT-TYPE
+   SYNTAX INTEGER {
+		    up(1),          --Able to run traffic
+                    down(2),        --Some defect (e.g. LOS, LOF) does not permit traffic to run
+                    testing(3),     --BERT and/or loopback in progress
+                    oosAuAinsFaf(4),--Out of Service-Autonomous Automatic In Service with facility faults
+                    oosAuAins(5),   --Out of Service-Autonomous Automatic In Service w/o facility faults
+                    oosAuAinsTs(6)  --Out of Service-Autonomous Automatic In Service Testing
+                  }
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION
+                "The facility service state."
+
+   ::= { adGenIfEntry 5 }
+
+adGenIfServiceStateOOSMAAlarmEnable OBJECT-TYPE
+   SYNTAX INTEGER {
+             enable(1),
+             disable(2)
+           	}
+   MAX-ACCESS  read-write
+   STATUS      obsolete
+   DESCRIPTION
+     "Enables/disables the interface service state OOS-MA alarm."
+   ::= { adGenIfEntry 6 }
+
+adGenIfResetAllPM OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+               reset(1)
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "A SET causes all Performance Monitoring history for the selected interface to be reset to zero.
+      This will reset all interval PM counts (15min and 24hr) as well as the current PM counts
+      (15min and 24hr) for the selected interface. This object has NO affect on rolling counters.
+      A GET will always return a one (1)."
+   ::= { adGenIfEntry 7 }
+
+adGenIfResetAllCounters OBJECT-TYPE
+   SYNTAX      INTEGER
+               {
+               reset(1)
+               }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "A SET causes all rolling counters for the selected interface to be reset to zero.
+      This object has NO affect on PM. A GET will always return a one (1)."
+   ::= { adGenIfEntry 8 }
+
+adGenIfInUnicastOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of unicast octets received on the interface."
+      ::= { adGenIfEntry 9 }
+
+adGenIfOutUnicastOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of unicast octets transmitted on the interface."
+      ::= { adGenIfEntry 10 }
+
+adGenIfInBroadcastOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of broadcast octets received on the interface."
+      ::= { adGenIfEntry 11 }
+
+adGenIfOutBroadcastOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of broadcast octets transmitted on the interface."
+      ::= { adGenIfEntry 12 }
+
+adGenIfInMulticastOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of multicast octets received on the interface."
+      ::= { adGenIfEntry 13 }
+
+adGenIfOutMulticastOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of multicast octets transmitted on the interface."
+      ::= { adGenIfEntry 14 }
+
+adGenIfOutDiscardedOctets    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of Tx discarded octets on the interface."
+      ::= { adGenIfEntry 15 }
+
+adGenIfInFrames    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of Rx frames on the interface."
+      ::= { adGenIfEntry 16 }
+
+adGenIfOutFrames    OBJECT-TYPE
+      SYNTAX Counter64
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+         "The total number of Tx frames on the interface."
+      ::= { adGenIfEntry 17 }
+
+-- *********************************************************************
+-- adGenIfCurr15MinPMTable
+-- *********************************************************************
+
+adGenIfCurr15MinPMTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIfCurr15MinPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports Adtran per-interface IF-MIB extensions
+      for current 15-minute performance monitoring."
+    ::= { adGenIfMIBObjects 2 }
+
+adGenIfCurr15MinPMEntry OBJECT-TYPE
+   SYNTAX      AdGenIfCurr15MinPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry containing Adtran specific control/information applicable
+      to the indexed interface."
+   INDEX { ifIndex }
+   ::= { adGenIfCurr15MinPMTable 1 }
+
+AdGenIfCurr15MinPMEntry ::=
+   SEQUENCE
+   {
+	  adGenIfCurr15MinPMOutDiscards			Gauge32,
+	  adGenIfCurr15MinPMOutDiscardOctets	Gauge32
+   }
+
+adGenIfCurr15MinPMOutDiscards OBJECT-TYPE
+	SYNTAX			Gauge32
+	MAX-ACCESS      read-only
+	STATUS			current
+	DESCRIPTION
+		"The number of packets discarded on this interface during
+		 the current 15-minute interval."
+    ::= { adGenIfCurr15MinPMEntry 1 }
+
+adGenIfCurr15MinPMOutDiscardOctets OBJECT-TYPE
+	SYNTAX			Gauge32
+	MAX-ACCESS      read-only
+	STATUS			current
+	DESCRIPTION
+		"The number of octets discarded on this interface during
+		 the current 15-minute interval."
+    ::= { adGenIfCurr15MinPMEntry 2 }
+
+-- *********************************************************************
+-- adGenIf15MinPMTable
+-- *********************************************************************
+
+adGenIf15MinPMTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIf15MinPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports Adtran per-interface IF-MIB extensions
+      for 15 minute performance monitoring."
+    ::= { adGenIfMIBObjects 3 }
+
+adGenIf15MinPMEntry OBJECT-TYPE
+   SYNTAX      AdGenIf15MinPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry containing Adtran specific control/information applicable
+      to the indexed interface."
+   INDEX { ifIndex, adGenIf15MinPMIntNumber }
+   ::= { adGenIf15MinPMTable 1 }
+
+AdGenIf15MinPMEntry ::=
+   SEQUENCE
+   {
+   	  adGenIf15MinPMIntNumber			Integer32,
+	  adGenIf15MinPMOutDiscards			Gauge32,
+	  adGenIf15MinPMOutDiscardOctets	Gauge32
+   }
+
+adGenIf15MinPMIntNumber OBJECT-TYPE
+	SYNTAX		Integer32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"15-minute performance interval. Interval 1 represents the most recent
+		 previous interval. Interval 96 represents 24 hours ago. Intervals 2
+		 through 96 are optional."
+	::= { adGenIf15MinPMEntry 1 }
+
+adGenIf15MinPMOutDiscards OBJECT-TYPE
+	SYNTAX		Gauge32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of packets discarded on this interface during
+		 the selected 15-minute interval."
+	::= { adGenIf15MinPMEntry 2 }
+
+adGenIf15MinPMOutDiscardOctets OBJECT-TYPE
+	SYNTAX		Gauge32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of bytes discarded on this interface during
+		 the selected 15-minute interval."
+	::= { adGenIf15MinPMEntry 3 }
+
+-- *********************************************************************
+-- adGenIfCurr24HrPMTable
+-- *********************************************************************
+
+adGenIfCurr24HrPMTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIfCurr24HrPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports Adtran per-interface IF-MIB extensions
+      for current 24 hour performance monitoring."
+    ::= { adGenIfMIBObjects 4 }
+
+adGenIfCurr24HrPMEntry OBJECT-TYPE
+   SYNTAX      AdGenIfCurr24HrPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry containing Adtran specific control/information applicable
+      to the indexed interface."
+   INDEX { ifIndex }
+   ::= { adGenIfCurr24HrPMTable 1 }
+
+AdGenIfCurr24HrPMEntry ::=
+   SEQUENCE
+   {
+	  adGenIfCurr24HrPMOutDiscards			Gauge32,
+	  adGenIfCurr24HrPMOutDiscardOctets		Gauge32
+   }
+
+adGenIfCurr24HrPMOutDiscards OBJECT-TYPE
+	SYNTAX			Gauge32
+	MAX-ACCESS      read-only
+	STATUS			current
+	DESCRIPTION
+		"The number of packets discarded on this interface during
+		 the current 24-hour interval."
+    ::= { adGenIfCurr24HrPMEntry 1 }
+
+adGenIfCurr24HrPMOutDiscardOctets OBJECT-TYPE
+	SYNTAX			Gauge32
+	MAX-ACCESS      read-only
+	STATUS			current
+	DESCRIPTION
+		"The number of octets discarded on this interface during
+		 the current 24-hour interval."
+    ::= { adGenIfCurr24HrPMEntry 2 }
+
+-- *********************************************************************
+-- adGenIf24HrPMTable
+-- *********************************************************************
+
+adGenIf24HrPMTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF AdGenIf24HrPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "This table supports Adtran per-interface IF-MIB extensions
+      for 24 hour performance monitoring."
+    ::= { adGenIfMIBObjects 5 }
+
+adGenIf24HrPMEntry OBJECT-TYPE
+   SYNTAX      AdGenIf24HrPMEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+     "An entry containing Adtran specific control/information applicable
+      to the indexed interface."
+   INDEX { ifIndex, adGenIf24HrPMIntNumber }
+   ::= { adGenIf24HrPMTable 1 }
+
+AdGenIf24HrPMEntry ::=
+   SEQUENCE
+   {
+   	  adGenIf24HrPMIntNumber			Integer32,
+	  adGenIf24HrPMOutDiscards			Gauge32,
+	  adGenIf24HrPMOutDiscardOctets		Gauge32
+   }
+
+adGenIf24HrPMIntNumber OBJECT-TYPE
+	SYNTAX			Integer32
+	MAX-ACCESS		read-only
+	STATUS			current
+	DESCRIPTION
+	     "24-hour performance interval.  Interval 1 represents the most recent
+		  previous interval.  Interval 30 represents 30 days ago.  Intervals 2
+		  through 30 are optional."
+	::= { adGenIf24HrPMEntry 1 }
+
+adGenIf24HrPMOutDiscards OBJECT-TYPE
+	SYNTAX			Gauge32
+	MAX-ACCESS      read-only
+	STATUS			current
+	DESCRIPTION
+		"The number of packets discarded on this interface during
+		 the selected 24-hour interval."
+    ::= { adGenIf24HrPMEntry 2 }
+
+adGenIf24HrPMOutDiscardOctets OBJECT-TYPE
+	SYNTAX			Gauge32
+	MAX-ACCESS      read-only
+	STATUS			current
+	DESCRIPTION
+		"The number of octets discarded on this interface during
+		 the selected 24-hour interval."
+    ::= { adGenIf24HrPMEntry 3 }
+
+
+-- ******************************************************************************************
+-- Alarms
+-- ******************************************************************************************
+adGenIfAlarms           OBJECT IDENTIFIER ::= { adGenIf 0 }
+
+adGenIfServiceStateOOSMAClear  NOTIFICATION-TYPE
+	    OBJECTS	{
+	        adTrapInformSeqNum,
+	        sysName,
+	        adGenSlotInfoIndex,
+			ifIndex,
+			ifDescr
+	        }
+            STATUS          obsolete
+	    DESCRIPTION    	"Indicates Interface Service State is no longer OOS-MA"
+		--#TYPE         "Warning - Interface Service State OOS-MA Alarm Clear"
+		--#SUMMARY		"Shelf: %s, Slot: %d, %s"
+		--#SEVERITY		WARNING
+		--#ARGUMENTS    {1,2,4}
+    	  ::= {adGenIfAlarms 1}
+
+adGenIfServiceStateOOSMAActive  NOTIFICATION-TYPE
+	    OBJECTS	{
+	        adTrapInformSeqNum,
+	        sysName,
+	        adGenSlotInfoIndex,
+			ifIndex,
+			ifDescr
+	        }
+            STATUS          obsolete
+	    DESCRIPTION    "Indicates Interface Service State is currently OOS-MA"
+		--#TYPE		   "Warning - Interface Service State OOS-MA Alarm Active"
+		--#SUMMARY 	   "Shelf: %s, Slot: %d, %s"
+		--#SEVERITY    WARNING
+		--#ARGUMENTS    {1,2,4}
+    	  ::= {adGenIfAlarms 2}
+END

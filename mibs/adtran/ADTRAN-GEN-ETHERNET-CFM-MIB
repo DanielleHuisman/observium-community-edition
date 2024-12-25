@@ -1,0 +1,1218 @@
+ADTRAN-GEN-ETHERNET-CFM-MIB
+
+DEFINITIONS  ::= BEGIN
+
+-- ******************************************************************
+-- TITLE:     ADTRAN GEN ETHERNET CFM MIB
+-- DATE:      December 5, 2008
+--
+-- REVISION HISTORY: Date           Comments
+--                   05/06/2008     Created
+--                   12/05/2008     Added Link State Awareness support via the
+--                                  adGenEthCfmMepLinkAwarenessPeers and
+--                                  adGenEthCfmMepLinkAwarenessMode of the
+--                                  adGenEthCfmMepTable.
+--		     10/16/2009     Added enterprise traps
+-- ******************************************************************
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32, Counter32,
+    Unsigned32               FROM SNMPv2-SMI    -- [RFC2578]
+    sysName		     FROM SNMPv2-MIB
+    TEXTUAL-CONVENTION,
+    DisplayString,
+    TruthValue               FROM SNMPv2-TC     -- [RFC2579]
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP       FROM SNMPv2-CONF   -- [RFC2580]
+    adTrapInformSeqNum       FROM ADTRAN-GENTRAPINFORM-MIB
+    ifDescr		     FROM IF-MIB
+    dot1agCfmVlanEntry,
+    dot1agCfmMdEntry,
+    dot1agCfmMaNetEntry,
+    dot1agCfmMaCompEntry,
+    dot1agCfmMaMepListEntry,
+    dot1agCfmMepEntry,
+    dot1agCfmLtrSeqNumber,
+    dot1agCfmMdIndex,
+    dot1agCfmMaIndex,
+    dot1agCfmMepDbRMepIdentifier,
+    dot1agCfmMepIdentifier,
+    dot1agCfmMepIfIndex,
+    dot1agCfmMdFormat,
+    dot1agCfmMdName,
+    dot1agCfmMdMdLevel,
+    dot1agCfmMaNetFormat,
+    dot1agCfmMaNetName,
+    dot1agCfmMaCompPrimaryVlanId,
+    dot1agCfmMepDirection,
+    dot1agCfmMepPrimaryVid   FROM IEEE8021-CFM-MIB
+    adGenEthernetCfm,
+    adGenEthernetCfmID       FROM ADTRAN-GEN-ETHERNET-OAM-MIB
+   ;
+
+adGenEthCfmMib   MODULE-IDENTITY
+    LAST-UPDATED "200812050000Z"    -- 12/05/2008 00:00GMT
+    ORGANIZATION "ADTRAN"
+    CONTACT-INFO
+       "WG-URL:
+        WG-EMail: http://www.adtran.com
+
+        Contact:  ADTRAN
+                  901 Explorer Blvd
+                  Huntsville, AL 35806
+
+        E-mail:
+
+       "
+   DESCRIPTION
+     "ADTRAN Generic Connectivity Fault Management Module"
+   REVISION "200804250000Z" -- 04/25/2008 00:00GMT
+   DESCRIPTION
+      ""
+     ::= { adGenEthernetCfmID 1 }
+
+adGenEthCfmNotifications      OBJECT IDENTIFIER  ::= { adGenEthernetCfm 0 }
+adGenEthCfmMIBObjects         OBJECT IDENTIFIER  ::= { adGenEthernetCfm 1 }
+
+-- ******************************************************************
+-- Groups in the CFM MIB Module
+-- ******************************************************************
+
+adGenEthCfmSystem          OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 1 }
+-- adGenEthCfmStack           OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 2 }
+adGenEthCfmDefaultMd       OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 3 }
+adGenEthCfmVlan            OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 4 }
+-- adGenEthCfmConfigErrorList OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 5 }
+adGenEthCfmMd              OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 6 }
+adGenEthCfmMa              OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 7 }
+adGenEthCfmMep             OBJECT IDENTIFIER  ::= { adGenEthCfmMIBObjects 8 }
+
+adGenEthCfmMaNet           OBJECT IDENTIFIER  ::= { adGenEthCfmMa 3 }
+adGenEthCfmMaComp          OBJECT IDENTIFIER  ::= { adGenEthCfmMa 4 }
+adGenEthCfmMaMepList       OBJECT IDENTIFIER  ::= { adGenEthCfmMa 5 }
+
+-- ******************************************************************
+-- Textual conventions
+-- ******************************************************************
+AdGenEthCfmMaNetEntryMepDbRule  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+         "Rule for this association's Peer MEP database
+         configuredOnly(1)       Received CCMs must match
+                                 configured Peer MEP list.
+
+         autoDiscovery(2)        Discover Peer MEPs and add to
+                                 MEP database as DynamicDiscovered entries
+
+         autoLearning(3)         Discover Peer MEPs and add to list
+                                 of expected, Static CCM sources
+"
+    SYNTAX      INTEGER {
+                  configuredOnly (1),
+                  autoDiscovery  (2),
+                  autoLearning   (3)
+                }
+AdGenEthCfmRemoteMepState  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Operational state of the remote MEP state machine.  This
+        state machine monitors the reception of valid CCMs from a
+        remote MEP with a specific MEPID.  It uses a timer that
+        expires in 3.5 times the length of time indicated by the
+        dot1agCfmMaNetCcmInterval object.
+
+        rMepIdle(1)            Momentary state during reset.
+
+        rMepStart(2)           The timer has not expired since the
+                               state machine was reset, and no valid
+                               CCM has yet been received.
+
+        rMepFailed(3)          The timer has expired, both since the
+                               state machine was reset, and since a
+                               valid CCM was received.
+
+        rMepOk(4)              The timer has not expired since a
+                               valid CCM was received.
+
+        rMepDiscoveredFail(5)  The timer has expired, both since the
+                               state machine was reset, and since a
+                               valid CCM was received, but no defect
+                               was raised because it is a dynamic entry.
+
+        rMepDiscoveredOk(6)    The timer has not expired since a
+                               valid CCM was received and this is a
+                               dynamic entry.
+
+"
+
+    SYNTAX      INTEGER {
+                  rMepIdle          (1),
+                  rMepStart         (2),
+                  rMepStaticFailed  (3),
+                  rMepStaticOk      (4),
+                  rMepDiscoveredFail(5),
+                  rMepDiscoveredOk  (6)
+                }
+AdGenEthCfmRMepProvisioningState  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Provisioned state of the remote MEP.
+
+        static(1)            RMEP entry is persistant and in provisioning.
+
+        dynamic(2)           RMEP entry is not persistant and not in provisioning.
+"
+    SYNTAX      INTEGER {
+                  static          (1),
+                  dynamic         (2)
+                }
+
+AdGenEthCfmRMepLockClear  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+         "Edit a dynamic RMEP entry in the MEP Database.  An entry can either be
+         cleared or locked.  Locking transistions it to a Static entry.  Clearing
+         removes the entry from the MEP Database.
+"
+    SYNTAX      INTEGER {
+                  lock (1),
+                  clear  (2)
+                }
+-- ******************************************************************
+-- The CFM System Managed Objects
+-- ******************************************************************
+
+adGenEthCfmEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "CFM System State"
+     ::= { adGenEthCfmSystem 1 }
+
+adGenEthCfmProvisioningUpdates OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Number of changes to CFM provisioning.  This value is initialized at
+        startup to a random value and is incremented upon each change to a
+        provisionable requiring non-volatile storage.  A remote system can
+        monitor this value in order to detect changes to provisioning without
+        having to iterate through the entire CFM object heirarchy."
+     ::= { adGenEthCfmSystem 2 }
+
+adGenEthCfmLinkTraceCacheTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The number of minutes a linktrace cache entry is
+        retained (in minutes).
+       "
+     ::= { adGenEthCfmSystem 3 }
+
+adGenEthCfmLinkTraceCacheSize OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4095)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The number of linktrace entries allowed in the cache."
+     ::= { adGenEthCfmSystem 4 }
+
+-- ******************************************************************
+-- CFM Stack Managed Objects
+-- ******************************************************************
+--
+--  Reserved:  Currently not in use.
+--
+--adGenEthCfmStackLastError OBJECT-TYPE
+--    SYNTAX      DisplayString
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "The reason for the last error of the CFM Stack Table."
+--     ::= { adGenEthCfmStack 1 }
+
+-- ******************************************************************
+-- VLAN Table Managed Objects
+-- ******************************************************************
+
+adGenEthCfmVlanTable
+OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The VLAN enterprise table.  This table defines the association of
+        VIDs into VLANs."
+     ::= { adGenEthCfmVlan 1 }
+
+adGenEthCfmVlanEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The VLAN table entry."
+    AUGMENTS      { dot1agCfmVlanEntry }
+     ::= { adGenEthCfmVlanTable 1 }
+
+AdGenEthCfmVlanEntry  ::= SEQUENCE {
+      adGenEthCfmVlanErrorStatus      DisplayString
+    }
+
+adGenEthCfmVlanErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason, if any, why the corresponding rowStatus in the
+        dot1agCfmVlanTable is in the notReady state."
+     ::= { adGenEthCfmVlanEntry 1 }
+
+-- *******************************************************************
+-- Maintenance Domain Default Managed Objects
+-- *******************************************************************
+
+adGenEthCfmDefaultMdLastCreateError OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason for the last error that occured when creating an entry in the
+        Default MD Table.  While a rowStatus does not exist for creation of
+        entries in the Default MD table, entries may be automatically created when
+        adding enties to the dot1agCfmVlanTable or setting properties of existing
+        entries in the dot1agCfmDefaultMdTable."
+     ::= { adGenEthCfmDefaultMd 1 }
+
+-- ******************************************************************
+-- CFM Configuration Error List Managed Objects
+-- ******************************************************************
+--
+--  Reserved:  Currently not in use.
+--
+--adGenEthCfmConfigErrorListLastError OBJECT-TYPE
+--    SYNTAX      DisplayString
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "The reason for the last error of the Config Error List."
+--     ::= { adGenEthCfmConfigErrorList 1 }
+
+-- ******************************************************************
+-- Maintenance Domain Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMdMaxNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum number of allowed maintenance domains."
+     ::= { adGenEthCfmMd 1 }
+
+adGenEthCfmMdCurrentNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Current number of maintenance domains."
+     ::= { adGenEthCfmMd 2 }
+
+adGenEthCfmMdLastCreateError OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason for the last error that occured while attempting to create
+        an entry in the Maintenance Domain Table (dot1agCfmMdTable)."
+     ::= { adGenEthCfmMd 3 }
+
+adGenEthCfmMdTable
+OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Domain enterprise table. Each row in the table
+        represents a different Maintenance Domain."
+     ::= { adGenEthCfmMd 4 }
+
+adGenEthCfmMdEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Domain enterprise table entry."
+    AUGMENTS      { dot1agCfmMdEntry }
+     ::= { adGenEthCfmMdTable 1 }
+
+AdGenEthCfmMdEntry  ::= SEQUENCE {
+      adGenEthCfmMdErrorStatus        DisplayString,
+      adGenEthCfmMdCfmEnabled		  TruthValue,
+      adGenEthCfmMdCcmEnabled		  TruthValue
+    }
+
+adGenEthCfmMdErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason, if any, why the corresponding rowStatus in the
+        dot1agCfmMdTable is in the notReady state."
+     ::= { adGenEthCfmMdEntry 1 }
+
+adGenEthCfmMdCfmEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This OID modifies the CFM state of all MEPs belonging to the domain."
+     ::= { adGenEthCfmMdEntry 2 }
+
+adGenEthCfmMdCcmEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This OID modifies the CCM generation of all MEPs belonging to the domain."
+     ::= { adGenEthCfmMdEntry 3 }
+
+-- ******************************************************************
+-- Maintenance Association Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMaMaxNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum number of allowed Maintenance Associations."
+     ::= { adGenEthCfmMa 1 }
+
+adGenEthCfmMaCurrentNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Current number of Maintenance Associations."
+     ::= { adGenEthCfmMa 2 }
+
+-- ******************************************************************
+-- Maintenance Association Network Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMaNetLastCreateError OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason for the last error that occured while attempting to create
+        an entry in the Maintenance Association Table (dot1agCfmMaNetTable)."
+     ::= { adGenEthCfmMaNet 1 }
+
+adGenEthCfmMaNetTable
+OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMaNetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association Network enterprise table. Each row in the table
+        represents an MA.  An MA is a set of MEPs, each configured
+        with a single service instance."
+     ::= { adGenEthCfmMaNet 2 }
+
+adGenEthCfmMaNetEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMaNetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association Network enterprise table entry."
+    AUGMENTS      { dot1agCfmMaNetEntry }
+     ::= { adGenEthCfmMaNetTable 1 }
+
+AdGenEthCfmMaNetEntry  ::= SEQUENCE {
+      adGenEthCfmMaNetErrorStatus     DisplayString,
+      adGenEthCfmMaNetCfmEnabled	  TruthValue,
+      adGenEthCfmMaNetCcmEnabled	  TruthValue,
+      adGenEthCfmMaNetMepDbRule    AdGenEthCfmMaNetEntryMepDbRule,
+      adGenEthCfmMaNetRMepHoldTime Unsigned32
+    }
+
+adGenEthCfmMaNetErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason, if any, why the corresponding rowStatus in the
+        dot1agCfmMaNetTable is in the notReady state."
+     ::= { adGenEthCfmMaNetEntry 1 }
+
+adGenEthCfmMaNetCfmEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This OID modifies the CFM state of all MEPs belonging to the association."
+     ::= { adGenEthCfmMaNetEntry 2 }
+
+adGenEthCfmMaNetCcmEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This OID modifies the CCM generation of all MEPs belonging to the association."
+     ::= { adGenEthCfmMaNetEntry 3 }
+
+adGenEthCfmMaNetMepDbRule OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMaNetEntryMepDbRule
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This OID modifies the MEP database rule for this association."
+     ::= { adGenEthCfmMaNetEntry 4 }
+
+adGenEthCfmMaNetRMepHoldTime OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This OID modifies the the amount of time discovered rMep entries stay in the rMepDiscoveredFail state before being cleared."
+     ::= { adGenEthCfmMaNetEntry 5 }
+
+-- ******************************************************************
+-- Maintenance Association Component Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMaCompLastCreateError OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason for the last error that occured while attempting to create
+        an entry in the Maintenance Association Component Table
+        (dot1agCfmMaCompTable)."
+     ::= { adGenEthCfmMaComp 1 }
+
+adGenEthCfmMaCompTable
+OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMaCompEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association Component enterprise table."
+     ::= { adGenEthCfmMaComp 2 }
+
+adGenEthCfmMaCompEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMaCompEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association Component enterprise table entry."
+    AUGMENTS      { dot1agCfmMaCompEntry }
+     ::= { adGenEthCfmMaCompTable 1 }
+
+AdGenEthCfmMaCompEntry  ::= SEQUENCE {
+      adGenEthCfmMaCompErrorStatus     DisplayString
+    }
+
+adGenEthCfmMaCompErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason, if any, why the corresponding rowStatus in the
+        dot1agCfmMaCompTable is in the notReady state."
+     ::= { adGenEthCfmMaCompEntry 1 }
+
+-- ******************************************************************
+-- Maintenance Association MEP List Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMaMepListLastCreateError OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason for the last error that occured while attempting to create
+        an entry in the Maintenance Association MEP List Table
+        (dot1agCfmMaMepListTable)."
+     ::= { adGenEthCfmMaMepList 1 }
+
+adGenEthCfmMaMepListTable
+OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMaMepListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association MEP List enterprise table."
+     ::= { adGenEthCfmMaMepList 2 }
+
+adGenEthCfmMaMepListEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMaMepListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The known MEPs table entry."
+    AUGMENTS      { dot1agCfmMaMepListEntry }
+     ::= { adGenEthCfmMaMepListTable 1 }
+
+AdGenEthCfmMaMepListEntry  ::= SEQUENCE {
+      adGenEthCfmMaMepListErrorStatus     DisplayString
+    }
+
+adGenEthCfmMaMepListErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason, if any, why the corresponding rowStatus in the
+        dot1agCfmMaMepListTable is in the notReady state."
+     ::= { adGenEthCfmMaMepListEntry 1 }
+
+-- ******************************************************************
+-- Maintenance Association End Point Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMepMaxNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum number of Maintenance Association End Points."
+     ::= { adGenEthCfmMep 1 }
+
+adGenEthCfmMepCurrentNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Current number of Maintenance Association End Points."
+     ::= { adGenEthCfmMep 2 }
+
+adGenEthCfmMepLastCreateError OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason for the last error that occured while attempting to create
+        an entry in the MEP Table (dot1agCfmMepTable)."
+     ::= { adGenEthCfmMep 3 }
+
+-- ******************************************************************
+-- Link Trace Reply Managed Objects
+-- ******************************************************************
+--
+--adGenEthCfmLtrLastError OBJECT-TYPE
+--    SYNTAX      DisplayString
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "The reason for the last error that occured while attempting to create
+--        an entry in the Link Trace Reply Table (dot1agCfmLtrTable).  While a
+--        rowStatus column does not exist for the dot1agCfmLtrTable, entries are
+--        automatically created upon receipt of Link Trace Replies.  Depending
+--        on system resources and configuration settings, an attempt to create
+--        a new entry in this table may fail.  This object provides additional
+--        insight into why an entry may have failed to be created."
+--     ::= { adGenEthCfmMep 5 }
+
+-- ******************************************************************
+-- MEP Database Managed Objects
+-- ******************************************************************
+--
+--adGenEthCfmMepDbLastError OBJECT-TYPE
+--    SYNTAX      DisplayString
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "The reason for the last error of the MEP Database Table."
+--     ::= { adGenEthCfmMep 6 }
+
+-- ******************************************************************
+-- MEP Table Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMepTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association End Point (MEP) table.
+
+        Each row in the table represents a different MEP.  A MEP is
+        an actively managed CFM entity, associated with a specific
+        DSAP of a Service Instance, which can generate and receive
+        CFM PDUs and track any responses.  It is an end point of a
+        single Maintenance Association, and is an endpoint of a
+        separate Maintenance Entity for each of the other MEPs in
+        the same Maintenance Association (802.1ag clause 3.17).
+
+        This table uses three indices. The first two indices are the
+        indices of the Maintenance Domain and MA tables, the reason
+        being that a MEP is always related to an MA and Maintenance
+        Domain.
+       "
+     ::= { adGenEthCfmMep 4 }
+
+adGenEthCfmMepEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP table entry"
+    AUGMENTS      { dot1agCfmMepEntry }
+     ::= { adGenEthCfmMepTable 1 }
+
+AdGenEthCfmMepEntry  ::= SEQUENCE {
+      adGenEthCfmMepLoopbackErrorStatus      DisplayString,
+      adGenEthCfmMepLoopbackTimeout          Unsigned32,
+      adGenEthCfmMepLoopbackInterframeDelay  Unsigned32,
+      adGenEthCfmMepErrorStatus              DisplayString,
+      adGenEthCfmMepLinkTraceErrorStatus     DisplayString,
+      adGenEthCfmMepLbrResponseTimeMin       Unsigned32,
+      adGenEthCfmMepLbrResponseTimeMax       Unsigned32,
+      adGenEthCfmMepLbrResponseTimeAvg       Unsigned32,
+      adGenEthCfmMepLoopbackCancel           TruthValue,
+      adGenEthCfmMepTransmitLtmStatus        TruthValue,
+      adGenEthCfmMepLinkAwarenessPeers       DisplayString,
+      adGenEthCfmMepLinkAwarenessMode        INTEGER
+    }
+
+adGenEthCfmMepLoopbackErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "MEP Loopback error.
+       "
+     ::= { adGenEthCfmMepEntry 1 }
+
+adGenEthCfmMepLoopbackTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (100..60000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "MEP Loopback Timeout in milliseconds.
+       "
+     ::= { adGenEthCfmMepEntry 2 }
+
+adGenEthCfmMepLoopbackInterframeDelay OBJECT-TYPE
+    SYNTAX      Unsigned32 (5..5000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "MEP Loopback Interframe Delay in milliseconds.
+       "
+     ::= { adGenEthCfmMepEntry 3 }
+
+adGenEthCfmMepErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reason, if any, why the corresponding rowStatus in the
+        dot1agCfmMepTable is in the notReady state."
+     ::= { adGenEthCfmMepEntry 4 }
+
+adGenEthCfmMepLinkTraceErrorStatus OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Link Trace Error Status
+       "
+     ::= { adGenEthCfmMepEntry 5 }
+
+adGenEthCfmMepLbrResponseTimeMin OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Minimum LBR round-trip time (in milliseconds).
+       "
+     ::= { adGenEthCfmMepEntry 6 }
+
+adGenEthCfmMepLbrResponseTimeMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Maximum LBR round-trip time (in milliseconds).
+       "
+     ::= { adGenEthCfmMepEntry 7 }
+
+adGenEthCfmMepLbrResponseTimeAvg OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Average LBR round-trip time (in milliseconds).
+       "
+     ::= { adGenEthCfmMepEntry 8 }
+
+adGenEthCfmMepLoopbackCancel OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "A Loopback sequence in process will be cancelled when the
+        value of this OID is set to True."
+     ::= { adGenEthCfmMepEntry 9 }
+
+adGenEthCfmMepTransmitLtmStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This OID is equivalent to dot1agCfmMepTransmitLtmStatus,
+        except that this value may be set to false to ensure that
+        no other management entity will use the Linktrace service.
+        The value is reset to true by the MEP Linktrace Initiator
+        State Machine to indicate that another LTM may be transmitted."
+     ::= { adGenEthCfmMepEntry 10 }
+
+adGenEthCfmMepLinkAwarenessPeers OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The string of peer MEPIDs to monitor for Link State Awareness support.
+        If the specified Remote MEP(s) exist and their reported interface
+        status specifies a fault that restricts passage of user data, this
+        MEP will notify it's underlying hardware of the fault so that
+        appropriate actions can be performed.  To specify more than one
+        peer to monitor, separate the MEPIDs with commas."
+     ::= { adGenEthCfmMepEntry 11 }
+
+adGenEthCfmMepLinkAwarenessMode OBJECT-TYPE
+    SYNTAX     INTEGER {
+        interfaceStatusTlv(1),
+        noCcm(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Determines the Link State Awareness mode of operation if a Link
+          Awareness Peer MEP(s) exist.  The interfaceStatusTlv mode of operation
+          utilizes the InterfaceStatus TLV of the CCM to communicate this
+          MEPs local interface status.  The noCcm mode of operation will
+          suspend any CCM generation by this MEP upon detection of a Link
+          State Awareness fault on it's interface."
+    DEFVAL {interfaceStatusTlv}
+     ::= { adGenEthCfmMepEntry 12 }
+
+-- ******************************************************************
+-- MEP LinkTrace Table Managed Objects
+-- ******************************************************************
+
+adGenEthCfmMepLinkTraceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMepLinkTraceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP Link Trace table.
+
+	Each row in the table represents a different completed
+	link trace sequence on a particular MEP.
+
+	This table uses four indices. The first two indices are the
+        indices of the Maintenance Domain and MA tables, the reason
+        being that a MEP is always related to an MA and Maintenance
+        Domain.  The third is the MEP ID.  The fourth index in the
+	Link Trace sequence number.
+       "
+     ::= { adGenEthCfmMep 5 }
+
+adGenEthCfmMepLinkTraceEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMepLinkTraceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP Link Trace table entry"
+    INDEX { dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier,
+	        dot1agCfmLtrSeqNumber
+          }
+     ::= { adGenEthCfmMepLinkTraceTable 1 }
+
+AdGenEthCfmMepLinkTraceEntry  ::= SEQUENCE {
+      adGenEthCfmMepLinkTraceTimeRemaining   Unsigned32
+    }
+
+adGenEthCfmMepLinkTraceTimeRemaining OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Link Trace Time Remaining
+
+	Each linktrace sequence will run for a fixed period
+	of time.  This counter indicates how much time is
+	remaining.  When the counter is 0, there are results
+	in the linktrace cache.  If this object does not exist
+	for a given index, then there are no results in the
+	cache for that MEP/Sequence number combination.
+       "
+     ::= { adGenEthCfmMepLinkTraceEntry 1 }
+
+-- ******************************************************************
+-- MEP Database Table Managed Objects
+-- ******************************************************************
+adGenEthCfmMepDbTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AdGenEthCfmMepDbEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association Peer MEP table."
+     ::= { adGenEthCfmMep 6 }
+
+adGenEthCfmMepDbEntry OBJECT-TYPE
+    SYNTAX      AdGenEthCfmMepDbEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The known Peer MEPS table entry."
+    INDEX { dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier,
+            dot1agCfmMepDbRMepIdentifier
+          }
+     ::= { adGenEthCfmMepDbTable 1 }
+AdGenEthCfmMepDbEntry  ::= SEQUENCE {
+      adGenEthCfmMepDbRMepState     AdGenEthCfmRemoteMepState,
+      adGenEthCfmMepDbRMepProvisioningState AdGenEthCfmRMepProvisioningState,
+      adGenEthCfmMepDbRMepEdit      AdGenEthCfmRMepLockClear
+    }
+
+adGenEthCfmMepDbRMepState
+OBJECT-TYPE
+    SYNTAX      AdGenEthCfmRemoteMepState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The operational state of the remote MEP IFF State machines and takes into account how the RMEP was created - Statically or Discovered"
+     ::= { adGenEthCfmMepDbEntry 1}
+
+adGenEthCfmMepDbRMepProvisioningState
+OBJECT-TYPE
+    SYNTAX      AdGenEthCfmRMepProvisioningState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The current provisioned state of the remote MEP. A value of 'static' indicates it is in provisioning.  A value of 'dynamic' indicates it was discovered and not in provisioning."
+     ::= { adGenEthCfmMepDbEntry 2}
+
+adGenEthCfmMepDbRMepEdit
+OBJECT-TYPE
+    SYNTAX      AdGenEthCfmRMepLockClear
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Lock or clear a discovered remote MEP. A GET always returns a 1."
+     ::= { adGenEthCfmMepDbEntry 3}
+
+adGenEthCfmRDISet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "A remote MEP is reported the RDI bit in its last CCM."
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "RDI Received on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 1 }
+
+adGenEthCfmRDIClear          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "No remote MEPs are reporting the RDI bit in their last CCM."
+
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "RDI not received on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 2 }
+
+adGenEthCfmMacStatusSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "Either some remote MEP is reporting its Interface Status TLV as not isUp, or all remote
+	 MEPs are reporting a Port Status TLV that contains some value other than psUp."
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "MAC Status Error Received on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 3 }
+
+adGenEthCfmMacStatusClear          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "No remote MEPs are reporting a Mac Status error."
+
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Mac Status Error no longer seen on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 4 }
+
+adGenEthCfmRemoteCCMSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "The MEP is not receiving valid CCMs from at least one of the remote MEPs."
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Lost communication with Remote MEP on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 5 }
+
+adGenEthCfmRemoteCCMClear          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "Communication with all Remote MEPs has been restored."
+
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Regained communication with all remote MEPs on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 6 }
+
+adGenEthCfmErroredCCMSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "The MEP has received at least one invalid CCM whose CCM Interval has not yet timed out."
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Invalid CCM Received on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 7 }
+
+adGenEthCfmErroredCCMClear          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "Invalid CCM cleared."
+
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Invalid CCM cleared on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 8 }
+
+adGenEthCfmXconCCMSet          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "The MEP has received at least one CCM from either another MAID or a lower MD Level whose CCM Interval has not yet timed out."
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Cross-connected CCM Received on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 9 }
+
+adGenEthCfmXconCCMClear          NOTIFICATION-TYPE
+    OBJECTS {
+        adTrapInformSeqNum,
+        sysName,
+        dot1agCfmMepIfIndex,
+        ifDescr,
+	dot1agCfmMdFormat,
+	dot1agCfmMdName,
+	dot1agCfmMdMdLevel,
+	dot1agCfmMaNetFormat,
+	dot1agCfmMaNetName,
+	dot1agCfmMaCompPrimaryVlanId,
+	dot1agCfmMepDirection,
+	dot1agCfmMepPrimaryVid
+    }
+    STATUS  current
+    DESCRIPTION
+        "Cross-connected CCM cleared."
+
+        --#TYPE         "Status - Alarm"
+        --#SUMMARY      "Cross-connected CCM cleared on"
+        --#SUMMARY      "Shelf: %s, Interface: %d, %s"
+        --#ARGUMENTS    {1, 2, 3}
+        --#SEVERITY     MINOR
+        --#GENERIC      6
+        --#CATEGORY     "Error Events"
+        --#SOURCE_ID    "A"
+        --#TIMEINDEX    0
+      ::= { adGenEthCfmNotifications 10 }
+
+END
+

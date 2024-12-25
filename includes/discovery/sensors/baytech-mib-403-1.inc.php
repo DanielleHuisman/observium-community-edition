@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) Adam Armstrong
  *
  */
 
@@ -29,7 +29,7 @@ foreach ($oids as $index => $entry) {
                     'limit_low'  => (isset($entry['sBTAModulesRPCLowCurrentThreshold']) && $entry['sBTAModulesRPCLowCurrentThreshold'] > -3000 ? $entry['sBTAModulesRPCLowCurrentThreshold'] * 0.1 : NULL)];
 
         $options['rename_rrd'] = "baytech-sBTAModulesRPCCurrent.$index";
-        discover_sensor_ng($device, 'current', $mib, 'sBTAModulesRPCCurrent', $oid, $index, NULL, $descr . ' Current', $scale, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, 'sBTAModulesRPCCurrent', $oid, $index, $descr . ' Current', $scale, $value, $options);
     }
 
     // Voltage
@@ -40,7 +40,7 @@ foreach ($oids as $index => $entry) {
                     'limit_low'  => (isset($entry['sBTAModulesRPCUnderVoltageThreshold']) && $entry['sBTAModulesRPCUnderVoltageThreshold'] > -3000 ? $entry['sBTAModulesRPCUnderVoltageThreshold'] * 0.1 : NULL)];
 
         $options['rename_rrd'] = "baytech-sBTAModulesRPCVoltage.$index";
-        discover_sensor_ng($device, 'voltage', $mib, 'sBTAModulesRPCVoltage', $oid, $index, NULL, $descr . ' Voltage', $scale, $value, $options);
+        discover_sensor_ng($device, 'voltage', $mib, 'sBTAModulesRPCVoltage', $oid, $index, $descr . ' Voltage', $scale, $value, $options);
     }
 
     // Power
@@ -51,7 +51,7 @@ foreach ($oids as $index => $entry) {
                     'limit_low'  => (isset($entry['NOTSUPPORTED']) && $entry['NOTSUPPORTED'] > -3000 ? $entry['NOTSUPPORTED'] : 0)];
 
         $options['rename_rrd'] = "baytech-sBTAModulesRPCPower.$index";
-        discover_sensor_ng($device, 'power', $mib, 'sBTAModulesRPCPower', $oid, $index, NULL, $descr . ' Power', 1, $value, $options);
+        discover_sensor_ng($device, 'power', $mib, 'sBTAModulesRPCPower', $oid, $index, $descr . ' Power', 1, $value, $options);
     }
 
     // Temperature
@@ -62,7 +62,7 @@ foreach ($oids as $index => $entry) {
                     'limit_low'  => (isset($entry['NOTSUPPORTED']) && $entry['NOTSUPPORTED'] > -3000 ? $entry['NOTSUPPORTED'] * 0.1 : NULL)];
 
         $options['rename_rrd'] = "baytech-sBTAModulesRPCTemperature.$index";
-        discover_sensor_ng($device, 'temperature', $mib, 'sBTAModulesRPCTemperature', $oid, $index, NULL, $descr, $scale, $value, $options);
+        discover_sensor_ng($device, 'temperature', $mib, 'sBTAModulesRPCTemperature', $oid, $index, $descr, $scale, $value, $options);
     }
 }
 
@@ -84,7 +84,7 @@ foreach ($oids as $index => $entry) {
                     'limit_low'  => 0];
 
         $options['rename_rrd'] = "baytech-sBTAModulesRPCBreakersCurrent.$module.$breaker";
-        discover_sensor_ng($device, 'current', $mib, 'sBTAModulesRPCBreakersCurrent', $oid, "$module.$breaker", NULL, $descr . ' Current', $scale, $value, $options);
+        discover_sensor_ng($device, 'current', $mib, 'sBTAModulesRPCBreakersCurrent', $oid, "$module.$breaker", $descr . ' Current', $scale, $value, $options);
     }
 }
 
